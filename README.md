@@ -1,4 +1,4 @@
-# MDV - Markdown Viewer
+# MD Viewer - Markdown Viewer
 
 一个简单的 Markdown 阅读工具，通过 HTTP 接口提供文件浏览功能。
 
@@ -6,7 +6,7 @@
 
 ```
 ┌─────────────────────────────────────┐
-│           MDV Server                │
+│        MD Viewer Server             │
 │  ┌─────────────┐  ┌─────────────┐  │
 │  │ HTTP Server │  │ File Reader │  │
 │  └──────┬──────┘  └─────────────┘  │
@@ -82,9 +82,36 @@ GET /api/files?dir=/path/to/dir
 ## 文件结构
 
 ```
-mdv/
+md-viewer/
 ├── src/
-│   └── server.ts    # 服务器实现（含前端代码）
+│   ├── server.ts    # 服务器实现（含前端代码）
+│   └── cli.ts       # 命令行客户端
 ├── package.json
 └── README.md
+```
+
+## CLI 客户端
+
+安装命令行工具:
+
+```bash
+# 使用 bun 运行
+bun run src/cli.ts <文件路径>
+
+# 或使用 npm link 后全局使用
+npm link
+md-viewer-cli README.md
+```
+
+用法:
+
+```bash
+# 基本用法
+md-viewer-cli README.md
+
+# 指定端口
+md-viewer-cli -p 3001 notes.md
+
+# 显示帮助
+md-viewer-cli --help
 ```

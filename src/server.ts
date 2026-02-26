@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * MDV Server - Markdown Viewer Server
+ * MD Viewer Server - Markdown Viewer Server
  * 简单的 HTTP 服务，提供 Markdown 文件浏览功能
  */
 
@@ -116,7 +116,7 @@ function generateClientHTML(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MDV - Markdown Viewer</title>
+  <title>MD Viewer - Markdown Viewer</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css/github-markdown-light.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js/styles/github.css">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>
@@ -356,7 +356,7 @@ function generateClientHTML(): string {
     <!-- 侧边栏 -->
     <aside class="sidebar">
       <div class="sidebar-header">
-        <h1>📚 MDV Viewer</h1>
+        <h1>📚 MD Viewer</h1>
         <div class="add-file">
           <input type="text" id="fileInput" placeholder="输入文件路径..."
                  onkeypress="if(event.key==='Enter')addFile()">
@@ -383,7 +383,7 @@ function generateClientHTML(): string {
       <!-- 内容区 -->
       <div class="content" id="content">
         <div class="empty-state">
-          <h2>欢迎使用 MDV</h2>
+          <h2>欢迎使用 MD Viewer</h2>
           <p>在左侧添加 Markdown 文件开始阅读</p>
         </div>
       </div>
@@ -398,7 +398,7 @@ function generateClientHTML(): string {
     };
 
     // ==================== 状态持久化 ====================
-    const STORAGE_KEY = 'mdv:openFiles';
+    const STORAGE_KEY = 'md-viewer:openFiles';
 
     function saveState() {
       const data = {
@@ -548,7 +548,7 @@ function generateClientHTML(): string {
         updateFileMeta(null);
         container.innerHTML = \`
           <div class="empty-state">
-            <h2>欢迎使用 MDV</h2>
+            <h2>欢迎使用 MD Viewer</h2>
             <p>在左侧添加 Markdown 文件开始阅读</p>
           </div>
         \`;
@@ -679,5 +679,5 @@ export default {
   fetch: app.fetch,
 };
 
-log(`🚀 MDV Server 启动于 http://localhost:${PORT}/`);
-log(`📖 使用方式: 在浏览器中打开，然后添加 Markdown 文件路径`);
+log(`🚀 MD Viewer Server 启动于 http://localhost:${PORT}/`);
+log(`📖 使用方法: 在浏览器中打开，然后添加 Markdown 文件路径`);

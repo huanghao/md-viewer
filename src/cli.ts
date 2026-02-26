@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
- * MDV CLI - 命令行客户端
- * 用法: mdv <文件路径> [选项]
+ * MD Viewer CLI - 命令行客户端
+ * 用法: md-viewer-cli <文件路径> [选项]
  */
 
 import { resolve, basename } from "path";
@@ -19,23 +19,23 @@ interface CliOptions {
 
 function showHelp() {
   console.log(`
-📖 MDV CLI - Markdown Viewer 命令行客户端
+📖 MD Viewer CLI - Markdown Viewer 命令行客户端
 
 用法:
-  mdv <文件路径>           在浏览器中打开指定 Markdown 文件
-  mdv --help               显示帮助信息
+  md-viewer-cli <文件路径>  在浏览器中打开指定 Markdown 文件
+  md-viewer-cli --help      显示帮助信息
 
 选项:
   -p, --port <端口>        指定服务器端口 (默认: 3000)
   -h, --host <主机>        指定服务器主机 (默认: localhost)
 
 示例:
-  mdv README.md                    # 打开当前目录的 README.md
-  mdv /path/to/document.md         # 打开指定路径的文件
-  mdv -p 3001 notes.md             # 使用端口 3001
+  md-viewer-cli README.md              # 打开当前目录的 README.md
+  md-viewer-cli /path/to/document.md   # 打开指定路径的文件
+  md-viewer-cli -p 3001 notes.md       # 使用端口 3001
 
 注意:
-  使用前请确保 MDV Server 已启动:
+  使用前请确保 MD Viewer Server 已启动:
     bun run src/server.ts
   或
     bun run dev
@@ -145,7 +145,7 @@ async function main() {
   // 检查服务器是否运行
   const serverRunning = await checkServer(options.host, options.port);
   if (!serverRunning) {
-    console.error(`\n❌ 无法连接到 MDV Server`);
+    console.error(`\n❌ 无法连接到 MD Viewer Server`);
     console.error(`   请确保服务器已启动:`);
     console.error(`   bun run src/server.ts`);
     console.error(`   或`);

@@ -83,8 +83,8 @@ interface SSEClient {
 
 const sseClients = new Set<SSEClient>();
 
-function broadcastFileOpened(fileInfo: { path: string; filename: string; content: string; lastModified: number }) {
-  const data = `data: ${JSON.stringify({ type: "file-opened", data: fileInfo })}\n\n`;
+function broadcastFileOpened(fileInfo: { path: string; filename: string; content: string; lastModified: number }, focus: boolean) {
+  const data = `data: ${JSON.stringify({ type: "file-opened", data: fileInfo, focus })}\n\n`;
   const encoder = new TextEncoder();
   const bytes = encoder.encode(data);
   
@@ -133,8 +133,9 @@ app.get("/api/files", (c) => {
 
 // API: CLI 调用 - 打开文件
 app.post("/api/open-file", async (c) => {
-  const body = await c.req.json<{ path?: string }>();
+  const body = await c.req.json<{ path?: string; focus?: boolean }>();
   const path = body?.path;
+  const focus = body?.focus ?? false;
   
   if (!path) {
     return c.json({ error: "缺少 path 参数" }, 400);
@@ -159,9 +160,9 @@ app.post("/api/open-file", async (c) => {
   };
 
   // 推送给所有连接的客户端
-  broadcastFileOpened(fileInfo);
+  broadcastFileOpened(fileInfo, focus);
   
-  log(`📄 CLI 打开文件: ${fileInfo.filename}`);
+  log(`📄 CLI 打开文件: ${fileInfo.filename}${focus ? " (并切换)" : ""}`);
   
   return c.json({ success: true, filename: fileInfo.filename });
 });
@@ -570,7 +571,7 @@ function generateClientHTML(): string {
     }
 
     // ==================== 消息处理 ====================
-    async function onFileLoaded(data) {
+    async function onFileLoaded(data, focus = false) {
       state.files.set(data.path, {
         path: data.path,
         name: data.filename,
@@ -579,7 +580,11 @@ function generateClientHTML(): string {
         lastModified: data.lastModified
       });
 
-      state.currentFile = data.path;
+      // 只有 focus=true 时才切换到该文件
+      if (focus) {
+        state.currentFile = data.path;
+      }
+      
       saveState();
       renderFiles();
       renderTabs();
@@ -740,10 +745,10 @@ function generateClientHTML(): string {
       const openPath = params.get('open');
       
       if (openPath) {
-        // 从 URL 加载指定文件
+        // 从 URL 加载指定文件，默认切换
         const data = await loadFile(openPath);
         if (data) {
-          onFileLoaded(data);
+          onFileLoaded(data, true);
         }
         // 清除 URL 参数，避免刷新时重复加载
         window.history.replaceState({}, '', '/');
@@ -756,9 +761,9 @@ function generateClientHTML(): string {
       
       evtSource.onmessage = (e) => {
         try {
-          const { type, data } = JSON.parse(e.data);
+          const { type, data, focus } = JSON.parse(e.data);
           if (type === 'file-opened') {
-            onFileLoaded(data);
+            onFileLoaded(data, focus);
           }
         } catch (err) {
           console.error('SSE 消息解析错误:', err);

@@ -422,14 +422,14 @@ function generateClientHTML(): string {
 
         // 恢复文件列表（重新加载内容）
         for (const [path, fileInfo] of data.files) {
-          const data = await loadFile(path);
-          if (data) {
+          const fileData = await loadFile(path);
+          if (fileData) {
             state.files.set(path, {
-              path: data.path,
-              name: data.filename,
-              content: data.content,
+              path: fileData.path,
+              name: fileData.filename,
+              content: fileData.content,
               active: fileInfo.active,
-              lastModified: data.lastModified
+              lastModified: fileData.lastModified
             });
           }
         }

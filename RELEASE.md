@@ -1,86 +1,80 @@
-# MD Viewer 打包发布指南
+# MD Viewer 发布指南
 
-## 1. 本地开发使用
+## Bun 跨平台编译
 
-### 方法 A：直接运行（无需安装）
+Bun 支持编译为以下目标平台的单文件可执行文件：
 
-```bash
-# 克隆代码
-cd ~/workspace/learning/md-viewer
+| 平台 | 架构 | 编译命令 |
+|------|------|---------|
+| macOS | x64 | `--target=bun-darwin-x64` |
+| macOS | arm64 | `--target=bun-darwin-arm64` |
+| Linux | x64 | `--target=bun-linux-x64` |
+| Linux | arm64 | `--target=bun-linux-arm64` |
+| Windows | x64 | `--target=bun-windows-x64` |
 
-# 启动服务端
-bun run dev
-
-# 使用 CLI（新终端）
-bun run cli README.md
-```
-
-### 方法 B：安装到系统 PATH
+### 编译命令
 
 ```bash
-# 运行安装脚本
-./scripts/install.sh
+# 当前平台
+bun build src/server.ts --compile --outfile=dist/md-viewer-server
+bun build src/cli.ts --compile --outfile=dist/md-viewer-cli
 
-# 现在可以在任何地方使用
-md-viewer-cli ~/Documents/notes.md
-md-viewer-cli -p 3001 ./README.md
+# 指定目标平台（交叉编译）
+bun build src/server.ts --compile --target=bun-darwin-arm64 --outfile=dist/md-viewer-server-darwin-arm64
+bun build src/cli.ts --compile --target=bun-linux-x64 --outfile=dist/md-viewer-cli-linux-x64
 ```
-
-**安装位置**：
-- 有权限时: `/usr/local/bin/md-viewer-cli`
-- 无权限时: `~/.local/bin/md-viewer-cli`
 
 ---
 
-## 2. 打包发布
-
-### 方式一：Bun 编译为独立可执行文件
+## GitHub Release 发布流程
 
 ```bash
-# 编译服务端为独立可执行文件
-bun build src/server.ts --compile --outfile=md-viewer-server
+# 1. 编译所有平台
+mkdir -p dist
+bun build src/server.ts --compile --target=bun-darwin-arm64 --outfile=dist/md-viewer-server-darwin-arm64
+bun build src/server.ts --compile --target=bun-darwin-x64 --outfile=dist/md-viewer-server-darwin-x64
+bun build src/server.ts --compile --target=bun-linux-x64 --outfile=dist/md-viewer-server-linux-x64
+bun build src/cli.ts --compile --target=bun-darwin-arm64 --outfile=dist/md-viewer-cli-darwin-arm64
+bun build src/cli.ts --compile --target=bun-linux-x64 --outfile=dist/md-viewer-cli-linux-x64
 
-# 编译 CLI 为独立可执行文件
-bun build src/cli.ts --compile --outfile=md-viewer-cli
+# 2. 打标签
+git tag v1.0.0
+git push origin v1.0.0
+
+# 3. 在 GitHub 创建 Release，上传 dist/ 下的二进制文件
 ```
 
-优点：
-- 单文件，无需依赖
-- 用户无需安装 bun
-- 可直接分发
+---
 
-### 方式二：NPM 发布
+## Homebrew 分发
 
-```bash
-# 1. 登录 npm
-npm login
-
-# 2. 发布
-npm publish
-```
-
-发布后用户安装：
-```bash
-npm install -g md-viewer
-md-viewer-cli README.md
-```
-
-### 方式三：Homebrew 发布（macOS/Linux）
-
-创建 `md-viewer.rb` formula：
+创建 `Formula/md-viewer.rb`：
 
 ```ruby
 class MdViewer < Formula
   desc "Markdown viewer with live reload"
   homepage "https://github.com/yourusername/md-viewer"
-  url "https://github.com/yourusername/md-viewer/archive/v1.0.0.tar.gz"
-  sha256 "..."
-  license "MIT"
+  version "1.0.0"
 
-  depends_on "bun"
+  on_macos do
+    if Hardware::CPU.arm?
+      url "https://github.com/yourusername/md-viewer/releases/download/v1.0.0/md-viewer-cli-darwin-arm64"
+      sha256 "..."
+    else
+      url "https://github.com/yourusername/md-viewer/releases/download/v1.0.0/md-viewer-cli-darwin-x64"
+      sha256 "..."
+    end
+  end
+
+  on_linux do
+    url "https://github.com/yourusername/md-viewer/releases/download/v1.0.0/md-viewer-cli-linux-x64"
+    sha256 "..."
+  end
 
   def install
-    bin.install "bin/md-viewer-cli"
+    bin.install "md-viewer-cli-darwin-arm64" => "md-viewer-cli" if Hardware::CPU.arm?
+    bin.install "md-viewer-cli-darwin-x64" => "md-viewer-cli" if Hardware::CPU.intel?
+    bin.install "md-viewer-cli-linux-x64" => "md-viewer-cli" if OS.linux?
   end
 end
 ```
@@ -89,51 +83,4 @@ end
 ```bash
 brew tap yourusername/md-viewer
 brew install md-viewer
-```
-
----
-
-## 3. 推荐发布流程
-
-### 步骤 1：版本号管理
-
-```bash
-# 更新 package.json 版本
-npm version patch  # 或 minor / major
-```
-
-### 步骤 2：创建 GitHub Release
-
-```bash
-# 打标签
-git tag v1.0.0
-git push origin v1.0.0
-
-# 在 GitHub 上创建 Release，上传编译好的二进制文件
-```
-
-### 步骤 3：多种分发渠道
-
-| 渠道 | 目标用户 | 命令 |
-|------|---------|------|
-| GitHub Releases | 所有用户 | 下载二进制文件 |
-| NPM | Node.js 用户 | `npm install -g md-viewer` |
-| Homebrew | macOS 用户 | `brew install md-viewer` |
-| AUR | Arch Linux | `yay -S md-viewer` |
-
----
-
-## 4. 快速测试发布包
-
-```bash
-# 1. 编译
-cd ~/workspace/learning/md-viewer
-bun build src/server.ts --compile --outfile=/tmp/md-viewer-server
-bun build src/cli.ts --compile --outfile=/tmp/md-viewer-cli
-
-# 2. 测试服务端
-/tmp/md-viewer-server
-
-# 3. 测试 CLI（新终端）
-/tmp/md-viewer-cli ~/Documents/some-file.md
 ```

@@ -1,28 +1,22 @@
 #!/usr/bin/env bun
 /**
  * MDV Server - Markdown Viewer Server
- * 维护文件监听列表，管理多个客户端，支持动态添加/移除监听
+ * 简单的 HTTP 服务，提供 Markdown 文件浏览功能
  */
 
 import { Hono } from "hono";
 import { marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
-import { readFileSync, watch, existsSync, statSync, readdirSync } from "fs";
-import { resolve, basename, dirname, relative } from "path";
-import { serve, type ServerWebSocket } from "bun";
+import { readFileSync, existsSync, statSync, readdirSync } from "fs";
+import { resolve, basename } from "path";
 
 // ==================== 类型定义 ====================
 
-interface Client {
-  ws: ServerWebSocket<unknown>;
-  watchingFiles: Set<string>; // 当前客户端正在查看的文件
-}
-
-interface WatchedFile {
+interface FileInfo {
   path: string;
-  watchers: Set<ServerWebSocket<unknown>>; // 哪些客户端在关注此文件
-  lastContent?: string;
+  name: string;
+  content: string;
   lastModified: number;
 }
 
@@ -37,12 +31,6 @@ marked.use(
     },
   })
 );
-
-// ==================== 状态管理 ====================
-
-const clients = new Map<ServerWebSocket<unknown>, Client>();
-const watchList = new Map<string, WatchedFile>(); // path -> WatchedFile
-const fileWatchers = new Map<string, ReturnType<typeof watch>>(); // path -> fs.watch handle
 
 // ==================== 工具函数 ====================
 
@@ -87,174 +75,6 @@ function getFileList(dir: string): string[] {
   }
 }
 
-// ==================== WebSocket 消息处理 ====================
-
-function send(ws: ServerWebSocket<unknown>, type: string, data?: unknown) {
-  try {
-    ws.send(JSON.stringify({ type, data }));
-  } catch {
-    // 忽略已断开的连接
-  }
-}
-
-function broadcast(type: string, data?: unknown, filter?: (client: Client) => boolean) {
-  for (const [ws, client] of clients) {
-    if (!filter || filter(client)) {
-      send(ws, type, data);
-    }
-  }
-}
-
-// ==================== 文件监听管理 ====================
-
-function addFileToWatchList(path: string, clientWs: ServerWebSocket<unknown>): boolean {
-  const resolvedPath = resolve(path);
-
-  if (!existsSync(resolvedPath)) {
-    return false;
-  }
-
-  // 添加到全局监听列表
-  if (!watchList.has(resolvedPath)) {
-    const stats = statSync(resolvedPath);
-    const { content } = readMarkdownFile(resolvedPath);
-
-    watchList.set(resolvedPath, {
-      path: resolvedPath,
-      watchers: new Set(),
-      lastContent: content,
-      lastModified: stats.mtimeMs,
-    });
-
-    // 启动文件系统监听
-    const watcher = watch(resolvedPath, (eventType) => {
-      if (eventType === "change") {
-        handleFileChange(resolvedPath);
-      }
-    });
-    fileWatchers.set(resolvedPath, watcher);
-
-    log(`📁 开始监听: ${basename(resolvedPath)}`);
-  }
-
-  // 关联到客户端
-  const fileInfo = watchList.get(resolvedPath)!;
-  fileInfo.watchers.add(clientWs);
-
-  // 更新客户端状态
-  const client = clients.get(clientWs);
-  if (client) {
-    client.watchingFiles.add(resolvedPath);
-  }
-
-  return true;
-}
-
-function removeFileFromWatchList(path: string, clientWs: ServerWebSocket<unknown>) {
-  const resolvedPath = resolve(path);
-  const fileInfo = watchList.get(resolvedPath);
-
-  if (fileInfo) {
-    fileInfo.watchers.delete(clientWs);
-
-    // 如果没有客户端关注此文件，停止监听
-    if (fileInfo.watchers.size === 0) {
-      const watcher = fileWatchers.get(resolvedPath);
-      if (watcher) {
-        watcher.close();
-        fileWatchers.delete(resolvedPath);
-      }
-      watchList.delete(resolvedPath);
-      log(`🛑 停止监听: ${basename(resolvedPath)}`);
-    }
-  }
-
-  const client = clients.get(clientWs);
-  if (client) {
-    client.watchingFiles.delete(resolvedPath);
-  }
-}
-
-function handleFileChange(path: string) {
-  const fileInfo = watchList.get(path);
-  if (!fileInfo) return;
-
-  const { content, error } = readMarkdownFile(path);
-  if (error) return;
-  const lastModified = getLastModified(path) ?? Date.now();
-
-  // 检查内容是否真的变化了（避免触发器导致的假更新）
-  if (content === fileInfo.lastContent) return;
-
-  fileInfo.lastContent = content;
-  fileInfo.lastModified = lastModified;
-
-  log(`🔄 文件变化: ${basename(path)} (${fileInfo.watchers.size} 个客户端)`);
-
-  // 通知所有关注此文件的客户端
-  for (const ws of fileInfo.watchers) {
-    send(ws, "file-updated", {
-      path,
-      filename: basename(path),
-      content,
-      lastModified,
-    });
-  }
-}
-
-// ==================== WebSocket 处理器 ====================
-
-function handleMessage(ws: ServerWebSocket<unknown>, rawMessage: string) {
-  let msg: { type: string; data?: unknown };
-  try {
-    msg = JSON.parse(rawMessage);
-  } catch {
-    return;
-  }
-
-  const client = clients.get(ws);
-  if (!client) return;
-
-  switch (msg.type) {
-    case "watch": {
-      const path = msg.data as string;
-      if (addFileToWatchList(path, ws)) {
-        const resolvedPath = resolve(path);
-        const { content, error } = readMarkdownFile(resolvedPath);
-        send(ws, "file-loaded", {
-          path: resolvedPath,
-          filename: basename(path),
-          content: error ? undefined : content,
-          lastModified: getLastModified(resolvedPath),
-          error,
-        });
-      } else {
-        send(ws, "error", { message: `无法监听文件: ${path}` });
-      }
-      break;
-    }
-
-    case "unwatch": {
-      const path = msg.data as string;
-      removeFileFromWatchList(path, ws);
-      break;
-    }
-
-    case "get-file-list": {
-      const dir = msg.data as string;
-      const files = getFileList(resolve(dir));
-      send(ws, "file-list", { files: files.map((f) => ({ path: f, name: basename(f) })) });
-      break;
-    }
-
-    case "close-tab": {
-      const path = msg.data as string;
-      removeFileFromWatchList(path, ws);
-      break;
-    }
-  }
-}
-
 // ==================== HTTP 服务 ====================
 
 const app = new Hono();
@@ -264,15 +84,21 @@ app.get("/", (c) => {
   return c.html(generateClientHTML());
 });
 
-// API: 获取文件内容（HTTP 备用方式）
+// API: 获取文件内容
 app.get("/api/file", (c) => {
   const path = c.req.query("path");
   if (!path) return c.json({ error: "缺少 path 参数" }, 400);
 
-  const { content, error } = readMarkdownFile(resolve(path));
+  const resolvedPath = resolve(path);
+  const { content, error } = readMarkdownFile(resolvedPath);
   if (error) return c.json({ error }, 404);
 
-  return c.json({ content, path: resolve(path), filename: basename(path) });
+  return c.json({
+    content,
+    path: resolvedPath,
+    filename: basename(resolvedPath),
+    lastModified: getLastModified(resolvedPath),
+  });
 });
 
 // API: 获取目录下的 Markdown 文件列表
@@ -293,7 +119,7 @@ function generateClientHTML(): string {
   <title>MDV - Markdown Viewer</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css/github-markdown-light.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js/styles/github.css">
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -390,12 +216,6 @@ function generateClientHTML(): string {
       background: #ff4444;
       color: white;
     }
-    .file-item.changed::after {
-      content: "●";
-      color: #ff6b6b;
-      margin-left: 6px;
-      font-size: 10px;
-    }
     .empty-tip {
       padding: 20px;
       text-align: center;
@@ -428,21 +248,16 @@ function generateClientHTML(): string {
       font-size: 12px;
       color: #586069;
     }
-    .status {
-      display: flex;
-      align-items: center;
-      gap: 6px;
+    .refresh-btn {
+      padding: 4px 10px;
+      background: #f6f8fa;
+      border: 1px solid #d1d5da;
+      border-radius: 4px;
+      cursor: pointer;
       font-size: 12px;
-      color: #586069;
     }
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #28a745;
-    }
-    .status-dot.disconnected {
-      background: #d73a49;
+    .refresh-btn:hover {
+      background: #f3f4f6;
     }
 
     /* 标签页 */
@@ -470,9 +285,6 @@ function generateClientHTML(): string {
       background: #fff;
       border-bottom: 2px solid #0969da;
       margin-bottom: -1px;
-    }
-    .tab.changed {
-      font-style: italic;
     }
     .tab .close {
       opacity: 0.5;
@@ -560,10 +372,7 @@ function generateClientHTML(): string {
     <main class="main">
       <!-- 工具栏 -->
       <div class="toolbar">
-        <div class="status">
-          <span class="status-dot" id="statusDot"></span>
-          <span id="statusText">连接中...</span>
-        </div>
+        <button class="refresh-btn" onclick="refreshCurrent()">🔄 刷新</button>
         <div class="spacer"></div>
         <span class="file-meta" id="fileMeta">最后修改: -</span>
       </div>
@@ -584,120 +393,54 @@ function generateClientHTML(): string {
   <script>
     // ==================== 状态管理 ====================
     const state = {
-      ws: null,
-      files: new Map(), // path -> { path, name, content, changed, active, lastModified }
+      files: new Map(), // path -> { path, name, content, active, lastModified }
       currentFile: null,
-      reconnectTimer: null
     };
 
-    // ==================== WebSocket ====================
-    function connect() {
-      const ws = new WebSocket(\`ws://\${location.host}/ws\`);
-
-      ws.onopen = () => {
-        console.log('WebSocket 已连接');
-        updateStatus(true);
-        // 重新订阅已打开的文件
-        for (const [path, file] of state.files) {
-          if (file.active) {
-            send('watch', path);
-          }
+    // ==================== API 请求 ====================
+    async function loadFile(path) {
+      try {
+        const response = await fetch(\`/api/file?path=\${encodeURIComponent(path)}\`);
+        const data = await response.json();
+        if (data.error) {
+          alert(data.error);
+          return null;
         }
-      };
-
-      ws.onclose = () => {
-        console.log('WebSocket 已断开');
-        updateStatus(false);
-        // 5秒后重连
-        clearTimeout(state.reconnectTimer);
-        state.reconnectTimer = setTimeout(connect, 5000);
-      };
-
-      ws.onmessage = (e) => {
-        const { type, data } = JSON.parse(e.data);
-        handleMessage(type, data);
-      };
-
-      state.ws = ws;
-    }
-
-    function send(type, data) {
-      if (state.ws?.readyState === WebSocket.OPEN) {
-        state.ws.send(JSON.stringify({ type, data }));
+        return data;
+      } catch (e) {
+        alert(\`加载失败: \${e.message}\`);
+        return null;
       }
     }
 
-    function updateStatus(connected) {
-      const dot = document.getElementById('statusDot');
-      const text = document.getElementById('statusText');
-      dot.classList.toggle('disconnected', !connected);
-      text.textContent = connected ? '已连接' : '连接中...';
+    async function refreshCurrent() {
+      if (!state.currentFile) return;
+      const data = await loadFile(state.currentFile);
+      if (data) {
+        const file = state.files.get(data.path);
+        if (file) {
+          file.content = data.content;
+          file.lastModified = data.lastModified;
+          renderContent();
+          renderFiles();
+        }
+      }
     }
 
     // ==================== 消息处理 ====================
-    function handleMessage(type, data) {
-      switch (type) {
-        case 'file-loaded':
-          onFileLoaded(data);
-          break;
-        case 'file-updated':
-          onFileUpdated(data);
-          break;
-        case 'error':
-          alert(data.message);
-          break;
-      }
-    }
-
-    function onFileLoaded(data) {
-      console.log('onFileLoaded:', data);
-      if (data.error) {
-        alert(data.error);
-        return;
-      }
-
+    async function onFileLoaded(data) {
       state.files.set(data.path, {
         path: data.path,
         name: data.filename,
         content: data.content,
-        changed: false,
         active: true,
         lastModified: data.lastModified
       });
 
       state.currentFile = data.path;
-      console.log('Rendering files, tabs, content...');
       renderFiles();
       renderTabs();
       renderContent();
-      console.log('Render complete');
-    }
-
-    function onFileUpdated(data) {
-      const file = state.files.get(data.path);
-      if (file) {
-        file.content = data.content;
-        file.lastModified = data.lastModified;
-        if (file.active) {
-          file.changed = false;
-          renderContent();
-        } else {
-          file.changed = true;
-          renderFiles();
-          renderTabs();
-        }
-      } else {
-        markChanged(data.path);
-      }
-    }
-
-    function markChanged(path) {
-      const file = state.files.get(path);
-      if (file) {
-        file.changed = true;
-        renderFiles();
-        renderTabs();
-      }
     }
 
     // ==================== UI 渲染 ====================
@@ -714,7 +457,7 @@ function generateClientHTML(): string {
 
       container.innerHTML = Array.from(state.files.values())
         .map(file => \`
-          <div class="file-item \${file.active ? 'active' : ''} \${file.changed ? 'changed' : ''}"
+          <div class="file-item \${file.active ? 'active' : ''}"
                onclick="switchFile('\${escapeAttr(file.path)}')">
             <span class="icon">📄</span>
             <span class="name">\${file.name}</span>
@@ -734,9 +477,9 @@ function generateClientHTML(): string {
 
       container.innerHTML = activeFiles
         .map(file => \`
-          <div class="tab \${file.path === state.currentFile ? 'active' : ''} \${file.changed ? 'changed' : ''}"
+          <div class="tab \${file.path === state.currentFile ? 'active' : ''}"
                onclick="switchFile('\${escapeAttr(file.path)}')">
-            <span>\${file.name}\${file.changed ? ' *' : ''}</span>
+            <span>\${file.name}</span>
             <span class="close" onclick="event.stopPropagation();closeFile('\${escapeAttr(file.path)}')">×</span>
           </div>
         \`).join('');
@@ -787,15 +530,18 @@ function generateClientHTML(): string {
     }
 
     // ==================== 用户操作 ====================
-    function addFile() {
+    async function addFile() {
       const input = document.getElementById('fileInput');
       const path = input.value.trim();
       if (!path) return;
 
       input.value = '';
 
-      // 发送 watch 请求
-      send('watch', path);
+      // 加载文件
+      const data = await loadFile(path);
+      if (data) {
+        onFileLoaded(data);
+      }
     }
 
     function switchFile(path) {
@@ -813,7 +559,6 @@ function generateClientHTML(): string {
       const file = state.files.get(path);
       if (file) {
         file.active = false;
-        send('close-tab', path);
       }
 
       // 如果关闭的是当前文件，切换到其他文件
@@ -829,28 +574,21 @@ function generateClientHTML(): string {
 
     // ==================== 拖拽支持 ====================
     document.addEventListener('dragover', e => e.preventDefault());
-    document.addEventListener('drop', e => {
+    document.addEventListener('drop', async e => {
       e.preventDefault();
       const files = e.dataTransfer?.files;
       if (files) {
         for (const file of files) {
           if (file.name.endsWith('.md')) {
-            send('watch', file.path);
+            const data = await loadFile(file.path);
+            if (data) {
+              onFileLoaded(data);
+            }
           }
         }
       }
     });
-
-    // ==================== 初始化 ====================
-    connect();
-
-    // 定期心跳保活
-    setInterval(() => {
-      if (state.ws?.readyState === WebSocket.OPEN) {
-        send('ping');
-      }
-    }, 30000);
-  </script>
+  <\/script>
 </body>
 </html>`;
 }
@@ -859,46 +597,10 @@ function generateClientHTML(): string {
 
 const PORT = parseInt(process.env.PORT || "3000");
 
-serve({
+export default {
   port: PORT,
-  fetch(req, server) {
-    const url = new URL(req.url);
-
-    // WebSocket 升级
-    if (url.pathname === "/ws") {
-      if (server.upgrade(req)) {
-        return;
-      }
-    }
-
-    // HTTP 路由
-    return app.fetch(req);
-  },
-  websocket: {
-    open(ws) {
-      clients.set(ws, {
-        ws,
-        watchingFiles: new Set(),
-      });
-      log(`👤 客户端已连接 (${clients.size} 个)`);
-      send(ws, "connected", { message: "已连接到 MDV Server" });
-    },
-    close(ws) {
-      const client = clients.get(ws);
-      if (client) {
-        // 清理该客户端的所有监听
-        for (const path of client.watchingFiles) {
-          removeFileFromWatchList(path, ws);
-        }
-        clients.delete(ws);
-      }
-      log(`👋 客户端已断开 (${clients.size} 个)`);
-    },
-    message(ws, message) {
-      handleMessage(ws, message.toString());
-    },
-  },
-});
+  fetch: app.fetch,
+};
 
 log(`🚀 MDV Server 启动于 http://localhost:${PORT}/`);
 log(`📖 使用方式: 在浏览器中打开，然后添加 Markdown 文件路径`);

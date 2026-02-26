@@ -646,8 +646,25 @@ function generateClientHTML(): string {
       }
     });
 
+    // ==================== URL 参数处理 ====================
+    async function handleUrlParams() {
+      const params = new URLSearchParams(window.location.search);
+      const openPath = params.get('open');
+      
+      if (openPath) {
+        // 从 URL 加载指定文件
+        const data = await loadFile(openPath);
+        if (data) {
+          onFileLoaded(data);
+        }
+        // 清除 URL 参数，避免刷新时重复加载
+        window.history.replaceState({}, '', '/');
+      }
+    }
+
     // ==================== 初始化 ====================
     restoreState();
+    handleUrlParams();
   <\/script>
 </body>
 </html>`;

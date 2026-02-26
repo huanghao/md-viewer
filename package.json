@@ -3,9 +3,13 @@
   "version": "1.0.0",
   "description": "Markdown viewer with live reload",
   "type": "module",
+  "bin": {
+    "mdv": "./src/cli.ts"
+  },
   "scripts": {
     "dev": "bun --watch run src/server.ts",
-    "build": "bun build src/server.ts --compile --outfile=mdv"
+    "build": "bun build src/server.ts --compile --outfile=mdv",
+    "cli": "bun run src/cli.ts"
   },
   "dependencies": {
     "hono": "^3.12.8",

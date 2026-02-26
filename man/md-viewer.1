@@ -1,0 +1,74 @@
+.TH MD-VIEWER 1 "February 2026" "MD Viewer" "User Commands"
+.SH NAME
+md-viewer \- Markdown file viewer with live reload
+.SH SYNOPSIS
+.B md-viewer-cli
+[\fIOPTIONS\fR] \fIFILE\fR
+.br
+.B bun run dev
+.RI [SERVER\ OPTIONS]
+.SH DESCRIPTION
+MD Viewer is a lightweight Markdown file viewer that provides live preview
+with automatic reload when files change. It consists of a server component
+that serves the web interface and a CLI tool for adding files from the command line.
+.SH CLI COMMANDS
+.TP
+.B md-viewer-cli \fIFILE\fR
+Add a Markdown file to the viewer. By default, the file will be added and
+switched to. Supports both local file paths and remote URLs (http/https).
+.SH CLI OPTIONS
+.TP
+.BR \-p ", " \-\-port " " \fIPORT\fR
+Specify the server port (default: 3000)
+.TP
+.BR \-h ", " \-\-host " " \fIHOST\fR
+Specify the server host (default: localhost)
+.TP
+.B \-\-no\-focus
+Add the file without switching to it. By default, the viewer will switch
+to the newly added file.
+.TP
+.B \-\-help
+Display help information and exit
+.SH SERVER OPTIONS
+The server can be configured using environment variables:
+.TP
+.B PORT
+Server port number (default: 3000)
+.SH EXAMPLES
+.TP
+Add a local file and switch to it:
+.B md-viewer-cli README.md
+.TP
+Add a file without switching:
+.B md-viewer-cli \-\-no\-focus notes.md
+.TP
+Add a file using a specific server port:
+.B md\-viewer-cli \-p 3001 README.md
+.TP
+Add a remote Markdown file:
+.B md-viewer-cli https://example.com/doc.md
+.TP
+Start the server on a custom port:
+.B PORT=8080 bun run dev
+.SH FILES
+.TP
+.I ~/.config/md-viewer/config.json
+User configuration file. See
+.BR md-viewer.config (5)
+for details.
+.TP
+.I ~/.local/share/md-viewer/
+Application data directory
+.SH ENVIRONMENT
+.TP
+.B PORT
+Server listening port (default: 3000)
+.SH SEE ALSO
+.BR md-viewer.config (5)
+.SH BUGS
+Report bugs at: https://github.com/yourusername/md-viewer/issues
+.SH AUTHOR
+MD Viewer was created for personal use.
+.SH COPYRIGHT
+MIT License

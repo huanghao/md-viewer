@@ -25,13 +25,13 @@ export const clientScript = `
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (!saved) return;
-        
+
         const data = JSON.parse(saved);
         if (!data.files || data.files.length === 0) return;
 
         // 恢复文件列表（重新加载内容）
+        const validFiles = [];
         for (const [path, fileInfo] of data.files) {
-          // 对于远程文件，需要重新 fetch 内容
           const fileData = await loadFile(path, true); // 静默加载，不弹窗
           if (fileData) {
             state.files.set(path, {
@@ -42,7 +42,19 @@ export const clientScript = `
               lastModified: fileData.lastModified,
               isRemote: fileData.isRemote || false
             });
+            validFiles.push([path, fileInfo]);
           }
+        }
+
+        // 清理不存在的文件：用实际存在的文件覆盖 localStorage
+        if (validFiles.length !== data.files.length) {
+          const currentFile = state.files.has(data.currentFile)
+            ? data.currentFile
+            : null;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            files: validFiles,
+            currentFile
+          }));
         }
 
         // 恢复当前文件

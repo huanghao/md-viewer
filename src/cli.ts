@@ -6,9 +6,11 @@
 
 import { resolve } from "path";
 import { existsSync } from "fs";
+import { loadConfig, getConfigDir } from "./config.ts";
 
-const DEFAULT_PORT = 3000;
-const DEFAULT_HOST = "localhost";
+const config = loadConfig();
+const DEFAULT_PORT = config.server.port;
+const DEFAULT_HOST = config.server.host;
 
 interface CliOptions {
   port: number;
@@ -27,9 +29,12 @@ function showHelp() {
   md-viewer-cli --help          显示帮助信息
 
 选项:
-  -p, --port <端口>             指定服务器端口 (默认: 3000)
-  -h, --host <主机>             指定服务器主机 (默认: localhost)
+  -p, --port <端口>             指定服务器端口 (默认: ${DEFAULT_PORT})
+  -h, --host <主机>             指定服务器主机 (默认: ${DEFAULT_HOST})
   --no-focus                    添加后不切换到该文件（默认会切换）
+
+配置文件:
+  ${getConfigDir()}/config.json
 
 示例:
   md-viewer-cli README.md               # 添加并切换到该文件（默认）

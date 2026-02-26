@@ -11,6 +11,12 @@ import hljs from "highlight.js";
 import { log } from "./utils.ts";
 import { generateClientHTML } from "./client/html.ts";
 import { handleGetFile, handleGetFiles, handleOpenFile, handleEvents } from "./handlers.ts";
+import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
+
+// ==================== 初始化配置 ====================
+
+initConfig();
+const config = loadConfig();
 
 // ==================== 配置 ====================
 
@@ -47,13 +53,15 @@ app.get("/api/events", handleEvents);
 
 // ==================== 启动服务 ====================
 
-const PORT = parseInt(process.env.PORT || "3000");
+const PORT = getServerPort(config);
+const HOST = getServerHost(config);
 
 export default {
   port: PORT,
+  hostname: HOST,
   fetch: app.fetch,
   idleTimeout: 255, // SSE 长连接 255 秒超时（Bun 最大值）
 };
 
-log(`🚀 MD Viewer Server 启动于 http://localhost:${PORT}/`);
+log(`🚀 MD Viewer Server 启动于 http://${HOST}:${PORT}/`);
 log(`📖 使用方法: 在浏览器中打开，然后添加 Markdown 文件路径`);

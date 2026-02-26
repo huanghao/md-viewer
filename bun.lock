@@ -1,0 +1,35 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "mdv",
+      "dependencies": {
+        "highlight.js": "^11.9.0",
+        "hono": "^3.12.8",
+        "marked": "^11.1.1",
+        "marked-highlight": "^2.0.6",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
+    },
+  },
+  "packages": {
+    "@types/bun": ["@types/bun@1.3.9", "http://r.npm.sankuai.com/@types/bun/download/@types/bun-1.3.9.tgz", { "dependencies": { "bun-types": "1.3.9" } }, "sha1-pe2A6hTW1Bl/oytuCmUaBbcUNlc="],
+
+    "@types/node": ["@types/node@25.3.1", "http://r.npm.sankuai.com/@types/node/download/@types/node-25.3.1.tgz", { "dependencies": { "undici-types": "~7.18.0" } }, "sha1-gvP24wrDtIVgoJLZIkqXW1wk440="],
+
+    "bun-types": ["bun-types@1.3.9", "http://r.npm.sankuai.com/bun-types/download/bun-types-1.3.9.tgz", { "dependencies": { "@types/node": "*" } }, "sha1-LQCWJOGbjBIkcrxD3HcKep2wlUA="],
+
+    "highlight.js": ["highlight.js@11.11.1", "http://r.npm.sankuai.com/highlight.js/download/highlight.js-11.11.1.tgz", {}, "sha1-/KBvoOWu7PbE1DcjkTX6vBUhNYU="],
+
+    "hono": ["hono@3.12.12", "http://r.npm.sankuai.com/hono/download/hono-3.12.12.tgz", {}, "sha1-G3Jf6yYE0bLVDDqMEVlMyh20Yvg="],
+
+    "marked": ["marked@11.2.0", "http://r.npm.sankuai.com/marked/download/marked-11.2.0.tgz", { "bin": { "marked": "bin/marked.js" } }, "sha1-/JCK7KlityGwOS7kIF5vkOv/sHQ="],
+
+    "marked-highlight": ["marked-highlight@2.2.3", "http://r.npm.sankuai.com/marked-highlight/download/marked-highlight-2.2.3.tgz", { "peerDependencies": { "marked": ">=4 <18" } }, "sha1-5+XnzPsWmTVsOkXYUduP6YNokXI="],
+
+    "undici-types": ["undici-types@7.18.2", "http://r.npm.sankuai.com/undici-types/download/undici-types-7.18.2.tgz", {}, "sha1-KTV6iee3ykrvO/D9P9DNc4hCKek="],
+  }
+}

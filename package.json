@@ -1,0 +1,19 @@
+{
+  "name": "mdv",
+  "version": "1.0.0",
+  "description": "Markdown viewer with live reload",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/server.ts",
+    "build": "bun build src/server.ts --compile --outfile=mdv"
+  },
+  "dependencies": {
+    "hono": "^3.12.8",
+    "marked": "^11.1.1",
+    "marked-highlight": "^2.0.6",
+    "highlight.js": "^11.9.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

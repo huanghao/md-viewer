@@ -397,6 +397,60 @@ function generateClientHTML(): string {
       currentFile: null,
     };
 
+    // ==================== 状态持久化 ====================
+    const STORAGE_KEY = 'mdv:openFiles';
+
+    function saveState() {
+      const data = {
+        files: Array.from(state.files.entries()).map(([path, file]) => [path, {
+          path: file.path,
+          name: file.name,
+          active: file.active
+        }]),
+        currentFile: state.currentFile
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    async function restoreState() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) return;
+        
+        const data = JSON.parse(saved);
+        if (!data.files || data.files.length === 0) return;
+
+        // 恢复文件列表（重新加载内容）
+        for (const [path, fileInfo] of data.files) {
+          const data = await loadFile(path);
+          if (data) {
+            state.files.set(path, {
+              path: data.path,
+              name: data.filename,
+              content: data.content,
+              active: fileInfo.active,
+              lastModified: data.lastModified
+            });
+          }
+        }
+
+        // 恢复当前文件
+        if (data.currentFile && state.files.has(data.currentFile)) {
+          state.currentFile = data.currentFile;
+        } else {
+          // 如果保存的当前文件不存在了，切换到第一个活跃文件
+          const activeFiles = Array.from(state.files.values()).filter(f => f.active);
+          state.currentFile = activeFiles.length > 0 ? activeFiles[0].path : null;
+        }
+
+        renderFiles();
+        renderTabs();
+        renderContent();
+      } catch (e) {
+        console.error('恢复状态失败:', e);
+      }
+    }
+
     // ==================== API 请求 ====================
     async function loadFile(path) {
       try {
@@ -438,6 +492,7 @@ function generateClientHTML(): string {
       });
 
       state.currentFile = data.path;
+      saveState();
       renderFiles();
       renderTabs();
       renderContent();
@@ -550,6 +605,7 @@ function generateClientHTML(): string {
       if (file) {
         file.active = true;
       }
+      saveState();
       renderFiles();
       renderTabs();
       renderContent();
@@ -567,6 +623,7 @@ function generateClientHTML(): string {
         state.currentFile = activeFiles.length > 0 ? activeFiles[0].path : null;
       }
 
+      saveState();
       renderFiles();
       renderTabs();
       renderContent();
@@ -588,6 +645,9 @@ function generateClientHTML(): string {
         }
       }
     });
+
+    // ==================== 初始化 ====================
+    restoreState();
   <\/script>
 </body>
 </html>`;

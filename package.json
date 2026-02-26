@@ -4,7 +4,7 @@
   "description": "Markdown viewer with live reload",
   "type": "module",
   "scripts": {
-    "dev": "bun run src/server.ts",
+    "dev": "bun --watch run src/server.ts",
     "build": "bun build src/server.ts --compile --outfile=mdv"
   },
   "dependencies": {

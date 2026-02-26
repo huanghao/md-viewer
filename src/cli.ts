@@ -14,6 +14,7 @@ interface CliOptions {
   port: number;
   host: string;
   focus: boolean;
+  noFocus: boolean;
   help: boolean;
 }
 
@@ -28,20 +29,30 @@ function showHelp() {
 选项:
   -p, --port <端口>             指定服务器端口 (默认: 3000)
   -h, --host <主机>             指定服务器主机 (默认: localhost)
-  -f, --focus                   添加后切换到该文件（默认只添加不切换）
+  --no-focus                    添加后不切换到该文件（默认会切换）
 
 示例:
-  md-viewer-cli README.md               # 添加文件，不切换
-  md-viewer-cli -f README.md            # 添加并切换到该文件
-  md-viewer-cli -p 3001 -f notes.md     # 指定端口并切换
+  md-viewer-cli README.md               # 添加并切换到该文件（默认）
+  md-viewer-cli --no-focus README.md    # 添加文件，不切换
+  md-viewer-cli -p 3001 notes.md        # 指定端口并切换
 `);
+}
+
+function isUrl(path: string): boolean {
+  try {
+    const url = new URL(path);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 function parseArgs(args: string[]): { filePath: string | null; options: CliOptions } {
   const options: CliOptions = {
     port: DEFAULT_PORT,
     host: DEFAULT_HOST,
-    focus: false,
+    focus: true,
+    noFocus: false,
     help: false,
   };
 
@@ -59,8 +70,8 @@ function parseArgs(args: string[]): { filePath: string | null; options: CliOptio
       }
     } else if (arg === "--host" || arg === "-h") {
       options.host = args[++i];
-    } else if (arg === "--focus" || arg === "-f") {
-      options.focus = true;
+    } else if (arg === "--no-focus") {
+      options.noFocus = true;
     } else if (!arg.startsWith("-") && !filePath) {
       filePath = arg;
     }
@@ -97,15 +108,25 @@ async function main() {
     process.exit(filePath ? 0 : 1);
   }
 
-  // 验证文件存在
-  const absolutePath = resolve(filePath);
-  if (!existsSync(absolutePath)) {
-    console.error(`❌ 文件不存在: ${filePath}`);
-    process.exit(1);
+  // 判断是 URL 还是本地文件
+  const isRemoteUrl = isUrl(filePath);
+  let targetPath: string;
+
+  if (isRemoteUrl) {
+    targetPath = filePath;
+  } else {
+    // 验证本地文件存在
+    const absolutePath = resolve(filePath);
+    if (!existsSync(absolutePath)) {
+      console.error(`❌ 文件不存在: ${filePath}`);
+      process.exit(1);
+    }
+    targetPath = absolutePath;
   }
 
   try {
-    await openFile(options.host, options.port, absolutePath, options.focus);
+    const shouldFocus = !options.noFocus;
+    await openFile(options.host, options.port, targetPath, shouldFocus);
   } catch (e: any) {
     if (e.cause?.code === "ECONNREFUSED") {
       console.error(`❌ 无法连接到 Server (${options.host}:${options.port})`);

@@ -32,7 +32,7 @@ export const clientScript = `
         // 恢复文件列表（重新加载内容）
         for (const [path, fileInfo] of data.files) {
           // 对于远程文件，需要重新 fetch 内容
-          const fileData = await loadFile(path);
+          const fileData = await loadFile(path, true); // 静默加载，不弹窗
           if (fileData) {
             state.files.set(path, {
               path: fileData.path,
@@ -63,17 +63,17 @@ export const clientScript = `
     }
 
     // ==================== API 请求 ====================
-    async function loadFile(path) {
+    async function loadFile(path, silent = false) {
       try {
         const response = await fetch(\`/api/file?path=\${encodeURIComponent(path)}\`);
         const data = await response.json();
         if (data.error) {
-          alert(data.error);
+          if (!silent) alert(data.error);
           return null;
         }
         return data;
       } catch (e) {
-        alert(\`加载失败: \${e.message}\`);
+        if (!silent) alert(\`加载失败: \${e.message}\`);
         return null;
       }
     }

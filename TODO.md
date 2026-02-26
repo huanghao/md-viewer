@@ -30,6 +30,15 @@
 ```
 
 ## 实现config
+- 服务端和客户端都从 ~/.config/md-viewer/config.json里读配置
+- 整理现在需要放到配置里的配置项
+- 写配置、和配置项参数的策略解释，放到docs里
+
+## 生成man手册
+- cli：`man/md-viewer.1`
+- config: `man/md-viewer.config.5`
+- 服务端需要man吗？惯例是什么？先给我解释一下，再做开发
+- 在项目的AGENTS.md里添加一个约定：更新了cli的参数以后要更新man手册，更新了配置相关代码也要更新man和配置说明文档
 
 -------- 以下的任务不要实现，我再想想
 

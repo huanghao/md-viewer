@@ -75,6 +75,29 @@ function getFileList(dir: string): string[] {
   }
 }
 
+// ==================== SSE 客户端管理 ====================
+
+interface SSEClient {
+  controller: ReadableStreamDefaultController<Uint8Array>;
+}
+
+const sseClients = new Set<SSEClient>();
+
+function broadcastFileOpened(fileInfo: { path: string; filename: string; content: string; lastModified: number }) {
+  const data = `data: ${JSON.stringify({ type: "file-opened", data: fileInfo })}\n\n`;
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(data);
+  
+  for (const client of sseClients) {
+    try {
+      client.controller.enqueue(bytes);
+    } catch {
+      // 客户端已断开
+      sseClients.delete(client);
+    }
+  }
+}
+
 // ==================== HTTP 服务 ====================
 
 const app = new Hono();
@@ -106,6 +129,71 @@ app.get("/api/files", (c) => {
   const dir = c.req.query("dir") || ".";
   const files = getFileList(resolve(dir));
   return c.json({ files: files.map((f) => ({ path: f, name: basename(f) })) });
+});
+
+// API: CLI 调用 - 打开文件
+app.post("/api/open-file", async (c) => {
+  const body = await c.req.json<{ path?: string }>();
+  const path = body?.path;
+  
+  if (!path) {
+    return c.json({ error: "缺少 path 参数" }, 400);
+  }
+
+  const resolvedPath = resolve(path);
+  
+  if (!existsSync(resolvedPath)) {
+    return c.json({ error: "文件不存在" }, 404);
+  }
+
+  const { content, error } = readMarkdownFile(resolvedPath);
+  if (error) {
+    return c.json({ error }, 500);
+  }
+
+  const fileInfo = {
+    path: resolvedPath,
+    filename: basename(resolvedPath),
+    content,
+    lastModified: getLastModified(resolvedPath) ?? Date.now(),
+  };
+
+  // 推送给所有连接的客户端
+  broadcastFileOpened(fileInfo);
+  
+  log(`📄 CLI 打开文件: ${fileInfo.filename}`);
+  
+  return c.json({ success: true, filename: fileInfo.filename });
+});
+
+// API: SSE 事件流
+app.get("/api/events", (c) => {
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const client: SSEClient = { controller };
+      sseClients.add(client);
+      
+      // 发送初始连接成功消息
+      const encoder = new TextEncoder();
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "connected" })}\n\n`));
+      
+      // 清理断开连接的客户端
+      c.req.signal.addEventListener("abort", () => {
+        sseClients.delete(client);
+      });
+    },
+    cancel(controller) {
+      // 清理
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive",
+    },
+  });
 });
 
 // ==================== 前端 HTML 生成 ====================
@@ -662,9 +750,32 @@ function generateClientHTML(): string {
       }
     }
 
+    // ==================== SSE 连接 ====================
+    function connectSSE() {
+      const evtSource = new EventSource('/api/events');
+      
+      evtSource.onmessage = (e) => {
+        try {
+          const { type, data } = JSON.parse(e.data);
+          if (type === 'file-opened') {
+            onFileLoaded(data);
+          }
+        } catch (err) {
+          console.error('SSE 消息解析错误:', err);
+        }
+      };
+      
+      evtSource.onerror = () => {
+        console.log('SSE 连接断开，5秒后重连...');
+        evtSource.close();
+        setTimeout(connectSSE, 5000);
+      };
+    }
+
     // ==================== 初始化 ====================
     restoreState();
     handleUrlParams();
+    connectSSE();
   <\/script>
 </body>
 </html>`;

@@ -1,0 +1,16 @@
+#!/bin/bash
+# MD Viewer CLI - 全局调用入口
+# 自动检测并调用 bun 运行 cli.ts
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+CLI_SCRIPT="$PROJECT_ROOT/src/cli.ts"
+
+# 检查 bun 是否可用
+if ! command -v bun &> /dev/null; then
+    echo "❌ 错误: 未找到 bun，请先安装: https://bun.sh"
+    exit 1
+fi
+
+# 运行 CLI
+exec bun run "$CLI_SCRIPT" "$@"

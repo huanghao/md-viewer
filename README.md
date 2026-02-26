@@ -33,10 +33,44 @@
 - **手动刷新**: 点击刷新按钮获取最新内容
 - **文件元信息**: 显示文件最后修改时间
 
-## 使用
+## 安装
+
+### 前提条件
+
+- 安装 [Bun](https://bun.sh): `curl -fsSL https://bun.sh/install | bash`
+
+### 方式一：本地开发（推荐）
 
 ```bash
-# 启动 Server
+# 克隆仓库
+git clone <repository-url>
+cd md-viewer
+
+# 安装依赖
+bun install
+```
+
+### 方式二：安装到系统 PATH
+
+```bash
+# 运行安装脚本
+./scripts/install.sh
+
+# 现在可以在任何地方使用 md-viewer-cli 命令
+md-viewer-cli --help
+```
+
+---
+
+## 使用
+
+### 启动服务端
+
+```bash
+# 开发模式（自动重载）
+bun run dev
+
+# 生产模式
 bun run src/server.ts
 
 # 指定端口
@@ -44,6 +78,17 @@ PORT=3001 bun run src/server.ts
 ```
 
 然后在浏览器打开 `http://localhost:3000/`
+
+### 使用 CLI 客户端打开文件
+
+```bash
+# 在项目目录内
+bun run cli README.md
+
+# 如果已安装到 PATH，可在任意目录使用
+md-viewer-cli ~/Documents/notes.md
+md-viewer-cli -p 3001 ./docs/guide.md
+```
 
 ## HTTP API
 

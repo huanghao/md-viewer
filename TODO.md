@@ -64,6 +64,21 @@
 先把设计文档整理出来，把交互也设计出来，我们看看
 - 设计文档: docs/design/file-update-indicator.md
 
+### Bug #3: 文件切换时布局跳动 [⏳等待 - 2026-02-28]
+- 问题：点击列表中最后一个文件时，左侧和顶部出现大片空白区域
+- 已尝试的修复（共6次迭代）：
+  1. 添加固定宽度的状态指示器容器（14px）
+  2. 统一字体粗细为 400 避免宽度变化
+  3. 居中蓝点和状态徽章
+  4. 添加固定高度（14px）+ 使用 `&nbsp;` 占位
+  5. 给 `.file-list` 添加 `min-height: 0`
+  6. 给 `.sidebar` 添加 `min-height: 0`
+- 当前状态：已应用 flexbox 嵌套容器修复，等待验证效果
+- 相关文件：
+  - src/client/css.ts (lines 15-21: .sidebar, lines 164-170: .file-list)
+  - src/client/ui/sidebar.ts (lines 146-166: renderFiles)
+- 技术要点：flexbox 嵌套容器需要 `min-height: 0` 防止错误收缩
+
 ## 输入新文件 [完成 - 2026-02-28]
 - 设计文档: docs/design/file-input-redesign.md
 - 实现：输入框移到侧边栏中部独立区域，移除添加按钮，仅回车添加

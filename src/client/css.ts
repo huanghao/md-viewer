@@ -18,6 +18,7 @@ export const styles = `
       border-right: 1px solid #e1e4e8;
       display: flex;
       flex-direction: column;
+      min-height: 0;
     }
     .sidebar-header {
       padding: 16px;
@@ -164,7 +165,9 @@ export const styles = `
     .file-list {
       flex: 1;
       overflow-y: auto;
+      overflow-x: hidden;
       padding: 8px;
+      min-height: 0;
     }
     .file-item {
       display: flex;
@@ -179,9 +182,11 @@ export const styles = `
       border: 2px solid transparent;
       gap: 6px;
       position: relative;
+      font-weight: 400;
     }
     .file-item-status {
       width: 14px;
+      height: 14px;
       flex-shrink: 0;
       display: flex;
       align-items: center;
@@ -194,7 +199,7 @@ export const styles = `
       background: #e8f0fe;
       color: #0969da;
       border: 2px solid transparent;
-      font-weight: 500;
+      font-weight: 400;
     }
     .file-item .icon {
       flex-shrink: 0;
@@ -205,14 +210,16 @@ export const styles = `
       background: #007AFF;
       border-radius: 50%;
       flex-shrink: 0;
+      margin: 0 auto;
     }
     .status-badge {
       font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
       font-size: 11px;
       font-weight: 700;
-      width: 14px;
+      width: 100%;
       text-align: center;
       flex-shrink: 0;
+      display: block;
     }
     .status-modified {
       color: #ff9500;
@@ -225,6 +232,7 @@ export const styles = `
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      min-width: 0;
     }
     .file-item .close {
       opacity: 0;
@@ -768,7 +776,7 @@ export const styles = `
     .workspace-header.active {
       background: #e8f0fe;
       color: #0969da;
-      font-weight: 500;
+      font-weight: 400;
     }
 
     .workspace-icon {
@@ -824,7 +832,7 @@ export const styles = `
     .tree-item.current {
       background: #e8f0fe;
       color: #0969da;
-      font-weight: 500;
+      font-weight: 400;
     }
 
     .tree-toggle {
@@ -890,7 +898,7 @@ export const styles = `
     .open-file-item.current {
       background: #e8f0fe;
       color: #0969da;
-      font-weight: 500;
+      font-weight: 400;
     }
 
     .open-file-icon {
@@ -928,5 +936,154 @@ export const styles = `
       text-align: center;
       color: #57606a;
       font-size: 13px;
+    }
+
+    /* ==================== 设置对话框样式 ==================== */
+
+    .settings-section {
+      margin-bottom: 24px;
+    }
+
+    .settings-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .settings-section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #24292e;
+      margin-bottom: 4px;
+    }
+
+    .settings-section-desc {
+      font-size: 12px;
+      color: #57606a;
+      margin-bottom: 12px;
+    }
+
+    /* 单选按钮组 */
+    .settings-radio-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .settings-radio-item {
+      display: flex;
+      align-items: flex-start;
+      padding: 12px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .settings-radio-item:hover {
+      background: #f6f8fa;
+      border-color: #0969da;
+    }
+
+    .settings-radio-item input[type="radio"] {
+      margin-top: 2px;
+      margin-right: 12px;
+      cursor: pointer;
+    }
+
+    .settings-radio-item input[type="radio"]:checked {
+      accent-color: #0969da;
+    }
+
+    .settings-radio-content {
+      flex: 1;
+    }
+
+    .settings-radio-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: #24292e;
+      margin-bottom: 4px;
+    }
+
+    .settings-radio-desc {
+      font-size: 12px;
+      color: #57606a;
+    }
+
+    /* 工作区列表 */
+    .settings-workspace-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .settings-workspace-item {
+      display: flex;
+      align-items: center;
+      padding: 12px;
+      background: #f6f8fa;
+      border-radius: 6px;
+      gap: 12px;
+    }
+
+    .settings-workspace-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .settings-workspace-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: #24292e;
+      margin-bottom: 4px;
+    }
+
+    .settings-workspace-path {
+      font-size: 12px;
+      color: #57606a;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .settings-workspace-remove {
+      background: none;
+      border: none;
+      font-size: 20px;
+      color: #57606a;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    .settings-workspace-remove:hover {
+      background: #ff4444;
+      color: white;
+    }
+
+    .settings-empty {
+      padding: 20px;
+      text-align: center;
+      color: #57606a;
+      font-size: 13px;
+      background: #f6f8fa;
+      border-radius: 6px;
+    }
+
+    /* 设置按钮 */
+    .settings-button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 4px;
+      font-size: 16px;
+      color: #57606a;
+      transition: all 0.2s;
+    }
+
+    .settings-button:hover {
+      background: #f6f8fa;
+      color: #0969da;
     }
 `;

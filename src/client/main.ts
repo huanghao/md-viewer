@@ -16,6 +16,7 @@ import { generateDistinctNames } from './utils/file-names';
 // 导入 UI 组件
 import { renderFiles, renderTabs, renderSearchBox, renderCurrentPath, renderSidebar } from './ui/sidebar';
 import { showToast, showSuccess, showError, showWarning, showInfo } from './ui/toast';
+import { showSettingsDialog } from './ui/settings';
 
 // ==================== 消息处理 ====================
 async function onFileLoaded(data: FileData, focus: boolean = false) {
@@ -784,6 +785,7 @@ declare global {
     copySingleText: (text: string, e?: Event) => void;
     copyErrorInfo: () => void;
     showToast?: (message: string, type: string) => void;
+    showSettingsDialog: () => void;
   }
 }
 
@@ -804,6 +806,7 @@ window.copySyncCommand = copySyncCommand;
 window.copySingleText = copySingleText;
 window.copyErrorInfo = copyErrorInfo;
 window.showToast = showToast;
+window.showSettingsDialog = showSettingsDialog;
 
 // ==================== 初始化 ====================
 (async () => {

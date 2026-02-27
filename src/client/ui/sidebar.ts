@@ -145,7 +145,7 @@ export function renderFiles(): void {
 
       // 获取文件状态（优先级：D > M > 🔵）
       const status = getFileListStatus(file);
-      let statusBadge = '';
+      let statusBadge = '&nbsp;'; // 默认使用不间断空格占位
 
       if (status.badge === 'dot') {
         // 蓝色圆点

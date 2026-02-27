@@ -72,6 +72,7 @@ export function generateClientHTML(): string {
       <div class="toolbar">
         <div class="breadcrumb" id="breadcrumb"></div>
         <div class="spacer"></div>
+        <button class="settings-button" onclick="showSettingsDialog()" title="设置">⚙️</button>
         <button class="sync-button" id="syncButton" onclick="handleSyncButtonClick()">
           <span id="syncButtonText">🔄 同步</span>
         </button>

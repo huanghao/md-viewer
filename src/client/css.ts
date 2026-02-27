@@ -162,6 +162,7 @@ export const styles = `
       color: #1f2328;
       background: transparent;
       border: 2px solid transparent;
+      gap: 6px;
     }
     .file-item:hover {
       background: #f6f8fa;
@@ -173,7 +174,14 @@ export const styles = `
       font-weight: 500;
     }
     .file-item .icon {
-      margin-right: 8px;
+      flex-shrink: 0;
+    }
+    .new-dot {
+      width: 6px;
+      height: 6px;
+      background: #007AFF;
+      border-radius: 50%;
+      flex-shrink: 0;
     }
     .file-item .name {
       flex: 1;

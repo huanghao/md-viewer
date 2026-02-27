@@ -128,9 +128,13 @@ export function renderFiles(): void {
         }
       }
 
+      // 新文件蓝点
+      const newDot = file.isNew ? '<span class="new-dot"></span>' : '';
+
       return `
       <div class="${classes}"
            onclick="window.switchFile('${escapeAttr(file.path)}')">
+        ${newDot}
         <span class="icon">📄</span>
         <span class="name">${displayName}</span>
         <span class="close" onclick="event.stopPropagation();window.removeFile('${escapeAttr(file.path)}')">×</span>

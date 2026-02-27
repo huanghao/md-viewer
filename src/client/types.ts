@@ -6,6 +6,7 @@ export interface FileInfo {
   lastModified: number;
   isRemote: boolean;
   displayName?: string;
+  isNew?: boolean;  // 标识是否为新文件（未读）
 }
 
 // 应用状态类型

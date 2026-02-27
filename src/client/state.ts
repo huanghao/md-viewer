@@ -18,6 +18,7 @@ export function saveState(): void {
         path: file.path,
         name: file.name,
         isRemote: file.isRemote || false,
+        isNew: file.isNew || false,
         lastAccessed: Date.now() // 记录最后访问时间用于 LRU
       }]),
       currentFile: state.currentFile
@@ -36,6 +37,7 @@ export function saveState(): void {
             path: file.path,
             name: file.name,
             isRemote: file.isRemote || false,
+            isNew: file.isNew || false,
             lastAccessed: Date.now()
           }]),
           currentFile: state.currentFile
@@ -92,7 +94,8 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
           name: fileData.filename,
           content: fileData.content,
           lastModified: fileData.lastModified,
-          isRemote: fileData.isRemote || false
+          isRemote: fileData.isRemote || false,
+          isNew: fileInfo.isNew || false  // 恢复 isNew 状态
         });
         validFiles.push([path, fileInfo]);
       }
@@ -128,12 +131,16 @@ export function addOrUpdateFile(fileData: FileData, switchTo: boolean = false): 
     cleanupOldFiles();
   }
 
+  const existing = state.files.get(fileData.path);
+  const isNew = !existing;  // 如果是新添加的文件，标记为 isNew
+
   state.files.set(fileData.path, {
     path: fileData.path,
     name: fileData.filename,
     content: fileData.content,
     lastModified: fileData.lastModified,
-    isRemote: fileData.isRemote || false
+    isRemote: fileData.isRemote || false,
+    isNew: isNew && !switchTo  // 新文件且不立即切换时标记为未读
   });
 
   if (switchTo) {
@@ -160,6 +167,10 @@ export function switchToFile(path: string): void {
   const file = state.files.get(path);
   if (file) {
     file.lastModified = Date.now();
+    // 标记为已读
+    if (file.isNew) {
+      file.isNew = false;
+    }
   }
 
   saveState();

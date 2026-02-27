@@ -128,8 +128,28 @@ export const clientScript = `
     }
 
     // ==================== UI 渲染 ====================
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     function escapeAttr(str) {
-      return str ? str.replace(/'/g, "\\\\'") : '';
+      return escapeHtml(str);
+    }
+
+    function escapeJsSingleQuoted(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\\\'")
+        .replace(/\r/g, '\\\\r')
+        .replace(/\n/g, '\\\\n')
+        .replace(/</g, '\\\\x3C');
     }
 
     // 为同名文件生成区分名称
@@ -677,7 +697,7 @@ export const clientScript = `
       let html = \`
         <div class="sync-dialog-field">
           <label class="sync-dialog-label">📄 文件</label>
-          <div style="color: #586069; font-size: 13px;">\${file.name}</div>
+          <div style="color: #586069; font-size: 13px;">\${escapeHtml(file.name)}</div>
         </div>
 
         <div class="sync-dialog-field">
@@ -694,11 +714,11 @@ export const clientScript = `
         recentData.parents.forEach((parent, index) => {
           const isDefault = parent.id === recentData.defaultParentId;
           html += \`
-            <div class="sync-dialog-recent-item \${isDefault ? 'selected' : ''}" onclick="selectRecentParent('\${escapeAttr(parent.id)}')">
+            <div class="sync-dialog-recent-item \${isDefault ? 'selected' : ''}" onclick="selectRecentParent('\${escapeJsSingleQuoted(parent.id)}', event)">
               <input type="radio" name="recentParent" value="\${escapeAttr(parent.id)}" class="sync-dialog-recent-radio" \${isDefault ? 'checked' : ''}>
               <div class="sync-dialog-recent-info">
-                <div class="sync-dialog-recent-title">\${parent.title}</div>
-                <div class="sync-dialog-recent-meta">ID: \${parent.id} · 最后使用：\${formatRelativeTime(parent.lastUsed)}</div>
+                <div class="sync-dialog-recent-title">\${escapeHtml(parent.title)}</div>
+                <div class="sync-dialog-recent-meta">ID: \${escapeHtml(parent.id)} · 最后使用：\${escapeHtml(formatRelativeTime(parent.lastUsed))}</div>
               </div>
             </div>
           \`;
@@ -733,6 +753,26 @@ export const clientScript = `
       \`;
 
       body.innerHTML = html;
+
+      // 如果字符串拼接被异常字符打断，兜底补上命令预览区
+      if (!document.getElementById('syncCommandPreview')) {
+        const checkbox = body.querySelector('.sync-dialog-checkbox');
+        if (checkbox) {
+          const fallback = document.createElement('div');
+          fallback.className = 'sync-dialog-field';
+          fallback.innerHTML = \`
+            <div class="sync-dialog-output-header">
+              <label class="sync-dialog-label">将执行的命令：</label>
+              <button class="sync-dialog-copy-btn" onclick="copySyncCommand()">
+                📋 复制
+              </button>
+            </div>
+            <div class="sync-dialog-output" id="syncCommandPreview">km-cli doc create --parent-id "..." --title "..." --markdown-file "\${escapeHtml(state.currentFile || '')}" --json</div>
+          \`;
+          checkbox.parentNode.insertBefore(fallback, checkbox);
+        }
+      }
+
       overlay.classList.add('show');
 
       // 监听标题输入变化
@@ -777,12 +817,16 @@ export const clientScript = `
     }
 
     // 选择最近位置
-    function selectRecentParent(parentId) {
+    function selectRecentParent(parentId, e) {
       const items = document.querySelectorAll('.sync-dialog-recent-item');
       items.forEach(item => item.classList.remove('selected'));
-      event.currentTarget.classList.add('selected');
+      if (e && e.currentTarget) {
+        e.currentTarget.classList.add('selected');
+      }
 
-      const radio = event.currentTarget.querySelector('input[type="radio"]');
+      const radio = e && e.currentTarget
+        ? e.currentTarget.querySelector('input[type="radio"]')
+        : null;
       if (radio) radio.checked = true;
 
       // 清空手动输入
@@ -896,11 +940,11 @@ export const clientScript = `
           <div class="sync-dialog-field">
             <div class="sync-dialog-output-header">
               <label class="sync-dialog-label">执行的命令：</label>
-              <button class="sync-dialog-copy-btn" onclick="copySingleText('\${escapeAttr(result.command)}')">
+              <button class="sync-dialog-copy-btn" onclick="copySingleText('\${escapeJsSingleQuoted(result.command)}', event)">
                 📋 复制
               </button>
             </div>
-            <div class="sync-dialog-output">\${result.command}</div>
+            <div class="sync-dialog-output">\${escapeHtml(result.command)}</div>
           </div>
         \` : ''}
 
@@ -908,11 +952,11 @@ export const clientScript = `
           <div class="sync-dialog-field">
             <div class="sync-dialog-output-header">
               <label class="sync-dialog-label">km-cli 返回：</label>
-              <button class="sync-dialog-copy-btn" onclick="copySingleText('\${escapeAttr(result.output)}')">
+              <button class="sync-dialog-copy-btn" onclick="copySingleText('\${escapeJsSingleQuoted(result.output)}', event)">
                 📋 复制
               </button>
             </div>
-            <div class="sync-dialog-output">\${result.output}</div>
+            <div class="sync-dialog-output">\${escapeHtml(result.output)}</div>
           </div>
         \` : ''}
 
@@ -949,22 +993,22 @@ export const clientScript = `
           <div class="sync-dialog-field">
             <div class="sync-dialog-output-header">
               <label class="sync-dialog-label">执行的命令：</label>
-              <button class="sync-dialog-copy-btn" onclick="copySingleText('\${escapeAttr(result.command)}')">
+              <button class="sync-dialog-copy-btn" onclick="copySingleText('\${escapeJsSingleQuoted(result.command)}', event)">
                 📋 复制
               </button>
             </div>
-            <div class="sync-dialog-output">\${result.command}</div>
+            <div class="sync-dialog-output">\${escapeHtml(result.command)}</div>
           </div>
         \` : ''}
 
         <div class="sync-dialog-field">
           <div class="sync-dialog-output-header">
             <label class="sync-dialog-label">km-cli 返回：</label>
-            <button class="sync-dialog-copy-btn" onclick="copySingleText('\${escapeAttr(result.output || '无输出')}')">
+            <button class="sync-dialog-copy-btn" onclick="copySingleText('\${escapeJsSingleQuoted(result.output || '无输出')}', event)">
               📋 复制
             </button>
           </div>
-          <div class="sync-dialog-output">\${result.output || '无输出'}</div>
+          <div class="sync-dialog-output">\${escapeHtml(result.output || '无输出')}</div>
         </div>
 
         <div class="sync-dialog-footer">
@@ -1004,11 +1048,11 @@ export const clientScript = `
           <div class="sync-dialog-field">
             <div class="sync-dialog-output-header">
               <label class="sync-dialog-label">执行的命令：</label>
-              <button class="sync-dialog-copy-btn" onclick="copySingleText('\${escapeAttr(syncData.command)}')">
+              <button class="sync-dialog-copy-btn" onclick="copySingleText('\${escapeJsSingleQuoted(syncData.command)}', event)">
                 📋 复制
               </button>
             </div>
-            <div class="sync-dialog-output">\${syncData.command}</div>
+            <div class="sync-dialog-output">\${escapeHtml(syncData.command)}</div>
           </div>
         \` : ''}
 
@@ -1040,10 +1084,10 @@ export const clientScript = `
     }
 
     // 复制单个文本
-    function copySingleText(text) {
+    function copySingleText(text, e) {
       navigator.clipboard.writeText(text).then(() => {
         // 临时显示复制成功提示
-        const btn = event.target.closest('.sync-dialog-copy-btn');
+        const btn = e && e.target ? e.target.closest('.sync-dialog-copy-btn') : null;
         if (btn) {
           const originalText = btn.innerHTML;
           btn.innerHTML = '✓ 已复制';

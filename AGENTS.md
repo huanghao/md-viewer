@@ -29,31 +29,13 @@ When adding, removing, or modifying configuration options:
    - Update the EXAMPLE CONFIGURATION section
    - Document the default value and valid ranges
 
-2. Update configuration loading code in the appropriate module
+2. 更新 `docs/配置说明.md`
 
-3. Consider backward compatibility:
+3. Update configuration loading code in the appropriate module
+
+4. Consider backward compatibility:
    - Mark deprecated options in the man page
    - Maintain support for old option names when possible
-
-### Man Page Format Guidelines
-
-- Use `.TP` for option definitions
-- Keep option descriptions under 80 characters where possible
-- Use `.BR` for bold+roman mixed text (e.g., `.BR \-p ", " \-\-port`)
-- Include examples for non-obvious options
-- Cross-reference related man pages with `.BR manpage (N)`
-
-## Current CLI Reference
-
-```
-md-viewer-cli [OPTIONS] FILE
-
-Options:
-  -p, --port <PORT>     Server port (default: 3000)
-  -h, --host <HOST>     Server host (default: localhost)
-  --no-focus            Don't switch to the file after adding
-  --help                Show help message
-```
 
 ## Current Configuration Options
 

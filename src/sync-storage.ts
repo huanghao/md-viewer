@@ -29,6 +29,7 @@ export interface SyncedFileInfo {
   kmTitle: string;
   parentId: string;
   lastSyncTime: number;
+  command?: string; // 执行的命令
 }
 
 export interface SyncRecords {

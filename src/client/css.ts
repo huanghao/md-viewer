@@ -519,6 +519,33 @@ export const styles = `
       word-break: break-all;
       user-select: all;
       margin-top: 12px;
+      position: relative;
+    }
+    .sync-dialog-output-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .sync-dialog-copy-btn {
+      padding: 4px 8px;
+      font-size: 11px;
+      background: #fff;
+      border: 1px solid #d1d5da;
+      border-radius: 4px;
+      cursor: pointer;
+      color: #586069;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .sync-dialog-copy-btn:hover {
+      background: #f6f8fa;
+      border-color: #0969da;
+      color: #0969da;
+    }
+    .sync-dialog-copy-btn:active {
+      background: #e6f7ed;
     }
 
     /* 加载动画 */

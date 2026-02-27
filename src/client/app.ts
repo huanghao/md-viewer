@@ -841,14 +841,24 @@ export const clientScript = `
 
         \${result.command ? \`
           <div class="sync-dialog-field">
-            <label class="sync-dialog-label">执行的命令：</label>
+            <div class="sync-dialog-output-header">
+              <label class="sync-dialog-label">执行的命令：</label>
+              <button class="sync-dialog-copy-btn" onclick="copySingleText('\${escapeAttr(result.command)}')">
+                📋 复制
+              </button>
+            </div>
             <div class="sync-dialog-output">\${result.command}</div>
           </div>
         \` : ''}
 
         \${result.output ? \`
           <div class="sync-dialog-field">
-            <label class="sync-dialog-label">km-cli 返回：</label>
+            <div class="sync-dialog-output-header">
+              <label class="sync-dialog-label">km-cli 返回：</label>
+              <button class="sync-dialog-copy-btn" onclick="copySingleText('\${escapeAttr(result.output)}')">
+                📋 复制
+              </button>
+            </div>
             <div class="sync-dialog-output">\${result.output}</div>
           </div>
         \` : ''}
@@ -884,13 +894,23 @@ export const clientScript = `
 
         \${result.command ? \`
           <div class="sync-dialog-field">
-            <label class="sync-dialog-label">执行的命令：</label>
+            <div class="sync-dialog-output-header">
+              <label class="sync-dialog-label">执行的命令：</label>
+              <button class="sync-dialog-copy-btn" onclick="copySingleText('\${escapeAttr(result.command)}')">
+                📋 复制
+              </button>
+            </div>
             <div class="sync-dialog-output">\${result.command}</div>
           </div>
         \` : ''}
 
         <div class="sync-dialog-field">
-          <label class="sync-dialog-label">km-cli 返回：</label>
+          <div class="sync-dialog-output-header">
+            <label class="sync-dialog-label">km-cli 返回：</label>
+            <button class="sync-dialog-copy-btn" onclick="copySingleText('\${escapeAttr(result.output || '无输出')}')">
+              📋 复制
+            </button>
+          </div>
           <div class="sync-dialog-output">\${result.output || '无输出'}</div>
         </div>
 
@@ -921,11 +941,23 @@ export const clientScript = `
             <span style="color: #586069;">🔗 链接：</span>
             <a href="\${syncData.kmUrl}" target="_blank" style="color: #0969da;">\${syncData.kmUrl}</a>
           </div>
-          <div>
+          <div style="margin-bottom: 16px;">
             <span style="color: #586069;">🕐 同步时间：</span>
             <span style="color: #24292e;">\${formatRelativeTime(syncData.lastSyncTime)}</span>
           </div>
         </div>
+
+        \${syncData.command ? \`
+          <div class="sync-dialog-field">
+            <div class="sync-dialog-output-header">
+              <label class="sync-dialog-label">执行的命令：</label>
+              <button class="sync-dialog-copy-btn" onclick="copySingleText('\${escapeAttr(syncData.command)}')">
+                📋 复制
+              </button>
+            </div>
+            <div class="sync-dialog-output">\${syncData.command}</div>
+          </div>
+        \` : ''}
 
         <div class="sync-dialog-footer">
           <button class="sync-dialog-button" onclick="window.open('\${syncData.kmUrl}', '_blank')">在学城中打开</button>
@@ -952,6 +984,25 @@ export const clientScript = `
           alert('错误信息已复制到剪贴板');
         });
       }
+    }
+
+    // 复制单个文本
+    function copySingleText(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        // 临时显示复制成功提示
+        const btn = event.target.closest('.sync-dialog-copy-btn');
+        if (btn) {
+          const originalText = btn.innerHTML;
+          btn.innerHTML = '✓ 已复制';
+          btn.style.color = '#2ea44f';
+          setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.style.color = '';
+          }, 1500);
+        }
+      }).catch(() => {
+        alert('复制失败');
+      });
     }
 
     // ==================== SSE 连接 ====================

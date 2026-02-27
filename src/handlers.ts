@@ -289,6 +289,7 @@ export async function handleSyncExecute(c: Context) {
       kmTitle: title,
       parentId,
       lastSyncTime: Date.now(),
+      command: result.command,
     });
 
     // 更新最近使用的位置

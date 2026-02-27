@@ -123,29 +123,44 @@ export const styles = `
       padding: 0 2px;
       border-radius: 2px;
     }
-    .add-file {
+    /* 添加文件区域 */
+    .add-file-section {
+      padding: 16px;
+      border-bottom: 1px solid #e1e4e8;
+      background: #f6f8fa;
+    }
+    .add-file-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #24292e;
+      margin-bottom: 8px;
       display: flex;
-      gap: 8px;
+      align-items: center;
+      gap: 6px;
     }
-    .add-file input {
-      flex: 1;
-      padding: 6px 10px;
-      border: 1px solid #d1d5da;
+    .add-file-input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #d0d7de;
       border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+      margin-bottom: 8px;
+    }
+    .add-file-input::placeholder {
+      color: #57606a;
+    }
+    .add-file-input:focus {
+      outline: none;
+      border-color: #0969da;
+      box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
+    }
+    .add-file-hint {
       font-size: 12px;
+      color: #57606a;
+      text-align: center;
     }
-    .add-file button {
-      padding: 6px 12px;
-      background: #2ea44f;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 12px;
-    }
-    .add-file button:hover {
-      background: #2c974b;
-    }
+
     .file-list {
       flex: 1;
       overflow-y: auto;

@@ -43,14 +43,26 @@ export function generateClientHTML(): string {
         <div id="searchBox"></div>
         <!-- 当前文件路径 -->
         <div id="currentPath"></div>
-        <div class="add-file">
-          <input type="text" id="fileInput" placeholder="输入文件路径..."
-                 onkeypress="if(event.key==='Enter')addFile()">
-          <button onclick="addFile()">添加</button>
-        </div>
       </div>
+
+      <!-- 添加文件区域 -->
+      <div class="add-file-section">
+        <div class="add-file-title">
+          <span>➕</span>
+          <span>添加文件</span>
+        </div>
+        <input
+          type="text"
+          class="add-file-input"
+          id="fileInput"
+          placeholder="输入文件路径并回车"
+          onkeypress="if(event.key==='Enter')addFile()"
+        />
+        <div class="add-file-hint">或拖拽 Markdown 文件到窗口</div>
+      </div>
+
       <div class="file-list" id="fileList">
-        <div class="empty-tip">点击上方添加 Markdown 文件<br>或拖拽文件到窗口</div>
+        <div class="empty-tip">暂无文件</div>
       </div>
     </aside>
 

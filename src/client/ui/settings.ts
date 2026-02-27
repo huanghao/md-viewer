@@ -2,6 +2,13 @@ import { state } from '../state';
 import { saveConfig } from '../config';
 import { renderSidebar } from './sidebar';
 
+// 初始化：绑定全局函数
+if (typeof window !== 'undefined') {
+  (window as any).closeSettingsDialog = closeSettingsDialog;
+  (window as any).saveSettings = saveSettings;
+  (window as any).removeWorkspaceFromSettings = removeWorkspaceFromSettings;
+}
+
 // 显示设置对话框
 export function showSettingsDialog(): void {
   const overlay = document.getElementById('settingsDialogOverlay');
@@ -159,8 +166,3 @@ export function removeWorkspaceFromSettings(index: number): void {
     renderSettingsDialog();
   }
 }
-
-// 绑定全局函数
-(window as any).closeSettingsDialog = closeSettingsDialog;
-(window as any).saveSettings = saveSettings;
-(window as any).removeWorkspaceFromSettings = removeWorkspaceFromSettings;

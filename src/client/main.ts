@@ -36,9 +36,32 @@ async function refreshCurrentFile() {
     if (file) {
       file.content = data.content;
       file.lastModified = data.lastModified;
+      file.displayedModified = data.lastModified;  // 同步时间戳
       renderContent();
       renderFiles();
     }
+  }
+}
+
+// 手动刷新文件（用户点击刷新按钮）
+async function refreshFile(path: string) {
+  const file = state.files.get(path);
+  if (!file) return;
+
+  const data = await loadFile(path);
+  if (data) {
+    file.content = data.content;
+    file.lastModified = data.lastModified;
+    file.displayedModified = data.lastModified;  // 同步时间戳，消除 dirty 状态
+
+    // 如果当前正在查看这个文件，重新渲染
+    if (state.currentFile === path) {
+      renderContent();
+      showSuccess('文件已刷新', 2000);
+    }
+
+    // 重新渲染文件列表（M 标识消失）
+    renderFiles();
   }
 }
 
@@ -691,13 +714,41 @@ function copyErrorInfo() {
 function connectSSE() {
   const eventSource = new EventSource('/api/events');
 
+  // 文件内容变化
   eventSource.addEventListener('file-changed', async (e: any) => {
     const data = JSON.parse(e.data);
-    if (state.files.has(data.path)) {
-      await refreshCurrentFile();
+    const file = state.files.get(data.path);
+
+    if (file) {
+      // 只更新 lastModified，不更新 content 和 displayedModified
+      // 这样 lastModified > displayedModified，触发 isDirty 状态
+      file.lastModified = data.lastModified;
+
+      // 重新渲染文件列表，显示 M 标识
+      renderFiles();
     }
   });
 
+  // 文件删除
+  eventSource.addEventListener('file-deleted', async (e: any) => {
+    const data = JSON.parse(e.data);
+    const file = state.files.get(data.path);
+
+    if (file) {
+      // 标记文件为不存在
+      file.isMissing = true;
+
+      // 重新渲染文件列表，显示 D 标识
+      renderFiles();
+
+      // 如果当前正在查看这个文件，显示提示
+      if (state.currentFile === data.path) {
+        showError('文件已不存在');
+      }
+    }
+  });
+
+  // 文件打开（CLI 触发）
   eventSource.addEventListener('file-opened', async (e: any) => {
     const data = JSON.parse(e.data);
     await onFileLoaded(data, data.focus !== false);
@@ -718,6 +769,7 @@ declare global {
     removeFile: (path: string) => void;
     showNearbyMenu: (e: Event) => void;
     addFileByPath: (path: string, focus: boolean) => void;
+    refreshFile: (path: string) => void;
     handleSyncButtonClick: () => void;
     closeSyncDialog: () => void;
     selectRecentParent: (parentId: string, e?: Event) => void;
@@ -737,6 +789,7 @@ window.switchFile = switchFile;
 window.removeFile = removeFileHandler;
 window.showNearbyMenu = showNearbyMenu;
 window.addFileByPath = addFileByPath;
+window.refreshFile = refreshFile;
 window.handleSyncButtonClick = handleSyncButtonClick;
 window.closeSyncDialog = closeSyncDialog;
 window.selectRecentParent = selectRecentParent;

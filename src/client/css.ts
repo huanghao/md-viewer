@@ -131,6 +131,39 @@ export const styles = `
       color: #586069;
     }
 
+    /* 同步按钮 */
+    .sync-button {
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      border: 1px solid #d1d5da;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s;
+    }
+    .sync-button:hover {
+      background: #f6f8fa;
+    }
+    .sync-button.synced {
+      color: #2ea44f;
+      border-color: #2ea44f;
+    }
+    .sync-button.synced:hover {
+      background: #e6f7ed;
+    }
+    .sync-button.syncing {
+      color: #586069;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+    .sync-button:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
     /* 面包屑 */
     .breadcrumb {
       display: flex;
@@ -297,6 +330,195 @@ export const styles = `
       font-size: 20px;
       margin-bottom: 12px;
       color: #24292e;
+    }
+
+    /* 同步对话框 */
+    .sync-dialog-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+    .sync-dialog-overlay.show {
+      display: flex;
+    }
+    .sync-dialog {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+      width: 90%;
+      max-width: 520px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .sync-dialog-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid #e1e4e8;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .sync-dialog-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #24292e;
+    }
+    .sync-dialog-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: #586069;
+      cursor: pointer;
+      padding: 0;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+    }
+    .sync-dialog-close:hover {
+      background: #f6f8fa;
+    }
+    .sync-dialog-body {
+      padding: 24px;
+    }
+    .sync-dialog-field {
+      margin-bottom: 20px;
+    }
+    .sync-dialog-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #24292e;
+      margin-bottom: 8px;
+    }
+    .sync-dialog-input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #d1d5da;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    .sync-dialog-input:focus {
+      outline: none;
+      border-color: #0969da;
+      box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
+    }
+    .sync-dialog-recent {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #d1d5da;
+      border-radius: 6px;
+      margin-bottom: 16px;
+    }
+    .sync-dialog-recent-item {
+      padding: 12px;
+      border-bottom: 1px solid #e1e4e8;
+      cursor: pointer;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .sync-dialog-recent-item:last-child {
+      border-bottom: none;
+    }
+    .sync-dialog-recent-item:hover {
+      background: #f6f8fa;
+    }
+    .sync-dialog-recent-item.selected {
+      background: #ddf4ff;
+    }
+    .sync-dialog-recent-radio {
+      margin-top: 2px;
+    }
+    .sync-dialog-recent-info {
+      flex: 1;
+    }
+    .sync-dialog-recent-title {
+      font-size: 14px;
+      color: #24292e;
+      margin-bottom: 4px;
+    }
+    .sync-dialog-recent-meta {
+      font-size: 12px;
+      color: #586069;
+    }
+    .sync-dialog-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #24292e;
+      margin-bottom: 20px;
+    }
+    .sync-dialog-footer {
+      padding: 16px 24px;
+      border-top: 1px solid #e1e4e8;
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+    .sync-dialog-button {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid #d1d5da;
+      background: #fff;
+      color: #24292e;
+    }
+    .sync-dialog-button:hover {
+      background: #f6f8fa;
+    }
+    .sync-dialog-button.primary {
+      background: #2ea44f;
+      color: #fff;
+      border-color: #2ea44f;
+    }
+    .sync-dialog-button.primary:hover {
+      background: #2c974b;
+    }
+    .sync-dialog-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .sync-dialog-empty {
+      padding: 20px;
+      text-align: center;
+      color: #586069;
+      font-size: 13px;
+    }
+    .sync-dialog-error {
+      padding: 12px;
+      background: #fff5f5;
+      border: 1px solid #ff4444;
+      border-radius: 6px;
+      color: #cf222e;
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+    .sync-dialog-output {
+      background: #f6f8fa;
+      border: 1px solid #d1d5da;
+      border-radius: 6px;
+      padding: 12px;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      user-select: all;
+      margin-top: 12px;
     }
 
     /* 加载动画 */

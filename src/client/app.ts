@@ -260,6 +260,7 @@ export const clientScript = `
 
       updateFileMeta(file.lastModified);
       renderBreadcrumb(file.path);
+      updateSyncButton();
     }
 
     function formatRelativeTime(timestamp) {
@@ -604,10 +605,336 @@ export const clientScript = `
       }
     }
 
+    // ==================== 同步功能 ====================
+
+    // 更新同步按钮状态
+    async function updateSyncButton() {
+      const button = document.getElementById('syncButton');
+      const buttonText = document.getElementById('syncButtonText');
+      if (!button || !buttonText || !state.currentFile) {
+        if (button) button.style.display = 'none';
+        return;
+      }
+
+      button.style.display = 'flex';
+
+      // 获取同步状态
+      try {
+        const response = await fetch(\`/api/sync/status?path=\${encodeURIComponent(state.currentFile)}\`);
+        const data = await response.json();
+
+        if (data.synced) {
+          button.className = 'sync-button synced';
+          buttonText.textContent = '✓ 已同步';
+        } else {
+          button.className = 'sync-button';
+          buttonText.textContent = '🔄 同步';
+        }
+      } catch (e) {
+        console.error('获取同步状态失败:', e);
+      }
+    }
+
+    // 点击同步按钮
+    async function handleSyncButtonClick() {
+      if (!state.currentFile) return;
+
+      const button = document.getElementById('syncButton');
+      if (button && button.classList.contains('syncing')) return;
+
+      // 获取同步状态
+      const response = await fetch(\`/api/sync/status?path=\${encodeURIComponent(state.currentFile)}\`);
+      const data = await response.json();
+
+      if (data.synced) {
+        // 已同步，显示详情对话框
+        showSyncedFileDialog(data);
+      } else {
+        // 未同步，显示同步对话框
+        showSyncDialog();
+      }
+    }
+
+    // 显示同步对话框
+    async function showSyncDialog() {
+      const file = state.files.get(state.currentFile);
+      if (!file) return;
+
+      // 从 Markdown 提取标题
+      const titleMatch = file.content.match(/^#\\s+(.+)$/m);
+      const defaultTitle = titleMatch ? titleMatch[1] : file.name.replace('.md', '');
+
+      // 获取最近位置
+      const recentResponse = await fetch('/api/sync/recent-parents');
+      const recentData = await recentResponse.json();
+
+      const overlay = document.getElementById('syncDialogOverlay');
+      const title = document.getElementById('syncDialogTitle');
+      const body = document.getElementById('syncDialogBody');
+
+      title.textContent = '同步到学城';
+
+      let html = \`
+        <div class="sync-dialog-field">
+          <label class="sync-dialog-label">📄 文件</label>
+          <div style="color: #586069; font-size: 13px;">\${file.name}</div>
+        </div>
+
+        <div class="sync-dialog-field">
+          <label class="sync-dialog-label">📝 标题</label>
+          <input type="text" class="sync-dialog-input" id="syncTitle" value="\${escapeAttr(defaultTitle)}">
+        </div>
+
+        <div class="sync-dialog-field">
+          <label class="sync-dialog-label">📍 选择位置</label>
+      \`;
+
+      if (recentData.parents && recentData.parents.length > 0) {
+        html += '<div class="sync-dialog-recent">';
+        recentData.parents.forEach((parent, index) => {
+          const isDefault = parent.id === recentData.defaultParentId;
+          html += \`
+            <div class="sync-dialog-recent-item \${isDefault ? 'selected' : ''}" onclick="selectRecentParent('\${escapeAttr(parent.id)}')">
+              <input type="radio" name="recentParent" value="\${escapeAttr(parent.id)}" class="sync-dialog-recent-radio" \${isDefault ? 'checked' : ''}>
+              <div class="sync-dialog-recent-info">
+                <div class="sync-dialog-recent-title">\${parent.title}</div>
+                <div class="sync-dialog-recent-meta">ID: \${parent.id} · 最后使用：\${formatRelativeTime(parent.lastUsed)}</div>
+              </div>
+            </div>
+          \`;
+        });
+        html += '</div>';
+      }
+
+      html += \`
+          <label class="sync-dialog-label" style="margin-top: 12px;">或手动输入 Parent ID：</label>
+          <input type="text" class="sync-dialog-input" id="syncParentId" placeholder="123456">
+        </div>
+
+        <div class="sync-dialog-checkbox">
+          <input type="checkbox" id="syncOpenAfter" checked>
+          <label for="syncOpenAfter">同步后打开学城页面</label>
+        </div>
+
+        <div class="sync-dialog-footer">
+          <button class="sync-dialog-button" onclick="closeSyncDialog()">取消</button>
+          <button class="sync-dialog-button primary" onclick="executeSyncDialog()">确定</button>
+        </div>
+      \`;
+
+      body.innerHTML = html;
+      overlay.classList.add('show');
+    }
+
+    // 选择最近位置
+    function selectRecentParent(parentId) {
+      const items = document.querySelectorAll('.sync-dialog-recent-item');
+      items.forEach(item => item.classList.remove('selected'));
+      event.currentTarget.classList.add('selected');
+
+      const radio = event.currentTarget.querySelector('input[type="radio"]');
+      if (radio) radio.checked = true;
+
+      // 清空手动输入
+      const manualInput = document.getElementById('syncParentId');
+      if (manualInput) manualInput.value = '';
+    }
+
+    // 执行同步
+    async function executeSyncDialog() {
+      const titleInput = document.getElementById('syncTitle');
+      const manualInput = document.getElementById('syncParentId');
+      const openAfterCheckbox = document.getElementById('syncOpenAfter');
+
+      const title = titleInput ? titleInput.value.trim() : '';
+      const manualParentId = manualInput ? manualInput.value.trim() : '';
+      const openAfter = openAfterCheckbox ? openAfterCheckbox.checked : false;
+
+      // 获取选中的 parent-id
+      let parentId = manualParentId;
+      if (!parentId) {
+        const selectedRadio = document.querySelector('input[name="recentParent"]:checked');
+        parentId = selectedRadio ? selectedRadio.value : '';
+      }
+
+      if (!title) {
+        alert('请输入标题');
+        return;
+      }
+
+      if (!parentId) {
+        alert('请选择位置或输入 Parent ID');
+        return;
+      }
+
+      // 关闭对话框，显示同步中状态
+      closeSyncDialog();
+
+      const button = document.getElementById('syncButton');
+      const buttonText = document.getElementById('syncButtonText');
+      if (button && buttonText) {
+        button.className = 'sync-button syncing';
+        button.disabled = true;
+        buttonText.textContent = '⏳ 同步中...';
+      }
+
+      // 调用同步 API
+      try {
+        const response = await fetch('/api/sync/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filePath: state.currentFile,
+            parentId,
+            title,
+            openAfterSync: openAfter
+          })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          // 同步成功
+          showSyncSuccessDialog(result);
+          updateSyncButton();
+        } else {
+          // 同步失败
+          showSyncErrorDialog(result);
+        }
+      } catch (e) {
+        showSyncErrorDialog({
+          success: false,
+          error: e.message,
+          output: e.stack || ''
+        });
+      } finally {
+        if (button) {
+          button.disabled = false;
+        }
+      }
+    }
+
+    // 显示同步成功对话框
+    function showSyncSuccessDialog(result) {
+      const overlay = document.getElementById('syncDialogOverlay');
+      const title = document.getElementById('syncDialogTitle');
+      const body = document.getElementById('syncDialogBody');
+
+      title.textContent = '同步成功！';
+
+      body.innerHTML = \`
+        <div style="text-align: center; padding: 20px 0;">
+          <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
+          <div style="font-size: 16px; color: #24292e; margin-bottom: 24px;">文档已成功同步到学城</div>
+
+          <div style="text-align: left; background: #f6f8fa; padding: 16px; border-radius: 8px;">
+            <div style="margin-bottom: 8px;">
+              <span style="color: #586069;">📄 标题：</span>
+              <span style="color: #24292e;">\${result.kmTitle}</span>
+            </div>
+            <div>
+              <span style="color: #586069;">🔗 链接：</span>
+              <a href="\${result.kmUrl}" target="_blank" style="color: #0969da;">\${result.kmUrl}</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="sync-dialog-footer">
+          <button class="sync-dialog-button" onclick="closeSyncDialog()">关闭</button>
+          <button class="sync-dialog-button primary" onclick="window.open('\${result.kmUrl}', '_blank');closeSyncDialog();">在学城中打开</button>
+        </div>
+      \`;
+
+      overlay.classList.add('show');
+
+      // 如果勾选了自动打开
+      if (result.openAfterSync) {
+        setTimeout(() => {
+          window.open(result.kmUrl, '_blank');
+        }, 500);
+      }
+    }
+
+    // 显示同步失败对话框
+    function showSyncErrorDialog(result) {
+      const overlay = document.getElementById('syncDialogOverlay');
+      const title = document.getElementById('syncDialogTitle');
+      const body = document.getElementById('syncDialogBody');
+
+      title.textContent = '同步失败';
+
+      body.innerHTML = \`
+        <div class="sync-dialog-error">
+          ✗ \${result.error || '同步失败'}
+        </div>
+
+        <div class="sync-dialog-field">
+          <label class="sync-dialog-label">命令输出：</label>
+          <div class="sync-dialog-output">\${result.output || '无输出'}</div>
+        </div>
+
+        <div class="sync-dialog-footer">
+          <button class="sync-dialog-button" onclick="copyErrorOutput()">复制错误信息</button>
+          <button class="sync-dialog-button primary" onclick="closeSyncDialog()">关闭</button>
+        </div>
+      \`;
+
+      overlay.classList.add('show');
+    }
+
+    // 显示已同步文件详情对话框
+    function showSyncedFileDialog(syncData) {
+      const overlay = document.getElementById('syncDialogOverlay');
+      const title = document.getElementById('syncDialogTitle');
+      const body = document.getElementById('syncDialogBody');
+
+      title.textContent = '文档已同步';
+
+      body.innerHTML = \`
+        <div style="padding: 20px 0;">
+          <div style="margin-bottom: 16px;">
+            <span style="color: #586069;">📄 标题：</span>
+            <span style="color: #24292e;">\${syncData.kmTitle}</span>
+          </div>
+          <div style="margin-bottom: 16px;">
+            <span style="color: #586069;">🔗 链接：</span>
+            <a href="\${syncData.kmUrl}" target="_blank" style="color: #0969da;">\${syncData.kmUrl}</a>
+          </div>
+          <div>
+            <span style="color: #586069;">🕐 同步时间：</span>
+            <span style="color: #24292e;">\${formatRelativeTime(syncData.lastSyncTime)}</span>
+          </div>
+        </div>
+
+        <div class="sync-dialog-footer">
+          <button class="sync-dialog-button" onclick="window.open('\${syncData.kmUrl}', '_blank')">在学城中打开</button>
+          <button class="sync-dialog-button primary" onclick="closeSyncDialog();showSyncDialog();">重新同步</button>
+        </div>
+      \`;
+
+      overlay.classList.add('show');
+    }
+
+    // 关闭对话框
+    function closeSyncDialog() {
+      const overlay = document.getElementById('syncDialogOverlay');
+      overlay.classList.remove('show');
+    }
+
+    // 复制错误信息
+    function copyErrorOutput() {
+      const output = document.querySelector('.sync-dialog-output');
+      if (output) {
+        navigator.clipboard.writeText(output.textContent).then(() => {
+          alert('错误信息已复制到剪贴板');
+        });
+      }
+    }
+
     // ==================== SSE 连接 ====================
     function connectSSE() {
       const evtSource = new EventSource('/api/events');
-      
+
       evtSource.onmessage = (e) => {
         try {
           const { type, data, focus } = JSON.parse(e.data);
@@ -618,7 +945,7 @@ export const clientScript = `
           console.error('SSE 消息解析错误:', err);
         }
       };
-      
+
       evtSource.onerror = () => {
         console.log('SSE 连接断开，5秒后重连...');
         evtSource.close();

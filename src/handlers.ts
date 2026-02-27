@@ -10,6 +10,14 @@ import {
   log,
 } from "./utils.ts";
 import { broadcastFileOpened, addClient, removeClient } from "./sse.ts";
+import { createKmDoc } from "./km-cli.ts";
+import {
+  getRecentParents,
+  addRecentParent,
+  getSyncedFile,
+  saveSyncedFile,
+  getDefaultParentId,
+} from "./sync-storage.ts";
 
 // API: 获取文件内容
 export async function handleGetFile(c: Context) {
@@ -223,6 +231,106 @@ export function handleEvents(c: Context) {
       "Cache-Control": "no-cache",
       "Connection": "keep-alive",
     },
+  });
+}
+
+// API: 获取最近使用的位置
+export function handleGetRecentParents(c: Context) {
+  const parents = getRecentParents();
+  const defaultParentId = getDefaultParentId();
+
+  return c.json({
+    parents,
+    defaultParentId,
+  });
+}
+
+// API: 执行同步
+export async function handleSyncExecute(c: Context) {
+  try {
+    const body = await c.req.json<{
+      filePath: string;
+      parentId: string;
+      title: string;
+      openAfterSync?: boolean;
+    }>();
+
+    const { filePath, parentId, title, openAfterSync = false } = body;
+
+    if (!filePath || !parentId || !title) {
+      return c.json({ error: "缺少必要参数" }, 400);
+    }
+
+    const resolvedPath = resolve(filePath);
+
+    if (!existsSync(resolvedPath)) {
+      return c.json({ error: "文件不存在" }, 404);
+    }
+
+    // 调用 km-cli 创建文档
+    const result = await createKmDoc({
+      parentId,
+      title,
+      markdownFile: resolvedPath,
+    });
+
+    if (!result.success) {
+      return c.json({
+        success: false,
+        error: result.error || "同步失败",
+        output: result.output || "",
+      });
+    }
+
+    // 保存同步记录
+    saveSyncedFile(resolvedPath, {
+      kmDocId: result.docId!,
+      kmUrl: result.url!,
+      kmTitle: title,
+      parentId,
+      lastSyncTime: Date.now(),
+    });
+
+    // 更新最近使用的位置
+    // 从 km-cli 获取 parent 的标题（如果可能）
+    addRecentParent(parentId, `Parent ${parentId}`, result.url!);
+
+    log(`🔄 同步成功: ${title} -> ${result.url}`);
+
+    return c.json({
+      success: true,
+      kmDocId: result.docId,
+      kmUrl: result.url,
+      kmTitle: title,
+      openAfterSync,
+    });
+  } catch (error: any) {
+    return c.json({
+      success: false,
+      error: error.message || "同步失败",
+      output: error.stack || "",
+    }, 500);
+  }
+}
+
+// API: 获取文件同步状态
+export function handleGetSyncStatus(c: Context) {
+  const path = c.req.query("path");
+  if (!path) return c.json({ error: "缺少 path 参数" }, 400);
+
+  const resolvedPath = resolve(path);
+  const syncInfo = getSyncedFile(resolvedPath);
+
+  if (!syncInfo) {
+    return c.json({ synced: false });
+  }
+
+  return c.json({
+    synced: true,
+    kmDocId: syncInfo.kmDocId,
+    kmUrl: syncInfo.kmUrl,
+    kmTitle: syncInfo.kmTitle,
+    lastSyncTime: syncInfo.lastSyncTime,
   });
 }
 

@@ -36,6 +36,9 @@ export function generateClientHTML(): string {
       <div class="toolbar">
         <div class="breadcrumb" id="breadcrumb"></div>
         <div class="spacer"></div>
+        <button class="sync-button" id="syncButton" onclick="handleSyncButtonClick()">
+          <span id="syncButtonText">🔄 同步</span>
+        </button>
         <span class="file-meta" id="fileMeta">最后修改: -</span>
       </div>
 
@@ -50,6 +53,19 @@ export function generateClientHTML(): string {
         </div>
       </div>
     </main>
+  </div>
+
+  <!-- 同步对话框 -->
+  <div class="sync-dialog-overlay" id="syncDialogOverlay">
+    <div class="sync-dialog">
+      <div class="sync-dialog-header">
+        <div class="sync-dialog-title" id="syncDialogTitle">同步到学城</div>
+        <button class="sync-dialog-close" onclick="closeSyncDialog()">×</button>
+      </div>
+      <div class="sync-dialog-body" id="syncDialogBody">
+        <!-- 动态内容 -->
+      </div>
+    </div>
   </div>
 
   <script>${clientScript}<\/script>

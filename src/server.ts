@@ -10,7 +10,16 @@ import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
 import { log } from "./utils.ts";
 import { generateClientHTML } from "./client/html.ts";
-import { handleGetFile, handleGetFiles, handleGetNearby, handleOpenFile, handleEvents } from "./handlers.ts";
+import {
+  handleGetFile,
+  handleGetFiles,
+  handleGetNearby,
+  handleOpenFile,
+  handleEvents,
+  handleGetRecentParents,
+  handleSyncExecute,
+  handleGetSyncStatus,
+} from "./handlers.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
 
 // ==================== 初始化配置 ====================
@@ -47,6 +56,11 @@ app.get("/api/files", handleGetFiles);
 
 // API: 获取附近的文件
 app.get("/api/nearby", handleGetNearby);
+
+// API: 同步相关
+app.get("/api/sync/recent-parents", handleGetRecentParents);
+app.post("/api/sync/execute", handleSyncExecute);
+app.get("/api/sync/status", handleGetSyncStatus);
 
 // API: CLI 调用 - 打开文件
 app.post("/api/open-file", handleOpenFile);

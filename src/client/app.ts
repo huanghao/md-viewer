@@ -708,7 +708,17 @@ export const clientScript = `
 
       html += \`
           <label class="sync-dialog-label" style="margin-top: 12px;">或手动输入 Parent ID：</label>
-          <input type="text" class="sync-dialog-input" id="syncParentId" placeholder="123456">
+          <input type="text" class="sync-dialog-input" id="syncParentId" placeholder="123456" oninput="updateSyncCommand()">
+        </div>
+
+        <div class="sync-dialog-field">
+          <div class="sync-dialog-output-header">
+            <label class="sync-dialog-label">将执行的命令：</label>
+            <button class="sync-dialog-copy-btn" onclick="copySyncCommand()">
+              📋 复制
+            </button>
+          </div>
+          <div class="sync-dialog-output" id="syncCommandPreview">km-cli doc create --parent-id "..." --title "..." --markdown-file "\${state.currentFile}" --json</div>
         </div>
 
         <div class="sync-dialog-checkbox">
@@ -724,6 +734,46 @@ export const clientScript = `
 
       body.innerHTML = html;
       overlay.classList.add('show');
+
+      // 监听标题输入变化
+      const titleInput = document.getElementById('syncTitle');
+      if (titleInput) {
+        titleInput.addEventListener('input', updateSyncCommand);
+      }
+
+      // 初始更新命令预览
+      updateSyncCommand();
+    }
+
+    // 更新同步命令预览
+    function updateSyncCommand() {
+      const titleInput = document.getElementById('syncTitle');
+      const manualInput = document.getElementById('syncParentId');
+      const preview = document.getElementById('syncCommandPreview');
+
+      if (!preview) return;
+
+      const title = titleInput ? titleInput.value.trim() : '';
+      const manualParentId = manualInput ? manualInput.value.trim() : '';
+
+      // 获取选中的 parent-id
+      let parentId = manualParentId;
+      if (!parentId) {
+        const selectedRadio = document.querySelector('input[name="recentParent"]:checked');
+        parentId = selectedRadio ? selectedRadio.value : '';
+      }
+
+      // 生成命令预览
+      const cmd = \`km-cli doc create --parent-id "\${parentId || '...'}" --title "\${title || '...'}" --markdown-file "\${state.currentFile}" --json\`;
+      preview.textContent = cmd;
+    }
+
+    // 复制同步命令
+    function copySyncCommand() {
+      const preview = document.getElementById('syncCommandPreview');
+      if (preview) {
+        copySingleText(preview.textContent);
+      }
     }
 
     // 选择最近位置
@@ -738,6 +788,9 @@ export const clientScript = `
       // 清空手动输入
       const manualInput = document.getElementById('syncParentId');
       if (manualInput) manualInput.value = '';
+
+      // 更新命令预览
+      updateSyncCommand();
     }
 
     // 执行同步
@@ -1036,6 +1089,8 @@ export const clientScript = `
     window.executeSyncDialog = executeSyncDialog;
     window.copyErrorOutput = copyErrorOutput;
     window.copySingleText = copySingleText;
+    window.updateSyncCommand = updateSyncCommand;
+    window.copySyncCommand = copySyncCommand;
 
     // ==================== 初始化 ====================
     (async function init() {

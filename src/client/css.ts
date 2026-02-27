@@ -183,9 +183,9 @@ export const styles = `
       background: #f6f8fa;
     }
     .file-item.current {
-      background: rgba(9, 105, 218, 0.1);
+      background: #e8f0fe;
       color: #0969da;
-      border: 2px solid #0969da;
+      border: 2px solid transparent;
       font-weight: 500;
     }
     .file-item .icon {

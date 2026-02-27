@@ -1,6 +1,7 @@
 import { state, setSearchQuery, getFilteredFiles } from '../state';
 import { escapeAttr } from '../utils/escape';
 import { generateDistinctNames } from '../utils/file-names';
+import { getFileListStatus } from '../utils/file-status';
 
 // 渲染搜索框
 export function renderSearchBox(): void {
@@ -141,13 +142,22 @@ export function renderFiles(): void {
         }
       }
 
-      // 新文件蓝点
-      const newDot = file.isNew ? '<span class="new-dot"></span>' : '';
+      // 获取文件状态（优先级：D > M > 🔵）
+      const status = getFileListStatus(file);
+      let statusBadge = '';
+
+      if (status.badge === 'dot') {
+        // 蓝色圆点
+        statusBadge = '<span class="new-dot"></span>';
+      } else if (status.badge) {
+        // M 或 D 字母标识
+        statusBadge = `<span class="status-badge status-${status.type}" style="color: ${status.color}">${status.badge}</span>`;
+      }
 
       return `
       <div class="${classes}"
            onclick="window.switchFile('${escapeAttr(file.path)}')">
-        ${newDot}
+        ${statusBadge}
         <span class="icon">📄</span>
         <span class="name">${displayName}</span>
         <span class="close" onclick="event.stopPropagation();window.removeFile('${escapeAttr(file.path)}')">×</span>

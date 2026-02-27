@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文件状态视觉效果预览 - VS Code 风格</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f5f5f5;
+      padding: 40px;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 10px;
+      color: #24292e;
+    }
+    .description {
+      color: #586069;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    .preview-section {
+      background: #fff;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 30px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .section-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 15px;
+      color: #24292e;
+    }
+
+    /* 文件列表样式 */
+    .file-list {
+      border: 1px solid #e1e4e8;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .file-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 12px;
+      border-bottom: 1px solid #e1e4e8;
+      gap: 8px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .file-item:last-child {
+      border-bottom: none;
+    }
+    .file-item:hover {
+      background: #f6f8fa;
+    }
+
+    /* 状态标识 */
+    .status-badge {
+      font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      width: 14px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .status-modified {
+      color: #ff9500;
+    }
+    .status-deleted {
+      color: #ff3b30;
+    }
+
+    /* 蓝点（未读） */
+    .new-dot {
+      width: 6px;
+      height: 6px;
+      background: #007AFF;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* 文件图标 */
+    .file-icon {
+      flex-shrink: 0;
+    }
+
+    /* 文件名 */
+    .file-name {
+      flex: 1;
+      color: #24292e;
+    }
+
+    /* 标签页样式 */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid #e1e4e8;
+      background: #f6f8fa;
+      border-radius: 6px 6px 0 0;
+      overflow-x: auto;
+    }
+    .tab {
+      padding: 10px 16px;
+      font-size: 13px;
+      border-right: 1px solid #e1e4e8;
+      cursor: pointer;
+      white-space: nowrap;
+      background: #f6f8fa;
+    }
+    .tab:hover {
+      background: #fff;
+    }
+    .tab.active {
+      background: #fff;
+      border-bottom: 2px solid #0969da;
+      margin-bottom: -1px;
+    }
+    .tab.deleted {
+      color: #ff3b30;
+      text-decoration: line-through;
+    }
+
+    /* 说明文字 */
+    .note {
+      margin-top: 15px;
+      padding: 12px;
+      background: #f6f8fa;
+      border-left: 3px solid #0969da;
+      font-size: 13px;
+      color: #586069;
+    }
+    .note strong {
+      color: #24292e;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>文件状态视觉效果预览</h1>
+    <p class="description">VS Code 风格的文件状态标识方案</p>
+
+    <!-- 文件列表预览 -->
+    <div class="preview-section">
+      <div class="section-title">文件列表（侧边栏）</div>
+      <div class="file-list">
+        <div class="file-item">
+          <span class="file-icon">📄</span>
+          <span class="file-name">README.md</span>
+          <span style="color: #586069; font-size: 11px;">正常状态</span>
+        </div>
+
+        <div class="file-item">
+          <span class="new-dot"></span>
+          <span class="file-icon">📄</span>
+          <span class="file-name">new-doc.md</span>
+          <span style="color: #007AFF; font-size: 11px;">新文件（未读）</span>
+        </div>
+
+        <div class="file-item">
+          <span class="status-badge status-modified">M</span>
+          <span class="file-icon">📄</span>
+          <span class="file-name">guide.md</span>
+          <span style="color: #ff9500; font-size: 11px;">已修改</span>
+        </div>
+
+        <div class="file-item">
+          <span class="status-badge status-modified">M</span>
+          <span class="file-icon">📄</span>
+          <span class="file-name">tutorial.md</span>
+          <span style="color: #586069; font-size: 11px;">新文件 + 已修改（只显示 M）</span>
+        </div>
+
+        <div class="file-item">
+          <span class="status-badge status-deleted">D</span>
+          <span class="file-icon">📄</span>
+          <span class="file-name">deleted.md</span>
+          <span style="color: #ff3b30; font-size: 11px;">文件不存在</span>
+        </div>
+      </div>
+
+      <div class="note">
+        <strong>说明：</strong><br>
+        • 🔵 蓝点 = 新加入的文件，从未被打开过（已实现）<br>
+        • <span style="color: #ff9500; font-weight: 700;">M</span> = Modified，本地文件已修改，需要手动刷新<br>
+        • <span style="color: #ff3b30; font-weight: 700;">D</span> = Deleted，文件不存在（被删除或移动）<br>
+        • 字母使用等宽字体，加粗，颜色编码<br>
+        • <strong>优先级规则：D > M > 🔵</strong>（当多个状态同时存在时，只显示优先级最高的）
+      </div>
+    </div>
+
+    <!-- 标签页预览 -->
+    <div class="preview-section">
+      <div class="section-title">标签页（顶部）</div>
+      <div class="tabs">
+        <div class="tab active">README.md</div>
+        <div class="tab">guide.md</div>
+        <div class="tab deleted">deleted.md</div>
+        <div class="tab">tutorial.md</div>
+      </div>
+
+      <div class="note">
+        <strong>说明：</strong><br>
+        • 删除的文件在标签页中显示为<span style="color: #ff3b30; text-decoration: line-through;">红色文字 + 删除线</span><br>
+        • 与 VS Code 的标签页样式保持一致
+      </div>
+    </div>
+
+    <!-- 对比方案 -->
+    <div class="preview-section">
+      <div class="section-title">方案对比</div>
+
+      <h3 style="font-size: 14px; margin-bottom: 10px; color: #24292e;">方案 E：VS Code 风格（推荐）</h3>
+      <div class="file-list" style="margin-bottom: 20px;">
+        <div class="file-item">
+          <span class="new-dot"></span>
+          <span class="file-icon">📄</span>
+          <span class="file-name">new-doc.md</span>
+          <span style="color: #586069; font-size: 11px;">只有新文件</span>
+        </div>
+        <div class="file-item">
+          <span class="status-badge status-modified">M</span>
+          <span class="file-icon">📄</span>
+          <span class="file-name">guide.md</span>
+          <span style="color: #586069; font-size: 11px;">已修改</span>
+        </div>
+        <div class="file-item">
+          <span class="status-badge status-modified">M</span>
+          <span class="file-icon">📄</span>
+          <span class="file-name">tutorial.md</span>
+          <span style="color: #586069; font-size: 11px;">新+修改（只显示M）</span>
+        </div>
+        <div class="file-item">
+          <span class="status-badge status-deleted">D</span>
+          <span class="file-icon">📄</span>
+          <span class="file-name">deleted.md</span>
+          <span style="color: #586069; font-size: 11px;">文件不存在</span>
+        </div>
+      </div>
+
+      <h3 style="font-size: 14px; margin-bottom: 10px; color: #24292e;">方案 A：橙色圆点</h3>
+      <div class="file-list" style="margin-bottom: 20px;">
+        <div class="file-item">
+          <span class="new-dot"></span>
+          <span class="file-icon">📄</span>
+          <span class="file-name">new-doc.md</span>
+        </div>
+        <div class="file-item">
+          <span style="width: 6px; height: 6px; background: #ff9500; border-radius: 50%; flex-shrink: 0;"></span>
+          <span class="file-icon">📄</span>
+          <span class="file-name">guide.md</span>
+        </div>
+        <div class="file-item">
+          <span style="width: 6px; height: 6px; background: #ff3b30; border-radius: 50%; flex-shrink: 0;"></span>
+          <span class="file-icon">📄</span>
+          <span class="file-name" style="color: #999;">deleted.md</span>
+        </div>
+      </div>
+
+      <h3 style="font-size: 14px; margin-bottom: 10px; color: #24292e;">方案 C：文件名颜色</h3>
+      <div class="file-list">
+        <div class="file-item">
+          <span class="new-dot"></span>
+          <span class="file-icon">📄</span>
+          <span class="file-name">new-doc.md</span>
+        </div>
+        <div class="file-item">
+          <span class="file-icon">📄</span>
+          <span class="file-name" style="color: #ff9500;">guide.md</span>
+        </div>
+        <div class="file-item">
+          <span class="file-icon">📄</span>
+          <span class="file-name" style="color: #ff3b30; text-decoration: line-through;">deleted.md</span>
+        </div>
+      </div>
+
+      <div class="note">
+        <strong>VS Code 风格的优势：</strong><br>
+        • 用户熟悉度最高（VS Code 是最流行的编辑器）<br>
+        • 字母含义清晰，无需学习（M=Modified, D=Deleted）<br>
+        • 字母 + 颜色双重编码，识别度高<br>
+        • 与现有蓝点（相当于 U=Untracked）风格统一<br>
+        • 在标签页中配合红色删除线，视觉效果完整
+      </div>
+    </div>
+  </div>
+</body>
+</html>

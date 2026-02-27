@@ -198,6 +198,20 @@ export const styles = `
       border-radius: 50%;
       flex-shrink: 0;
     }
+    .status-badge {
+      font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      width: 14px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .status-modified {
+      color: #ff9500;
+    }
+    .status-deleted {
+      color: #ff3b30;
+    }
     .file-item .name {
       flex: 1;
       overflow: hidden;

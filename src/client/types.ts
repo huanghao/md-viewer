@@ -4,9 +4,16 @@ export interface FileInfo {
   name: string;
   content: string;
   lastModified: number;
+  displayedModified: number;  // 展示内容对应的修改时间
   isRemote: boolean;
   displayName?: string;
-  isNew?: boolean;  // 标识是否为新文件（未读）
+  isNew?: boolean;            // 标识是否为新文件（未读）
+  isMissing?: boolean;        // 标识文件是否不存在
+
+  // 同步相关
+  syncedDocId?: string;       // 学城文档 ID
+  syncedUrl?: string;         // 学城文档 URL
+  syncedAt?: number;          // 同步时间
 }
 
 // 应用状态类型

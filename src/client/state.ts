@@ -19,6 +19,11 @@ export function saveState(): void {
         name: file.name,
         isRemote: file.isRemote || false,
         isNew: file.isNew || false,
+        isMissing: file.isMissing || false,
+        displayedModified: file.displayedModified,
+        syncedDocId: file.syncedDocId,
+        syncedUrl: file.syncedUrl,
+        syncedAt: file.syncedAt,
         lastAccessed: Date.now() // 记录最后访问时间用于 LRU
       }]),
       currentFile: state.currentFile
@@ -38,6 +43,11 @@ export function saveState(): void {
             name: file.name,
             isRemote: file.isRemote || false,
             isNew: file.isNew || false,
+            isMissing: file.isMissing || false,
+            displayedModified: file.displayedModified,
+            syncedDocId: file.syncedDocId,
+            syncedUrl: file.syncedUrl,
+            syncedAt: file.syncedAt,
             lastAccessed: Date.now()
           }]),
           currentFile: state.currentFile
@@ -94,8 +104,13 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
           name: fileData.filename,
           content: fileData.content,
           lastModified: fileData.lastModified,
+          displayedModified: fileInfo.displayedModified || fileData.lastModified,
           isRemote: fileData.isRemote || false,
-          isNew: fileInfo.isNew || false  // 恢复 isNew 状态
+          isNew: fileInfo.isNew || false,
+          isMissing: false,  // 恢复时文件存在，清除 isMissing
+          syncedDocId: fileInfo.syncedDocId,
+          syncedUrl: fileInfo.syncedUrl,
+          syncedAt: fileInfo.syncedAt
         });
         validFiles.push([path, fileInfo]);
       }
@@ -139,8 +154,14 @@ export function addOrUpdateFile(fileData: FileData, switchTo: boolean = false): 
     name: fileData.filename,
     content: fileData.content,
     lastModified: fileData.lastModified,
+    displayedModified: fileData.lastModified,  // 初始化时两者相同
     isRemote: fileData.isRemote || false,
-    isNew: isNew && !switchTo  // 新文件且不立即切换时标记为未读
+    isNew: isNew && !switchTo,  // 新文件且不立即切换时标记为未读
+    isMissing: false,
+    // 保留已有的同步状态
+    syncedDocId: existing?.syncedDocId,
+    syncedUrl: existing?.syncedUrl,
+    syncedAt: existing?.syncedAt
   });
 
   if (switchTo) {

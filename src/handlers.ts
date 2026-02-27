@@ -279,6 +279,7 @@ export async function handleSyncExecute(c: Context) {
         success: false,
         error: result.error || "同步失败",
         output: result.output || "",
+        command: result.command,
       });
     }
 
@@ -304,6 +305,8 @@ export async function handleSyncExecute(c: Context) {
       kmUrl: result.url,
       kmTitle: title,
       openAfterSync,
+      command: result.command,
+      output: result.output,
     });
   } catch (error: any) {
     return c.json({

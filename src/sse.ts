@@ -6,10 +6,10 @@ export function broadcastFileOpened(
   fileInfo: { path: string; filename: string; content: string; lastModified: number; isRemote: boolean },
   focus: boolean
 ) {
-  const data = `data: ${JSON.stringify({ type: "file-opened", data: fileInfo, focus })}\n\n`;
+  const message = `event: file-opened\ndata: ${JSON.stringify({ ...fileInfo, focus })}\n\n`;
   const encoder = new TextEncoder();
-  const bytes = encoder.encode(data);
-  
+  const bytes = encoder.encode(message);
+
   for (const client of sseClients) {
     try {
       client.controller.enqueue(bytes);

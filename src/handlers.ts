@@ -213,7 +213,7 @@ export function handleEvents(c: Context) {
       
       // 发送初始连接成功消息
       const encoder = new TextEncoder();
-      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "connected" })}\n\n`));
+      controller.enqueue(encoder.encode(`event: connected\ndata: ${JSON.stringify({})}\n\n`));
       
       // 清理断开连接的客户端
       c.req.signal.addEventListener("abort", () => {

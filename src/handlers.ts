@@ -373,6 +373,121 @@ export function handleGetSyncStats(c: Context) {
   }
 }
 
+// API: 推断工作区（从文件路径推断 git 仓库根目录）
+export async function handleInferWorkspace(c: Context) {
+  try {
+    const { filePath } = await c.req.json();
+    if (!filePath) {
+      return c.json({ error: "缺少 filePath 参数" }, 400);
+    }
+
+    const resolvedPath = resolve(filePath);
+    if (!existsSync(resolvedPath)) {
+      return c.json({ error: "文件不存在" }, 404);
+    }
+
+    // 从文件路径向上查找 .git 目录
+    let currentDir = dirname(resolvedPath);
+    let workspacePath: string | null = null;
+
+    while (currentDir !== dirname(currentDir)) {  // 直到根目录
+      if (existsSync(join(currentDir, '.git'))) {
+        workspacePath = currentDir;
+        break;
+      }
+      currentDir = dirname(currentDir);
+    }
+
+    if (!workspacePath) {
+      return c.json({ workspacePath: null });
+    }
+
+    const workspaceName = basename(workspacePath);
+
+    return c.json({
+      workspacePath,
+      workspaceName
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+}
+
+// API: 扫描工作区，构建文件树
+export function handleScanWorkspace(c: Context) {
+  try {
+    const { path } = c.req.json() as any;
+    if (!path) {
+      return c.json({ error: "缺少 path 参数" }, 400);
+    }
+
+    const resolvedPath = resolve(path);
+    if (!existsSync(resolvedPath)) {
+      return c.json({ error: "目录不存在" }, 404);
+    }
+
+    const tree = scanDirectory(resolvedPath);
+    return c.json(tree);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+}
+
+// 扫描目录，构建文件树（只包含 .md 文件和包含 .md 的目录）
+function scanDirectory(dirPath: string): any {
+  const name = basename(dirPath);
+  const tree: any = {
+    name,
+    path: dirPath,
+    type: 'directory',
+    children: [],
+    fileCount: 0
+  };
+
+  try {
+    const entries = readdirSync(dirPath, { withFileTypes: true });
+
+    for (const entry of entries) {
+      // 跳过隐藏文件和特殊目录
+      if (entry.name.startsWith('.') ||
+          ['node_modules', 'dist', 'build', '.git'].includes(entry.name)) {
+        continue;
+      }
+
+      const fullPath = join(dirPath, entry.name);
+
+      if (entry.isDirectory()) {
+        const subTree = scanDirectory(fullPath);
+        // 只添加包含 md 文件的目录
+        if (subTree.fileCount > 0) {
+          tree.children.push(subTree);
+          tree.fileCount += subTree.fileCount;
+        }
+      } else if (entry.name.endsWith('.md')) {
+        tree.children.push({
+          name: entry.name,
+          path: fullPath,
+          type: 'file'
+        });
+        tree.fileCount++;
+      }
+    }
+
+    // 排序：目录在前，文件在后，同类按名称排序
+    tree.children.sort((a: any, b: any) => {
+      if (a.type !== b.type) {
+        return a.type === 'directory' ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+  } catch (error) {
+    console.error(`扫描目录失败: ${dirPath}`, error);
+  }
+
+  return tree;
+}
+
 // 辅助函数
 function fileExists(path: string): boolean {
   return existsSync(path);

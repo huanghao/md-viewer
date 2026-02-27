@@ -1,10 +1,18 @@
 import type { AppState, FileInfo, FileData } from './types';
+import { loadConfig } from './config';
 
 // 全局状态
 export const state: AppState = {
   files: new Map(),
   currentFile: null,
   searchQuery: '', // 搜索关键词
+
+  // 配置
+  config: loadConfig(),
+
+  // 工作区模式
+  currentWorkspace: null,
+  fileTree: new Map(),
 };
 
 // 状态持久化
@@ -99,12 +107,16 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
     for (const [path, fileInfo] of data.files) {
       const fileData = await loadFile(path, true); // 静默加载，不弹窗
       if (fileData) {
+        // 恢复时：如果磁盘文件的修改时间没变，使用保存的 displayedModified
+        // 如果磁盘文件已被修改，保持 dirty 状态
+        const savedDisplayedModified = fileInfo.displayedModified || fileData.lastModified;
+
         state.files.set(path, {
           path: fileData.path,
           name: fileData.filename,
           content: fileData.content,
           lastModified: fileData.lastModified,
-          displayedModified: fileInfo.displayedModified || fileData.lastModified,
+          displayedModified: savedDisplayedModified,
           isRemote: fileData.isRemote || false,
           isNew: fileInfo.isNew || false,
           isMissing: false,  // 恢复时文件存在，清除 isMissing
@@ -184,11 +196,9 @@ export function removeFile(path: string): void {
 export function switchToFile(path: string): void {
   state.currentFile = path;
 
-  // 更新最后访问时间（用于 LRU）
+  // 标记为已读
   const file = state.files.get(path);
   if (file) {
-    file.lastModified = Date.now();
-    // 标记为已读
     if (file.isNew) {
       file.isNew = false;
     }

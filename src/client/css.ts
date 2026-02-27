@@ -178,6 +178,14 @@ export const styles = `
       background: transparent;
       border: 2px solid transparent;
       gap: 6px;
+      position: relative;
+    }
+    .file-item-status {
+      width: 14px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .file-item:hover {
       background: #f6f8fa;
@@ -694,5 +702,231 @@ export const styles = `
 
     .toast:hover {
       box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+    }
+
+    /* ==================== 工作区模式样式 ==================== */
+
+    /* 工作区区域 */
+    .workspace-section {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 8px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #57606a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .section-header-actions {
+      display: flex;
+      gap: 4px;
+    }
+
+    .icon-button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      font-size: 14px;
+      opacity: 0.6;
+    }
+
+    .icon-button:hover {
+      background: #f6f8fa;
+      opacity: 1;
+    }
+
+    /* 工作区项 */
+    .workspace-item {
+      margin-bottom: 4px;
+    }
+
+    .workspace-header {
+      display: flex;
+      align-items: center;
+      padding: 6px 12px;
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #24292e;
+      user-select: none;
+    }
+
+    .workspace-header:hover {
+      background: #f6f8fa;
+    }
+
+    .workspace-header.active {
+      background: #e8f0fe;
+      color: #0969da;
+      font-weight: 500;
+    }
+
+    .workspace-icon {
+      margin-right: 6px;
+      font-size: 16px;
+    }
+
+    .workspace-name {
+      flex: 1;
+    }
+
+    .workspace-toggle {
+      font-size: 12px;
+      color: #57606a;
+      margin-right: 4px;
+      width: 16px;
+      text-align: center;
+    }
+
+    /* 文件树 */
+    .file-tree {
+      padding-left: 8px;
+      margin-top: 4px;
+    }
+
+    .file-tree.loading,
+    .file-tree.empty {
+      padding: 12px;
+      text-align: center;
+      font-size: 12px;
+      color: #57606a;
+    }
+
+    .tree-node {
+      margin-bottom: 2px;
+    }
+
+    .tree-item {
+      display: flex;
+      align-items: center;
+      padding: 4px 8px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 13px;
+      color: #24292e;
+      user-select: none;
+    }
+
+    .tree-item:hover {
+      background: #f6f8fa;
+    }
+
+    .tree-item.current {
+      background: #e8f0fe;
+      color: #0969da;
+      font-weight: 500;
+    }
+
+    .tree-toggle {
+      width: 16px;
+      font-size: 10px;
+      color: #57606a;
+      flex-shrink: 0;
+      text-align: center;
+    }
+
+    .tree-icon {
+      margin-right: 6px;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .tree-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tree-count {
+      font-size: 11px;
+      color: #57606a;
+      background: #f6f8fa;
+      padding: 2px 6px;
+      border-radius: 10px;
+      margin-left: 4px;
+    }
+
+    /* 已打开文件区域 */
+    .open-files-section {
+      border-top: 1px solid #e1e4e8;
+      padding: 12px 8px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .empty-open-files {
+      padding: 20px;
+      text-align: center;
+      font-size: 12px;
+      color: #57606a;
+    }
+
+    .open-file-item {
+      display: flex;
+      align-items: center;
+      padding: 6px 12px;
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #24292e;
+      margin-bottom: 2px;
+    }
+
+    .open-file-item:hover {
+      background: #f6f8fa;
+    }
+
+    .open-file-item.current {
+      background: #e8f0fe;
+      color: #0969da;
+      font-weight: 500;
+    }
+
+    .open-file-icon {
+      margin-right: 8px;
+      font-size: 14px;
+    }
+
+    .open-file-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .open-file-close {
+      opacity: 0;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 16px;
+      color: #57606a;
+    }
+
+    .open-file-item:hover .open-file-close {
+      opacity: 1;
+    }
+
+    .open-file-close:hover {
+      background: #ff4444;
+      color: white;
+    }
+
+    /* 空工作区提示 */
+    .empty-workspace {
+      padding: 20px;
+      text-align: center;
+      color: #57606a;
+      font-size: 13px;
     }
 `;

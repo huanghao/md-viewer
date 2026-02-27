@@ -16,11 +16,42 @@ export interface FileInfo {
   syncedAt?: number;          // 同步时间
 }
 
+// 工作区类型
+export interface Workspace {
+  id: string;
+  name: string;
+  path: string;
+  isExpanded: boolean;
+}
+
+// 文件树节点类型
+export interface FileTreeNode {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  children?: FileTreeNode[];
+  isExpanded?: boolean;
+  fileCount?: number;  // 目录下的 md 文件数
+}
+
+// 应用配置类型
+export interface AppConfig {
+  sidebarMode: 'simple' | 'workspace';
+  workspaces: Workspace[];
+}
+
 // 应用状态类型
 export interface AppState {
   files: Map<string, FileInfo>;
   currentFile: string | null;
   searchQuery: string;
+
+  // 配置
+  config: AppConfig;
+
+  // 工作区模式相关
+  currentWorkspace: string | null;  // 当前工作区 ID
+  fileTree: Map<string, FileTreeNode>;  // 工作区文件树缓存
 }
 
 // API 响应类型

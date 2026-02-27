@@ -14,7 +14,7 @@ import { formatRelativeTime, formatFileTime } from './utils/format';
 import { generateDistinctNames } from './utils/file-names';
 
 // 导入 UI 组件
-import { renderFiles, renderTabs, renderSearchBox, renderCurrentPath } from './ui/sidebar';
+import { renderFiles, renderTabs, renderSearchBox, renderCurrentPath, renderSidebar } from './ui/sidebar';
 import { showToast, showSuccess, showError, showWarning, showInfo } from './ui/toast';
 
 // ==================== 消息处理 ====================
@@ -66,6 +66,12 @@ async function refreshFile(path: string) {
 }
 
 // ==================== UI 渲染 ====================
+
+// 渲染所有 UI（供工作区模式调用）
+export function renderAll() {
+  renderSidebar();
+  renderContent();
+}
 
 function renderContent() {
   const container = document.getElementById('content');
@@ -802,10 +808,9 @@ window.showToast = showToast;
 // ==================== 初始化 ====================
 (async () => {
   await restoreState(loadFile);
-  renderSearchBox();
-  renderCurrentPath();
-  renderFiles();
-  renderTabs();
+
+  // 根据配置渲染侧边栏
+  renderSidebar();
   renderContent();
 
   setupDragAndDrop();

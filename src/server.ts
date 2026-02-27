@@ -22,6 +22,8 @@ import {
   handleGetSyncStatus,
   handleCleanupSync,
   handleGetSyncStats,
+  handleInferWorkspace,
+  handleScanWorkspace,
 } from "./handlers.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
 
@@ -75,6 +77,10 @@ app.post("/api/open-file", handleOpenFile);
 
 // API: SSE 事件流
 app.get("/api/events", handleEvents);
+
+// API: 工作区相关
+app.post("/api/infer-workspace", handleInferWorkspace);
+app.post("/api/scan-workspace", handleScanWorkspace);
 
 // ==================== 启动服务 ====================
 

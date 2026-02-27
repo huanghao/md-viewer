@@ -2,6 +2,7 @@ import { state, setSearchQuery, getFilteredFiles } from '../state';
 import { escapeAttr } from '../utils/escape';
 import { generateDistinctNames } from '../utils/file-names';
 import { getFileListStatus } from '../utils/file-status';
+import { renderWorkspaceSidebar, bindWorkspaceEvents } from './sidebar-workspace';
 
 // 渲染搜索框
 export function renderSearchBox(): void {
@@ -157,12 +158,49 @@ export function renderFiles(): void {
       return `
       <div class="${classes}"
            onclick="window.switchFile('${escapeAttr(file.path)}')">
-        ${statusBadge}
+        <span class="file-item-status">${statusBadge}</span>
         <span class="icon">📄</span>
         <span class="name">${displayName}</span>
         <span class="close" onclick="event.stopPropagation();window.removeFile('${escapeAttr(file.path)}')">×</span>
       </div>
     `}).join('');
+}
+
+// 渲染整个侧边栏（根据模式选择）
+export function renderSidebar(): void {
+  const mode = state.config.sidebarMode;
+
+  // 渲染搜索框
+  renderSearchBox();
+
+  if (mode === 'workspace') {
+    // 工作区模式
+    renderCurrentPath();  // 工作区模式也显示当前路径
+    const container = document.querySelector('.sidebar') as HTMLElement;
+    if (!container) return;
+
+    // 查找或创建文件列表容器
+    let fileListContainer = document.getElementById('fileList');
+    if (!fileListContainer) {
+      fileListContainer = document.createElement('div');
+      fileListContainer.id = 'fileList';
+      fileListContainer.className = 'file-list';
+      container.appendChild(fileListContainer);
+    }
+
+    // 渲染工作区侧边栏
+    fileListContainer.innerHTML = renderWorkspaceSidebar();
+
+    // 绑定事件
+    bindWorkspaceEvents();
+  } else {
+    // 简单模式
+    renderCurrentPath();
+    renderFiles();
+  }
+
+  // 渲染标签页（两种模式都有）
+  renderTabs();
 }
 
 // 渲染标签页

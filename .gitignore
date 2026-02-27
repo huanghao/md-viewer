@@ -174,3 +174,7 @@ Temporary Items
 # Project-specific
 .claude/
 mdv
+md-viewer
+
+# Build artifacts
+dist/

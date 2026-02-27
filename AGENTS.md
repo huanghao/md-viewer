@@ -65,9 +65,43 @@ Categories:
 - `editor.*` - Display options (font size, line height)
 - `files.*` - File handling (auto-refresh, remember open)
 
+## Build System
+
+The project uses esbuild to bundle client-side code:
+
+- Client code is in `src/client/main.ts` (and will be split into modules)
+- Build output goes to `dist/client.js`
+- Server reads the bundled client code from `dist/client.js`
+
+### Build Commands
+
+- `bun run build:client` - Build client code once
+- `bun run build:client:watch` - Watch and rebuild on changes
+- `bun run build` - Full production build (client + server binary)
+
+### Development Workflow
+
+When modifying client-side code:
+
+1. Run `bun run build:client:watch` in one terminal (auto-rebuilds on save)
+2. Run `bun run dev` in another terminal (auto-reloads server on changes)
+3. Both will watch and reload automatically
+4. **DO NOT restart the server manually** - `bun run dev` handles auto-reload
+
+When modifying server-side code:
+
+- Just run `bun run dev` - it auto-reloads on changes
+- No manual build step needed
+
+### Important Notes
+
+- Always build client code before starting the server in production
+- The server will fail to start if `dist/client.js` doesn't exist
+- Client code changes require a rebuild (use watch mode during development)
+
 ## Development Reminders
 
 - Always run `bun tsc --noEmit` after TypeScript changes
 - Test both CLI and web interface after modifications
 - Update TODO.md when completing tasks
-- **DO NOT restart the server** - User runs `bun run dev` which auto-reloads on changes
+- Build client code before committing if you changed client files

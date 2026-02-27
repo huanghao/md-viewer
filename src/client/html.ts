@@ -1,5 +1,15 @@
 import { styles } from "./css.ts";
-import { clientScript } from "./app.ts";
+import { readFileSync } from "fs";
+import { join } from "path";
+
+// 读取打包后的客户端脚本
+let clientScript: string;
+try {
+  clientScript = readFileSync(join(process.cwd(), "dist/client.js"), "utf-8");
+} catch (e) {
+  console.error("❌ 无法读取客户端脚本，请先运行: bun run build:client");
+  process.exit(1);
+}
 
 export function generateClientHTML(): string {
   return `<!DOCTYPE html>

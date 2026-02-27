@@ -70,3 +70,4 @@ Categories:
 - Always run `bun tsc --noEmit` after TypeScript changes
 - Test both CLI and web interface after modifications
 - Update TODO.md when completing tasks
+- **DO NOT restart the server** - User runs `bun run dev` which auto-reloads on changes

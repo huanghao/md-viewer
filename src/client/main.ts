@@ -1,92 +1,27 @@
-// ==================== 状态管理 ====================
-const state = {
-  files: new Map(), // path -> { path, name, content, active, lastModified, isRemote }
-  currentFile: null,
-};
+// 导入类型
+import type { FileData } from './types';
 
-// ==================== 状态持久化 ====================
-const STORAGE_KEY = 'md-viewer:openFiles';
+// 导入状态管理
+import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFileFromState, setFileInactive, switchToFile } from './state';
 
-function saveState() {
-  const data = {
-    files: Array.from(state.files.entries()).map(([path, file]) => [path, {
-      path: file.path,
-      name: file.name,
-      active: file.active,
-      isRemote: file.isRemote || false
-    }]),
-    currentFile: state.currentFile
-  };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
+// 导入 API
+import { loadFile, searchFiles, getNearbyFiles, openFile } from './api/files';
+import { getSyncStatus, getRecentParents, executeSync } from './api/sync';
 
-async function restoreState() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) return;
+// 导入工具函数
+import { escapeHtml, escapeAttr, escapeJsSingleQuoted } from './utils/escape';
+import { formatRelativeTime, formatFileTime } from './utils/format';
+import { generateDistinctNames } from './utils/file-names';
 
-    const data = JSON.parse(saved);
-    if (!data.files || data.files.length === 0) return;
+// 导入 UI 组件
+import { renderFiles, renderTabs } from './ui/sidebar';
 
-    // 恢复文件列表（重新加载内容）
-    const validFiles = [];
-    for (const [path, fileInfo] of data.files) {
-      const fileData = await loadFile(path, true); // 静默加载，不弹窗
-      if (fileData) {
-        state.files.set(path, {
-          path: fileData.path,
-          name: fileData.filename,
-          content: fileData.content,
-          active: fileInfo.active,
-          lastModified: fileData.lastModified,
-          isRemote: fileData.isRemote || false
-        });
-        validFiles.push([path, fileInfo]);
-      }
-    }
-
-    // 清理不存在的文件：用实际存在的文件覆盖 localStorage
-    if (validFiles.length !== data.files.length) {
-      const currentFile = state.files.has(data.currentFile)
-        ? data.currentFile
-        : null;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        files: validFiles,
-        currentFile
-      }));
-    }
-
-    // 恢复当前文件
-    if (data.currentFile && state.files.has(data.currentFile)) {
-      state.currentFile = data.currentFile;
-    } else {
-      // 如果保存的当前文件不存在了，切换到第一个活跃文件
-      const activeFiles = Array.from(state.files.values()).filter(f => f.active);
-      state.currentFile = activeFiles.length > 0 ? activeFiles[0].path : null;
-    }
-
-    renderFiles();
-    renderTabs();
-    renderContent();
-  } catch (e) {
-    console.error('恢复状态失败:', e);
-  }
-}
-
-// ==================== API 请求 ====================
-async function loadFile(path, silent = false) {
-  try {
-    const response = await fetch(`/api/file?path=${encodeURIComponent(path)}`);
-    const data = await response.json();
-    if (data.error) {
-      if (!silent) alert(data.error);
-      return null;
-    }
-    return data;
-  } catch (e) {
-    if (!silent) alert(`加载失败: ${e.message}`);
-    return null;
-  }
+// ==================== 消息处理 ====================
+async function onFileLoaded(data: FileData, focus: boolean = false) {
+  addOrUpdateFile(data, focus);
+  renderFiles();
+  renderTabs();
+  renderContent();
 }
 
 // 刷新当前文件（页面加载时自动调用）
@@ -104,154 +39,13 @@ async function refreshCurrentFile() {
   }
 }
 
-// ==================== 消息处理 ====================
-async function onFileLoaded(data, focus = false) {
-  state.files.set(data.path, {
-    path: data.path,
-    name: data.filename,
-    content: data.content,
-    active: true,
-    lastModified: data.lastModified,
-    isRemote: data.isRemote || false
-  });
-
-  // 只有 focus=true 时才切换到该文件
-  if (focus) {
-    state.currentFile = data.path;
-  }
-  
-  saveState();
-  renderFiles();
-  renderTabs();
-  renderContent();
-}
-
 // ==================== UI 渲染 ====================
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function escapeAttr(str) {
-  return escapeHtml(str);
-}
-
-function escapeJsSingleQuoted(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/\\/g, '\\')
-    .replace(/'/g, "\\'")
-    .replace(/\r/g, '\\r')
-    .replace(/\n/g, '\\n')
-    .replace(/</g, '\\x3C');
-}
-
-// 为同名文件生成区分名称
-function getDisplayNames(files) {
-  const fileArray = Array.from(files.values());
-  const nameCount = {};
-  
-  // 统计每个 basename 出现的次数
-  fileArray.forEach(file => {
-    nameCount[file.name] = (nameCount[file.name] || 0) + 1;
-  });
-  
-  return fileArray.map(file => {
-    if (nameCount[file.name] === 1) {
-      return { ...file, displayName: file.name };
-    }
-    
-    // 有同名文件，需要找区分
-    const parts = file.path.split('/').filter(Boolean);
-    const otherFiles = fileArray.filter(f => f.name === file.name && f.path !== file.path);
-    
-    // 从父目录开始找不同的部分
-    let diffPart = '';
-    for (let i = parts.length - 2; i >= 0; i--) {
-      const part = parts[i];
-      const isUnique = otherFiles.every(other => {
-        const otherParts = other.path.split('/').filter(Boolean);
-        return otherParts[i] !== part;
-      });
-      if (isUnique) {
-        diffPart = part;
-        break;
-      }
-    }
-    
-    // 如果没找到唯一区分的，就用直接父目录
-    if (!diffPart && parts.length >= 2) {
-      diffPart = parts[parts.length - 2];
-    }
-    
-    return {
-      ...file,
-      displayName: diffPart ? file.name + ' (' + diffPart + ')' : file.name
-    };
-  });
-}
-
-function renderFiles() {
-  const container = document.getElementById('fileList');
-  if (state.files.size === 0) {
-    container.innerHTML = '<div class="empty-tip">点击上方添加 Markdown 文件</div>';
-    return;
-  }
-
-  const filesWithDisplay = getDisplayNames(state.files);
-  container.innerHTML = filesWithDisplay
-    .map(file => {
-      const isCurrent = file.path === state.currentFile;
-      const classes = [
-        'file-item',
-        file.active ? 'active' : '',
-        isCurrent ? 'current' : ''
-      ].filter(Boolean).join(' ');
-      return `
-      <div class="${classes}"
-           onclick="switchFile('${escapeAttr(file.path)}')">
-        <span class="icon">📄</span>
-        <span class="name">${file.displayName}</span>
-        <span class="close" onclick="event.stopPropagation();removeFile('${escapeAttr(file.path)}')">×</span>
-      </div>
-    `}).join('');
-}
-
-function renderTabs() {
-  const activeFiles = Array.from(state.files.values()).filter(f => f.active);
-  const container = document.getElementById('tabs');
-
-  if (activeFiles.length === 0) {
-    container.innerHTML = '';
-    return;
-  }
-
-  // 为活跃标签也计算区分名称（基于所有文件）
-  const allFilesWithDisplay = getDisplayNames(state.files);
-  const displayNameMap = new Map(allFilesWithDisplay.map(f => [f.path, f.displayName]));
-  
-  container.innerHTML = activeFiles
-    .map(file => `
-      <div class="tab ${file.path === state.currentFile ? 'active' : ''}"
-           onclick="switchFile('${escapeAttr(file.path)}')">
-        <span>${displayNameMap.get(file.path) || file.name}</span>
-        <span class="close" onclick="event.stopPropagation();closeFile('${escapeAttr(file.path)}')">×</span>
-      </div>
-    `).join('');
-}
 
 function renderContent() {
   const container = document.getElementById('content');
-  const file = state.currentFile ? state.files.get(state.currentFile) : null;
+  if (!container) return;
 
-  if (!file) {
-    updateFileMeta(null);
-    renderBreadcrumb(null);
+  if (!state.currentFile) {
     container.innerHTML = `
       <div class="empty-state">
         <h2>欢迎使用 MD Viewer</h2>
@@ -261,366 +55,201 @@ function renderContent() {
     return;
   }
 
-  try {
-    const html = marked.parse(file.content || '');
-    container.innerHTML = `
-      <div class="markdown-wrapper">
-        <div class="markdown-body">${html}</div>
-      </div>
-    `;
-  } catch (e) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <h2>渲染错误</h2>
-        <p>${e.message}</p>
-      </div>
-    `;
+  const file = state.files.get(state.currentFile);
+  if (!file) return;
+
+  // 使用 marked 渲染 Markdown
+  const html = (window as any).marked.parse(file.content);
+  container.innerHTML = `<div class="markdown-body">${html}</div>`;
+
+  // 更新文件元信息
+  const meta = document.getElementById('fileMeta');
+  if (meta) {
+    meta.textContent = `最后修改: ${formatFileTime(file.lastModified)}`;
   }
 
-  updateFileMeta(file.lastModified);
-  renderBreadcrumb(file.path);
+  // 更新面包屑
+  renderBreadcrumb();
+
+  // 更新同步按钮
   updateSyncButton();
 }
 
-function formatRelativeTime(timestamp) {
-  const now = Date.now();
-  const diff = now - timestamp;
-  const date = new Date(timestamp);
-
-  // 时间单位（毫秒）
-  const minute = 60 * 1000;
-  const hour = 60 * minute;
-  const day = 24 * hour;
-  const week = 7 * day;
-
-  // 计算相对时间文本
-  let relativeText;
-  if (diff < minute) {
-    relativeText = '刚刚';
-  } else if (diff < hour) {
-    relativeText = Math.floor(diff / minute) + '分钟前';
-  } else if (diff < day) {
-    relativeText = Math.floor(diff / hour) + '小时前';
-  } else if (diff < week) {
-    relativeText = Math.floor(diff / day) + '天前';
-  } else if (diff < 4 * week) {
-    relativeText = Math.floor(diff / week) + '周前';
-  } else {
-    relativeText = Math.floor(diff / (30 * day)) + '个月前';
-  }
-
-  // 格式化日期时间
-  const hours = date.getHours().toString().padStart(2, '0');
-  const minutes = date.getMinutes().toString().padStart(2, '0');
-  const timeStr = hours + ':' + minutes;
-
-  // 判断是否是今天/昨天/本周
-  const nowDate = new Date(now);
-  const isSameDay = date.toDateString() === nowDate.toDateString();
-
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const isYesterday = date.toDateString() === yesterday.toDateString();
-
-  const weekDays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-
-  if (isSameDay) {
-    return '今天 ' + timeStr + '（' + relativeText + '）';
-  } else if (isYesterday) {
-    return '昨天 ' + timeStr + '（' + relativeText + '）';
-  } else if (diff < week) {
-    return weekDays[date.getDay()] + ' ' + timeStr + '（' + relativeText + '）';
-  } else {
-    // 更早的显示月-日
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    return month + '-' + day + ' ' + timeStr + '（' + relativeText + '）';
-  }
-}
-
-function updateFileMeta(lastModified) {
-  const el = document.getElementById('fileMeta');
-  if (!el) return;
-  if (!lastModified) {
-    el.textContent = '最后修改: -';
-    return;
-  }
-  el.textContent = '最后修改: ' + formatRelativeTime(lastModified);
-}
-
 // ==================== 面包屑导航 ====================
-function renderBreadcrumb(filePath) {
+function renderBreadcrumb() {
   const container = document.getElementById('breadcrumb');
-  if (!container) return;
-
-  if (!filePath) {
-    container.innerHTML = '';
+  if (!container || !state.currentFile) {
+    if (container) container.innerHTML = '';
     return;
   }
 
-  const parts = filePath.split('/').filter(Boolean);
-  const fileName = parts[parts.length - 1];
-  const parentDir = parts.length > 1 ? parts[parts.length - 2] : '';
+  const file = state.files.get(state.currentFile);
+  if (!file) return;
 
-  // 显示：父目录 / 文件名
+  const parts = file.path.split('/').filter(Boolean);
+  const breadcrumbItems = parts.map((part, index) => {
+    const isLast = index === parts.length - 1;
+    const path = '/' + parts.slice(0, index + 1).join('/');
+
+    if (isLast) {
+      return `<span class="breadcrumb-item active">${escapeHtml(part)}</span>`;
+    }
+
+    return `
+      <span class="breadcrumb-item" title="${escapeAttr(path)}">
+        ${escapeHtml(part)}
+      </span>
+      <span class="breadcrumb-separator">/</span>
+    `;
+  }).join('');
+
+  // 添加附近文件菜单
   container.innerHTML = `
-    <div class="breadcrumb-folder" onclick="toggleNearbyMenu(event)">
-      <span>📁</span>
-      <span>${parentDir || '(root)'}</span>
-      <span>▼</span>
+    <div class="breadcrumb-path">
+      ${breadcrumbItems}
+      <button class="breadcrumb-nearby-btn" onclick="window.showNearbyMenu(event)">
+        📁
+      </button>
     </div>
-    <span class="breadcrumb-separator">/</span>
-    <span class="breadcrumb-file">${fileName}</span>
   `;
 }
 
-async function toggleNearbyMenu(event) {
-  event.stopPropagation();
+// 显示附近文件菜单
+async function showNearbyMenu(e: Event) {
+  e.stopPropagation();
+  if (!state.currentFile) return;
 
-  // 检查是否已有菜单
-  let menu = document.querySelector('.nearby-menu');
-  if (menu) {
-    menu.classList.toggle('show');
+  const button = e.target as HTMLElement;
+  const existingMenu = document.querySelector('.nearby-menu');
+  if (existingMenu) {
+    existingMenu.remove();
     return;
   }
 
-  // 创建菜单
-  menu = document.createElement('div');
-  menu.className = 'nearby-menu';
-
-  const breadcrumb = document.getElementById('breadcrumb');
-  if (breadcrumb) {
-    breadcrumb.appendChild(menu);
-  }
-
-  // 加载附近文件
-  await loadNearbyFiles(menu);
-  menu.classList.add('show');
-
-  // 点击外部关闭菜单
-  setTimeout(() => {
-    document.addEventListener('click', closeNearbyMenu);
-  }, 0);
-}
-
-function closeNearbyMenu() {
-  const menu = document.querySelector('.nearby-menu');
-  if (menu) {
-    menu.classList.remove('show');
-  }
-  document.removeEventListener('click', closeNearbyMenu);
-}
-
-async function loadNearbyFiles(menuElement) {
-  if (!state.currentFile) return;
-
   try {
-    const response = await fetch(`/api/nearby?path=${encodeURIComponent(state.currentFile)}`);
-    const data = await response.json();
-
-    if (data.error) {
-      menuElement.innerHTML = `
-        <div class="nearby-menu-empty">${data.error}</div>
-      `;
+    const data = await getNearbyFiles(state.currentFile);
+    if (!data.files || data.files.length === 0) {
+      alert('附近没有其他 Markdown 文件');
       return;
     }
 
-    renderNearbyMenu(menuElement, data);
-  } catch (e) {
+    const menuElement = document.createElement('div');
+    menuElement.className = 'nearby-menu';
     menuElement.innerHTML = `
-      <div class="nearby-menu-empty">加载失败</div>
-    `;
-  }
-}
-
-function renderNearbyMenu(menuElement, data) {
-  const { currentDir, parentDir, subdirs, siblings } = data;
-  let html = '';
-
-  // 当前目录的文件
-  if (siblings && siblings.length > 0) {
-    html += `
-      <div class="nearby-menu-section">
-        <div class="nearby-menu-title">当前目录 (${currentDir})</div>
-    `;
-    siblings.forEach(file => {
-      const isCurrent = file.path === state.currentFile;
-      html += `
-        <div class="nearby-menu-item ${isCurrent ? 'current' : ''}"
-             onclick="openNearbyFile('${escapeAttr(file.path)}')">
-          <span class="icon">📄</span>
-          <span class="name">${file.name}</span>
-          ${isCurrent ? '<span class="badge">当前</span>' : ''}
+      <div class="nearby-menu-header">附近的文件</div>
+      ${data.files.map(f => `
+        <div class="nearby-menu-item" onclick="window.addFileByPath('${escapeAttr(f.path)}', true)">
+          📄 ${escapeHtml(f.name)}
         </div>
-      `;
-    });
-    html += '</div>';
-  }
-
-  // 父目录
-  if (parentDir) {
-    html += `
-      <div class="nearby-menu-section">
-        <div class="nearby-menu-title">父目录</div>
-        <div class="nearby-menu-item" onclick="openNearbyFile('${escapeAttr(parentDir)}')">
-          <span class="icon">📁</span>
-          <span class="name">..</span>
-        </div>
-      </div>
+      `).join('')}
     `;
-  }
 
-  // 子目录
-  if (subdirs && subdirs.length > 0) {
-    html += `
-      <div class="nearby-menu-section">
-        <div class="nearby-menu-title">子目录</div>
-    `;
-    subdirs.forEach(dir => {
-      html += `
-        <div class="nearby-menu-item" onclick="openNearbyFile('${escapeAttr(dir.path)}')">
-          <span class="icon">📁</span>
-          <span class="name">${dir.name}</span>
-          <span class="badge">${dir.count} 个文件</span>
-        </div>
-      `;
-    });
-    html += '</div>';
-  }
+    const rect = button.getBoundingClientRect();
+    menuElement.style.position = 'fixed';
+    menuElement.style.left = rect.left + 'px';
+    menuElement.style.top = (rect.bottom + 5) + 'px';
 
-  if (!html) {
-    html = '<div class="nearby-menu-empty">没有附近的文件</div>';
-  }
+    document.body.appendChild(menuElement);
 
-  menuElement.innerHTML = html;
-}
-
-async function openNearbyFile(path) {
-  closeNearbyMenu();
-
-  // 如果是目录，暂时不处理（未来可以展开）
-  if (!path.endsWith('.md')) {
-    return;
-  }
-
-  // 如果文件已打开，直接切换
-  if (state.files.has(path)) {
-    switchFile(path);
-    return;
-  }
-
-  // 加载新文件
-  const data = await loadFile(path);
-  if (data) {
-    onFileLoaded(data, true);
+    const closeMenu = () => {
+      menuElement.remove();
+      document.removeEventListener('click', closeMenu);
+    };
+    setTimeout(() => document.addEventListener('click', closeMenu), 0);
+  } catch (err: any) {
+    alert('获取附近文件失败: ' + err.message);
   }
 }
 
 // ==================== 用户操作 ====================
-async function addFile() {
-  const input = document.getElementById('fileInput');
-  const path = input.value.trim();
-  if (!path) return;
 
-  input.value = '';
+// 添加文件
+async function addFileByPath(path: string, focus: boolean = true) {
+  if (!path.trim()) return;
 
-  // 加载文件
   const data = await loadFile(path);
   if (data) {
-    onFileLoaded(data);
+    await onFileLoaded(data, focus);
+    await openFile(path, focus);
+
+    // 清空输入框
+    const input = document.getElementById('fileInput') as HTMLInputElement;
+    if (input) input.value = '';
   }
 }
 
-function switchFile(path) {
-  state.currentFile = path;
-  const file = state.files.get(path);
-  if (file) {
-    file.active = true;
-  }
-  saveState();
+// 切换文件
+function switchFile(path: string) {
+  switchToFile(path);
   renderFiles();
   renderTabs();
   renderContent();
 }
 
-function closeFile(path) {
-  // 右侧标签页关闭：设为 inactive，不从列表删除
-  const file = state.files.get(path);
-  if (!file) return;
-
-  file.active = false;
-
-  // 如果关闭的是当前文件，切换到其他文件
-  if (state.currentFile === path) {
-    const activeFiles = Array.from(state.files.values()).filter(f => f.active);
-    state.currentFile = activeFiles.length > 0 ? activeFiles[0].path : null;
-  }
-
-  saveState();
+// 移除文件
+function removeFileHandler(path: string) {
+  removeFileFromState(path);
   renderFiles();
   renderTabs();
   renderContent();
 }
 
-function removeFile(path) {
-  // 左侧文件列表关闭：直接删除文件
-  const file = state.files.get(path);
-  if (!file) return;
+// 关闭标签页
+function closeTab(path: string) {
+  setFileInactive(path);
+  renderFiles();
+  renderTabs();
+  renderContent();
+}
 
-  // 如果删除的是当前文件，先切换
-  if (state.currentFile === path) {
-    // 找其他 active 文件，或者找其他任意文件
-    const otherActive = Array.from(state.files.values())
-      .filter(f => f.active && f.path !== path);
-    if (otherActive.length > 0) {
-      state.currentFile = otherActive[0].path;
+// 搜索文件
+async function searchFilesHandler() {
+  const input = document.getElementById('fileInput') as HTMLInputElement;
+  if (!input) return;
+
+  const query = input.value.trim();
+  if (!query) return;
+
+  try {
+    const data = await searchFiles(query);
+    if (data.files && data.files.length > 0) {
+      // 显示搜索结果（简单实现：添加第一个）
+      await addFileByPath(data.files[0].path);
     } else {
-      // 没有 active 文件了，找任意其他文件
-      const otherFiles = Array.from(state.files.values())
-        .filter(f => f.path !== path);
-      state.currentFile = otherFiles.length > 0 ? otherFiles[0].path : null;
+      alert('没有找到匹配的文件');
     }
+  } catch (err: any) {
+    alert('搜索失败: ' + err.message);
   }
-
-  // 彻底删除
-  state.files.delete(path);
-
-  saveState();
-  renderFiles();
-  renderTabs();
-  renderContent();
 }
 
 // ==================== 拖拽支持 ====================
-document.addEventListener('dragover', e => e.preventDefault());
-document.addEventListener('drop', async e => {
-  e.preventDefault();
-  const files = e.dataTransfer?.files;
-  if (files) {
+function setupDragAndDrop() {
+  document.body.addEventListener('dragover', (e) => {
+    e.preventDefault();
+  });
+
+  document.body.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    const files = Array.from(e.dataTransfer?.files || []);
     for (const file of files) {
       if (file.name.endsWith('.md')) {
-        const data = await loadFile(file.path);
-        if (data) {
-          onFileLoaded(data);
-        }
+        await addFileByPath((file as any).path);
       }
     }
-  }
-});
+  });
+}
 
 // ==================== URL 参数处理 ====================
-async function handleUrlParams() {
+function handleURLParams() {
   const params = new URLSearchParams(window.location.search);
-  const openPath = params.get('open');
-  
-  if (openPath) {
-    // 从 URL 加载指定文件，默认切换
-    const data = await loadFile(openPath);
-    if (data) {
-      onFileLoaded(data, true);
-    }
-    // 清除 URL 参数，避免刷新时重复加载
-    window.history.replaceState({}, '', '/');
+  const filePath = params.get('file');
+  const focus = params.get('focus') !== 'false';
+
+  if (filePath) {
+    addFileByPath(filePath, focus);
+    // 清理 URL 参数
+    window.history.replaceState({}, '', window.location.pathname);
   }
 }
 
@@ -637,12 +266,10 @@ async function updateSyncButton() {
 
   button.style.display = 'flex';
 
-  // 获取同步状态
   try {
-    const response = await fetch(`/api/sync/status?path=${encodeURIComponent(state.currentFile)}`);
-    const data = await response.json();
+    const data = await getSyncStatus(state.currentFile);
 
-    if (data.synced) {
+    if (data.docId) {
       button.className = 'sync-button synced';
       buttonText.textContent = '✓ 已同步';
     } else {
@@ -661,35 +288,30 @@ async function handleSyncButtonClick() {
   const button = document.getElementById('syncButton');
   if (button && button.classList.contains('syncing')) return;
 
-  // 获取同步状态
-  const response = await fetch(`/api/sync/status?path=${encodeURIComponent(state.currentFile)}`);
-  const data = await response.json();
+  const data = await getSyncStatus(state.currentFile);
 
-  if (data.synced) {
-    // 已同步，显示详情对话框
+  if (data.docId) {
     showSyncedFileDialog(data);
   } else {
-    // 未同步，显示同步对话框
     showSyncDialog();
   }
 }
 
 // 显示同步对话框
 async function showSyncDialog() {
-  const file = state.files.get(state.currentFile);
+  const file = state.files.get(state.currentFile!);
   if (!file) return;
 
-  // 从 Markdown 提取标题
   const titleMatch = file.content.match(/^#\s+(.+)$/m);
   const defaultTitle = titleMatch ? titleMatch[1] : file.name.replace('.md', '');
 
-  // 获取最近位置
-  const recentResponse = await fetch('/api/sync/recent-parents');
-  const recentData = await recentResponse.json();
+  const recentData = await getRecentParents();
 
   const overlay = document.getElementById('syncDialogOverlay');
   const title = document.getElementById('syncDialogTitle');
   const body = document.getElementById('syncDialogBody');
+
+  if (!overlay || !title || !body) return;
 
   title.textContent = '同步到学城';
 
@@ -710,10 +332,10 @@ async function showSyncDialog() {
 
   if (recentData.parents && recentData.parents.length > 0) {
     html += '<div class="sync-dialog-recent">';
-    recentData.parents.forEach((parent, index) => {
+    recentData.parents.forEach((parent) => {
       const isDefault = parent.id === recentData.defaultParentId;
       html += `
-        <div class="sync-dialog-recent-item ${isDefault ? 'selected' : ''}" onclick="selectRecentParent('${escapeJsSingleQuoted(parent.id)}', event)">
+        <div class="sync-dialog-recent-item ${isDefault ? 'selected' : ''}" onclick="window.selectRecentParent('${escapeJsSingleQuoted(parent.id)}', event)">
           <input type="radio" name="recentParent" value="${escapeAttr(parent.id)}" class="sync-dialog-recent-radio" ${isDefault ? 'checked' : ''}>
           <div class="sync-dialog-recent-info">
             <div class="sync-dialog-recent-title">${escapeHtml(parent.title)}</div>
@@ -726,28 +348,30 @@ async function showSyncDialog() {
   }
 
   html += `
-      <label class="sync-dialog-label" style="margin-top: 12px;">或手动输入 Parent ID：</label>
-      <input type="text" class="sync-dialog-input" id="syncParentId" placeholder="123456" oninput="updateSyncCommand()">
+    <div class="sync-dialog-or">或</div>
+    <input type="text" class="sync-dialog-input" id="syncParentId" placeholder="输入父文档 ID 或 URL">
+    </div>
+
+    <div class="sync-dialog-field">
+      <label class="sync-dialog-checkbox">
+        <input type="checkbox" id="syncOpenAfter" checked>
+        <span>同步后在浏览器中打开</span>
+      </label>
     </div>
 
     <div class="sync-dialog-field">
       <div class="sync-dialog-output-header">
         <label class="sync-dialog-label">将执行的命令：</label>
-        <button class="sync-dialog-copy-btn" onclick="copySyncCommand()">
+        <button class="sync-dialog-copy-btn" onclick="window.copySyncCommand()">
           📋 复制
         </button>
       </div>
-      <div class="sync-dialog-output" id="syncCommandPreview">km-cli doc create --parent-id "..." --title "..." --markdown-file "${state.currentFile}" --json</div>
-    </div>
-
-    <div class="sync-dialog-checkbox">
-      <input type="checkbox" id="syncOpenAfter" checked>
-      <label for="syncOpenAfter">同步后打开学城页面</label>
+      <div class="sync-dialog-output" id="syncCommandPreview">km-cli doc create --parent-id "..." --title "..." --markdown-file "${escapeHtml(state.currentFile || '')}" --json</div>
     </div>
 
     <div class="sync-dialog-footer">
-      <button class="sync-dialog-button" onclick="closeSyncDialog()">取消</button>
-      <button class="sync-dialog-button primary" onclick="executeSyncDialog()">确定</button>
+      <button class="sync-dialog-btn sync-dialog-btn-cancel" onclick="window.closeSyncDialog()">取消</button>
+      <button class="sync-dialog-btn sync-dialog-btn-primary" onclick="window.confirmSync()">开始同步</button>
     </div>
   `;
 
@@ -762,96 +386,94 @@ async function showSyncDialog() {
       fallback.innerHTML = `
         <div class="sync-dialog-output-header">
           <label class="sync-dialog-label">将执行的命令：</label>
-          <button class="sync-dialog-copy-btn" onclick="copySyncCommand()">
+          <button class="sync-dialog-copy-btn" onclick="window.copySyncCommand()">
             📋 复制
           </button>
         </div>
         <div class="sync-dialog-output" id="syncCommandPreview">km-cli doc create --parent-id "..." --title "..." --markdown-file "${escapeHtml(state.currentFile || '')}" --json</div>
       `;
-      checkbox.parentNode.insertBefore(fallback, checkbox);
+      checkbox.parentNode!.insertBefore(fallback, checkbox);
     }
   }
 
   overlay.classList.add('show');
 
   // 监听标题输入变化
-  const titleInput = document.getElementById('syncTitle');
+  const titleInput = document.getElementById('syncTitle') as HTMLInputElement;
+  const parentInput = document.getElementById('syncParentId') as HTMLInputElement;
+
   if (titleInput) {
-    titleInput.addEventListener('input', updateSyncCommand);
+    titleInput.addEventListener('input', updateCommandPreview);
+  }
+  if (parentInput) {
+    parentInput.addEventListener('input', () => {
+      // 清除最近位置选择
+      document.querySelectorAll('.sync-dialog-recent-item').forEach(item => {
+        item.classList.remove('selected');
+      });
+      document.querySelectorAll('.sync-dialog-recent-radio').forEach((radio: any) => {
+        radio.checked = false;
+      });
+      updateCommandPreview();
+    });
   }
 
-  // 初始更新命令预览
-  updateSyncCommand();
+  updateCommandPreview();
 }
 
-// 更新同步命令预览
-function updateSyncCommand() {
-  const titleInput = document.getElementById('syncTitle');
-  const manualInput = document.getElementById('syncParentId');
+// 更新命令预览
+function updateCommandPreview() {
   const preview = document.getElementById('syncCommandPreview');
+  const titleInput = document.getElementById('syncTitle') as HTMLInputElement;
+  const parentInput = document.getElementById('syncParentId') as HTMLInputElement;
+  const selectedRadio = document.querySelector('.sync-dialog-recent-radio:checked') as HTMLInputElement;
 
-  if (!preview) return;
+  if (!preview || !state.currentFile) return;
 
-  const title = titleInput ? titleInput.value.trim() : '';
-  const manualParentId = manualInput ? manualInput.value.trim() : '';
+  const title = titleInput?.value || '...';
+  let parentId = parentInput?.value.trim() || selectedRadio?.value || '...';
 
-  // 获取选中的 parent-id
-  let parentId = manualParentId;
-  if (!parentId) {
-    const selectedRadio = document.querySelector('input[name="recentParent"]:checked');
-    parentId = selectedRadio ? selectedRadio.value : '';
+  // 从 URL 提取 ID
+  if (parentId.includes('xuecheng.com')) {
+    const match = parentId.match(/\/doc\/([a-zA-Z0-9_-]+)/);
+    if (match) parentId = match[1];
   }
 
-  // 生成命令预览
-  const cmd = `km-cli doc create --parent-id "${parentId || '...'}" --title "${title || '...'}" --markdown-file "${state.currentFile}" --json`;
-  preview.textContent = cmd;
-}
-
-// 复制同步命令
-function copySyncCommand() {
-  const preview = document.getElementById('syncCommandPreview');
-  if (preview) {
-    copySingleText(preview.textContent);
-  }
+  preview.textContent = `km-cli doc create --parent-id "${parentId}" --title "${title}" --markdown-file "${state.currentFile}" --json`;
 }
 
 // 选择最近位置
-function selectRecentParent(parentId, e) {
+function selectRecentParent(parentId: string, e?: Event) {
   const items = document.querySelectorAll('.sync-dialog-recent-item');
   items.forEach(item => item.classList.remove('selected'));
+
   if (e && e.currentTarget) {
-    e.currentTarget.classList.add('selected');
+    (e.currentTarget as HTMLElement).classList.add('selected');
   }
 
   const radio = e && e.currentTarget
-    ? e.currentTarget.querySelector('input[type="radio"]')
+    ? (e.currentTarget as HTMLElement).querySelector('input[type="radio"]') as HTMLInputElement
     : null;
   if (radio) radio.checked = true;
 
   // 清空手动输入
-  const manualInput = document.getElementById('syncParentId');
-  if (manualInput) manualInput.value = '';
+  const parentInput = document.getElementById('syncParentId') as HTMLInputElement;
+  if (parentInput) parentInput.value = '';
 
-  // 更新命令预览
-  updateSyncCommand();
+  updateCommandPreview();
 }
 
-// 执行同步
-async function executeSyncDialog() {
-  const titleInput = document.getElementById('syncTitle');
-  const manualInput = document.getElementById('syncParentId');
-  const openAfterCheckbox = document.getElementById('syncOpenAfter');
+// 确认同步
+async function confirmSync() {
+  const titleInput = document.getElementById('syncTitle') as HTMLInputElement;
+  const parentInput = document.getElementById('syncParentId') as HTMLInputElement;
+  const selectedRadio = document.querySelector('.sync-dialog-recent-radio:checked') as HTMLInputElement;
+  const openAfter = (document.getElementById('syncOpenAfter') as HTMLInputElement)?.checked;
 
-  const title = titleInput ? titleInput.value.trim() : '';
-  const manualParentId = manualInput ? manualInput.value.trim() : '';
-  const openAfter = openAfterCheckbox ? openAfterCheckbox.checked : false;
+  if (!state.currentFile) return;
 
-  // 获取选中的 parent-id
-  let parentId = manualParentId;
-  if (!parentId) {
-    const selectedRadio = document.querySelector('input[name="recentParent"]:checked');
-    parentId = selectedRadio ? selectedRadio.value : '';
-  }
+  const title = titleInput?.value.trim();
+  let parentId = parentInput?.value.trim() || selectedRadio?.value;
 
   if (!title) {
     alert('请输入标题');
@@ -859,87 +481,54 @@ async function executeSyncDialog() {
   }
 
   if (!parentId) {
-    alert('请选择位置或输入 Parent ID');
+    alert('请选择位置或输入父文档 ID');
     return;
   }
 
-  // 关闭对话框，显示同步中状态
-  closeSyncDialog();
-
-  const button = document.getElementById('syncButton');
-  const buttonText = document.getElementById('syncButtonText');
-  if (button && buttonText) {
-    button.className = 'sync-button syncing';
-    button.disabled = true;
-    buttonText.textContent = '⏳ 同步中...';
+  // 从 URL 提取 ID
+  if (parentId.includes('xuecheng.com')) {
+    const match = parentId.match(/\/doc\/([a-zA-Z0-9_-]+)/);
+    if (match) parentId = match[1];
   }
 
-  // 调用同步 API
-  try {
-    const response = await fetch('/api/sync/execute', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        filePath: state.currentFile,
-        parentId,
-        title,
-        openAfterSync: openAfter
-      })
-    });
+  const button = document.querySelector('.sync-dialog-btn-primary') as HTMLButtonElement;
+  if (button) {
+    button.disabled = true;
+    button.textContent = '同步中...';
+  }
 
-    const result = await response.json();
+  try {
+    const result = await executeSync(state.currentFile, title, parentId, false);
 
     if (result.success) {
-      // 同步成功
-      showSyncSuccessDialog(result);
-      updateSyncButton();
+      showSyncSuccessDialog(result, openAfter);
     } else {
-      // 同步失败
       showSyncErrorDialog(result);
     }
-  } catch (e) {
-    showSyncErrorDialog({
-      success: false,
-      error: e.message,
-      output: e.stack || ''
-    });
-  } finally {
+  } catch (err: any) {
+    alert('同步失败: ' + err.message);
     if (button) {
       button.disabled = false;
+      button.textContent = '开始同步';
     }
   }
 }
 
 // 显示同步成功对话框
-function showSyncSuccessDialog(result) {
-  const overlay = document.getElementById('syncDialogOverlay');
+function showSyncSuccessDialog(result: any, openAfter: boolean) {
   const title = document.getElementById('syncDialogTitle');
   const body = document.getElementById('syncDialogBody');
 
-  title.textContent = '同步成功！';
+  if (!title || !body) return;
+
+  title.textContent = '✓ 同步成功';
 
   body.innerHTML = `
-    <div style="text-align: center; padding: 20px 0;">
-      <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
-      <div style="font-size: 16px; color: #24292e; margin-bottom: 24px;">文档已成功同步到学城</div>
-
-      <div style="text-align: left; background: #f6f8fa; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
-        <div style="margin-bottom: 8px;">
-          <span style="color: #586069;">📄 标题：</span>
-          <span style="color: #24292e;">${result.kmTitle}</span>
-        </div>
-        <div>
-          <span style="color: #586069;">🔗 链接：</span>
-          <a href="${result.kmUrl}" target="_blank" style="color: #0969da;">${result.kmUrl}</a>
-        </div>
-      </div>
-    </div>
-
     ${result.command ? `
       <div class="sync-dialog-field">
         <div class="sync-dialog-output-header">
           <label class="sync-dialog-label">执行的命令：</label>
-          <button class="sync-dialog-copy-btn" onclick="copySingleText('${escapeJsSingleQuoted(result.command)}', event)">
+          <button class="sync-dialog-copy-btn" onclick="window.copySingleText('${escapeJsSingleQuoted(result.command)}', event)">
             📋 复制
           </button>
         </div>
@@ -951,7 +540,7 @@ function showSyncSuccessDialog(result) {
       <div class="sync-dialog-field">
         <div class="sync-dialog-output-header">
           <label class="sync-dialog-label">km-cli 返回：</label>
-          <button class="sync-dialog-copy-btn" onclick="copySingleText('${escapeJsSingleQuoted(result.output)}', event)">
+          <button class="sync-dialog-copy-btn" onclick="window.copySingleText('${escapeJsSingleQuoted(result.output)}', event)">
             📋 复制
           </button>
         </div>
@@ -959,40 +548,40 @@ function showSyncSuccessDialog(result) {
       </div>
     ` : ''}
 
+    <div class="sync-dialog-success">
+      <div class="sync-dialog-success-icon">✓</div>
+      <div class="sync-dialog-success-text">文档已成功同步到学城</div>
+      ${result.url ? `<a href="${escapeAttr(result.url)}" target="_blank" class="sync-dialog-link">${escapeHtml(result.url)}</a>` : ''}
+    </div>
+
     <div class="sync-dialog-footer">
-      <button class="sync-dialog-button" onclick="closeSyncDialog()">关闭</button>
-      <button class="sync-dialog-button primary" onclick="window.open('${result.kmUrl}', '_blank');closeSyncDialog();">在学城中打开</button>
+      <button class="sync-dialog-btn sync-dialog-btn-cancel" onclick="window.closeSyncDialog()">关闭</button>
+      ${result.url ? `<button class="sync-dialog-btn sync-dialog-btn-primary" onclick="window.open('${escapeAttr(result.url)}', '_blank')">在浏览器中打开</button>` : ''}
     </div>
   `;
 
-  overlay.classList.add('show');
-
-  // 如果勾选了自动打开
-  if (result.openAfterSync) {
-    setTimeout(() => {
-      window.open(result.kmUrl, '_blank');
-    }, 500);
+  if (openAfter && result.url) {
+    window.open(result.url, '_blank');
   }
+
+  updateSyncButton();
 }
 
-// 显示同步失败对话框
-function showSyncErrorDialog(result) {
-  const overlay = document.getElementById('syncDialogOverlay');
+// 显示同步错误对话框
+function showSyncErrorDialog(result: any) {
   const title = document.getElementById('syncDialogTitle');
   const body = document.getElementById('syncDialogBody');
 
-  title.textContent = '同步失败';
+  if (!title || !body) return;
+
+  title.textContent = '✗ 同步失败';
 
   body.innerHTML = `
-    <div class="sync-dialog-error">
-      ✗ ${result.error || '同步失败'}
-    </div>
-
     ${result.command ? `
       <div class="sync-dialog-field">
         <div class="sync-dialog-output-header">
           <label class="sync-dialog-label">执行的命令：</label>
-          <button class="sync-dialog-copy-btn" onclick="copySingleText('${escapeJsSingleQuoted(result.command)}', event)">
+          <button class="sync-dialog-copy-btn" onclick="window.copySingleText('${escapeJsSingleQuoted(result.command)}', event)">
             📋 复制
           </button>
         </div>
@@ -1003,7 +592,7 @@ function showSyncErrorDialog(result) {
     <div class="sync-dialog-field">
       <div class="sync-dialog-output-header">
         <label class="sync-dialog-label">km-cli 返回：</label>
-        <button class="sync-dialog-copy-btn" onclick="copySingleText('${escapeJsSingleQuoted(result.output || '无输出')}', event)">
+        <button class="sync-dialog-copy-btn" onclick="window.copySingleText('${escapeJsSingleQuoted(result.output || '无输出')}', event)">
           📋 复制
         </button>
       </div>
@@ -1011,43 +600,33 @@ function showSyncErrorDialog(result) {
     </div>
 
     <div class="sync-dialog-footer">
-      <button class="sync-dialog-button" onclick="copyErrorOutput()">复制错误信息</button>
-      <button class="sync-dialog-button primary" onclick="closeSyncDialog()">关闭</button>
+      <button class="sync-dialog-btn sync-dialog-btn-cancel" onclick="window.closeSyncDialog()">关闭</button>
+      <button class="sync-dialog-btn sync-dialog-btn-primary" onclick="window.copyErrorInfo()">复制错误信息</button>
     </div>
   `;
-
-  overlay.classList.add('show');
 }
 
-// 显示已同步文件详情对话框
-function showSyncedFileDialog(syncData) {
+// 显示已同步文件的对话框
+async function showSyncedFileDialog(syncData: any) {
   const overlay = document.getElementById('syncDialogOverlay');
   const title = document.getElementById('syncDialogTitle');
   const body = document.getElementById('syncDialogBody');
 
-  title.textContent = '文档已同步';
+  if (!overlay || !title || !body) return;
+
+  title.textContent = '文档同步信息';
 
   body.innerHTML = `
-    <div style="padding: 20px 0;">
-      <div style="margin-bottom: 16px;">
-        <span style="color: #586069;">📄 标题：</span>
-        <span style="color: #24292e;">${syncData.kmTitle}</span>
-      </div>
-      <div style="margin-bottom: 16px;">
-        <span style="color: #586069;">🔗 链接：</span>
-        <a href="${syncData.kmUrl}" target="_blank" style="color: #0969da;">${syncData.kmUrl}</a>
-      </div>
-      <div style="margin-bottom: 16px;">
-        <span style="color: #586069;">🕐 同步时间：</span>
-        <span style="color: #24292e;">${formatRelativeTime(syncData.lastSyncTime)}</span>
-      </div>
+    <div class="sync-dialog-field">
+      <label class="sync-dialog-label">📄 本地文件</label>
+      <div style="color: #586069; font-size: 13px;">${escapeHtml(syncData.path)}</div>
     </div>
 
     ${syncData.command ? `
       <div class="sync-dialog-field">
         <div class="sync-dialog-output-header">
           <label class="sync-dialog-label">执行的命令：</label>
-          <button class="sync-dialog-copy-btn" onclick="copySingleText('${escapeJsSingleQuoted(syncData.command)}', event)">
+          <button class="sync-dialog-copy-btn" onclick="window.copySingleText('${escapeJsSingleQuoted(syncData.command)}', event)">
             📋 复制
           </button>
         </div>
@@ -1055,26 +634,60 @@ function showSyncedFileDialog(syncData) {
       </div>
     ` : ''}
 
+    <div class="sync-dialog-success">
+      <div class="sync-dialog-success-icon">✓</div>
+      <div class="sync-dialog-success-text">此文档已同步到学城</div>
+      ${syncData.url ? `<a href="${escapeAttr(syncData.url)}" target="_blank" class="sync-dialog-link">${escapeHtml(syncData.url)}</a>` : ''}
+      ${syncData.lastSyncTime ? `<div style="color: #586069; font-size: 12px; margin-top: 8px;">最后同步: ${formatFileTime(syncData.lastSyncTime)}</div>` : ''}
+    </div>
+
     <div class="sync-dialog-footer">
-      <button class="sync-dialog-button" onclick="window.open('${syncData.kmUrl}', '_blank')">在学城中打开</button>
-      <button class="sync-dialog-button primary" onclick="closeSyncDialog();showSyncDialog();">重新同步</button>
+      <button class="sync-dialog-btn sync-dialog-btn-cancel" onclick="window.closeSyncDialog()">关闭</button>
+      ${syncData.url ? `<button class="sync-dialog-btn sync-dialog-btn-primary" onclick="window.open('${escapeAttr(syncData.url)}', '_blank')">在浏览器中打开</button>` : ''}
     </div>
   `;
 
   overlay.classList.add('show');
 }
 
-// 关闭对话框
+// 关闭同步对话框
 function closeSyncDialog() {
   const overlay = document.getElementById('syncDialogOverlay');
-  overlay.classList.remove('show');
+  if (overlay) {
+    overlay.classList.remove('show');
+  }
+}
+
+// 复制命令
+function copySyncCommand() {
+  const preview = document.getElementById('syncCommandPreview');
+  if (preview) {
+    navigator.clipboard.writeText(preview.textContent || '').then(() => {
+      alert('命令已复制到剪贴板');
+    });
+  }
+}
+
+// 复制单个文本
+function copySingleText(text: string, e?: Event) {
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = e && e.target ? (e.target as HTMLElement).closest('.sync-dialog-copy-btn') : null;
+    if (btn) {
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '✓ 已复制';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.classList.remove('copied');
+      }, 2000);
+    }
+  });
 }
 
 // 复制错误信息
-function copyErrorOutput() {
+function copyErrorInfo() {
   const outputs = document.querySelectorAll('.sync-dialog-output');
   if (outputs.length > 0) {
-    // 收集所有输出框的内容
     const texts = Array.from(outputs).map(el => el.textContent).join('\n\n');
     navigator.clipboard.writeText(texts).then(() => {
       alert('错误信息已复制到剪贴板');
@@ -1082,63 +695,75 @@ function copyErrorOutput() {
   }
 }
 
-// 复制单个文本
-function copySingleText(text, e) {
-  navigator.clipboard.writeText(text).then(() => {
-    // 临时显示复制成功提示
-    const btn = e && e.target ? e.target.closest('.sync-dialog-copy-btn') : null;
-    if (btn) {
-      const originalText = btn.innerHTML;
-      btn.innerHTML = '✓ 已复制';
-      btn.style.color = '#2ea44f';
-      setTimeout(() => {
-        btn.innerHTML = originalText;
-        btn.style.color = '';
-      }, 1500);
-    }
-  }).catch(() => {
-    alert('复制失败');
-  });
-}
-
 // ==================== SSE 连接 ====================
 function connectSSE() {
-  const evtSource = new EventSource('/api/events');
+  const eventSource = new EventSource('/api/events');
 
-  evtSource.onmessage = (e) => {
-    try {
-      const { type, data, focus } = JSON.parse(e.data);
-      if (type === 'file-opened') {
-        onFileLoaded(data, focus);
-      }
-    } catch (err) {
-      console.error('SSE 消息解析错误:', err);
+  eventSource.addEventListener('file-changed', async (e: any) => {
+    const data = JSON.parse(e.data);
+    if (state.files.has(data.path)) {
+      await refreshCurrentFile();
     }
-  };
+  });
 
-  evtSource.onerror = () => {
-    console.log('SSE 连接断开，5秒后重连...');
-    evtSource.close();
-    setTimeout(connectSSE, 5000);
+  eventSource.addEventListener('file-opened', async (e: any) => {
+    const data = JSON.parse(e.data);
+    await onFileLoaded(data, data.focus !== false);
+  });
+
+  eventSource.onerror = () => {
+    console.error('SSE 连接断开，尝试重连...');
+    eventSource.close();
+    setTimeout(connectSSE, 3000);
   };
 }
 
 // ==================== 暴露全局函数 ====================
-// 这些函数需要在 HTML onclick 中调用，所以必须暴露到全局
+declare global {
+  interface Window {
+    addFile: () => void;
+    switchFile: (path: string) => void;
+    removeFile: (path: string) => void;
+    closeTab: (path: string) => void;
+    showNearbyMenu: (e: Event) => void;
+    addFileByPath: (path: string, focus: boolean) => void;
+    handleSyncButtonClick: () => void;
+    closeSyncDialog: () => void;
+    selectRecentParent: (parentId: string, e?: Event) => void;
+    confirmSync: () => void;
+    copySyncCommand: () => void;
+    copySingleText: (text: string, e?: Event) => void;
+    copyErrorInfo: () => void;
+  }
+}
+
+window.addFile = () => {
+  const input = document.getElementById('fileInput') as HTMLInputElement;
+  if (input) addFileByPath(input.value, true);
+};
+window.switchFile = switchFile;
+window.removeFile = removeFileHandler;
+window.closeTab = closeTab;
+window.showNearbyMenu = showNearbyMenu;
+window.addFileByPath = addFileByPath;
 window.handleSyncButtonClick = handleSyncButtonClick;
 window.closeSyncDialog = closeSyncDialog;
-window.showSyncDialog = showSyncDialog;
 window.selectRecentParent = selectRecentParent;
-window.executeSyncDialog = executeSyncDialog;
-window.copyErrorOutput = copyErrorOutput;
-window.copySingleText = copySingleText;
-window.updateSyncCommand = updateSyncCommand;
+window.confirmSync = confirmSync;
 window.copySyncCommand = copySyncCommand;
+window.copySingleText = copySingleText;
+window.copyErrorInfo = copyErrorInfo;
 
 // ==================== 初始化 ====================
-(async function init() {
-  await restoreState();
-  await handleUrlParams();
+(async () => {
+  await restoreState(loadFile);
+  renderFiles();
+  renderTabs();
+  renderContent();
+
+  setupDragAndDrop();
+  handleURLParams();
+
   // 页面刷新时，自动刷新当前正在展示的文件
   await refreshCurrentFile();
   connectSSE();

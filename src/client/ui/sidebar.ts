@@ -26,9 +26,17 @@ export function renderSearchBox(): void {
   if (input) {
     input.addEventListener('input', (e) => {
       const query = (e.target as HTMLInputElement).value;
+      const cursorPosition = input.selectionStart || 0;
       setSearchQuery(query);
       renderSearchBox();
       renderFiles();
+
+      // 重新渲染后恢复焦点和光标位置
+      const newInput = document.getElementById('searchInput') as HTMLInputElement;
+      if (newInput) {
+        newInput.focus();
+        newInput.setSelectionRange(cursorPosition, cursorPosition);
+      }
     });
   }
 
@@ -38,7 +46,12 @@ export function renderSearchBox(): void {
       setSearchQuery('');
       renderSearchBox();
       renderFiles();
-      input?.focus();
+
+      // 清除后恢复焦点
+      const newInput = document.getElementById('searchInput') as HTMLInputElement;
+      if (newInput) {
+        newInput.focus();
+      }
     });
   }
 }

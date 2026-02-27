@@ -5,6 +5,7 @@
  */
 
 import { Hono } from "hono";
+import { serveStatic } from "hono/bun";
 import { marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
@@ -47,6 +48,9 @@ const app = new Hono();
 app.get("/", (c) => {
   return c.html(generateClientHTML());
 });
+
+// 静态文件服务（favicon 等）
+app.get("/favicon.svg", serveStatic({ path: "./public/favicon.svg" }));
 
 // API: 获取文件内容
 app.get("/api/file", handleGetFile);

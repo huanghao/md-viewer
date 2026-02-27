@@ -2,7 +2,7 @@
 import type { FileData } from './types';
 
 // 导入状态管理
-import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFileFromState, setFileInactive, switchToFile } from './state';
+import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFileFromState, switchToFile } from './state';
 
 // 导入 API
 import { loadFile, searchFiles, getNearbyFiles, openFile } from './api/files';
@@ -104,15 +104,8 @@ function renderBreadcrumb() {
     `;
   }).join('');
 
-  // 添加附近文件菜单
-  container.innerHTML = `
-    <div class="breadcrumb-path">
-      ${breadcrumbItems}
-      <button class="breadcrumb-nearby-btn" onclick="window.showNearbyMenu(event)">
-        📁
-      </button>
-    </div>
-  `;
+  // 只显示面包屑路径
+  container.innerHTML = breadcrumbItems;
 }
 
 // 显示附近文件菜单
@@ -130,7 +123,7 @@ async function showNearbyMenu(e: Event) {
   try {
     const data = await getNearbyFiles(state.currentFile);
     if (!data.files || data.files.length === 0) {
-      showInfo('附近没有其他 Markdown 文件');
+      showInfo('附近没有其他 Markdown 文件', 3000);
       return;
     }
 
@@ -187,17 +180,9 @@ function switchFile(path: string) {
   renderContent();
 }
 
-// 移除文件
+// 移除文件（关闭标签页和从列表删除是同一个操作）
 function removeFileHandler(path: string) {
   removeFileFromState(path);
-  renderFiles();
-  renderTabs();
-  renderContent();
-}
-
-// 关闭标签页
-function closeTab(path: string) {
-  setFileInactive(path);
   renderFiles();
   renderTabs();
   renderContent();
@@ -217,7 +202,7 @@ async function searchFilesHandler() {
       // 显示搜索结果（简单实现：添加第一个）
       await addFileByPath(data.files[0].path);
     } else {
-      showInfo('没有找到匹配的文件');
+      showInfo('没有找到匹配的文件', 3000);
     }
   } catch (err: any) {
     showError('搜索失败: ' + err.message);
@@ -725,7 +710,6 @@ declare global {
     addFile: () => void;
     switchFile: (path: string) => void;
     removeFile: (path: string) => void;
-    closeTab: (path: string) => void;
     showNearbyMenu: (e: Event) => void;
     addFileByPath: (path: string, focus: boolean) => void;
     handleSyncButtonClick: () => void;
@@ -744,7 +728,6 @@ window.addFile = () => {
 };
 window.switchFile = switchFile;
 window.removeFile = removeFileHandler;
-window.closeTab = closeTab;
 window.showNearbyMenu = showNearbyMenu;
 window.addFileByPath = addFileByPath;
 window.handleSyncButtonClick = handleSyncButtonClick;

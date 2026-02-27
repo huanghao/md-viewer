@@ -4,5 +4,5 @@
 
 ```bash
 bun build src/server.ts --compile --outfile=dist/md-viewer-server
-bun build src/cli.ts --compile --outfile=dist/md-viewer-cli
+bun build src/cli.ts --compile --outfile=dist/mdv
 ```

@@ -4,7 +4,7 @@
   "description": "Markdown viewer with live reload",
   "type": "module",
   "bin": {
-    "md-viewer-cli": "./src/cli.ts"
+    "mdv": "./src/cli.ts"
   },
   "scripts": {
     "build:client": "bun run build.ts",

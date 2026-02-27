@@ -15,6 +15,7 @@ import { generateDistinctNames } from './utils/file-names';
 
 // 导入 UI 组件
 import { renderFiles, renderTabs } from './ui/sidebar';
+import { showToast, showSuccess, showError, showWarning, showInfo } from './ui/toast';
 
 // ==================== 消息处理 ====================
 async function onFileLoaded(data: FileData, focus: boolean = false) {
@@ -129,7 +130,7 @@ async function showNearbyMenu(e: Event) {
   try {
     const data = await getNearbyFiles(state.currentFile);
     if (!data.files || data.files.length === 0) {
-      alert('附近没有其他 Markdown 文件');
+      showInfo('附近没有其他 Markdown 文件');
       return;
     }
 
@@ -157,7 +158,7 @@ async function showNearbyMenu(e: Event) {
     };
     setTimeout(() => document.addEventListener('click', closeMenu), 0);
   } catch (err: any) {
-    alert('获取附近文件失败: ' + err.message);
+    showError('获取附近文件失败: ' + err.message);
   }
 }
 
@@ -216,10 +217,10 @@ async function searchFilesHandler() {
       // 显示搜索结果（简单实现：添加第一个）
       await addFileByPath(data.files[0].path);
     } else {
-      alert('没有找到匹配的文件');
+      showInfo('没有找到匹配的文件');
     }
   } catch (err: any) {
-    alert('搜索失败: ' + err.message);
+    showError('搜索失败: ' + err.message);
   }
 }
 
@@ -476,12 +477,12 @@ async function confirmSync() {
   let parentId = parentInput?.value.trim() || selectedRadio?.value;
 
   if (!title) {
-    alert('请输入标题');
+    showWarning('请输入标题');
     return;
   }
 
   if (!parentId) {
-    alert('请选择位置或输入父文档 ID');
+    showWarning('请选择位置或输入父文档 ID');
     return;
   }
 
@@ -506,7 +507,7 @@ async function confirmSync() {
       showSyncErrorDialog(result);
     }
   } catch (err: any) {
-    alert('同步失败: ' + err.message);
+    showError('同步失败: ' + err.message);
     if (button) {
       button.disabled = false;
       button.textContent = '开始同步';
@@ -663,7 +664,7 @@ function copySyncCommand() {
   const preview = document.getElementById('syncCommandPreview');
   if (preview) {
     navigator.clipboard.writeText(preview.textContent || '').then(() => {
-      alert('命令已复制到剪贴板');
+      showSuccess('命令已复制到剪贴板', 2000);
     });
   }
 }
@@ -690,7 +691,7 @@ function copyErrorInfo() {
   if (outputs.length > 0) {
     const texts = Array.from(outputs).map(el => el.textContent).join('\n\n');
     navigator.clipboard.writeText(texts).then(() => {
-      alert('错误信息已复制到剪贴板');
+      showSuccess('错误信息已复制到剪贴板', 2000);
     });
   }
 }

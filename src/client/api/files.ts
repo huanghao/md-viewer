@@ -1,4 +1,5 @@
 import type { FileData, FilesResponse, NearbyResponse } from '../types';
+import { showError } from '../ui/toast';
 
 // 加载单个文件
 export async function loadFile(path: string, silent: boolean = false): Promise<FileData | null> {
@@ -6,12 +7,12 @@ export async function loadFile(path: string, silent: boolean = false): Promise<F
     const response = await fetch(`/api/file?path=${encodeURIComponent(path)}`);
     const data = await response.json();
     if (data.error) {
-      if (!silent) alert(data.error);
+      if (!silent) showError(data.error);
       return null;
     }
     return data;
   } catch (e: any) {
-    if (!silent) alert(`加载失败: ${e.message}`);
+    if (!silent) showError(`加载失败: ${e.message}`);
     return null;
   }
 }

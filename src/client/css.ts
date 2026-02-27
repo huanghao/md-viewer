@@ -35,6 +35,94 @@ export const styles = `
       color: #2563eb;
       flex-shrink: 0;
     }
+
+    /* 搜索框 */
+    .search-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .search-icon {
+      position: absolute;
+      left: 10px;
+      font-size: 14px;
+      color: #57606a;
+      pointer-events: none;
+    }
+    .search-input {
+      flex: 1;
+      padding: 8px 32px 8px 32px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+    }
+    .search-input::placeholder {
+      color: #57606a;
+    }
+    .search-input:focus {
+      outline: none;
+      border-color: #0969da;
+      box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
+    }
+    .search-clear {
+      position: absolute;
+      right: 8px;
+      background: none;
+      border: none;
+      font-size: 20px;
+      color: #57606a;
+      cursor: pointer;
+      padding: 0 4px;
+      border-radius: 4px;
+    }
+    .search-clear:hover {
+      background: #f6f8fa;
+      color: #24292e;
+    }
+
+    /* 当前文件路径 */
+    .current-path-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: #f6f8fa;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+    .current-path-text {
+      flex: 1;
+      color: #57606a;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .current-path-copy {
+      flex-shrink: 0;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      font-size: 14px;
+      opacity: 0.7;
+    }
+    .current-path-copy:hover {
+      background: #fff;
+      opacity: 1;
+    }
+
+    /* 搜索高亮 */
+    .search-highlight {
+      background: #fff8c5;
+      color: #24292e;
+      font-weight: 500;
+      padding: 0 2px;
+      border-radius: 2px;
+    }
     .add-file {
       display: flex;
       gap: 8px;
@@ -66,21 +154,23 @@ export const styles = `
     .file-item {
       display: flex;
       align-items: center;
-      padding: 8px 10px;
-      border-radius: 6px;
+      padding: 6px 12px;
+      border-radius: 16px;
       cursor: pointer;
       margin-bottom: 4px;
       font-size: 13px;
-      color: #24292e;
+      color: #1f2328;
+      background: transparent;
+      border: 2px solid transparent;
     }
     .file-item:hover {
       background: #f6f8fa;
     }
     .file-item.current {
-      background: #ddf4ff;
+      background: rgba(9, 105, 218, 0.1);
       color: #0969da;
-      border-left: 3px solid #0969da;
-      padding-left: 7px;
+      border: 2px solid #0969da;
+      font-weight: 500;
     }
     .file-item .icon {
       margin-right: 8px;

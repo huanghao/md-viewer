@@ -12,6 +12,7 @@ export interface FileInfo {
 export interface AppState {
   files: Map<string, FileInfo>;
   currentFile: string | null;
+  searchQuery: string;
 }
 
 // API 响应类型

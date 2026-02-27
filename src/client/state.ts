@@ -4,21 +4,74 @@ import type { AppState, FileInfo, FileData } from './types';
 export const state: AppState = {
   files: new Map(),
   currentFile: null,
+  searchQuery: '', // 搜索关键词
 };
 
 // 状态持久化
 const STORAGE_KEY = 'md-viewer:openFiles';
+const MAX_FILES = 100; // 最大保存文件数量（LRU 限制）
 
 export function saveState(): void {
-  const data = {
-    files: Array.from(state.files.entries()).map(([path, file]) => [path, {
-      path: file.path,
-      name: file.name,
-      isRemote: file.isRemote || false
-    }]),
-    currentFile: state.currentFile
-  };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  try {
+    const data = {
+      files: Array.from(state.files.entries()).map(([path, file]) => [path, {
+        path: file.path,
+        name: file.name,
+        isRemote: file.isRemote || false,
+        lastAccessed: Date.now() // 记录最后访问时间用于 LRU
+      }]),
+      currentFile: state.currentFile
+    };
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e: any) {
+    // 处理 QuotaExceededError
+    if (e.name === 'QuotaExceededError' || e.code === 22) {
+      console.warn('localStorage 配额已满，执行清理...');
+      cleanupOldFiles();
+      // 重试保存
+      try {
+        const data = {
+          files: Array.from(state.files.entries()).map(([path, file]) => [path, {
+            path: file.path,
+            name: file.name,
+            isRemote: file.isRemote || false,
+            lastAccessed: Date.now()
+          }]),
+          currentFile: state.currentFile
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (retryError) {
+        console.error('保存状态失败（重试后）:', retryError);
+      }
+    } else {
+      console.error('保存状态失败:', e);
+    }
+  }
+}
+
+/**
+ * 清理旧文件（LRU 策略）
+ * 当文件数量超过 MAX_FILES 时，移除最少使用的文件
+ */
+function cleanupOldFiles(): void {
+  if (state.files.size <= MAX_FILES) return;
+
+  // 按最后访问时间排序
+  const sortedFiles = Array.from(state.files.entries())
+    .sort((a, b) => (b[1].lastModified || 0) - (a[1].lastModified || 0));
+
+  // 保留最近的 MAX_FILES 个
+  const filesToKeep = sortedFiles.slice(0, MAX_FILES);
+  const filesToRemove = sortedFiles.slice(MAX_FILES);
+
+  // 清理旧文件
+  state.files.clear();
+  filesToKeep.forEach(([path, file]) => {
+    state.files.set(path, file);
+  });
+
+  console.log(`已清理 ${filesToRemove.length} 个旧文件`);
 }
 
 export async function restoreState(loadFile: (path: string, silent: boolean) => Promise<FileData | null>): Promise<void> {
@@ -70,6 +123,11 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
 }
 
 export function addOrUpdateFile(fileData: FileData, switchTo: boolean = false): void {
+  // 检查是否需要清理（超过限制）
+  if (state.files.size >= MAX_FILES && !state.files.has(fileData.path)) {
+    cleanupOldFiles();
+  }
+
   state.files.set(fileData.path, {
     path: fileData.path,
     name: fileData.filename,
@@ -97,5 +155,28 @@ export function removeFile(path: string): void {
 
 export function switchToFile(path: string): void {
   state.currentFile = path;
+
+  // 更新最后访问时间（用于 LRU）
+  const file = state.files.get(path);
+  if (file) {
+    file.lastModified = Date.now();
+  }
+
   saveState();
+}
+
+export function setSearchQuery(query: string): void {
+  state.searchQuery = query;
+}
+
+export function getFilteredFiles(): FileInfo[] {
+  const query = state.searchQuery.toLowerCase().trim();
+  if (!query) {
+    return Array.from(state.files.values());
+  }
+
+  return Array.from(state.files.values()).filter(file => {
+    return file.name.toLowerCase().includes(query) ||
+           file.path.toLowerCase().includes(query);
+  });
 }

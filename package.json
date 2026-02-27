@@ -4,14 +4,16 @@
   "description": "Markdown viewer with live reload",
   "type": "module",
   "bin": {
-    "mdv": "./src/cli.ts"
+    "mdv": "./src/cli.ts",
+    "mdv-admin": "./src/cli-admin.ts"
   },
   "scripts": {
     "build:client": "bun run build.ts",
     "build:client:watch": "bun run build.ts --watch",
     "dev": "bun --watch run src/server.ts",
     "build": "bun run build:client && bun build src/server.ts --compile --outfile=md-viewer",
-    "cli": "bun run src/cli.ts"
+    "cli": "bun run src/cli.ts",
+    "admin": "bun run src/cli-admin.ts"
   },
   "dependencies": {
     "highlight.js": "^11.9.0",

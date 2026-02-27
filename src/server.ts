@@ -20,6 +20,8 @@ import {
   handleGetRecentParents,
   handleSyncExecute,
   handleGetSyncStatus,
+  handleCleanupSync,
+  handleGetSyncStats,
 } from "./handlers.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
 
@@ -65,6 +67,8 @@ app.get("/api/nearby", handleGetNearby);
 app.get("/api/sync/recent-parents", handleGetRecentParents);
 app.post("/api/sync/execute", handleSyncExecute);
 app.get("/api/sync/status", handleGetSyncStatus);
+app.post("/api/sync/cleanup", handleCleanupSync);
+app.get("/api/sync/stats", handleGetSyncStats);
 
 // API: CLI 调用 - 打开文件
 app.post("/api/open-file", handleOpenFile);

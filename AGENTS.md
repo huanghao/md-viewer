@@ -68,7 +68,7 @@ When modifying client-side code:
 1. Run `bun run build:client:watch` in one terminal (auto-rebuilds on save)
 2. Run `bun run dev` in another terminal (auto-reloads server on changes)
 3. Both will watch and reload automatically
-4. **DO NOT restart the server manually** - `bun run dev` handles auto-reload
+4. 默认agent **DO NOT restart the server** - 因为我在终端已经运行了 `bun run dev` handles auto-reload
 
 When modifying server-side code:
 

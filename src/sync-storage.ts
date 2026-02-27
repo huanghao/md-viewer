@@ -15,6 +15,9 @@ const SYNC_RECORDS_PATH = join(
   "sync-records.json"
 );
 
+// 同步记录保留时间（6 个月）
+const SYNC_RECORD_MAX_AGE = 6 * 30 * 24 * 60 * 60 * 1000;
+
 export interface RecentParent {
   id: string;
   title: string;
@@ -51,13 +54,39 @@ export function loadSyncRecords(): SyncRecords {
 
   try {
     const content = readFileSync(SYNC_RECORDS_PATH, "utf-8");
-    return JSON.parse(content);
+    const records = JSON.parse(content);
+
+    // 自动清理过期的同步记录
+    cleanupExpiredSyncRecords(records);
+
+    return records;
   } catch (error) {
     console.error("读取同步记录失败:", error);
     return {
       recentParents: [],
       syncedFiles: {},
     };
+  }
+}
+
+/**
+ * 清理过期的同步记录（超过 6 个月）
+ */
+function cleanupExpiredSyncRecords(records: SyncRecords): void {
+  const now = Date.now();
+  let cleanedCount = 0;
+
+  // 清理过期的文件同步记录
+  for (const [filePath, info] of Object.entries(records.syncedFiles)) {
+    if (now - info.lastSyncTime > SYNC_RECORD_MAX_AGE) {
+      delete records.syncedFiles[filePath];
+      cleanedCount++;
+    }
+  }
+
+  if (cleanedCount > 0) {
+    console.log(`已清理 ${cleanedCount} 条过期的同步记录（超过 6 个月）`);
+    saveSyncRecords(records);
   }
 }
 
@@ -162,4 +191,54 @@ export function removeSyncedFile(filePath: string): void {
 export function getDefaultParentId(): string | undefined {
   const records = loadSyncRecords();
   return records.defaultParentId;
+}
+
+/**
+ * 手动清理所有过期的同步记录
+ * 可通过 CLI 调用
+ */
+export function cleanupAllExpiredRecords(): number {
+  const records = loadSyncRecords();
+  const now = Date.now();
+  let cleanedCount = 0;
+
+  for (const [filePath, info] of Object.entries(records.syncedFiles)) {
+    if (now - info.lastSyncTime > SYNC_RECORD_MAX_AGE) {
+      delete records.syncedFiles[filePath];
+      cleanedCount++;
+    }
+  }
+
+  if (cleanedCount > 0) {
+    saveSyncRecords(records);
+  }
+
+  return cleanedCount;
+}
+
+/**
+ * 获取同步记录统计信息
+ */
+export function getSyncRecordsStats(): {
+  totalFiles: number;
+  expiredFiles: number;
+  recentParents: number;
+  oldestSync: number | null;
+  newestSync: number | null;
+} {
+  const records = loadSyncRecords();
+  const now = Date.now();
+
+  const syncTimes = Object.values(records.syncedFiles).map(f => f.lastSyncTime);
+  const expiredCount = Object.values(records.syncedFiles)
+    .filter(f => now - f.lastSyncTime > SYNC_RECORD_MAX_AGE)
+    .length;
+
+  return {
+    totalFiles: Object.keys(records.syncedFiles).length,
+    expiredFiles: expiredCount,
+    recentParents: records.recentParents.length,
+    oldestSync: syncTimes.length > 0 ? Math.min(...syncTimes) : null,
+    newestSync: syncTimes.length > 0 ? Math.max(...syncTimes) : null,
+  };
 }

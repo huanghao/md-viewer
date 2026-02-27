@@ -14,12 +14,14 @@ import { formatRelativeTime, formatFileTime } from './utils/format';
 import { generateDistinctNames } from './utils/file-names';
 
 // 导入 UI 组件
-import { renderFiles, renderTabs } from './ui/sidebar';
+import { renderFiles, renderTabs, renderSearchBox, renderCurrentPath } from './ui/sidebar';
 import { showToast, showSuccess, showError, showWarning, showInfo } from './ui/toast';
 
 // ==================== 消息处理 ====================
 async function onFileLoaded(data: FileData, focus: boolean = false) {
   addOrUpdateFile(data, focus);
+  renderSearchBox();
+  renderCurrentPath();
   renderFiles();
   renderTabs();
   renderContent();
@@ -175,6 +177,8 @@ async function addFileByPath(path: string, focus: boolean = true) {
 // 切换文件
 function switchFile(path: string) {
   switchToFile(path);
+  renderSearchBox();
+  renderCurrentPath();
   renderFiles();
   renderTabs();
   renderContent();
@@ -183,6 +187,8 @@ function switchFile(path: string) {
 // 移除文件（关闭标签页和从列表删除是同一个操作）
 function removeFileHandler(path: string) {
   removeFileFromState(path);
+  renderSearchBox();
+  renderCurrentPath();
   renderFiles();
   renderTabs();
   renderContent();
@@ -719,6 +725,7 @@ declare global {
     copySyncCommand: () => void;
     copySingleText: (text: string, e?: Event) => void;
     copyErrorInfo: () => void;
+    showToast?: (message: string, type: string) => void;
   }
 }
 
@@ -737,10 +744,13 @@ window.confirmSync = confirmSync;
 window.copySyncCommand = copySyncCommand;
 window.copySingleText = copySingleText;
 window.copyErrorInfo = copyErrorInfo;
+window.showToast = showToast;
 
 // ==================== 初始化 ====================
 (async () => {
   await restoreState(loadFile);
+  renderSearchBox();
+  renderCurrentPath();
   renderFiles();
   renderTabs();
   renderContent();

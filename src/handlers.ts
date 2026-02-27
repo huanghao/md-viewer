@@ -17,6 +17,8 @@ import {
   getSyncedFile,
   saveSyncedFile,
   getDefaultParentId,
+  cleanupAllExpiredRecords,
+  getSyncRecordsStats,
 } from "./sync-storage.ts";
 
 // API: 获取文件内容
@@ -336,6 +338,39 @@ export function handleGetSyncStatus(c: Context) {
     kmTitle: syncInfo.kmTitle,
     lastSyncTime: syncInfo.lastSyncTime,
   });
+}
+
+// API: 清理过期的同步记录
+export function handleCleanupSync(c: Context) {
+  try {
+    const cleanedCount = cleanupAllExpiredRecords();
+    return c.json({
+      success: true,
+      cleanedCount,
+      message: `已清理 ${cleanedCount} 条过期的同步记录`,
+    });
+  } catch (error: any) {
+    return c.json({
+      success: false,
+      error: error.message,
+    }, 500);
+  }
+}
+
+// API: 获取同步记录统计信息
+export function handleGetSyncStats(c: Context) {
+  try {
+    const stats = getSyncRecordsStats();
+    return c.json({
+      success: true,
+      stats,
+    });
+  } catch (error: any) {
+    return c.json({
+      success: false,
+      error: error.message,
+    }, 500);
+  }
 }
 
 // 辅助函数

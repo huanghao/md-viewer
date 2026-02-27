@@ -1027,6 +1027,16 @@ export const clientScript = `
       };
     }
 
+    // ==================== 暴露全局函数 ====================
+    // 这些函数需要在 HTML onclick 中调用，所以必须暴露到全局
+    window.handleSyncButtonClick = handleSyncButtonClick;
+    window.closeSyncDialog = closeSyncDialog;
+    window.showSyncDialog = showSyncDialog;
+    window.selectRecentParent = selectRecentParent;
+    window.executeSyncDialog = executeSyncDialog;
+    window.copyErrorOutput = copyErrorOutput;
+    window.copySingleText = copySingleText;
+
     // ==================== 初始化 ====================
     (async function init() {
       await restoreState();

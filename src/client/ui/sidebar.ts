@@ -68,15 +68,18 @@ export function renderCurrentPath(): void {
     copyBtn.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(state.currentFile || '');
-        // 触发 toast 提示
-        if (window.showToast) {
-          window.showToast('已复制路径', 'success');
-        }
+        // 视觉反馈：按钮短暂变化
+        copyBtn.textContent = '✓';
+        setTimeout(() => {
+          copyBtn.textContent = '📋';
+        }, 1000);
       } catch (err) {
         console.error('复制失败:', err);
-        if (window.showToast) {
-          window.showToast('复制失败', 'error');
-        }
+        // 失败时显示错误图标
+        copyBtn.textContent = '✗';
+        setTimeout(() => {
+          copyBtn.textContent = '📋';
+        }, 1000);
       }
     });
   }

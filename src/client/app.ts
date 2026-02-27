@@ -827,7 +827,7 @@ export const clientScript = `
           <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
           <div style="font-size: 16px; color: #24292e; margin-bottom: 24px;">文档已成功同步到学城</div>
 
-          <div style="text-align: left; background: #f6f8fa; padding: 16px; border-radius: 8px;">
+          <div style="text-align: left; background: #f6f8fa; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
             <div style="margin-bottom: 8px;">
               <span style="color: #586069;">📄 标题：</span>
               <span style="color: #24292e;">\${result.kmTitle}</span>
@@ -838,6 +838,20 @@ export const clientScript = `
             </div>
           </div>
         </div>
+
+        \${result.command ? \`
+          <div class="sync-dialog-field">
+            <label class="sync-dialog-label">执行的命令：</label>
+            <div class="sync-dialog-output">\${result.command}</div>
+          </div>
+        \` : ''}
+
+        \${result.output ? \`
+          <div class="sync-dialog-field">
+            <label class="sync-dialog-label">km-cli 返回：</label>
+            <div class="sync-dialog-output">\${result.output}</div>
+          </div>
+        \` : ''}
 
         <div class="sync-dialog-footer">
           <button class="sync-dialog-button" onclick="closeSyncDialog()">关闭</button>
@@ -868,8 +882,15 @@ export const clientScript = `
           ✗ \${result.error || '同步失败'}
         </div>
 
+        \${result.command ? \`
+          <div class="sync-dialog-field">
+            <label class="sync-dialog-label">执行的命令：</label>
+            <div class="sync-dialog-output">\${result.command}</div>
+          </div>
+        \` : ''}
+
         <div class="sync-dialog-field">
-          <label class="sync-dialog-label">命令输出：</label>
+          <label class="sync-dialog-label">km-cli 返回：</label>
           <div class="sync-dialog-output">\${result.output || '无输出'}</div>
         </div>
 
@@ -923,9 +944,11 @@ export const clientScript = `
 
     // 复制错误信息
     function copyErrorOutput() {
-      const output = document.querySelector('.sync-dialog-output');
-      if (output) {
-        navigator.clipboard.writeText(output.textContent).then(() => {
+      const outputs = document.querySelectorAll('.sync-dialog-output');
+      if (outputs.length > 0) {
+        // 收集所有输出框的内容
+        const texts = Array.from(outputs).map(el => el.textContent).join('\\n\\n');
+        navigator.clipboard.writeText(texts).then(() => {
           alert('错误信息已复制到剪贴板');
         });
       }

@@ -15,6 +15,7 @@ export interface KmDocResult {
   title?: string;
   error?: string;
   output?: string;
+  command?: string; // 执行的命令
 }
 
 /**
@@ -25,10 +26,30 @@ export async function createKmDoc(options: {
   title: string;
   markdownFile: string;
 }): Promise<KmDocResult> {
-  try {
-    const cmd = `km-cli doc create --parent-id "${options.parentId}" --title "${options.title}" --markdown-file "${options.markdownFile}" --json`;
+  const cmd = `km-cli doc create --parent-id "${options.parentId}" --title "${options.title}" --markdown-file "${options.markdownFile}" --json`;
 
+  try {
     const { stdout, stderr } = await execAsync(cmd);
+
+    // 检查是否有错误输出
+    if (stderr && stderr.trim()) {
+      return {
+        success: false,
+        error: "km-cli 执行失败",
+        output: `STDOUT:\n${stdout}\n\nSTDERR:\n${stderr}`,
+        command: cmd,
+      };
+    }
+
+    // 检查输出是否包含 "Error:" 或 "Usage:"
+    if (stdout.includes("Error:") || stdout.includes("Usage:")) {
+      return {
+        success: false,
+        error: "km-cli 执行失败",
+        output: stdout,
+        command: cmd,
+      };
+    }
 
     // 尝试解析 JSON 输出
     try {
@@ -43,6 +64,8 @@ export async function createKmDoc(options: {
         docId,
         url,
         title: result.title || options.title,
+        command: cmd,
+        output: stdout, // 成功时也保存输出
       };
     } catch (parseError) {
       // JSON 解析失败，但命令可能成功了
@@ -56,6 +79,8 @@ export async function createKmDoc(options: {
           docId: idMatch ? idMatch[0] : undefined,
           url: urlMatch ? urlMatch[0] : undefined,
           title: options.title,
+          command: cmd,
+          output: stdout,
         };
       }
 
@@ -63,15 +88,25 @@ export async function createKmDoc(options: {
       return {
         success: false,
         error: "无法解析 km-cli 输出",
-        output: stdout + "\n" + stderr,
+        output: stdout,
+        command: cmd,
       };
     }
   } catch (error: any) {
-    // 命令执行失败
+    // 命令执行失败（通常是 exit code 非 0）
+    const output = [
+      error.stdout ? `STDOUT:\n${error.stdout}` : "",
+      error.stderr ? `STDERR:\n${error.stderr}` : "",
+      error.message ? `ERROR:\n${error.message}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
     return {
       success: false,
-      error: error.message || "km-cli 执行失败",
-      output: error.stdout + "\n" + error.stderr,
+      error: "km-cli 执行失败",
+      output: output || error.toString(),
+      command: cmd,
     };
   }
 }

@@ -34,6 +34,7 @@ export function generateClientHTML(): string {
     <main class="main">
       <!-- 工具栏 -->
       <div class="toolbar">
+        <div class="breadcrumb" id="breadcrumb"></div>
         <div class="spacer"></div>
         <span class="file-meta" id="fileMeta">最后修改: -</span>
       </div>

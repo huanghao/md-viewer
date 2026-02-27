@@ -1,5 +1,5 @@
-import { basename, resolve } from "path";
-import { existsSync } from "fs";
+import { basename, resolve, dirname, join } from "path";
+import { existsSync, readdirSync, statSync } from "fs";
 import type { Context } from "hono";
 import {
   isUrl,
@@ -60,6 +60,71 @@ export function handleGetFiles(c: Context) {
   const dir = c.req.query("dir") || ".";
   const files = getFileList(resolve(dir));
   return c.json({ files: files.map((f) => ({ path: f, name: basename(f) })) });
+}
+
+// API: 获取附近的文件（同目录、父目录、子目录）
+export function handleGetNearby(c: Context) {
+  const path = c.req.query("path");
+  if (!path) return c.json({ error: "缺少 path 参数" }, 400);
+
+  // 远程文件不支持附近文件功能
+  if (isUrl(path)) {
+    return c.json({ error: "远程文件不支持附近文件功能" });
+  }
+
+  const resolvedPath = resolve(path);
+  if (!existsSync(resolvedPath)) {
+    return c.json({ error: "文件不存在" }, 404);
+  }
+
+  const currentDir = dirname(resolvedPath);
+  const currentFile = basename(resolvedPath);
+
+  try {
+    // 获取当前目录的所有 .md 文件（兄弟文件）
+    const siblings = readdirSync(currentDir)
+      .filter((f) => f.endsWith(".md"))
+      .sort()
+      .map((f) => ({
+        name: f,
+        path: join(currentDir, f),
+      }));
+
+    // 获取父目录（如果存在）
+    const parentDir = dirname(currentDir);
+    const hasParent = parentDir !== currentDir;
+
+    // 获取子目录（包含 .md 文件的目录）
+    const subdirs = readdirSync(currentDir)
+      .filter((f) => {
+        const fullPath = join(currentDir, f);
+        try {
+          return statSync(fullPath).isDirectory();
+        } catch {
+          return false;
+        }
+      })
+      .map((dir) => {
+        const dirPath = join(currentDir, dir);
+        const mdFiles = getFileList(dirPath);
+        return {
+          name: dir,
+          path: dirPath,
+          count: mdFiles.length,
+        };
+      })
+      .filter((dir) => dir.count > 0)
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    return c.json({
+      currentDir: basename(currentDir),
+      parentDir: hasParent ? parentDir : null,
+      siblings,
+      subdirs,
+    });
+  } catch (e) {
+    return c.json({ error: "读取目录失败: " + (e as Error).message }, 500);
+  }
 }
 
 // API: CLI 调用 - 打开文件

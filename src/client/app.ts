@@ -232,6 +232,7 @@ export const clientScript = `
 
       if (!file) {
         updateFileMeta(null);
+        renderBreadcrumb(null);
         container.innerHTML = \`
           <div class="empty-state">
             <h2>欢迎使用 MD Viewer</h2>
@@ -258,6 +259,7 @@ export const clientScript = `
       }
 
       updateFileMeta(file.lastModified);
+      renderBreadcrumb(file.path);
     }
 
     function formatRelativeTime(timestamp) {
@@ -324,6 +326,174 @@ export const clientScript = `
         return;
       }
       el.textContent = '最后修改: ' + formatRelativeTime(lastModified);
+    }
+
+    // ==================== 面包屑导航 ====================
+    function renderBreadcrumb(filePath) {
+      const container = document.getElementById('breadcrumb');
+      if (!container) return;
+
+      if (!filePath) {
+        container.innerHTML = '';
+        return;
+      }
+
+      const parts = filePath.split('/').filter(Boolean);
+      const fileName = parts[parts.length - 1];
+      const parentDir = parts.length > 1 ? parts[parts.length - 2] : '';
+
+      // 显示：父目录 / 文件名
+      container.innerHTML = \`
+        <div class="breadcrumb-folder" onclick="toggleNearbyMenu(event)">
+          <span>📁</span>
+          <span>\${parentDir || '(root)'}</span>
+          <span>▼</span>
+        </div>
+        <span class="breadcrumb-separator">/</span>
+        <span class="breadcrumb-file">\${fileName}</span>
+      \`;
+    }
+
+    async function toggleNearbyMenu(event) {
+      event.stopPropagation();
+
+      // 检查是否已有菜单
+      let menu = document.querySelector('.nearby-menu');
+      if (menu) {
+        menu.classList.toggle('show');
+        return;
+      }
+
+      // 创建菜单
+      menu = document.createElement('div');
+      menu.className = 'nearby-menu';
+
+      const breadcrumb = document.getElementById('breadcrumb');
+      if (breadcrumb) {
+        breadcrumb.appendChild(menu);
+      }
+
+      // 加载附近文件
+      await loadNearbyFiles(menu);
+      menu.classList.add('show');
+
+      // 点击外部关闭菜单
+      setTimeout(() => {
+        document.addEventListener('click', closeNearbyMenu);
+      }, 0);
+    }
+
+    function closeNearbyMenu() {
+      const menu = document.querySelector('.nearby-menu');
+      if (menu) {
+        menu.classList.remove('show');
+      }
+      document.removeEventListener('click', closeNearbyMenu);
+    }
+
+    async function loadNearbyFiles(menuElement) {
+      if (!state.currentFile) return;
+
+      try {
+        const response = await fetch(\`/api/nearby?path=\${encodeURIComponent(state.currentFile)}\`);
+        const data = await response.json();
+
+        if (data.error) {
+          menuElement.innerHTML = \`
+            <div class="nearby-menu-empty">\${data.error}</div>
+          \`;
+          return;
+        }
+
+        renderNearbyMenu(menuElement, data);
+      } catch (e) {
+        menuElement.innerHTML = \`
+          <div class="nearby-menu-empty">加载失败</div>
+        \`;
+      }
+    }
+
+    function renderNearbyMenu(menuElement, data) {
+      const { currentDir, parentDir, subdirs, siblings } = data;
+      let html = '';
+
+      // 当前目录的文件
+      if (siblings && siblings.length > 0) {
+        html += \`
+          <div class="nearby-menu-section">
+            <div class="nearby-menu-title">当前目录 (\${currentDir})</div>
+        \`;
+        siblings.forEach(file => {
+          const isCurrent = file.path === state.currentFile;
+          html += \`
+            <div class="nearby-menu-item \${isCurrent ? 'current' : ''}"
+                 onclick="openNearbyFile('\${escapeAttr(file.path)}')">
+              <span class="icon">📄</span>
+              <span class="name">\${file.name}</span>
+              \${isCurrent ? '<span class="badge">当前</span>' : ''}
+            </div>
+          \`;
+        });
+        html += '</div>';
+      }
+
+      // 父目录
+      if (parentDir) {
+        html += \`
+          <div class="nearby-menu-section">
+            <div class="nearby-menu-title">父目录</div>
+            <div class="nearby-menu-item" onclick="openNearbyFile('\${escapeAttr(parentDir)}')">
+              <span class="icon">📁</span>
+              <span class="name">..</span>
+            </div>
+          </div>
+        \`;
+      }
+
+      // 子目录
+      if (subdirs && subdirs.length > 0) {
+        html += \`
+          <div class="nearby-menu-section">
+            <div class="nearby-menu-title">子目录</div>
+        \`;
+        subdirs.forEach(dir => {
+          html += \`
+            <div class="nearby-menu-item" onclick="openNearbyFile('\${escapeAttr(dir.path)}')">
+              <span class="icon">📁</span>
+              <span class="name">\${dir.name}</span>
+              <span class="badge">\${dir.count} 个文件</span>
+            </div>
+          \`;
+        });
+        html += '</div>';
+      }
+
+      if (!html) {
+        html = '<div class="nearby-menu-empty">没有附近的文件</div>';
+      }
+
+      menuElement.innerHTML = html;
+    }
+
+    async function openNearbyFile(path) {
+      closeNearbyMenu();
+
+      // 如果是目录，暂时不处理（未来可以展开）
+      if (!path.endsWith('.md')) {
+        return;
+      }
+
+      // 如果文件已打开，直接切换
+      if (state.files.has(path)) {
+        switchFile(path);
+        return;
+      }
+
+      // 加载新文件
+      const data = await loadFile(path);
+      if (data) {
+        onFileLoaded(data, true);
+      }
     }
 
     // ==================== 用户操作 ====================

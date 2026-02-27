@@ -91,8 +91,8 @@
 - 视觉原型: docs/design/workspace-prototype.html
 - 决策：采用方案 C（渐进式迁移 + 配置切换）
 - 实现：工作区模式完成，通过配置切换，默认保持简单模式
-- 提交: a0c61e0
-- 使用方法：修改 localStorage 配置 `sidebarMode: 'workspace'` 后刷新页面
+- 提交: a0c61e0 (工作区模式), 2bd1815 (设置页面)
+- 使用方法：点击工具栏 ⚙️ 按钮打开设置，切换侧边栏模式
 
 ## 复制文件名的按钮
 

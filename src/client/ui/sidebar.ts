@@ -18,7 +18,6 @@ export function renderFiles(): void {
       const isCurrent = file.path === state.currentFile;
       const classes = [
         'file-item',
-        file.active ? 'active' : '',
         isCurrent ? 'current' : ''
       ].filter(Boolean).join(' ');
       return `
@@ -33,18 +32,18 @@ export function renderFiles(): void {
 
 // 渲染标签页
 export function renderTabs(): void {
-  const activeFiles = Array.from(state.files.values()).filter(f => f.active);
+  const allFiles = Array.from(state.files.values());
   const container = document.getElementById('tabs');
   if (!container) return;
 
-  if (activeFiles.length === 0) {
+  if (allFiles.length === 0) {
     container.innerHTML = '';
     container.style.display = 'none';
     return;
   }
 
   container.style.display = 'flex';
-  const filesWithDisplay = generateDistinctNames(new Map(activeFiles.map(f => [f.path, f])));
+  const filesWithDisplay = generateDistinctNames(state.files);
 
   container.innerHTML = filesWithDisplay
     .map(file => {
@@ -53,7 +52,7 @@ export function renderTabs(): void {
         <div class="tab ${isCurrent ? 'active' : ''}"
              onclick="window.switchFile('${escapeAttr(file.path)}')">
           <span class="tab-name">${file.displayName}</span>
-          <span class="tab-close" onclick="event.stopPropagation();window.closeTab('${escapeAttr(file.path)}')">×</span>
+          <span class="tab-close" onclick="event.stopPropagation();window.removeFile('${escapeAttr(file.path)}')">×</span>
         </div>
       `;
     }).join('');

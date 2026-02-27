@@ -3,7 +3,6 @@ export interface FileInfo {
   path: string;
   name: string;
   content: string;
-  active: boolean;
   lastModified: number;
   isRemote: boolean;
   displayName?: string;

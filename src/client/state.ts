@@ -14,7 +14,6 @@ export function saveState(): void {
     files: Array.from(state.files.entries()).map(([path, file]) => [path, {
       path: file.path,
       name: file.name,
-      active: file.active,
       isRemote: file.isRemote || false
     }]),
     currentFile: state.currentFile
@@ -39,7 +38,6 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
           path: fileData.path,
           name: fileData.filename,
           content: fileData.content,
-          active: fileInfo.active,
           lastModified: fileData.lastModified,
           isRemote: fileData.isRemote || false
         });
@@ -62,9 +60,9 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
     if (data.currentFile && state.files.has(data.currentFile)) {
       state.currentFile = data.currentFile;
     } else {
-      // 如果保存的当前文件不存在了，切换到第一个活跃文件
-      const activeFiles = Array.from(state.files.values()).filter(f => f.active);
-      state.currentFile = activeFiles.length > 0 ? activeFiles[0].path : null;
+      // 如果保存的当前文件不存在了，切换到第一个文件
+      const firstFile = Array.from(state.files.values())[0];
+      state.currentFile = firstFile ? firstFile.path : null;
     }
   } catch (e) {
     console.error('恢复状态失败:', e);
@@ -76,7 +74,6 @@ export function addOrUpdateFile(fileData: FileData, switchTo: boolean = false): 
     path: fileData.path,
     name: fileData.filename,
     content: fileData.content,
-    active: true,
     lastModified: fileData.lastModified,
     isRemote: fileData.isRemote || false
   });
@@ -91,18 +88,11 @@ export function addOrUpdateFile(fileData: FileData, switchTo: boolean = false): 
 export function removeFile(path: string): void {
   state.files.delete(path);
   if (state.currentFile === path) {
-    const activeFiles = Array.from(state.files.values()).filter(f => f.active);
-    state.currentFile = activeFiles.length > 0 ? activeFiles[0].path : null;
+    // 切换到剩余文件中的第一个
+    const remainingFiles = Array.from(state.files.values());
+    state.currentFile = remainingFiles.length > 0 ? remainingFiles[0].path : null;
   }
   saveState();
-}
-
-export function setFileInactive(path: string): void {
-  const file = state.files.get(path);
-  if (file) {
-    file.active = false;
-    saveState();
-  }
 }
 
 export function switchToFile(path: string): void {

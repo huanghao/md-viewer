@@ -36,7 +36,9 @@ bun build src/cli.ts --compile --outfile=mdv
    方式 A：全局安装（推荐）
    ```bash
    # 在项目目录运行
-   bun link
+   npm install -g .
+   # 或
+   bun install -g .
 
    # 现在可以在任何地方使用 mdv 命令
    mdv /path/to/file.md
@@ -48,13 +50,22 @@ bun build src/cli.ts --compile --outfile=mdv
    alias mdv='bun run /Users/huanghao/workspace/md-viewer/src/cli.ts'
    ```
 
+   方式 C：使用完整路径（临时方案）
+   ```bash
+   # 直接使用，不需要安装
+   /Users/huanghao/workspace/md-viewer/src/cli.ts /path/to/file.md
+   ```
+
 2. **配置 iTerm2 Semantic History**
 
    - 打开 iTerm2 → Preferences (⌘,)
    - 选择 Profiles → 你的 Profile → Advanced
    - 找到 "Semantic History" 部分
    - 选择 "Run command"
-   - 输入：`mdv "\1"`
+   - 根据你的安装方式输入：
+     - 全局安装：`mdv "\1"`
+     - 使用别名：`mdv "\1"`（需要先 source ~/.zshrc）
+     - 完整路径：`/Users/huanghao/workspace/md-viewer/src/cli.ts "\1"`
    - 点击 "OK"
 
 3. **测试**

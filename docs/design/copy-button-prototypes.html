@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>复制按钮设计原型</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f5f5f5;
+      padding: 40px;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 12px;
+      color: #24292e;
+    }
+    .intro {
+      color: #586069;
+      margin-bottom: 40px;
+      line-height: 1.6;
+    }
+    .section {
+      margin-bottom: 48px;
+    }
+    .section-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #24292e;
+      margin-bottom: 20px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e1e4e8;
+    }
+    .prototype-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+    .prototype {
+      border: 2px solid #e1e4e8;
+      border-radius: 8px;
+      padding: 24px;
+      transition: all 0.2s;
+    }
+    .prototype:hover {
+      border-color: #0969da;
+      box-shadow: 0 4px 12px rgba(9, 105, 218, 0.1);
+    }
+    .prototype-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #0969da;
+      margin-bottom: 16px;
+    }
+    .prototype-demo {
+      background: #f6f8fa;
+      padding: 16px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .path-text {
+      flex: 1;
+      font-size: 13px;
+      color: #24292e;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .copy-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 4px;
+      transition: all 0.2s;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .copy-btn:hover {
+      background: rgba(0,0,0,0.05);
+    }
+    .copy-btn:active {
+      transform: scale(0.95);
+    }
+    .copy-btn.success {
+      color: #1a7f37;
+    }
+    .tooltip {
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #24292e;
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      margin-bottom: 4px;
+    }
+    .copy-btn:hover .tooltip {
+      opacity: 1;
+    }
+    .prototype-desc {
+      font-size: 12px;
+      color: #586069;
+      line-height: 1.5;
+    }
+    .prototype-source {
+      font-size: 11px;
+      color: #0969da;
+      margin-top: 8px;
+      font-style: italic;
+    }
+
+    /* 方案 A: GitHub 风格 - 双重方框 */
+    .style-a .copy-icon {
+      width: 16px;
+      height: 16px;
+      position: relative;
+    }
+    .style-a .copy-icon::before,
+    .style-a .copy-icon::after {
+      content: '';
+      position: absolute;
+      border: 1.5px solid currentColor;
+      border-radius: 2px;
+    }
+    .style-a .copy-icon::before {
+      width: 10px;
+      height: 12px;
+      top: 0;
+      left: 4px;
+    }
+    .style-a .copy-icon::after {
+      width: 10px;
+      height: 12px;
+      top: 4px;
+      left: 0;
+    }
+    .style-a .check-icon {
+      display: none;
+      width: 16px;
+      height: 16px;
+    }
+    .style-a .check-icon svg {
+      width: 100%;
+      height: 100%;
+    }
+    .style-a.success .copy-icon {
+      display: none;
+    }
+    .style-a.success .check-icon {
+      display: block;
+    }
+
+    /* 方案 B: VS Code 风格 - 单方框 */
+    .style-b .copy-icon {
+      width: 16px;
+      height: 16px;
+      border: 1.5px solid currentColor;
+      border-radius: 2px;
+      position: relative;
+    }
+    .style-b .copy-icon::after {
+      content: '';
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border: 1.5px solid currentColor;
+      border-radius: 1px;
+      top: -3px;
+      right: -3px;
+      background: #f6f8fa;
+    }
+    .style-b .check-icon {
+      display: none;
+      width: 16px;
+      height: 16px;
+    }
+    .style-b .check-icon svg {
+      width: 100%;
+      height: 100%;
+    }
+    .style-b.success .copy-icon {
+      display: none;
+    }
+    .style-b.success .check-icon {
+      display: block;
+    }
+
+    /* 方案 C: Notion 风格 - 两张纸 */
+    .style-c .copy-icon {
+      width: 16px;
+      height: 16px;
+      position: relative;
+    }
+    .style-c .copy-icon::before,
+    .style-c .copy-icon::after {
+      content: '';
+      position: absolute;
+      border: 1.5px solid currentColor;
+      border-radius: 3px;
+      background: white;
+    }
+    .style-c .copy-icon::before {
+      width: 11px;
+      height: 13px;
+      top: 0;
+      left: 3px;
+      border-bottom-left-radius: 0;
+    }
+    .style-c .copy-icon::after {
+      width: 11px;
+      height: 13px;
+      top: 3px;
+      left: 0;
+    }
+    .style-c .check-icon {
+      display: none;
+      width: 16px;
+      height: 16px;
+    }
+    .style-c .check-icon svg {
+      width: 100%;
+      height: 100%;
+    }
+    .style-c.success .copy-icon {
+      display: none;
+    }
+    .style-c.success .check-icon {
+      display: block;
+    }
+
+    /* 方案 D: 文字按钮 */
+    .style-d {
+      padding: 4px 12px;
+      background: white;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #24292e;
+      font-weight: 500;
+    }
+    .style-d:hover {
+      background: #f6f8fa;
+      border-color: #0969da;
+    }
+    .style-d .button-text {
+      display: inline;
+    }
+    .style-d .button-text-success {
+      display: none;
+    }
+    .style-d.success {
+      border-color: #1a7f37;
+      color: #1a7f37;
+    }
+    .style-d.success .button-text {
+      display: none;
+    }
+    .style-d.success .button-text-success {
+      display: inline;
+    }
+
+    /* 方案 E: 图标+文字组合 */
+    .style-e {
+      padding: 4px 10px;
+      background: white;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #586069;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .style-e:hover {
+      background: #f6f8fa;
+      border-color: #0969da;
+      color: #0969da;
+    }
+    .style-e .copy-icon {
+      width: 14px;
+      height: 14px;
+      position: relative;
+    }
+    .style-e .copy-icon::before,
+    .style-e .copy-icon::after {
+      content: '';
+      position: absolute;
+      border: 1.5px solid currentColor;
+      border-radius: 2px;
+    }
+    .style-e .copy-icon::before {
+      width: 9px;
+      height: 10px;
+      top: 0;
+      left: 3px;
+    }
+    .style-e .copy-icon::after {
+      width: 9px;
+      height: 10px;
+      top: 3px;
+      left: 0;
+    }
+    .style-e .check-icon {
+      display: none;
+      width: 14px;
+      height: 14px;
+    }
+    .style-e .check-icon svg {
+      width: 100%;
+      height: 100%;
+    }
+    .style-e .button-text {
+      display: inline;
+    }
+    .style-e .button-text-success {
+      display: none;
+    }
+    .style-e.success {
+      border-color: #1a7f37;
+      color: #1a7f37;
+    }
+    .style-e.success .copy-icon {
+      display: none;
+    }
+    .style-e.success .check-icon {
+      display: block;
+    }
+    .style-e.success .button-text {
+      display: none;
+    }
+    .style-e.success .button-text-success {
+      display: inline;
+    }
+
+    /* 方案 F: 简约圆形图标 */
+    .style-f {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      padding: 0;
+      color: #586069;
+    }
+    .style-f:hover {
+      background: #f6f8fa;
+      color: #0969da;
+    }
+    .style-f .copy-icon {
+      width: 14px;
+      height: 14px;
+      position: relative;
+    }
+    .style-f .copy-icon::before,
+    .style-f .copy-icon::after {
+      content: '';
+      position: absolute;
+      border: 1.5px solid currentColor;
+      border-radius: 2px;
+    }
+    .style-f .copy-icon::before {
+      width: 8px;
+      height: 10px;
+      top: 0;
+      left: 3px;
+    }
+    .style-f .copy-icon::after {
+      width: 8px;
+      height: 10px;
+      top: 3px;
+      left: 0;
+    }
+    .style-f .check-icon {
+      display: none;
+      width: 14px;
+      height: 14px;
+    }
+    .style-f .check-icon svg {
+      width: 100%;
+      height: 100%;
+    }
+    .style-f.success {
+      color: #1a7f37;
+    }
+    .style-f.success .copy-icon {
+      display: none;
+    }
+    .style-f.success .check-icon {
+      display: block;
+    }
+
+    .recommendation {
+      background: #fff8c5;
+      border: 1px solid #bf8700;
+      border-radius: 6px;
+      padding: 16px;
+      margin-top: 32px;
+    }
+    .recommendation-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #24292e;
+      margin-bottom: 8px;
+    }
+    .recommendation-text {
+      font-size: 13px;
+      color: #24292e;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>复制按钮设计原型</h1>
+    <div class="intro">
+      以下是主流产品的复制按钮设计方案。每个方案都包含交互演示：hover 显示 tooltip，点击后显示成功状态。
+    </div>
+
+    <div class="section">
+      <div class="section-title">方案对比</div>
+      <div class="prototype-grid">
+        <!-- 方案 A: GitHub -->
+        <div class="prototype">
+          <div class="prototype-label">方案 A - GitHub 风格</div>
+          <div class="prototype-demo">
+            <span class="path-text">/Users/username/documents/project/README.md</span>
+            <button class="copy-btn style-a" onclick="copyDemo(this)">
+              <span class="copy-icon"></span>
+              <span class="check-icon">
+                <svg viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path>
+                </svg>
+              </span>
+              <span class="tooltip">复制路径</span>
+            </button>
+          </div>
+          <div class="prototype-desc">
+            <strong>特点：</strong>双重方框，简洁清晰<br>
+            <strong>优点：</strong>图标含义明确，广泛认知<br>
+            <strong>缺点：</strong>较为常见，不够独特
+          </div>
+          <div class="prototype-source">参考：GitHub、GitLab</div>
+        </div>
+
+        <!-- 方案 B: VS Code -->
+        <div class="prototype">
+          <div class="prototype-label">方案 B - VS Code 风格</div>
+          <div class="prototype-demo">
+            <span class="path-text">/Users/username/documents/project/README.md</span>
+            <button class="copy-btn style-b" onclick="copyDemo(this)">
+              <span class="copy-icon"></span>
+              <span class="check-icon">
+                <svg viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path>
+                </svg>
+              </span>
+              <span class="tooltip">复制路径</span>
+            </button>
+          </div>
+          <div class="prototype-desc">
+            <strong>特点：</strong>单方框+小方框，层次分明<br>
+            <strong>优点：</strong>视觉更轻量，现代感强<br>
+            <strong>缺点：</strong>小方框可能不够明显
+          </div>
+          <div class="prototype-source">参考：VS Code、Sublime Text</div>
+        </div>
+
+        <!-- 方案 C: Notion -->
+        <div class="prototype">
+          <div class="prototype-label">方案 C - Notion 风格</div>
+          <div class="prototype-demo">
+            <span class="path-text">/Users/username/documents/project/README.md</span>
+            <button class="copy-btn style-c" onclick="copyDemo(this)">
+              <span class="copy-icon"></span>
+              <span class="check-icon">
+                <svg viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path>
+                </svg>
+              </span>
+              <span class="tooltip">复制路径</span>
+            </button>
+          </div>
+          <div class="prototype-desc">
+            <strong>特点：</strong>两张纸叠加，圆角设计<br>
+            <strong>优点：</strong>更具亲和力，视觉柔和<br>
+            <strong>缺点：</strong>相对复杂
+          </div>
+          <div class="prototype-source">参考：Notion、Linear</div>
+        </div>
+
+        <!-- 方案 D: 文字按钮 -->
+        <div class="prototype">
+          <div class="prototype-label">方案 D - 文字按钮</div>
+          <div class="prototype-demo">
+            <span class="path-text">/Users/username/documents/project/README.md</span>
+            <button class="copy-btn style-d" onclick="copyDemo(this)">
+              <span class="button-text">复制</span>
+              <span class="button-text-success">已复制</span>
+            </button>
+          </div>
+          <div class="prototype-desc">
+            <strong>特点：</strong>纯文字，无图标<br>
+            <strong>优点：</strong>含义最明确，无歧义<br>
+            <strong>缺点：</strong>占用空间较大
+          </div>
+          <div class="prototype-source">参考：Medium、Substack</div>
+        </div>
+
+        <!-- 方案 E: 图标+文字 -->
+        <div class="prototype">
+          <div class="prototype-label">方案 E - 图标+文字组合</div>
+          <div class="prototype-demo">
+            <span class="path-text">/Users/username/documents/project/README.md</span>
+            <button class="copy-btn style-e" onclick="copyDemo(this)">
+              <span class="copy-icon"></span>
+              <span class="check-icon">
+                <svg viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path>
+                </svg>
+              </span>
+              <span class="button-text">复制</span>
+              <span class="button-text-success">已复制</span>
+            </button>
+          </div>
+          <div class="prototype-desc">
+            <strong>特点：</strong>图标+文字，信息完整<br>
+            <strong>优点：</strong>最易理解，视觉平衡<br>
+            <strong>缺点：</strong>占用空间最大
+          </div>
+          <div class="prototype-source">参考：Figma、Vercel</div>
+        </div>
+
+        <!-- 方案 F: 简约圆形 -->
+        <div class="prototype">
+          <div class="prototype-label">方案 F - 简约圆形图标</div>
+          <div class="prototype-demo">
+            <span class="path-text">/Users/username/documents/project/README.md</span>
+            <button class="copy-btn style-f" onclick="copyDemo(this)">
+              <span class="copy-icon"></span>
+              <span class="check-icon">
+                <svg viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path>
+                </svg>
+              </span>
+              <span class="tooltip">复制路径</span>
+            </button>
+          </div>
+          <div class="prototype-desc">
+            <strong>特点：</strong>圆形背景，极简设计<br>
+            <strong>优点：</strong>最节省空间，视觉轻盈<br>
+            <strong>缺点：</strong>可能不够醒目
+          </div>
+          <div class="prototype-source">参考：Apple、Tailwind UI</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="recommendation">
+      <div class="recommendation-title">💡 推荐建议</div>
+      <div class="recommendation-text">
+        <strong>首选：方案 A（GitHub 风格）</strong><br>
+        理由：用户认知度最高，图标含义清晰，视觉简洁。GitHub、GitLab 等主流开发工具都采用此设计。<br><br>
+        <strong>次选：方案 F（简约圆形）</strong><br>
+        理由：最节省空间，不干扰路径显示，适合轻量级工具。配合 tooltip 可以清晰表达功能。<br><br>
+        <strong>交互建议：</strong><br>
+        • Hover 状态：显示 "复制路径" tooltip<br>
+        • 点击后：图标变为绿色对勾，tooltip 变为 "已复制"<br>
+        • 1秒后：自动恢复初始状态
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function copyDemo(btn) {
+      // 添加成功状态
+      btn.classList.add('success');
+      const tooltip = btn.querySelector('.tooltip');
+      const originalText = tooltip.textContent;
+      tooltip.textContent = '已复制';
+
+      // 1秒后恢复
+      setTimeout(() => {
+        btn.classList.remove('success');
+        tooltip.textContent = originalText;
+      }, 1000);
+    }
+  </script>
+</body>
+</html>

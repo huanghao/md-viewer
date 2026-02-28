@@ -106,13 +106,88 @@ export const styles = `
       background: none;
       border: none;
       cursor: pointer;
-      padding: 4px;
+      padding: 6px;
       border-radius: 4px;
-      font-size: 14px;
-      opacity: 0.7;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #586069;
+      transition: all 0.2s;
     }
     .current-path-copy:hover {
-      background: #fff;
+      background: rgba(0,0,0,0.05);
+      color: #24292e;
+    }
+    .current-path-copy:active {
+      transform: scale(0.95);
+    }
+    .current-path-copy.success {
+      color: #1a7f37;
+    }
+
+    /* Notion 风格复制图标 */
+    .current-path-copy .copy-icon {
+      width: 16px;
+      height: 16px;
+      position: relative;
+      display: block;
+    }
+    .current-path-copy .copy-icon::before,
+    .current-path-copy .copy-icon::after {
+      content: '';
+      position: absolute;
+      border: 1.5px solid currentColor;
+      border-radius: 3px;
+      background: white;
+    }
+    .current-path-copy .copy-icon::before {
+      width: 11px;
+      height: 13px;
+      top: 0;
+      left: 3px;
+      border-bottom-left-radius: 0;
+    }
+    .current-path-copy .copy-icon::after {
+      width: 11px;
+      height: 13px;
+      top: 3px;
+      left: 0;
+    }
+    .current-path-copy .check-icon {
+      display: none;
+      width: 16px;
+      height: 16px;
+    }
+    .current-path-copy .check-icon svg {
+      width: 100%;
+      height: 100%;
+    }
+    .current-path-copy.success .copy-icon {
+      display: none;
+    }
+    .current-path-copy.success .check-icon {
+      display: block;
+    }
+
+    /* Tooltip */
+    .copy-tooltip {
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #24292e;
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      margin-bottom: 4px;
+    }
+    .current-path-copy:hover .copy-tooltip {
       opacity: 1;
     }
 
@@ -1129,54 +1204,5 @@ export const styles = `
     .settings-button:hover {
       background: #f6f8fa;
       color: #0969da;
-    }
-
-    /* ==================== 右键菜单样式 ==================== */
-
-    .context-menu {
-      position: fixed;
-      background: white;
-      border: 1px solid #d0d7de;
-      border-radius: 6px;
-      box-shadow: 0 8px 24px rgba(140, 149, 159, 0.2);
-      padding: 4px 0;
-      min-width: 180px;
-      z-index: 10001;
-      display: none;
-    }
-
-    .context-menu.show {
-      display: block;
-    }
-
-    .context-menu-item {
-      padding: 8px 16px;
-      cursor: pointer;
-      font-size: 13px;
-      color: #24292e;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      user-select: none;
-    }
-
-    .context-menu-item:hover {
-      background: #f6f8fa;
-    }
-
-    .context-menu-item:active {
-      background: #e8f0fe;
-    }
-
-    .context-menu-icon {
-      width: 16px;
-      text-align: center;
-      font-size: 14px;
-    }
-
-    .context-menu-divider {
-      height: 1px;
-      background: #d0d7de;
-      margin: 4px 0;
     }
 `;

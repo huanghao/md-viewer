@@ -3,7 +3,6 @@ import { escapeAttr, escapeHtml } from '../utils/escape';
 import { generateDistinctNames } from '../utils/file-names';
 import { getFileListStatus } from '../utils/file-status';
 import { renderWorkspaceSidebar, bindWorkspaceEvents } from './sidebar-workspace';
-import { showFileContextMenu } from './context-menu';
 
 // 渲染搜索框
 export function renderSearchBox(): void {
@@ -74,7 +73,15 @@ export function renderCurrentPath(): void {
   container.innerHTML = `
     <div class="current-path-wrapper">
       <span class="current-path-text" title="${escapeAttr(state.currentFile)}">${escapeAttr(state.currentFile)}</span>
-      <button class="current-path-copy" id="copyPathBtn" title="复制路径">📋</button>
+      <button class="current-path-copy" id="copyPathBtn">
+        <span class="copy-icon"></span>
+        <span class="check-icon">
+          <svg viewBox="0 0 16 16" fill="currentColor">
+            <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path>
+          </svg>
+        </span>
+        <span class="copy-tooltip">复制路径</span>
+      </button>
     </div>
   `;
 
@@ -84,18 +91,20 @@ export function renderCurrentPath(): void {
     copyBtn.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(state.currentFile || '');
-        // 视觉反馈：按钮短暂变化
-        copyBtn.textContent = '✓';
+        // 视觉反馈：添加成功状态
+        copyBtn.classList.add('success');
+        const tooltip = copyBtn.querySelector('.copy-tooltip');
+        if (tooltip) {
+          tooltip.textContent = '已复制';
+        }
         setTimeout(() => {
-          copyBtn.textContent = '📋';
+          copyBtn.classList.remove('success');
+          if (tooltip) {
+            tooltip.textContent = '复制路径';
+          }
         }, 1000);
       } catch (err) {
         console.error('复制失败:', err);
-        // 失败时显示错误图标
-        copyBtn.textContent = '✗';
-        setTimeout(() => {
-          copyBtn.textContent = '📋';
-        }, 1000);
       }
     });
   }
@@ -158,7 +167,6 @@ export function renderFiles(): void {
 
       return `
       <div class="${classes}"
-           data-file-path="${escapeAttr(file.path)}"
            onclick="window.switchFile('${escapeAttr(file.path)}')">
         <span class="file-item-status">${statusBadge}</span>
         <span class="icon">📄</span>
@@ -166,17 +174,6 @@ export function renderFiles(): void {
         <span class="close" onclick="event.stopPropagation();window.removeFile('${escapeAttr(file.path)}')">×</span>
       </div>
     `}).join('');
-
-  // 绑定右键菜单事件
-  container.querySelectorAll('.file-item').forEach(item => {
-    const fileItem = item as HTMLElement;
-    const filePath = fileItem.getAttribute('data-file-path');
-    if (filePath) {
-      fileItem.addEventListener('contextmenu', (e) => {
-        showFileContextMenu(e as MouseEvent, filePath);
-      });
-    }
-  });
 }
 
 // 渲染整个侧边栏（根据模式选择）
@@ -241,22 +238,10 @@ export function renderTabs(): void {
 
       return `
         <div class="${classes.join(' ')}"
-             data-file-path="${escapeAttr(file.path)}"
              onclick="window.switchFile('${escapeAttr(file.path)}')">
           <span class="tab-name">${escapeHtml(file.displayName)}</span>
           <span class="tab-close" onclick="event.stopPropagation();window.removeFile('${escapeAttr(file.path)}')">×</span>
         </div>
       `;
     }).join('');
-
-  // 绑定右键菜单事件
-  container.querySelectorAll('.tab').forEach(tab => {
-    const tabElement = tab as HTMLElement;
-    const filePath = tabElement.getAttribute('data-file-path');
-    if (filePath) {
-      tabElement.addEventListener('contextmenu', (e) => {
-        showFileContextMenu(e as MouseEvent, filePath);
-      });
-    }
-  });
 }

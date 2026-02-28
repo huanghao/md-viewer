@@ -824,9 +824,7 @@ function copySingleText(text: string, e?: Event) {
 // 复制文件名
 function copyFileName(fileName: string, event?: Event) {
   navigator.clipboard.writeText(fileName).then(() => {
-    showSuccess('文件名已复制');
-
-    // 添加视觉反馈：变成对勾
+    // 只显示视觉反馈（对勾），不显示 Toast
     if (event) {
       const btn = (event.target as HTMLElement).closest('.copy-filename-button') as HTMLButtonElement;
       if (btn) {

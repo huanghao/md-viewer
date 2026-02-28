@@ -360,16 +360,19 @@ export const styles = `
       border-radius: 6px;
       font-size: 13px;
       cursor: pointer;
-      border: 1px solid #ff9500;
-      background: #fff;
-      color: #ff9500;
+      border: 1px solid #3b82f6;
+      background: #eff6ff;
+      color: #3b82f6;
       display: flex;
       align-items: center;
       gap: 4px;
       transition: all 0.2s;
+      box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
     }
     .refresh-button:hover {
-      background: #fff8e6;
+      background: #dbeafe;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
     }
 
     /* 同步按钮 */
@@ -448,7 +451,7 @@ export const styles = `
       color: #1a7f37;
     }
 
-    /* Notion 风格复制图标 - 两张纸叠加 */
+    /* GitHub 风格复制图标 - 双重方框 */
     .copy-icon {
       width: 13px;
       height: 13px;
@@ -461,19 +464,17 @@ export const styles = `
       position: absolute;
       border: 1.2px solid currentColor;
       border-radius: 2px;
-      background: white;
     }
     .copy-icon::before {
-      width: 9px;
+      width: 8px;
       height: 10px;
       top: 0;
-      left: 2.5px;
-      border-bottom-left-radius: 0;
+      left: 3px;
     }
     .copy-icon::after {
-      width: 9px;
+      width: 8px;
       height: 10px;
-      top: 2.5px;
+      top: 3px;
       left: 0;
     }
 

@@ -20,6 +20,7 @@ import {
   cleanupAllExpiredRecords,
   getSyncRecordsStats,
 } from "./sync-storage.ts";
+import { watchFile } from "./file-watcher.ts";
 
 // API: 获取文件内容
 export async function handleGetFile(c: Context) {
@@ -55,6 +56,9 @@ export async function handleGetFile(c: Context) {
   const resolvedPath = resolve(path);
   const { content, error } = readMarkdownFile(resolvedPath);
   if (error) return c.json({ error }, 404);
+
+  // 添加文件到监听列表
+  watchFile(resolvedPath);
 
   return c.json({
     content,

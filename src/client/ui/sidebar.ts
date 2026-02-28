@@ -1,5 +1,5 @@
 import { state, setSearchQuery, getFilteredFiles } from '../state';
-import { escapeAttr } from '../utils/escape';
+import { escapeAttr, escapeHtml } from '../utils/escape';
 import { generateDistinctNames } from '../utils/file-names';
 import { getFileListStatus } from '../utils/file-status';
 import { renderWorkspaceSidebar, bindWorkspaceEvents } from './sidebar-workspace';
@@ -221,10 +221,15 @@ export function renderTabs(): void {
   container.innerHTML = filesWithDisplay
     .map(file => {
       const isCurrent = file.path === state.currentFile;
+      const isMissing = file.isMissing || false;
+      const classes = ['tab'];
+      if (isCurrent) classes.push('active');
+      if (isMissing) classes.push('deleted');
+
       return `
-        <div class="tab ${isCurrent ? 'active' : ''}"
+        <div class="${classes.join(' ')}"
              onclick="window.switchFile('${escapeAttr(file.path)}')">
-          <span class="tab-name">${file.displayName}</span>
+          <span class="tab-name">${escapeHtml(file.displayName)}</span>
           <span class="tab-close" onclick="event.stopPropagation();window.removeFile('${escapeAttr(file.path)}')">×</span>
         </div>
       `;

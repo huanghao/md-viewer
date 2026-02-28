@@ -279,6 +279,24 @@ export const styles = `
       color: #586069;
     }
 
+    /* 刷新按钮 */
+    .refresh-button {
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      border: 1px solid #ff9500;
+      background: #fff;
+      color: #ff9500;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s;
+    }
+    .refresh-button:hover {
+      background: #fff8e6;
+    }
+
     /* 同步按钮 */
     .sync-button {
       padding: 6px 12px;
@@ -356,6 +374,10 @@ export const styles = `
       background: #fff;
       border-bottom: 2px solid #0969da;
       margin-bottom: -1px;
+    }
+    .tab.deleted .tab-name {
+      color: #ff3b30;
+      text-decoration: line-through;
     }
     .tab .close {
       opacity: 0.5;
@@ -615,6 +637,12 @@ export const styles = `
     /* 加载动画 */
     @keyframes spin {
       to { transform: rotate(360deg); }
+    }
+
+    /* 内容刷新闪烁动画 */
+    @keyframes flash {
+      0% { background: #fff8c5; }
+      100% { background: transparent; }
     }
 
     /* Toast 通知 */

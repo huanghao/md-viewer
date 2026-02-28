@@ -104,8 +104,8 @@ function renderContent() {
   // 更新面包屑
   renderBreadcrumb();
 
-  // 更新同步按钮
-  updateSyncButton();
+  // 更新工具栏按钮（刷新按钮和同步按钮）
+  updateToolbarButtons();
 }
 
 // ==================== 面包屑导航 ====================
@@ -278,6 +278,31 @@ function handleURLParams() {
 // ==================== 同步功能 ====================
 
 // 更新同步按钮状态
+// 更新工具栏按钮（刷新按钮和同步按钮）
+async function updateToolbarButtons() {
+  if (!state.currentFile) {
+    // 没有当前文件时隐藏所有按钮
+    const refreshButton = document.getElementById('refreshButton');
+    const syncButton = document.getElementById('syncButton');
+    if (refreshButton) refreshButton.style.display = 'none';
+    if (syncButton) syncButton.style.display = 'none';
+    return;
+  }
+
+  const file = state.files.get(state.currentFile);
+  if (!file) return;
+
+  // 更新刷新按钮：只有当文件 dirty 时才显示
+  const refreshButton = document.getElementById('refreshButton');
+  if (refreshButton) {
+    const isDirty = file.lastModified > file.displayedModified;
+    refreshButton.style.display = isDirty ? 'flex' : 'none';
+  }
+
+  // 更新同步按钮
+  await updateSyncButton();
+}
+
 async function updateSyncButton() {
   const button = document.getElementById('syncButton');
   const buttonText = document.getElementById('syncButtonText');
@@ -300,6 +325,47 @@ async function updateSyncButton() {
     }
   } catch (e) {
     console.error('获取同步状态失败:', e);
+  }
+}
+
+// 点击刷新按钮
+async function handleRefreshButtonClick() {
+  if (!state.currentFile) return;
+
+  const file = state.files.get(state.currentFile);
+  if (!file) return;
+
+  try {
+    // 重新加载文件
+    const response = await fetch(`/api/file?path=${encodeURIComponent(state.currentFile)}`);
+    const data = await response.json();
+
+    if (data.error) {
+      showError(`刷新失败: ${data.error}`);
+      return;
+    }
+
+    // 更新文件内容和时间戳
+    file.content = data.content;
+    file.lastModified = data.lastModified;
+    file.displayedModified = data.lastModified; // 同步时间戳，消除 dirty 状态
+
+    // 重新渲染
+    renderContent();
+    renderFiles(); // 刷新文件列表，M 标识消失
+    saveState();
+
+    // 可选：添加内容闪烁效果
+    const container = document.getElementById('content');
+    if (container) {
+      container.style.animation = 'flash 1s ease-out';
+      setTimeout(() => {
+        container.style.animation = '';
+      }, 1000);
+    }
+  } catch (e) {
+    console.error('刷新文件失败:', e);
+    showError('刷新文件失败');
   }
 }
 
@@ -733,6 +799,11 @@ function connectSSE() {
 
       // 重新渲染文件列表，显示 M 标识
       renderFiles();
+
+      // 如果是当前文件，更新工具栏（显示刷新按钮）
+      if (state.currentFile === data.path) {
+        updateToolbarButtons();
+      }
     }
   });
 
@@ -798,6 +869,7 @@ window.removeFile = removeFileHandler;
 window.showNearbyMenu = showNearbyMenu;
 window.addFileByPath = addFileByPath;
 window.refreshFile = refreshFile;
+window.handleRefreshButtonClick = handleRefreshButtonClick;
 window.handleSyncButtonClick = handleSyncButtonClick;
 window.closeSyncDialog = closeSyncDialog;
 window.selectRecentParent = selectRecentParent;

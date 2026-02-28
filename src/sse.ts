@@ -31,3 +31,31 @@ export function removeClient(client: SSEClient) {
 export function getClients(): Set<SSEClient> {
   return sseClients;
 }
+
+export function broadcastFileChanged(path: string, lastModified: number) {
+  const message = `event: file-changed\ndata: ${JSON.stringify({ path, lastModified })}\n\n`;
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(message);
+
+  for (const client of sseClients) {
+    try {
+      client.controller.enqueue(bytes);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}
+
+export function broadcastFileDeleted(path: string) {
+  const message = `event: file-deleted\ndata: ${JSON.stringify({ path })}\n\n`;
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(message);
+
+  for (const client of sseClients) {
+    try {
+      client.controller.enqueue(bytes);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}

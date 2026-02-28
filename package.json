@@ -16,6 +16,7 @@
     "admin": "bun run src/cli-admin.ts"
   },
   "dependencies": {
+    "chokidar": "^5.0.0",
     "highlight.js": "^11.9.0",
     "hono": "^3.12.8",
     "marked": "^11.1.1",

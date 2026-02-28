@@ -73,6 +73,9 @@ export function generateClientHTML(): string {
         <div class="breadcrumb" id="breadcrumb"></div>
         <div class="spacer"></div>
         <button class="settings-button" onclick="showSettingsDialog()" title="设置">⚙️</button>
+        <button class="refresh-button" id="refreshButton" onclick="handleRefreshButtonClick()" style="display: none;" title="刷新文件">
+          <span>🔄 刷新</span>
+        </button>
         <button class="sync-button" id="syncButton" onclick="handleSyncButtonClick()">
           <span id="syncButtonText">🔄 同步</span>
         </button>

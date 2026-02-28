@@ -1,0 +1,5 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- 方案 A: 圆形徽章 + 简化字母 M -->
+  <circle cx="64" cy="64" r="64" fill="#3b82f6"/>
+  <path d="M 35 45 L 35 83 L 45 83 L 45 58 L 64 77 L 83 58 L 83 83 L 93 83 L 93 45 L 64 74 Z" fill="white"/>
+</svg>

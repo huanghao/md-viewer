@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MD Viewer Logo 重设计方案</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f9fafb;
+      padding: 40px 20px;
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 { font-size: 32px; margin-bottom: 12px; color: #111827; }
+    .subtitle { color: #6b7280; margin-bottom: 40px; font-size: 16px; }
+
+    .plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-bottom: 60px; }
+    .plan-card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .plan-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+    }
+    .plan-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #111827; }
+    .plan-preview {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f3f4f6;
+      border-radius: 8px;
+      padding: 32px;
+      margin-bottom: 16px;
+    }
+    .plan-preview img { width: 128px; height: 128px; }
+
+    .sizes-section { background: white; border-radius: 12px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 40px; }
+    .sizes-section h2 { font-size: 24px; margin-bottom: 24px; color: #111827; }
+    .size-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px; }
+    .size-item { text-align: center; }
+    .size-label { font-size: 14px; color: #6b7280; margin-bottom: 12px; font-weight: 500; }
+    .size-box {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #f9fafb;
+      border: 2px dashed #d1d5db;
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .browser-tab { background: white; border-radius: 12px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .browser-tab h2 { font-size: 24px; margin-bottom: 24px; color: #111827; }
+    .tab-mockup {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #e5e7eb;
+      padding: 8px 16px;
+      border-radius: 8px 8px 0 0;
+      font-size: 13px;
+      color: #374151;
+    }
+    .tab-mockup img { width: 16px; height: 16px; }
+
+    .features { margin-top: 16px; }
+    .feature { display: flex; align-items: start; gap: 8px; margin-bottom: 8px; color: #4b5563; font-size: 14px; }
+    .feature::before { content: '✓'; color: #10b981; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>MD Viewer Logo 重设计方案</h1>
+    <p class="subtitle">四个圆润、现代的设计方案 - 保持蓝色基调，优化小尺寸显示效果</p>
+
+    <div class="plans">
+      <div class="plan-card">
+        <div class="plan-title">方案 A: 圆形徽章 (推荐)</div>
+        <div class="plan-preview">
+          <img src="plan-a-circle.svg" alt="方案 A">
+        </div>
+        <div class="features">
+          <div class="feature">完全圆润，无尖角</div>
+          <div class="feature">小尺寸最清晰</div>
+          <div class="feature">类似 Claude 风格</div>
+        </div>
+      </div>
+
+      <div class="plan-card">
+        <div class="plan-title">方案 B: 圆角方形 + 文档符号</div>
+        <div class="plan-preview">
+          <img src="plan-b-rounded-square.svg" alt="方案 B">
+        </div>
+        <div class="features">
+          <div class="feature">平衡的圆润感</div>
+          <div class="feature">保留文档概念</div>
+          <div class="feature">类似 Notion 风格</div>
+        </div>
+      </div>
+
+      <div class="plan-card">
+        <div class="plan-title">方案 C: 渐变圆形</div>
+        <div class="plan-preview">
+          <img src="plan-c-gradient-circle.svg" alt="方案 C">
+        </div>
+        <div class="features">
+          <div class="feature">柔和的渐变效果</div>
+          <div class="feature">现代科技感</div>
+          <div class="feature">颜色更丰富</div>
+        </div>
+      </div>
+
+      <div class="plan-card">
+        <div class="plan-title">方案 D: 极简文档</div>
+        <div class="plan-preview">
+          <img src="plan-d-simple-doc.svg" alt="方案 D">
+        </div>
+        <div class="features">
+          <div class="feature">识别度高</div>
+          <div class="feature">文档概念清晰</div>
+          <div class="feature">简洁专业</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sizes-section">
+      <h2>不同尺寸效果对比 (方案 A)</h2>
+      <div class="size-grid">
+        <div class="size-item">
+          <div class="size-label">16×16 (浏览器标签)</div>
+          <div class="size-box">
+            <img src="plan-a-circle.svg" width="16" height="16" alt="16px">
+          </div>
+        </div>
+        <div class="size-item">
+          <div class="size-label">32×32 (标准 favicon)</div>
+          <div class="size-box">
+            <img src="plan-a-circle.svg" width="32" height="32" alt="32px">
+          </div>
+        </div>
+        <div class="size-item">
+          <div class="size-label">64×64 (高清显示)</div>
+          <div class="size-box">
+            <img src="plan-a-circle.svg" width="64" height="64" alt="64px">
+          </div>
+        </div>
+        <div class="size-item">
+          <div class="size-label">128×128 (应用图标)</div>
+          <div class="size-box">
+            <img src="plan-a-circle.svg" width="128" height="128" alt="128px">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="browser-tab">
+      <h2>浏览器标签页效果模拟</h2>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <div class="tab-mockup">
+          <img src="plan-a-circle.svg" alt="A">
+          <span>MD Viewer - 方案 A</span>
+        </div>
+        <div class="tab-mockup">
+          <img src="plan-b-rounded-square.svg" alt="B">
+          <span>MD Viewer - 方案 B</span>
+        </div>
+        <div class="tab-mockup">
+          <img src="plan-c-gradient-circle.svg" alt="C">
+          <span>MD Viewer - 方案 C</span>
+        </div>
+        <div class="tab-mockup">
+          <img src="plan-d-simple-doc.svg" alt="D">
+          <span>MD Viewer - 方案 D</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,8 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- 方案 B: 圆角方形 + 抽象符号 -->
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="#0ea5e9"/>
+  <!-- 三条横线代表文档 -->
+  <rect x="32" y="45" width="64" height="6" rx="3" fill="white"/>
+  <rect x="32" y="61" width="64" height="6" rx="3" fill="white"/>
+  <rect x="32" y="77" width="48" height="6" rx="3" fill="white"/>
+</svg>

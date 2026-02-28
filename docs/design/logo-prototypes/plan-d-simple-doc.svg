@@ -1,0 +1,7 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- 方案 D: 圆角方形 + 极简文档图标 -->
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="#3b82f6"/>
+  <!-- 简化的文档折角 -->
+  <path d="M 45 35 L 45 93 L 83 93 L 83 50 L 68 35 Z" fill="white"/>
+  <path d="M 68 35 L 68 50 L 83 50 Z" fill="#93c5fd"/>
+</svg>

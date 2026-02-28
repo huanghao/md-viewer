@@ -3,6 +3,7 @@ import { escapeAttr, escapeHtml } from '../utils/escape';
 import { generateDistinctNames } from '../utils/file-names';
 import { getFileListStatus } from '../utils/file-status';
 import { renderWorkspaceSidebar, bindWorkspaceEvents } from './sidebar-workspace';
+import { showFileContextMenu } from './context-menu';
 
 // 渲染搜索框
 export function renderSearchBox(): void {
@@ -157,6 +158,7 @@ export function renderFiles(): void {
 
       return `
       <div class="${classes}"
+           data-file-path="${escapeAttr(file.path)}"
            onclick="window.switchFile('${escapeAttr(file.path)}')">
         <span class="file-item-status">${statusBadge}</span>
         <span class="icon">📄</span>
@@ -164,6 +166,17 @@ export function renderFiles(): void {
         <span class="close" onclick="event.stopPropagation();window.removeFile('${escapeAttr(file.path)}')">×</span>
       </div>
     `}).join('');
+
+  // 绑定右键菜单事件
+  container.querySelectorAll('.file-item').forEach(item => {
+    const fileItem = item as HTMLElement;
+    const filePath = fileItem.getAttribute('data-file-path');
+    if (filePath) {
+      fileItem.addEventListener('contextmenu', (e) => {
+        showFileContextMenu(e as MouseEvent, filePath);
+      });
+    }
+  });
 }
 
 // 渲染整个侧边栏（根据模式选择）
@@ -228,10 +241,22 @@ export function renderTabs(): void {
 
       return `
         <div class="${classes.join(' ')}"
+             data-file-path="${escapeAttr(file.path)}"
              onclick="window.switchFile('${escapeAttr(file.path)}')">
           <span class="tab-name">${escapeHtml(file.displayName)}</span>
           <span class="tab-close" onclick="event.stopPropagation();window.removeFile('${escapeAttr(file.path)}')">×</span>
         </div>
       `;
     }).join('');
+
+  // 绑定右键菜单事件
+  container.querySelectorAll('.tab').forEach(tab => {
+    const tabElement = tab as HTMLElement;
+    const filePath = tabElement.getAttribute('data-file-path');
+    if (filePath) {
+      tabElement.addEventListener('contextmenu', (e) => {
+        showFileContextMenu(e as MouseEvent, filePath);
+      });
+    }
+  });
 }

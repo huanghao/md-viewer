@@ -1114,4 +1114,53 @@ export const styles = `
       background: #f6f8fa;
       color: #0969da;
     }
+
+    /* ==================== 右键菜单样式 ==================== */
+
+    .context-menu {
+      position: fixed;
+      background: white;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      box-shadow: 0 8px 24px rgba(140, 149, 159, 0.2);
+      padding: 4px 0;
+      min-width: 180px;
+      z-index: 10001;
+      display: none;
+    }
+
+    .context-menu.show {
+      display: block;
+    }
+
+    .context-menu-item {
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #24292e;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      user-select: none;
+    }
+
+    .context-menu-item:hover {
+      background: #f6f8fa;
+    }
+
+    .context-menu-item:active {
+      background: #e8f0fe;
+    }
+
+    .context-menu-icon {
+      width: 16px;
+      text-align: center;
+      font-size: 14px;
+    }
+
+    .context-menu-divider {
+      height: 1px;
+      background: #d0d7de;
+      margin: 4px 0;
+    }
 `;

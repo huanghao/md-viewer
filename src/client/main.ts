@@ -120,6 +120,8 @@ function renderBreadcrumb() {
   if (!file) return;
 
   const parts = file.path.split('/').filter(Boolean);
+  const fileName = parts[parts.length - 1] || '';
+
   const breadcrumbItems = parts.map((part, index) => {
     const isLast = index === parts.length - 1;
     const path = '/' + parts.slice(0, index + 1).join('/');
@@ -136,8 +138,13 @@ function renderBreadcrumb() {
     `;
   }).join('');
 
-  // 只显示面包屑路径
-  container.innerHTML = breadcrumbItems;
+  // 显示面包屑路径和复制按钮
+  container.innerHTML = `
+    ${breadcrumbItems}
+    <button class="copy-filename-button" onclick="copyFileName('${escapeAttr(fileName)}')" title="复制文件名">
+      📋
+    </button>
+  `;
 }
 
 // 显示附近文件菜单
@@ -772,6 +779,15 @@ function copySingleText(text: string, e?: Event) {
   });
 }
 
+// 复制文件名
+function copyFileName(fileName: string) {
+  navigator.clipboard.writeText(fileName).then(() => {
+    showToast('文件名已复制', 'success');
+  }).catch(() => {
+    showToast('复制失败', 'error');
+  });
+}
+
 // 复制错误信息
 function copyErrorInfo() {
   const outputs = document.querySelectorAll('.sync-dialog-output');
@@ -854,6 +870,7 @@ declare global {
     confirmSync: () => void;
     copySyncCommand: () => void;
     copySingleText: (text: string, e?: Event) => void;
+    copyFileName: (fileName: string) => void;
     copyErrorInfo: () => void;
     showToast?: (message: string, type: string) => void;
     showSettingsDialog: () => void;
@@ -876,6 +893,7 @@ window.selectRecentParent = selectRecentParent;
 window.confirmSync = confirmSync;
 window.copySyncCommand = copySyncCommand;
 window.copySingleText = copySingleText;
+window.copyFileName = copyFileName;
 window.copyErrorInfo = copyErrorInfo;
 window.showToast = showToast;
 window.showSettingsDialog = showSettingsDialog;

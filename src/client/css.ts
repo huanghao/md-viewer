@@ -348,6 +348,22 @@ export const styles = `
     .breadcrumb-separator {
       color: #d1d5da;
     }
+    .copy-filename-button {
+      padding: 2px 6px;
+      margin-left: 4px;
+      border: none;
+      background: transparent;
+      color: #586069;
+      cursor: pointer;
+      font-size: 14px;
+      border-radius: 4px;
+      transition: all 0.2s;
+      opacity: 0.6;
+    }
+    .copy-filename-button:hover {
+      background: #e1e4e8;
+      opacity: 1;
+    }
 
     /* 标签页 */
     .tabs {

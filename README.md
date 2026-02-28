@@ -6,15 +6,18 @@
 
 ### 开发模式
 
+需要 3 个终端窗口：
+
 ```bash
-# 启动服务器
+# 终端 1: 启动服务器
 bun run dev
 
-# 启动客户端构建监听
+# 终端 2: 启动客户端构建监听（开发时需要）
 bun run build:client:watch
 
-# 在另一个终端打开文件
+# 终端 3: 使用 CLI 打开文件
 bun run src/cli.ts README.md
+# 或在浏览器中访问 http://localhost:3000
 ```
 
 ### 编译
@@ -28,6 +31,20 @@ bun build src/cli.ts --compile --outfile=mdv
 ## iTerm2 集成
 
 在 iTerm2 中点击文件路径直接在 MD Viewer 中打开。
+
+### 前置条件
+
+**⚠️ 重要：使用前需要先启动服务器**
+
+```bash
+# 开发模式
+bun run dev
+
+# 或使用编译后的二进制文件
+./md-viewer
+```
+
+服务器会在 `http://localhost:3000` 运行，CLI 命令会连接到这个服务器。
 
 ### 配置步骤
 
@@ -68,14 +85,28 @@ bun build src/cli.ts --compile --outfile=mdv
      - 完整路径：`/Users/huanghao/workspace/md-viewer/src/cli.ts "\1"`
    - 点击 "OK"
 
-3. **测试**
+3. **启动服务器**
 
    ```bash
-   # 在终端中运行
+   # 在一个终端窗口中保持运行
+   bun run dev
+   # 或
+   ./md-viewer
+   ```
+
+4. **测试**
+
+   ```bash
+   # 在另一个终端中运行
    ls *.md
 
    # ⌘ + 点击任意 .md 文件名，应该会在 MD Viewer 中打开
    ```
+
+   如果点击后没有反应，检查：
+   - 服务器是否正在运行（访问 http://localhost:3000）
+   - iTerm2 配置是否正确
+   - mdv 命令是否可用（运行 `which mdv`）
 
 ### 使用场景
 

@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>刷新按钮设计方案</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+      padding: 40px;
+      background: #f6f8fa;
+      color: #24292f;
+    }
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 32px;
+      margin-bottom: 16px;
+      color: #24292f;
+    }
+    .subtitle {
+      font-size: 16px;
+      color: #57606a;
+      margin-bottom: 32px;
+    }
+    .design-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+    .design-card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .design-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #24292f;
+    }
+    .design-desc {
+      font-size: 14px;
+      color: #57606a;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+    .design-reference {
+      font-size: 13px;
+      color: #0969da;
+      margin-bottom: 20px;
+      padding: 8px 12px;
+      background: #ddf4ff;
+      border-radius: 6px;
+      display: inline-block;
+    }
+    .toolbar-demo {
+      background: #ffffff;
+      border: 1px solid #d0d7de;
+      border-radius: 8px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .breadcrumb-demo {
+      font-size: 13px;
+      color: #57606a;
+    }
+    .spacer {
+      flex: 1;
+    }
+    .pros-cons {
+      margin-top: 16px;
+      font-size: 13px;
+    }
+    .pros {
+      color: #1a7f37;
+      margin-bottom: 8px;
+    }
+    .cons {
+      color: #cf222e;
+    }
+    .label {
+      font-weight: 600;
+      margin-right: 4px;
+    }
+
+    /* 方案 A: GitHub 风格 - 极简灰色 */
+    .refresh-btn-a {
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      border: 1px solid #d0d7de;
+      background: #f6f8fa;
+      color: #24292f;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+      font-weight: 500;
+    }
+    .refresh-btn-a:hover {
+      background: #f3f4f6;
+      border-color: #b1b7c1;
+    }
+    .refresh-btn-a:active {
+      background: #ebecf0;
+      border-color: #9ca3af;
+    }
+
+    /* 方案 B: Notion 风格 - 柔和灰蓝 */
+    .refresh-btn-b {
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      border: none;
+      background: #f1f3f5;
+      color: #495057;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+      font-weight: 500;
+    }
+    .refresh-btn-b:hover {
+      background: #e9ecef;
+    }
+    .refresh-btn-b:active {
+      background: #dee2e6;
+    }
+
+    /* 方案 C: VS Code 风格 - 透明 + hover 背景 */
+    .refresh-btn-c {
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      color: #424242;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+      font-weight: 500;
+    }
+    .refresh-btn-c:hover {
+      background: rgba(0, 0, 0, 0.05);
+    }
+    .refresh-btn-c:active {
+      background: rgba(0, 0, 0, 0.08);
+    }
+
+    /* 方案 D: Linear 风格 - 极简边框 */
+    .refresh-btn-d {
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      border: 1px solid #e5e7eb;
+      background: #ffffff;
+      color: #6b7280;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+      font-weight: 500;
+    }
+    .refresh-btn-d:hover {
+      border-color: #d1d5db;
+      color: #374151;
+    }
+    .refresh-btn-d:active {
+      background: #f9fafb;
+    }
+
+    /* 方案 E: Slack 风格 - 柔和紫蓝 */
+    .refresh-btn-e {
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      border: none;
+      background: #f0f4ff;
+      color: #4f5d95;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+      font-weight: 500;
+    }
+    .refresh-btn-e:hover {
+      background: #e6eeff;
+    }
+    .refresh-btn-e:active {
+      background: #dce5ff;
+    }
+
+    /* 方案 F: Figma 风格 - 柔和蓝灰 */
+    .refresh-btn-f {
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      border: none;
+      background: #e3e8ef;
+      color: #5e6c84;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+      font-weight: 500;
+    }
+    .refresh-btn-f:hover {
+      background: #d4dae4;
+    }
+    .refresh-btn-f:active {
+      background: #c5ccd8;
+    }
+
+    /* 当前设计（对比用） */
+    .refresh-btn-current {
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      border: 1px solid #3b82f6;
+      background: #eff6ff;
+      color: #3b82f6;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s;
+      font-weight: 500;
+    }
+    .refresh-btn-current:hover {
+      background: #dbeafe;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .sync-btn-demo {
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      border: 1px solid #d1d5da;
+      background: #fff;
+      color: #24292f;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+      font-weight: 500;
+    }
+    .sync-btn-demo:hover {
+      background: #f6f8fa;
+    }
+
+    .settings-btn-demo {
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      transition: all 0.15s;
+    }
+    .settings-btn-demo:hover {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    .comparison-section {
+      margin-top: 40px;
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .comparison-title {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>刷新按钮设计方案</h1>
+    <p class="subtitle">参考业界主流产品的设计风格，提供 6 种低调、融入整体的方案</p>
+
+    <div class="design-grid">
+      <!-- 方案 A -->
+      <div class="design-card">
+        <div class="design-title">方案 A - GitHub 风格（推荐）</div>
+        <div class="design-reference">参考：GitHub Actions 刷新按钮</div>
+        <div class="design-desc">
+          极简灰色系，使用浅灰背景 + 灰色边框。GitHub 的经典设计，低调、专业、不抢眼。
+        </div>
+        <div class="toolbar-demo">
+          <div class="breadcrumb-demo">文档 / 设计 / README.md</div>
+          <div class="spacer"></div>
+          <button class="settings-btn-demo">⚙️</button>
+          <button class="refresh-btn-a">
+            <span>🔄</span>
+            <span>刷新</span>
+          </button>
+          <button class="sync-btn-demo">
+            <span>🔄</span>
+            <span>同步</span>
+          </button>
+        </div>
+        <div class="pros-cons">
+          <div class="pros"><span class="label">✓ 优点：</span>低调、专业，和灰色同步按钮风格一致</div>
+          <div class="cons"><span class="label">✗ 缺点：</span>可能不够醒目</div>
+        </div>
+      </div>
+
+      <!-- 方案 B -->
+      <div class="design-card">
+        <div class="design-title">方案 B - Notion 风格</div>
+        <div class="design-reference">参考：Notion 工具栏按钮</div>
+        <div class="design-desc">
+          无边框设计，使用柔和的灰色背景。Notion 的极简风格，非常干净、现代。
+        </div>
+        <div class="toolbar-demo">
+          <div class="breadcrumb-demo">文档 / 设计 / README.md</div>
+          <div class="spacer"></div>
+          <button class="settings-btn-demo">⚙️</button>
+          <button class="refresh-btn-b">
+            <span>🔄</span>
+            <span>刷新</span>
+          </button>
+          <button class="sync-btn-demo">
+            <span>🔄</span>
+            <span>同步</span>
+          </button>
+        </div>
+        <div class="pros-cons">
+          <div class="pros"><span class="label">✓ 优点：</span>极简、现代，视觉统一</div>
+          <div class="cons"><span class="label">✗ 缺点：</span>可能和背景融为一体</div>
+        </div>
+      </div>
+
+      <!-- 方案 C -->
+      <div class="design-card">
+        <div class="design-title">方案 C - VS Code 风格</div>
+        <div class="design-reference">参考：VS Code 工具栏按钮</div>
+        <div class="design-desc">
+          完全透明，hover 时显示背景。VS Code 的极简风格，最大程度融入界面。
+        </div>
+        <div class="toolbar-demo">
+          <div class="breadcrumb-demo">文档 / 设计 / README.md</div>
+          <div class="spacer"></div>
+          <button class="settings-btn-demo">⚙️</button>
+          <button class="refresh-btn-c">
+            <span>🔄</span>
+            <span>刷新</span>
+          </button>
+          <button class="sync-btn-demo">
+            <span>🔄</span>
+            <span>同步</span>
+          </button>
+        </div>
+        <div class="pros-cons">
+          <div class="pros"><span class="label">✓ 优点：</span>最不突兀，完全融入界面</div>
+          <div class="cons"><span class="label">✗ 缺点：</span>可能太隐蔽</div>
+        </div>
+      </div>
+
+      <!-- 方案 D -->
+      <div class="design-card">
+        <div class="design-title">方案 D - Linear 风格</div>
+        <div class="design-reference">参考：Linear 按钮设计</div>
+        <div class="design-desc">
+          极细边框 + 白色背景，使用柔和的灰色文字。Linear 的精致风格，简约但不简单。
+        </div>
+        <div class="toolbar-demo">
+          <div class="breadcrumb-demo">文档 / 设计 / README.md</div>
+          <div class="spacer"></div>
+          <button class="settings-btn-demo">⚙️</button>
+          <button class="refresh-btn-d">
+            <span>🔄</span>
+            <span>刷新</span>
+          </button>
+          <button class="sync-btn-demo">
+            <span>🔄</span>
+            <span>同步</span>
+          </button>
+        </div>
+        <div class="pros-cons">
+          <div class="pros"><span class="label">✓ 优点：</span>精致、现代，边框很轻</div>
+          <div class="cons"><span class="label">✗ 缺点：</span>和同步按钮风格接近</div>
+        </div>
+      </div>
+
+      <!-- 方案 E -->
+      <div class="design-card">
+        <div class="design-title">方案 E - Slack 风格</div>
+        <div class="design-reference">参考：Slack 消息操作按钮</div>
+        <div class="design-desc">
+          柔和的紫蓝色背景，无边框。比纯灰色稍微有点色彩，但不会太抢眼。
+        </div>
+        <div class="toolbar-demo">
+          <div class="breadcrumb-demo">文档 / 设计 / README.md</div>
+          <div class="spacer"></div>
+          <button class="settings-btn-demo">⚙️</button>
+          <button class="refresh-btn-e">
+            <span>🔄</span>
+            <span>刷新</span>
+          </button>
+          <button class="sync-btn-demo">
+            <span>🔄</span>
+            <span>同步</span>
+          </button>
+        </div>
+        <div class="pros-cons">
+          <div class="pros"><span class="label">✓ 优点：</span>有一点色彩，但很柔和</div>
+          <div class="cons"><span class="label">✗ 缺点：</span>可能和整体蓝色风格有点不搭</div>
+        </div>
+      </div>
+
+      <!-- 方案 F -->
+      <div class="design-card">
+        <div class="design-title">方案 F - Figma 风格</div>
+        <div class="design-reference">参考：Figma 工具栏按钮</div>
+        <div class="design-desc">
+          蓝灰色背景，无边框。Figma 的设计风格，柔和的蓝灰色调，和蓝色系有关联但不抢眼。
+        </div>
+        <div class="toolbar-demo">
+          <div class="breadcrumb-demo">文档 / 设计 / README.md</div>
+          <div class="spacer"></div>
+          <button class="settings-btn-demo">⚙️</button>
+          <button class="refresh-btn-f">
+            <span>🔄</span>
+            <span>刷新</span>
+          </button>
+          <button class="sync-btn-demo">
+            <span>🔄</span>
+            <span>同步</span>
+          </button>
+        </div>
+        <div class="pros-cons">
+          <div class="pros"><span class="label">✓ 优点：</span>蓝灰色调和整体风格呼应</div>
+          <div class="cons"><span class="label">✗ 缺点：</span>可能显得有点暗</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 当前设计对比 -->
+    <div class="comparison-section">
+      <div class="comparison-title">当前设计（对比参考）</div>
+      <div class="design-desc" style="margin-bottom: 16px;">
+        蓝色边框 + 蓝色背景，饱和度较高，和整体风格对比强烈。
+      </div>
+      <div class="toolbar-demo">
+        <div class="breadcrumb-demo">文档 / 设计 / README.md</div>
+        <div class="spacer"></div>
+        <button class="settings-btn-demo">⚙️</button>
+        <button class="refresh-btn-current">
+          <span>🔄</span>
+          <span>刷新</span>
+        </button>
+        <button class="sync-btn-demo">
+          <span>🔄</span>
+          <span>同步</span>
+        </button>
+      </div>
+      <div class="pros-cons" style="margin-top: 16px;">
+        <div class="cons"><span class="label">问题：</span>蓝色边框饱和度高，和灰色同步按钮对比强烈，显得突兀</div>
+      </div>
+    </div>
+
+    <div style="margin-top: 40px; padding: 20px; background: #fff3cd; border-radius: 8px; border-left: 4px solid #ffc107;">
+      <strong>设计建议：</strong>
+      <ul style="margin: 12px 0 0 20px; line-height: 1.8;">
+        <li><strong>推荐方案 A（GitHub 风格）</strong>：最安全的选择，专业、低调，和现有同步按钮风格一致</li>
+        <li><strong>方案 C（VS Code 风格）</strong>：如果希望更极简，完全融入界面</li>
+        <li><strong>方案 F（Figma 风格）</strong>：如果希望和蓝色主题有关联，但不要太抢眼</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    // 让所有按钮可以交互，方便测试 hover 效果
+    document.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        console.log('Button clicked:', btn.textContent.trim());
+      });
+    });
+  </script>
+</body>
+</html>

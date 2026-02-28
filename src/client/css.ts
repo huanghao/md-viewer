@@ -351,61 +351,42 @@ export const styles = `
     }
     .file-meta {
       font-size: 12px;
-      color: #586069;
+      color: #9ca3af;
+      font-weight: 400;
+      white-space: nowrap;
     }
 
-    /* 刷新按钮 */
-    .refresh-button {
-      padding: 6px 12px;
-      border-radius: 6px;
+    /* 纯文本工具栏按钮 */
+    .toolbar-text-button {
+      padding: 4px 8px;
+      border-radius: 4px;
       font-size: 13px;
+      font-weight: 400;
+      font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Consolas', monospace;
       cursor: pointer;
-      border: 1px solid #3b82f6;
-      background: #eff6ff;
-      color: #3b82f6;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      transition: all 0.2s;
-      box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
-    }
-    .refresh-button:hover {
-      background: #dbeafe;
-      border-color: #2563eb;
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      border: none;
+      background: transparent;
+      color: #6b7280;
+      transition: all 0.15s ease;
+      white-space: nowrap;
     }
 
-    /* 同步按钮 */
-    .sync-button {
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 13px;
-      cursor: pointer;
-      border: 1px solid #d1d5da;
-      background: #fff;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      transition: all 0.2s;
+    .toolbar-text-button:hover {
+      background: rgba(0, 0, 0, 0.04);
+      color: #374151;
     }
-    .sync-button:hover {
-      background: #f6f8fa;
+
+    .toolbar-text-button:active {
+      background: rgba(0, 0, 0, 0.08);
     }
-    .sync-button.synced {
-      color: #2ea44f;
-      border-color: #2ea44f;
+
+    /* 已同步状态 */
+    .toolbar-text-button.synced {
+      color: #1a7f37;
     }
-    .sync-button.synced:hover {
-      background: #e6f7ed;
-    }
-    .sync-button.syncing {
-      color: #586069;
-      cursor: not-allowed;
-      opacity: 0.6;
-    }
-    .sync-button:disabled {
-      cursor: not-allowed;
-      opacity: 0.5;
+
+    .toolbar-text-button.synced:hover {
+      background: rgba(26, 127, 55, 0.08);
     }
 
     /* 面包屑 */
@@ -1357,20 +1338,5 @@ export const styles = `
       border-radius: 6px;
     }
 
-    /* 设置按钮 */
-    .settings-button {
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 6px;
-      border-radius: 4px;
-      font-size: 16px;
-      color: #57606a;
-      transition: all 0.2s;
-    }
-
-    .settings-button:hover {
-      background: #f6f8fa;
-      color: #0969da;
-    }
+    /* 设置按钮已统一为 toolbar-button 样式 */
 `;

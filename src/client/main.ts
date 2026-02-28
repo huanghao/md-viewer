@@ -12,7 +12,6 @@ import { getSyncStatus, getRecentParents, executeSync, getSyncPreferences, saveS
 import { escapeHtml, escapeAttr, escapeJsSingleQuoted } from './utils/escape';
 import { formatRelativeTime, formatFileTime } from './utils/format';
 import { generateDistinctNames } from './utils/file-names';
-import { isMarkdownFile, getFileExtension } from './utils/file-type';
 
 // 导入 UI 组件
 import { renderFiles, renderTabs, renderSearchBox, renderCurrentPath, renderSidebar } from './ui/sidebar';
@@ -96,10 +95,10 @@ function renderContent() {
   const html = (window as any).marked.parse(file.content);
   container.innerHTML = `<div class="markdown-body">${html}</div>`;
 
-  // 更新文件元信息
+  // 更新文件元信息（仅显示相对时间）
   const meta = document.getElementById('fileMeta');
   if (meta) {
-    meta.textContent = `最后修改: ${formatFileTime(file.lastModified)}`;
+    meta.textContent = formatRelativeTime(file.lastModified);
   }
 
   // 更新面包屑
@@ -212,14 +211,6 @@ async function addFileByPath(path: string, focus: boolean = true) {
     await onFileLoaded(data, focus);
     await openFile(path, focus);
 
-    // 检查文件类型，首次添加非 MD 文件时提示
-    if (!isMarkdownFile(path)) {
-      if (!sessionStorage.getItem('non-md-warning-shown')) {
-        const ext = getFileExtension(path);
-        showWarning(`已添加非 Markdown 文件 (.${ext})，可能显示异常`, 3000);
-        sessionStorage.setItem('non-md-warning-shown', 'true');
-      }
-    }
 
     // 清空输入框
     const input = document.getElementById('fileInput') as HTMLInputElement;
@@ -344,22 +335,23 @@ async function updateToolbarButtons() {
 async function updateSyncButton() {
   const button = document.getElementById('syncButton');
   const buttonText = document.getElementById('syncButtonText');
+
   if (!button || !buttonText || !state.currentFile) {
     if (button) button.style.display = 'none';
     return;
   }
 
-  button.style.display = 'flex';
+  button.style.display = 'block';
 
   try {
     const data = await getSyncStatus(state.currentFile);
 
     if (data.docId) {
-      button.className = 'sync-button synced';
-      buttonText.textContent = '✓ 已同步';
+      button.className = 'toolbar-text-button synced';
+      buttonText.textContent = '[✓ 已同步]';
     } else {
-      button.className = 'sync-button';
-      buttonText.textContent = '🔄 同步';
+      button.className = 'toolbar-text-button';
+      buttonText.textContent = '[☁↑ 同步]';
     }
   } catch (e) {
     console.error('获取同步状态失败:', e);

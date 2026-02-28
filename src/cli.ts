@@ -127,6 +127,12 @@ async function main() {
       process.exit(1);
     }
     targetPath = absolutePath;
+
+    // 检查文件类型，非 MD 文件给出警告
+    const ext = targetPath.match(/\.([^.]+)$/)?.[1]?.toLowerCase();
+    if (ext && ext !== 'md' && ext !== 'markdown') {
+      console.warn(`⚠️  警告: ${filePath} 不是 Markdown 文件 (.${ext})，可能显示异常`);
+    }
   }
 
   try {

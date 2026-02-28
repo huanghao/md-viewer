@@ -92,14 +92,16 @@ export function generateClientHTML(): string {
       <div class="toolbar">
         <div class="breadcrumb" id="breadcrumb"></div>
         <div class="spacer"></div>
-        <button class="settings-button" onclick="showSettingsDialog()" title="设置">⚙️</button>
-        <button class="refresh-button" id="refreshButton" onclick="handleRefreshButtonClick()" style="display: none;" title="刷新文件">
-          <span>🔄 刷新</span>
+        <button class="toolbar-text-button" onclick="showSettingsDialog()" title="设置">
+          <span id="settingsButtonText">[⚙ 设置]</span>
         </button>
-        <button class="sync-button" id="syncButton" onclick="handleSyncButtonClick()">
-          <span id="syncButtonText">🔄 同步</span>
+        <button class="toolbar-text-button" id="refreshButton" onclick="handleRefreshButtonClick()" style="display: none;" title="文件已更新，点击刷新">
+          <span id="refreshButtonText">[↻ 刷新]</span>
         </button>
-        <span class="file-meta" id="fileMeta">最后修改: -</span>
+        <button class="toolbar-text-button" id="syncButton" onclick="handleSyncButtonClick()" title="同步到学城">
+          <span id="syncButtonText">[☁↑ 同步]</span>
+        </button>
+        <span class="file-meta" id="fileMeta"></span>
       </div>
 
       <!-- 标签页 -->

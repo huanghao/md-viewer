@@ -6,12 +6,13 @@ import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFi
 
 // 导入 API
 import { loadFile, searchFiles, getNearbyFiles, openFile } from './api/files';
-import { getSyncStatus, getRecentParents, executeSync } from './api/sync';
+import { getSyncStatus, getRecentParents, executeSync, getSyncPreferences, saveSyncPreference } from './api/sync';
 
 // 导入工具函数
 import { escapeHtml, escapeAttr, escapeJsSingleQuoted } from './utils/escape';
 import { formatRelativeTime, formatFileTime } from './utils/format';
 import { generateDistinctNames } from './utils/file-names';
+import { isMarkdownFile, getFileExtension } from './utils/file-type';
 
 // 导入 UI 组件
 import { renderFiles, renderTabs, renderSearchBox, renderCurrentPath, renderSidebar } from './ui/sidebar';
@@ -204,6 +205,15 @@ async function addFileByPath(path: string, focus: boolean = true) {
   if (data) {
     await onFileLoaded(data, focus);
     await openFile(path, focus);
+
+    // 检查文件类型，首次添加非 MD 文件时提示
+    if (!isMarkdownFile(path)) {
+      if (!sessionStorage.getItem('non-md-warning-shown')) {
+        const ext = getFileExtension(path);
+        showWarning(`已添加非 Markdown 文件 (.${ext})，可能显示异常`, 3000);
+        sessionStorage.setItem('non-md-warning-shown', 'true');
+      }
+    }
 
     // 清空输入框
     const input = document.getElementById('fileInput') as HTMLInputElement;
@@ -416,6 +426,7 @@ async function showSyncDialog() {
   const defaultTitle = titleMatch ? titleMatch[1] : file.name.replace('.md', '');
 
   const recentData = await getRecentParents();
+  const preferences = await getSyncPreferences();
 
   const overlay = document.getElementById('syncDialogOverlay');
   const title = document.getElementById('syncDialogTitle');
@@ -425,12 +436,8 @@ async function showSyncDialog() {
 
   title.textContent = '同步到学城';
 
+  // 开始构建 HTML（移除文件名展示）
   let html = `
-    <div class="sync-dialog-field">
-      <label class="sync-dialog-label">📄 文件</label>
-      <div style="color: #586069; font-size: 13px;">${escapeHtml(file.name)}</div>
-    </div>
-
     <div class="sync-dialog-field">
       <label class="sync-dialog-label">📝 标题</label>
       <input type="text" class="sync-dialog-input" id="syncTitle" value="${escapeAttr(defaultTitle)}">
@@ -440,6 +447,7 @@ async function showSyncDialog() {
       <label class="sync-dialog-label">📍 选择位置</label>
   `;
 
+  // 最近位置列表（带链接）
   if (recentData.parents && recentData.parents.length > 0) {
     html += '<div class="sync-dialog-recent">';
     recentData.parents.forEach((parent) => {
@@ -448,7 +456,10 @@ async function showSyncDialog() {
         <div class="sync-dialog-recent-item ${isDefault ? 'selected' : ''}" onclick="window.selectRecentParent('${escapeJsSingleQuoted(parent.id)}', event)">
           <input type="radio" name="recentParent" value="${escapeAttr(parent.id)}" class="sync-dialog-recent-radio" ${isDefault ? 'checked' : ''}>
           <div class="sync-dialog-recent-info">
-            <div class="sync-dialog-recent-title">${escapeHtml(parent.title)}</div>
+            <div class="sync-dialog-recent-title">
+              ${escapeHtml(parent.title)}
+              ${parent.url ? `<a href="${escapeAttr(parent.url)}" target="_blank" class="sync-dialog-link-icon" onclick="event.stopPropagation()" title="在学城中打开">🔗</a>` : ''}
+            </div>
             <div class="sync-dialog-recent-meta">ID: ${escapeHtml(parent.id)} · 最后使用：${escapeHtml(formatRelativeTime(parent.lastUsed))}</div>
           </div>
         </div>
@@ -457,14 +468,18 @@ async function showSyncDialog() {
     html += '</div>';
   }
 
+  // 手动输入区域（合并，移除独立的「或」行）
+  const placeholder = recentData.parents && recentData.parents.length > 0
+    ? '或输入父文档 ID / URL'
+    : '输入父文档 ID / URL';
+
   html += `
-    <div class="sync-dialog-or">或</div>
-    <input type="text" class="sync-dialog-input" id="syncParentId" placeholder="输入父文档 ID 或 URL">
+    <input type="text" class="sync-dialog-input sync-dialog-manual-input" id="syncParentId" placeholder="${placeholder}">
     </div>
 
     <div class="sync-dialog-field">
       <label class="sync-dialog-checkbox">
-        <input type="checkbox" id="syncOpenAfter" checked>
+        <input type="checkbox" id="syncOpenAfter" ${preferences.openAfterSync !== false ? 'checked' : ''}>
         <span>同步后在浏览器中打开</span>
       </label>
     </div>
@@ -480,8 +495,7 @@ async function showSyncDialog() {
     </div>
 
     <div class="sync-dialog-footer">
-      <button class="sync-dialog-btn sync-dialog-btn-cancel" onclick="window.closeSyncDialog()">取消</button>
-      <button class="sync-dialog-btn sync-dialog-btn-primary" onclick="window.confirmSync()">开始同步</button>
+      <button class="sync-dialog-btn sync-dialog-btn-primary" onclick="window.confirmSync()">同步</button>
     </div>
   `;
 
@@ -601,6 +615,13 @@ async function confirmSync() {
     if (match) parentId = match[1];
   }
 
+  // 保存用户偏好
+  try {
+    await saveSyncPreference('openAfterSync', openAfter);
+  } catch (err) {
+    console.error('保存偏好失败:', err);
+  }
+
   const button = document.querySelector('.sync-dialog-btn-primary') as HTMLButtonElement;
   if (button) {
     button.disabled = true;
@@ -619,7 +640,7 @@ async function confirmSync() {
     showError('同步失败: ' + err.message);
     if (button) {
       button.disabled = false;
-      button.textContent = '开始同步';
+      button.textContent = '同步';
     }
   }
 }

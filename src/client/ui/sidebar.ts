@@ -2,6 +2,7 @@ import { state, setSearchQuery, getFilteredFiles } from '../state';
 import { escapeAttr, escapeHtml } from '../utils/escape';
 import { generateDistinctNames } from '../utils/file-names';
 import { getFileListStatus } from '../utils/file-status';
+import { getFileTypeLabel } from '../utils/file-type';
 import { renderWorkspaceSidebar, bindWorkspaceEvents } from './sidebar-workspace';
 
 // 渲染搜索框
@@ -99,7 +100,7 @@ export function renderFiles(): void {
       ].filter(Boolean).join(' ');
 
       // 高亮匹配的文本
-      let displayName = file.displayName;
+      let displayName = file.displayName || file.name;
       const query = state.searchQuery.toLowerCase().trim();
       if (query) {
         const index = displayName.toLowerCase().indexOf(query);
@@ -123,12 +124,16 @@ export function renderFiles(): void {
         statusBadge = `<span class="status-badge status-${status.type}" style="color: ${status.color}">${status.badge}</span>`;
       }
 
+      // 获取文件类型标签
+      const typeLabel = getFileTypeLabel(file.path);
+      const typeBadge = typeLabel ? `<span class="file-type-badge">${escapeHtml(typeLabel)}</span>` : '';
+
       return `
       <div class="${classes}"
            onclick="window.switchFile('${escapeAttr(file.path)}')">
         <span class="file-item-status">${statusBadge}</span>
         <span class="icon">📄</span>
-        <span class="name">${displayName}</span>
+        <span class="name">${displayName}${typeBadge}</span>
         <span class="close" onclick="event.stopPropagation();window.removeFile('${escapeAttr(file.path)}')">×</span>
       </div>
     `}).join('');
@@ -194,10 +199,13 @@ export function renderTabs(): void {
       if (isCurrent) classes.push('active');
       if (isMissing) classes.push('deleted');
 
+      const typeLabel = getFileTypeLabel(file.path);
+      const typeBadge = typeLabel ? `<span class="file-type-badge">${escapeHtml(typeLabel)}</span>` : '';
+
       return `
         <div class="${classes.join(' ')}"
              onclick="window.switchFile('${escapeAttr(file.path)}')">
-          <span class="tab-name">${escapeHtml(file.displayName)}</span>
+          <span class="tab-name">${escapeHtml(file.displayName)}${typeBadge}</span>
           <span class="tab-close" onclick="event.stopPropagation();window.removeFile('${escapeAttr(file.path)}')">×</span>
         </div>
       `;

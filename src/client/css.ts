@@ -481,6 +481,24 @@ export const styles = `
       border-radius: 4px;
     }
 
+    /* 文件类型徽章 */
+    .file-type-badge {
+      display: inline-block;
+      background: #f3f4f6;
+      color: #6b7280;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 6px;
+      font-weight: 500;
+      vertical-align: middle;
+    }
+    .tab .file-type-badge {
+      font-size: 10px;
+      padding: 1px 5px;
+      margin-left: 4px;
+    }
+
     /* 内容区 */
     .content {
       flex: 1;
@@ -623,6 +641,18 @@ export const styles = `
       font-size: 14px;
       color: #24292e;
       margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .sync-dialog-link-icon {
+      font-size: 14px;
+      text-decoration: none;
+      opacity: 0.6;
+      transition: opacity 0.2s;
+    }
+    .sync-dialog-link-icon:hover {
+      opacity: 1;
     }
     .sync-dialog-recent-meta {
       font-size: 12px;
@@ -636,12 +666,41 @@ export const styles = `
       color: #24292e;
       margin-bottom: 20px;
     }
+    .sync-dialog-manual-input {
+      margin-top: 12px;
+    }
     .sync-dialog-footer {
       padding: 16px 24px;
       border-top: 1px solid #e1e4e8;
       display: flex;
-      justify-content: flex-end;
+      justify-content: center;
       gap: 12px;
+    }
+    .sync-dialog-btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid #d1d5da;
+      background: #fff;
+      color: #24292e;
+    }
+    .sync-dialog-btn:hover {
+      background: #f6f8fa;
+    }
+    .sync-dialog-btn-primary {
+      background: #2ea44f;
+      color: #fff;
+      border-color: #2ea44f;
+      padding: 8px 24px;
+    }
+    .sync-dialog-btn-primary:hover {
+      background: #2c974b;
+    }
+    .sync-dialog-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
     .sync-dialog-button {
       padding: 8px 16px;
@@ -667,6 +726,28 @@ export const styles = `
     .sync-dialog-button:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+    }
+    .sync-dialog-success {
+      text-align: center;
+      padding: 24px;
+    }
+    .sync-dialog-success-icon {
+      font-size: 48px;
+      color: #2ea44f;
+      margin-bottom: 16px;
+    }
+    .sync-dialog-success-text {
+      font-size: 16px;
+      color: #24292e;
+      margin-bottom: 12px;
+    }
+    .sync-dialog-link {
+      color: #0969da;
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .sync-dialog-link:hover {
+      text-decoration: underline;
     }
     .sync-dialog-empty {
       padding: 20px;

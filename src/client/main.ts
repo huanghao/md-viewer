@@ -269,6 +269,21 @@ function setupDragAndDrop() {
   });
 }
 
+// ==================== 键盘快捷键 ====================
+function setupKeyboardShortcuts() {
+  document.addEventListener('keydown', (e) => {
+    // Cmd-W (Mac) 或 Ctrl-W (Windows/Linux) 关闭当前标签页
+    if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
+      e.preventDefault(); // 阻止关闭浏览器标签
+
+      // 如果有当前文件，关闭它
+      if (state.currentFile) {
+        removeFileHandler(state.currentFile);
+      }
+    }
+  });
+}
+
 // ==================== URL 参数处理 ====================
 function handleURLParams() {
   const params = new URLSearchParams(window.location.search);
@@ -908,6 +923,7 @@ window.showSettingsDialog = showSettingsDialog;
 
   setupDragAndDrop();
   handleURLParams();
+  setupKeyboardShortcuts();
 
   // 页面刷新时，自动刷新当前正在展示的文件
   await refreshCurrentFile();

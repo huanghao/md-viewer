@@ -75,6 +75,7 @@ export interface NearbyResponse {
 export interface SyncParent {
   id: string;
   title: string;
+  url: string;
   lastUsed: number;
 }
 
@@ -98,4 +99,8 @@ export interface SyncStatusData {
   url?: string;
   lastSyncTime?: number;
   command?: string;
+}
+
+export interface SyncPreferences {
+  openAfterSync?: boolean;
 }

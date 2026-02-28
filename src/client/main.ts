@@ -818,9 +818,9 @@ function copySingleText(text: string, e?: Event) {
 // 复制文件名
 function copyFileName(fileName: string) {
   navigator.clipboard.writeText(fileName).then(() => {
-    showToast('文件名已复制', 'success');
+    showSuccess('文件名已复制');
   }).catch(() => {
-    showToast('复制失败', 'error');
+    showError('复制失败');
   });
 }
 

@@ -22,6 +22,8 @@ import {
   handleGetSyncStatus,
   handleCleanupSync,
   handleGetSyncStats,
+  handleGetSyncPreferences,
+  handleSetSyncPreferences,
   handleInferWorkspace,
   handleScanWorkspace,
 } from "./handlers.ts";
@@ -71,6 +73,8 @@ app.post("/api/sync/execute", handleSyncExecute);
 app.get("/api/sync/status", handleGetSyncStatus);
 app.post("/api/sync/cleanup", handleCleanupSync);
 app.get("/api/sync/stats", handleGetSyncStats);
+app.get("/api/sync/preferences", handleGetSyncPreferences);
+app.post("/api/sync/preferences", handleSetSyncPreferences);
 
 // API: CLI 调用 - 打开文件
 app.post("/api/open-file", handleOpenFile);

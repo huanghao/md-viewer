@@ -39,6 +39,7 @@ export interface SyncRecords {
   recentParents: RecentParent[];
   syncedFiles: Record<string, SyncedFileInfo>;
   defaultParentId?: string;
+  preferences?: Record<string, any>;
 }
 
 /**
@@ -214,6 +215,26 @@ export function cleanupAllExpiredRecords(): number {
   }
 
   return cleanedCount;
+}
+
+/**
+ * 获取同步偏好设置
+ */
+export function getSyncPreferences(): Record<string, any> {
+  const records = loadSyncRecords();
+  return records.preferences || {};
+}
+
+/**
+ * 设置同步偏好
+ */
+export function setSyncPreference(key: string, value: any): void {
+  const records = loadSyncRecords();
+  if (!records.preferences) {
+    records.preferences = {};
+  }
+  records.preferences[key] = value;
+  saveSyncRecords(records);
 }
 
 /**

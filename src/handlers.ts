@@ -10,7 +10,7 @@ import {
   log,
 } from "./utils.ts";
 import { broadcastFileOpened, addClient, removeClient } from "./sse.ts";
-import { createKmDoc } from "./km-cli.ts";
+import { createKmDoc, getKmDocMeta } from "./km-cli.ts";
 import {
   getRecentParents,
   addRecentParent,
@@ -19,6 +19,8 @@ import {
   getDefaultParentId,
   cleanupAllExpiredRecords,
   getSyncRecordsStats,
+  getSyncPreferences,
+  setSyncPreference,
 } from "./sync-storage.ts";
 import { watchFile } from "./file-watcher.ts";
 
@@ -300,8 +302,22 @@ export async function handleSyncExecute(c: Context) {
     });
 
     // 更新最近使用的位置
-    // 从 km-cli 获取 parent 的标题（如果可能）
-    addRecentParent(parentId, `Parent ${parentId}`, result.url!);
+    // 尝试获取父文档的真实标题
+    let parentTitle = `Parent ${parentId}`;
+    let parentUrl = result.url!;
+    try {
+      const parentMeta = await getKmDocMeta(parentId);
+      if (parentMeta && parentMeta.title) {
+        parentTitle = parentMeta.title;
+      }
+      if (parentMeta && parentMeta.url) {
+        parentUrl = parentMeta.url;
+      }
+    } catch (error) {
+      // 获取失败时使用降级方案
+      log(`⚠️  获取父文档信息失败，使用降级方案: ${error}`);
+    }
+    addRecentParent(parentId, parentTitle, parentUrl);
 
     log(`🔄 同步成功: ${title} -> ${result.url}`);
 
@@ -369,6 +385,34 @@ export function handleGetSyncStats(c: Context) {
       success: true,
       stats,
     });
+  } catch (error: any) {
+    return c.json({
+      success: false,
+      error: error.message,
+    }, 500);
+  }
+}
+
+// API: 获取同步偏好设置
+export function handleGetSyncPreferences(c: Context) {
+  try {
+    const preferences = getSyncPreferences();
+    return c.json(preferences);
+  } catch (error: any) {
+    return c.json({
+      error: error.message,
+    }, 500);
+  }
+}
+
+// API: 保存同步偏好设置
+export async function handleSetSyncPreferences(c: Context) {
+  try {
+    const body = await c.req.json();
+    for (const [key, value] of Object.entries(body)) {
+      setSyncPreference(key, value);
+    }
+    return c.json({ success: true });
   } catch (error: any) {
     return c.json({
       success: false,

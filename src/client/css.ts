@@ -417,7 +417,7 @@ export const styles = `
       color: #586069;
     }
     .breadcrumb-item.active {
-      color: #0969da;
+      color: #586069;
       font-weight: 500;
     }
     .breadcrumb-separator {

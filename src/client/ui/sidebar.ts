@@ -58,56 +58,14 @@ export function renderSearchBox(): void {
   }
 }
 
-// 渲染当前文件路径
+// 渲染当前文件路径（已移除，功能由面包屑导航提供）
 export function renderCurrentPath(): void {
   const container = document.getElementById('currentPath');
   if (!container) return;
 
-  if (!state.currentFile) {
-    container.innerHTML = '';
-    container.style.display = 'none';
-    return;
-  }
-
-  container.style.display = 'block';
-  container.innerHTML = `
-    <div class="current-path-wrapper">
-      <span class="current-path-text" title="${escapeAttr(state.currentFile)}">${escapeAttr(state.currentFile)}</span>
-      <button class="current-path-copy" id="copyPathBtn">
-        <span class="copy-icon"></span>
-        <span class="check-icon">
-          <svg viewBox="0 0 16 16" fill="currentColor">
-            <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path>
-          </svg>
-        </span>
-        <span class="copy-tooltip">复制路径</span>
-      </button>
-    </div>
-  `;
-
-  // 绑定复制事件
-  const copyBtn = document.getElementById('copyPathBtn');
-  if (copyBtn) {
-    copyBtn.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(state.currentFile || '');
-        // 视觉反馈：添加成功状态
-        copyBtn.classList.add('success');
-        const tooltip = copyBtn.querySelector('.copy-tooltip');
-        if (tooltip) {
-          tooltip.textContent = '已复制';
-        }
-        setTimeout(() => {
-          copyBtn.classList.remove('success');
-          if (tooltip) {
-            tooltip.textContent = '复制路径';
-          }
-        }, 1000);
-      } catch (err) {
-        console.error('复制失败:', err);
-      }
-    });
-  }
+  // 隐藏当前路径区域
+  container.innerHTML = '';
+  container.style.display = 'none';
 }
 
 // 渲染文件列表

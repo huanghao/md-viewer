@@ -2,23 +2,46 @@ import { styles } from "./css.ts";
 import { readFileSync } from "fs";
 import { join } from "path";
 
-// 读取打包后的客户端脚本
-let clientScript: string;
-try {
-  clientScript = readFileSync(join(process.cwd(), "dist/client.js"), "utf-8");
-} catch (e) {
-  console.error("❌ 无法读取客户端脚本，请先运行: bun run build:client");
-  process.exit(1);
+// 判断是否为开发模式
+const isDev = process.env.NODE_ENV !== 'production';
+
+// 生产模式：启动时读取一次并缓存
+let cachedClientScript: string | null = null;
+
+function loadClientScript(): string {
+  try {
+    return readFileSync(join(process.cwd(), "dist/client.js"), "utf-8");
+  } catch (e) {
+    console.error("❌ 无法读取客户端脚本，请先运行: bun run build:client");
+    process.exit(1);
+  }
+}
+
+// 生产模式下预加载
+if (!isDev) {
+  cachedClientScript = loadClientScript();
+}
+
+// 获取客户端脚本
+function getClientScript(): string {
+  if (isDev) {
+    // 开发模式：每次动态读取，支持热更新
+    return loadClientScript();
+  } else {
+    // 生产模式：使用缓存，提升性能
+    return cachedClientScript!;
+  }
 }
 
 export function generateClientHTML(): string {
+  const clientScript = getClientScript();
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MD Viewer - Markdown Viewer</title>
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css/github-markdown-light.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js/styles/github.css">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>
@@ -30,12 +53,9 @@ export function generateClientHTML(): string {
     <aside class="sidebar">
       <div class="sidebar-header">
         <h1>
-          <svg class="logo-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-            <polyline points="14 2 14 8 20 8"/>
-            <line x1="16" y1="13" x2="8" y2="13"/>
-            <line x1="16" y1="17" x2="8" y2="17"/>
-            <line x1="10" y1="9" x2="8" y2="9"/>
+          <svg class="logo-icon" width="24" height="24" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="16" cy="16" r="16" fill="#3b82f6"/>
+            <path d="M 9 11 L 9 21 L 11 21 L 11 14.5 L 16 19.5 L 21 14.5 L 21 21 L 23 21 L 23 11 L 16 18.5 Z" fill="white"/>
           </svg>
           MD Viewer
         </h1>

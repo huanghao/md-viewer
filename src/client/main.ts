@@ -142,8 +142,14 @@ function renderBreadcrumb() {
   // 显示面包屑路径和复制按钮
   container.innerHTML = `
     ${breadcrumbItems}
-    <button class="copy-filename-button" onclick="copyFileName('${escapeAttr(fileName)}')" title="复制文件名">
-      📋
+    <button class="copy-filename-button" onclick="copyFileName('${escapeAttr(fileName)}', event)">
+      <span class="copy-icon"></span>
+      <span class="check-icon">
+        <svg viewBox="0 0 16 16" fill="currentColor">
+          <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path>
+        </svg>
+      </span>
+      <span class="copy-tooltip">复制路径</span>
     </button>
   `;
 }
@@ -816,9 +822,30 @@ function copySingleText(text: string, e?: Event) {
 }
 
 // 复制文件名
-function copyFileName(fileName: string) {
+function copyFileName(fileName: string, event?: Event) {
   navigator.clipboard.writeText(fileName).then(() => {
     showSuccess('文件名已复制');
+
+    // 添加视觉反馈：变成对勾
+    if (event) {
+      const btn = (event.target as HTMLElement).closest('.copy-filename-button') as HTMLButtonElement;
+      if (btn) {
+        btn.classList.add('success');
+        const tooltip = btn.querySelector('.copy-tooltip');
+        if (tooltip) {
+          const originalText = tooltip.textContent;
+          tooltip.textContent = '已复制';
+
+          // 1秒后恢复
+          setTimeout(() => {
+            btn.classList.remove('success');
+            if (tooltip && originalText) {
+              tooltip.textContent = originalText;
+            }
+          }, 1000);
+        }
+      }
+    }
   }).catch(() => {
     showError('复制失败');
   });

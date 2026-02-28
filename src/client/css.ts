@@ -424,19 +424,95 @@ export const styles = `
       color: #d1d5da;
     }
     .copy-filename-button {
-      padding: 2px 6px;
-      margin-left: 4px;
+      padding: 4px;
+      margin-left: 6px;
       border: none;
       background: transparent;
       color: #586069;
       cursor: pointer;
-      font-size: 14px;
-      border-radius: 4px;
+      border-radius: 3px;
       transition: all 0.2s;
-      opacity: 0.6;
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      vertical-align: middle;
     }
     .copy-filename-button:hover {
-      background: #e1e4e8;
+      background: rgba(0,0,0,0.05);
+    }
+    .copy-filename-button:active {
+      transform: scale(0.95);
+    }
+    .copy-filename-button.success {
+      color: #1a7f37;
+    }
+
+    /* Notion 风格复制图标 - 两张纸叠加 */
+    .copy-icon {
+      width: 13px;
+      height: 13px;
+      position: relative;
+      display: inline-block;
+    }
+    .copy-icon::before,
+    .copy-icon::after {
+      content: '';
+      position: absolute;
+      border: 1.2px solid currentColor;
+      border-radius: 2px;
+      background: white;
+    }
+    .copy-icon::before {
+      width: 9px;
+      height: 10px;
+      top: 0;
+      left: 2.5px;
+      border-bottom-left-radius: 0;
+    }
+    .copy-icon::after {
+      width: 9px;
+      height: 10px;
+      top: 2.5px;
+      left: 0;
+    }
+
+    /* 对勾图标 */
+    .check-icon {
+      display: none;
+      width: 13px;
+      height: 13px;
+    }
+    .check-icon svg {
+      width: 100%;
+      height: 100%;
+    }
+    .copy-filename-button.success .copy-icon {
+      display: none;
+    }
+    .copy-filename-button.success .check-icon {
+      display: inline-block;
+    }
+
+    /* Tooltip */
+    .copy-tooltip {
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #24292e;
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      margin-bottom: 4px;
+      z-index: 1000;
+    }
+    .copy-filename-button:hover .copy-tooltip {
       opacity: 1;
     }
 
@@ -1089,6 +1165,7 @@ export const styles = `
       font-size: 13px;
       color: #24292e;
       margin-bottom: 2px;
+      gap: 6px;
     }
 
     .open-file-item:hover {
@@ -1101,9 +1178,18 @@ export const styles = `
       font-weight: 400;
     }
 
+    .open-file-item .file-item-status {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
     .open-file-icon {
-      margin-right: 8px;
       font-size: 14px;
+      flex-shrink: 0;
     }
 
     .open-file-name {

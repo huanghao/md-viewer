@@ -1,6 +1,8 @@
 import type { Workspace, FileTreeNode, FileInfo } from '../types';
 import { state } from '../state';
 import { escapeHtml, escapeAttr } from '../utils/escape';
+import { getFileListStatus } from '../utils/file-status';
+import { getFileTypeLabel } from '../utils/file-type';
 import {
   getCurrentWorkspace,
   toggleWorkspaceExpanded,
@@ -164,11 +166,28 @@ function renderOpenFilesSection(): string {
 function renderOpenFileItem(file: FileInfo): string {
   const isCurrent = state.currentFile === file.path;
 
+  // 获取文件状态（优先级：D > M > 🔵）
+  const status = getFileListStatus(file);
+  let statusBadge = '&nbsp;'; // 默认使用不间断空格占位
+
+  if (status.badge === 'dot') {
+    // 蓝色圆点
+    statusBadge = '<span class="new-dot"></span>';
+  } else if (status.badge) {
+    // M 或 D 字母标识
+    statusBadge = `<span class="status-badge status-${status.type}" style="color: ${status.color}">${status.badge}</span>`;
+  }
+
+  // 获取文件类型标签
+  const typeLabel = getFileTypeLabel(file.path);
+  const typeBadge = typeLabel ? `<span class="file-type-badge">${escapeHtml(typeLabel)}</span>` : '';
+
   return `
     <div class="open-file-item ${isCurrent ? 'current' : ''}"
          onclick="handleFileClick('${escapeAttr(file.path)}')">
+      <span class="file-item-status">${statusBadge}</span>
       <span class="open-file-icon">📄</span>
-      <span class="open-file-name">${escapeHtml(file.name)}</span>
+      <span class="open-file-name">${escapeHtml(file.name)}${typeBadge}</span>
       <span class="open-file-close" onclick="event.stopPropagation(); handleCloseFile('${escapeAttr(file.path)}')">×</span>
     </div>
   `;

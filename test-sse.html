@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SSE 测试</title>
+  <style>
+    body {
+      font-family: monospace;
+      padding: 20px;
+    }
+    .event {
+      margin: 10px 0;
+      padding: 10px;
+      border: 1px solid #ccc;
+      background: #f5f5f5;
+    }
+    .event-type {
+      font-weight: bold;
+      color: #0066cc;
+    }
+    .timestamp {
+      color: #666;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+  <h1>SSE 事件监听器</h1>
+  <div id="status">连接中...</div>
+  <div id="events"></div>
+
+  <script>
+    const eventsDiv = document.getElementById('events');
+    const statusDiv = document.getElementById('status');
+
+    const eventSource = new EventSource('http://localhost:3456/api/events');
+
+    eventSource.onopen = () => {
+      statusDiv.textContent = '✅ 已连接';
+      statusDiv.style.color = 'green';
+    };
+
+    eventSource.onerror = (err) => {
+      statusDiv.textContent = '❌ 连接错误';
+      statusDiv.style.color = 'red';
+      console.error('SSE error:', err);
+    };
+
+    // 监听所有类型的事件
+    ['file-changed', 'file-deleted', 'file-opened'].forEach(eventType => {
+      eventSource.addEventListener(eventType, (e) => {
+        const timestamp = new Date().toLocaleTimeString();
+        const data = JSON.parse(e.data);
+
+        const eventDiv = document.createElement('div');
+        eventDiv.className = 'event';
+        eventDiv.innerHTML = `
+          <div class="timestamp">${timestamp}</div>
+          <div class="event-type">${eventType}</div>
+          <pre>${JSON.stringify(data, null, 2)}</pre>
+        `;
+
+        eventsDiv.insertBefore(eventDiv, eventsDiv.firstChild);
+        console.log(`[${eventType}]`, data);
+      });
+    });
+  </script>
+</body>
+</html>

@@ -2,6 +2,7 @@ import type { Workspace, FileTreeNode } from './types';
 import { state } from './state';
 import { updateWorkspaceListDiff, removeWorkspaceTracking } from './workspace-state';
 import { saveConfig } from './config';
+import { mergeDirectoryExpandedState } from './workspace-tree-expansion';
 
 // 生成唯一 ID
 function generateId(): string {
@@ -147,6 +148,12 @@ export async function scanWorkspace(workspaceId: string): Promise<FileTreeNode |
 
     const tree: FileTreeNode = await response.json();
 
+    // Keep user's directory expand/collapse preference across polling rescans.
+    const previousTree = state.fileTree.get(workspaceId);
+    if (previousTree) {
+      mergeDirectoryExpandedState(previousTree, tree);
+    }
+
     // 缓存文件树
     state.fileTree.set(workspaceId, tree);
     updateWorkspaceListDiff(workspaceId, collectFilePaths(tree));
@@ -191,7 +198,8 @@ export function toggleNodeExpanded(workspaceId: string, nodePath: string): void 
 
   const node = findNodeByPath(tree, nodePath);
   if (node && node.type === 'directory') {
-    node.isExpanded = !node.isExpanded;
+    const currentlyExpanded = node.isExpanded !== false;
+    node.isExpanded = !currentlyExpanded;
   }
 }
 

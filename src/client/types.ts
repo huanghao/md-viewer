@@ -41,7 +41,8 @@ export interface AppConfig {
 
 // 应用状态类型
 export interface AppState {
-  files: Map<string, FileInfo>;
+  // 会话级文件缓存（用于 tabs/正文缓存/同步上下文），不等同于“工作区全量文件状态”
+  sessionFiles: Map<string, FileInfo>;
   currentFile: string | null;
   searchQuery: string;
 

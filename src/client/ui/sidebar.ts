@@ -1,4 +1,5 @@
-import { state, setSearchQuery, getFilteredFiles, hasListDiff } from '../state';
+import { state, setSearchQuery, getFilteredFiles } from '../state';
+import { hasListDiff } from '../workspace-state';
 import { saveConfig } from '../config';
 import { escapeAttr, escapeHtml } from '../utils/escape';
 import { generateDistinctNames } from '../utils/file-names';
@@ -198,7 +199,7 @@ export function renderFiles(): void {
   const container = document.getElementById('fileList');
   if (!container) return;
 
-  if (state.files.size === 0) {
+  if (state.sessionFiles.size === 0) {
     container.innerHTML = '<div class="empty-tip">点击上方添加 Markdown/HTML 文件</div>';
     return;
   }
@@ -310,7 +311,7 @@ export function renderSidebar(): void {
 
 // 渲染标签页
 export function renderTabs(): void {
-  const allFiles = Array.from(state.files.values());
+  const allFiles = Array.from(state.sessionFiles.values());
   const container = document.getElementById('tabs');
   if (!container) return;
 
@@ -321,7 +322,7 @@ export function renderTabs(): void {
   }
 
   container.style.display = 'flex';
-  const filesWithDisplay = generateDistinctNames(state.files);
+  const filesWithDisplay = generateDistinctNames(state.sessionFiles);
 
   container.innerHTML = filesWithDisplay
     .map(file => {

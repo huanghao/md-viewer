@@ -2,8 +2,9 @@
 import type { FileData } from './types';
 
 // 导入状态管理
-import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFileFromState, switchToFile, setSearchQuery, clearListDiff } from './state';
-import { addWorkspace, hydrateExpandedWorkspaces } from './workspace';
+import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFileFromState, switchToFile, setSearchQuery, markFileMissing, getSessionFile } from './state';
+import { clearListDiff, markWorkspacePathMissing } from './workspace-state';
+import { addWorkspace, hydrateExpandedWorkspaces, scanWorkspace } from './workspace';
 
 // 导入 API
 import { loadFile, searchFiles, getNearbyFiles, openFile, detectPathType } from './api/files';
@@ -25,6 +26,7 @@ const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 680;
 const fileRefreshSeq = new Map<string, number>();
 const PARENT_URL_SKIP_SEGMENTS = new Set(['doc', 'docs', 'page', 'pages', 'content', 'wiki']);
+let workspacePollRunning = false;
 
 // ==================== 消息处理 ====================
 async function onFileLoaded(data: FileData, focus: boolean = false) {
@@ -129,7 +131,7 @@ async function syncFileFromDisk(
   path: string,
   options: { silent?: boolean; highlight?: boolean } = {}
 ): Promise<boolean> {
-  const file = state.files.get(path);
+  const file = state.sessionFiles.get(path);
   if (!file || file.isMissing) return false;
 
   const nextSeq = (fileRefreshSeq.get(path) || 0) + 1;
@@ -140,7 +142,7 @@ async function syncFileFromDisk(
 
   if (fileRefreshSeq.get(path) !== nextSeq) return false;
 
-  const targetFile = state.files.get(path) || state.files.get(data.path);
+  const targetFile = state.sessionFiles.get(path) || state.sessionFiles.get(data.path);
   if (!targetFile) return false;
 
   targetFile.content = data.content;
@@ -210,6 +212,69 @@ function normalizeParentIdInput(raw: string): string {
   return input;
 }
 
+function normalizeJoinedPath(baseDir: string, relativePath: string): string {
+  const merged = `${baseDir}/${relativePath}`;
+  const isAbsolute = merged.startsWith('/');
+  const parts = merged.split('/');
+  const stack: string[] = [];
+  for (const part of parts) {
+    if (!part || part === '.') continue;
+    if (part === '..') {
+      if (stack.length > 0) stack.pop();
+      continue;
+    }
+    stack.push(part);
+  }
+  return `${isAbsolute ? '/' : ''}${stack.join('/')}`;
+}
+
+function resolveMarkdownAssetSrc(src: string, currentFilePath: string): string | null {
+  const trimmed = src.trim();
+  if (!trimmed) return null;
+
+  // 保留可直接访问或内嵌的来源
+  if (
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('data:') ||
+    trimmed.startsWith('blob:') ||
+    trimmed.startsWith('/api/')
+  ) {
+    return null;
+  }
+
+  // 当前仅为本地文件提供相对资源解析
+  if (isUrlPath(currentFilePath)) {
+    return null;
+  }
+
+  const qIndex = trimmed.indexOf('?');
+  const hIndex = trimmed.indexOf('#');
+  const cutIndex = [qIndex, hIndex].filter((i) => i >= 0).sort((a, b) => a - b)[0] ?? -1;
+  const pathPart = cutIndex >= 0 ? trimmed.slice(0, cutIndex) : trimmed;
+  const suffix = cutIndex >= 0 ? trimmed.slice(cutIndex) : '';
+
+  const baseDir = currentFilePath.slice(0, currentFilePath.lastIndexOf('/'));
+  const absPath = pathPart.startsWith('/')
+    ? pathPart
+    : normalizeJoinedPath(baseDir, pathPart);
+
+  return `/api/file-asset?path=${encodeURIComponent(absPath)}${suffix}`;
+}
+
+function rewriteMarkdownAssetUrls(container: HTMLElement, currentFilePath: string): void {
+  const root = container.querySelector('.markdown-body');
+  if (!root) return;
+
+  root.querySelectorAll('img[src], video[src], source[src]').forEach((el) => {
+    const source = el.getAttribute('src');
+    if (!source) return;
+    const resolved = resolveMarkdownAssetSrc(source, currentFilePath);
+    if (!resolved) return;
+    el.setAttribute('src', resolved);
+  });
+}
+
 function renderContent() {
   const container = document.getElementById('content');
   if (!container) return;
@@ -224,7 +289,7 @@ function renderContent() {
     return;
   }
 
-  const file = state.files.get(state.currentFile);
+  const file = state.sessionFiles.get(state.currentFile);
   if (!file) return;
 
   if (isHtmlPath(file.path)) {
@@ -253,6 +318,7 @@ function renderContent() {
     `
     : '';
   container.innerHTML = `${deletedNotice}<div class="markdown-body">${html}</div>`;
+  rewriteMarkdownAssetUrls(container, file.path);
 
   // 更新文件元信息（仅显示相对时间）
   const meta = document.getElementById('fileMeta');
@@ -275,7 +341,7 @@ function renderBreadcrumb() {
     return;
   }
 
-  const file = state.files.get(state.currentFile);
+  const file = state.sessionFiles.get(state.currentFile);
   if (!file) return;
 
   const parts = file.path.split('/').filter(Boolean);
@@ -569,7 +635,7 @@ function switchFile(path: string) {
   switchToFile(path);
   renderSidebar();
   renderContent();
-  const file = state.files.get(path);
+  const file = state.sessionFiles.get(path);
   if (file && !file.isMissing && file.lastModified > file.displayedModified) {
     void syncFileFromDisk(path, { silent: true, highlight: true });
   }
@@ -844,7 +910,7 @@ async function updateToolbarButtons() {
     return;
   }
 
-  const file = state.files.get(state.currentFile);
+  const file = state.sessionFiles.get(state.currentFile);
   if (!file) return;
 
   if (file.isMissing) {
@@ -924,7 +990,7 @@ async function handleSyncButtonClick() {
 
 // 显示同步对话框
 async function showSyncDialog() {
-  const file = state.files.get(state.currentFile!);
+  const file = state.sessionFiles.get(state.currentFile!);
   if (!file) return;
 
   const titleMatch = file.content.match(/^#\s+(.+)$/m);
@@ -1435,7 +1501,7 @@ function connectSSE() {
   // 文件内容变化
   eventSource.addEventListener('file-changed', async (e: any) => {
     const data = JSON.parse(e.data);
-    const file = state.files.get(data.path);
+    const file = getSessionFile(data.path);
 
     if (file) {
       // 先更新 lastModified，便于失败兜底时保留 M 状态
@@ -1458,21 +1524,24 @@ function connectSSE() {
   // 文件删除
   eventSource.addEventListener('file-deleted', async (e: any) => {
     const data = JSON.parse(e.data);
-    const file = state.files.get(data.path);
+    const file = getSessionFile(data.path);
 
     if (file) {
-      // 标记文件为不存在
       file.isMissing = true;
+      saveState();
+    } else {
+      // 未打开文件的删除态只标记在工作区树中，不污染已打开文件列表。
+      markWorkspacePathMissing(data.path);
+    }
 
-      // 重新渲染侧边栏（支持简单模式和工作区模式）
-      renderSidebar();
+    // 重新渲染侧边栏（支持简单模式和工作区模式）
+    renderSidebar();
 
-      // 如果当前正在查看这个文件，仅提示“已删除”并保留当前正文（不做自动刷新替换）
-      if (state.currentFile === data.path) {
-        renderContent();
-        updateToolbarButtons();
-        showError('文件已不存在');
-      }
+    // 如果当前正在查看这个文件，仅提示“已删除”并保留当前正文（不做自动刷新替换）
+    if (state.currentFile === data.path) {
+      renderContent();
+      updateToolbarButtons();
+      showError('文件已不存在');
     }
   });
 
@@ -1559,6 +1628,26 @@ window.toggleFontScaleMenu = toggleFontScaleMenu;
 window.setFontScale = setFontScale;
 window.openExternalFile = openFileInBrowser;
 
+function startWorkspacePolling() {
+  window.setInterval(async () => {
+    if (workspacePollRunning) return;
+    if (state.config.sidebarMode !== 'workspace') return;
+
+    const expanded = state.config.workspaces.filter((ws) => ws.isExpanded);
+    if (expanded.length === 0) return;
+
+    workspacePollRunning = true;
+    try {
+      for (const ws of expanded) {
+        await scanWorkspace(ws.id);
+      }
+      renderSidebar();
+    } finally {
+      workspacePollRunning = false;
+    }
+  }, 1500);
+}
+
 // ==================== 初始化 ====================
 (async () => {
   initSidebarWidth();
@@ -1568,6 +1657,7 @@ window.openExternalFile = openFileInBrowser;
 
   await restoreState(loadFile);
   await hydrateExpandedWorkspaces();
+  startWorkspacePolling();
 
   // 根据配置渲染侧边栏
   renderSidebar();

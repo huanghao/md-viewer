@@ -1,5 +1,6 @@
 import type { Workspace, FileTreeNode, FileInfo } from '../types';
-import { state, hasListDiff } from '../state';
+import { state, getSessionFile, getSessionFiles, hasSessionFile } from '../state';
+import { hasListDiff, isWorkspacePathMissing, getWorkspaceMissingPaths } from '../workspace-state';
 import { escapeHtml, escapeAttr } from '../utils/escape';
 import { getFileListStatus } from '../utils/file-status';
 import { showError, showSuccess, showWarning } from './toast';
@@ -300,8 +301,9 @@ function renderTreeNode(workspaceId: string, node: FileTreeNode, depth: number):
   const isCurrentFile = state.currentFile === node.path;
 
   if (node.type === 'file') {
-    const openedFile = state.files.get(node.path);
+    const openedFile = getSessionFile(node.path);
     const listDiff = hasListDiff(node.path);
+    const isMissing = !!openedFile?.isMissing || isWorkspacePathMissing(node.path);
 
     // 获取文件状态（优先级：D > M > 蓝点）
     let statusBadge = '&nbsp;';
@@ -312,6 +314,8 @@ function renderTreeNode(workspaceId: string, node: FileTreeNode, depth: number):
       } else if (status.badge) {
         statusBadge = `<span class="status-badge status-${status.type}" style="color: ${status.color}">${status.badge}</span>`;
       }
+    } else if (isMissing) {
+      statusBadge = '<span class="status-badge status-deleted" style="color: #cf222e">D</span>';
     } else if (listDiff) {
       statusBadge = '<span class="new-dot"></span>';
     }
@@ -319,6 +323,7 @@ function renderTreeNode(workspaceId: string, node: FileTreeNode, depth: number):
     const classes = [
       'tree-item',
       'file-node',
+      isMissing ? 'missing' : '',
       isCurrentFile ? 'current' : '',
     ].filter(Boolean).join(' ');
 
@@ -372,7 +377,7 @@ function renderMissingOpenFiles(workspaceId: string, workspacePath: string, tree
   collectTreeFilePaths(tree, filePathsInTree);
 
   const workspacePrefix = `${workspacePath}/`;
-  const missingFiles = Array.from(state.files.values()).filter((file) => {
+  const missingOpenedFiles = getSessionFiles().filter((file) => {
     if (!file.isMissing) return false;
     if (!file.path.startsWith(workspacePrefix)) return false;
     if (filePathsInTree.has(file.path)) return false;
@@ -380,24 +385,50 @@ function renderMissingOpenFiles(workspaceId: string, workspacePath: string, tree
     return file.name.toLowerCase().includes(query) || file.path.toLowerCase().includes(query);
   });
 
-  if (missingFiles.length === 0) {
+  const openedSet = new Set(missingOpenedFiles.map((file) => file.path));
+  const missingPaths = getWorkspaceMissingPaths(workspacePath)
+    .filter((path) => !openedSet.has(path))
+    .filter((path) => !filePathsInTree.has(path))
+    .filter((path) => {
+      if (!query) return true;
+      const lower = path.toLowerCase();
+      const name = (path.split('/').pop() || '').toLowerCase();
+      return lower.includes(query) || name.includes(query);
+    });
+
+  if (missingOpenedFiles.length === 0 && missingPaths.length === 0) {
     return '';
   }
 
+  const missingRows = [
+    ...missingOpenedFiles.map((file) => ({
+      path: file.path,
+      name: file.path.split('/').pop() || file.name,
+      isCurrent: state.currentFile === file.path,
+      hasRetry: true,
+      hasClose: true,
+    })),
+    ...missingPaths.map((path) => ({
+      path,
+      name: path.split('/').pop() || path,
+      isCurrent: state.currentFile === path,
+      hasRetry: false,
+      hasClose: false,
+    }))
+  ];
+
   return `
     <div class="tree-missing-section">
-      <div class="tree-missing-title">已删除（仍在文件列表）</div>
-      ${missingFiles.map((file) => {
-        const isCurrent = state.currentFile === file.path;
-        const fileName = file.path.split('/').pop() || file.name;
+      <div class="tree-missing-title">已删除</div>
+      ${missingRows.map((row) => {
         return `
-          <div class="tree-item missing ${isCurrent ? 'current' : ''}" onclick="handleFileClick('${escapeAttr(file.path)}')">
+          <div class="tree-item file-node missing ${row.isCurrent ? 'current' : ''}" onclick="handleFileClick('${escapeAttr(row.path)}')">
             <span class="tree-indent" style="width: 12px"></span>
             <span class="tree-toggle"></span>
-            <span class="tree-name">${escapeHtml(fileName)}</span>
+            <span class="tree-name">${escapeHtml(row.name)}</span>
             <span class="file-item-status"><span class="status-badge status-deleted">D</span></span>
-            <button class="tree-inline-action" title="重试加载" onclick="event.stopPropagation(); handleRetryMissingFile('${escapeAttr(file.path)}')">↻</button>
-            <button class="tree-inline-action danger" title="关闭文件" onclick="event.stopPropagation(); handleCloseFile('${escapeAttr(file.path)}')">×</button>
+            ${row.hasRetry ? `<button class="tree-inline-action" title="重试加载" onclick="event.stopPropagation(); handleRetryMissingFile('${escapeAttr(row.path)}')">↻</button>` : ''}
+            ${row.hasClose ? `<button class="tree-inline-action danger" title="关闭文件" onclick="event.stopPropagation(); handleCloseFile('${escapeAttr(row.path)}')">×</button>` : ''}
           </div>
         `;
       }).join('')}
@@ -542,9 +573,16 @@ export function bindWorkspaceEvents(): void {
     const { loadFile } = await import('../api/files');
 
     // 如果文件未打开，先加载
-    if (!state.files.has(filePath)) {
-      const fileData = await loadFile(filePath);
-      if (!fileData) return;
+    if (!hasSessionFile(filePath)) {
+      const fileData = await loadFile(filePath, true);
+      if (!fileData) {
+        const { markFileMissing } = await import('../state');
+        markFileMissing(filePath, true);
+        const main = await import('../main');
+        (main as any).renderAll();
+        showError('文件已删除，已标记为 D（无本地缓存）');
+        return;
+      }
 
       const { addOrUpdateFile } = await import('../state');
       addOrUpdateFile(fileData, true);

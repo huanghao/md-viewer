@@ -1,5 +1,6 @@
 import type { Workspace, FileTreeNode } from './types';
-import { state, updateWorkspaceListDiff, removeWorkspaceTracking } from './state';
+import { state } from './state';
+import { updateWorkspaceListDiff, removeWorkspaceTracking } from './workspace-state';
 import { saveConfig } from './config';
 
 // 生成唯一 ID

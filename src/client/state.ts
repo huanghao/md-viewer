@@ -1,9 +1,16 @@
 import type { AppState, FileInfo, FileData } from './types';
 import { loadConfig } from './config';
+import {
+  clearListDiff,
+  clearWorkspacePathMissing,
+  markListDiff,
+  markWorkspacePathMissing,
+  restoreWorkspaceAuxiliaryState,
+} from './workspace-state';
 
 // 全局状态
 export const state: AppState = {
-  files: new Map(),
+  sessionFiles: new Map(),
   currentFile: null,
   searchQuery: '', // 搜索关键词
 
@@ -17,104 +24,24 @@ export const state: AppState = {
 
 // 状态持久化
 const STORAGE_KEY = 'md-viewer:openFiles';
-const WORKSPACE_KNOWN_KEY = 'md-viewer:workspaceKnownFiles';
 const MAX_FILES = 100; // 最大保存文件数量（LRU 限制）
-const listDiffPaths = new Set<string>();
-const workspaceKnownFiles = new Map<string, Set<string>>();
 
-function saveAuxiliaryState(): void {
-  try {
-    localStorage.setItem(
-      WORKSPACE_KNOWN_KEY,
-      JSON.stringify(
-        Array.from(workspaceKnownFiles.entries()).map(([workspaceId, paths]) => [workspaceId, Array.from(paths)])
-      )
-    );
-  } catch (e) {
-    console.error('保存列表差异状态失败:', e);
-  }
+export function getSessionFile(path: string): FileInfo | undefined {
+  return state.sessionFiles.get(path);
 }
 
-function restoreAuxiliaryState(): void {
-  // 蓝点为会话内提示，刷新后清空
-  listDiffPaths.clear();
-  workspaceKnownFiles.clear();
-
-  try {
-    const savedKnown = localStorage.getItem(WORKSPACE_KNOWN_KEY);
-    if (savedKnown) {
-      const records = JSON.parse(savedKnown);
-      if (Array.isArray(records)) {
-        for (const item of records) {
-          if (!Array.isArray(item) || item.length !== 2) continue;
-          const workspaceId = item[0];
-          const paths = item[1];
-          if (typeof workspaceId !== 'string' || !Array.isArray(paths)) continue;
-          workspaceKnownFiles.set(
-            workspaceId,
-            new Set(paths.filter((path): path is string => typeof path === 'string' && path.length > 0))
-          );
-        }
-      }
-    }
-  } catch (e) {
-    console.error('恢复列表差异状态失败:', e);
-  }
+export function hasSessionFile(path: string): boolean {
+  return state.sessionFiles.has(path);
 }
 
-export function hasListDiff(path: string): boolean {
-  return listDiffPaths.has(path);
-}
-
-export function clearListDiff(path: string): void {
-  if (!listDiffPaths.has(path)) return;
-  listDiffPaths.delete(path);
-}
-
-export function updateWorkspaceListDiff(workspaceId: string, scannedPaths: string[]): void {
-  const scannedSet = new Set(scannedPaths);
-  const knownSet = workspaceKnownFiles.get(workspaceId);
-
-  // 首次扫描仅建立基线，不触发全量蓝点
-  if (!knownSet) {
-    workspaceKnownFiles.set(workspaceId, scannedSet);
-    saveAuxiliaryState();
-    return;
-  }
-
-  // 新扫描到的路径标记蓝点
-  for (const path of scannedSet) {
-    if (!knownSet.has(path)) {
-      listDiffPaths.add(path);
-    }
-  }
-
-  // 从工作区中消失的路径，移除蓝点
-  for (const oldPath of knownSet) {
-    if (!scannedSet.has(oldPath)) {
-      listDiffPaths.delete(oldPath);
-    }
-  }
-
-  workspaceKnownFiles.set(workspaceId, scannedSet);
-  saveAuxiliaryState();
-}
-
-export function removeWorkspaceTracking(workspaceId: string): void {
-  const knownSet = workspaceKnownFiles.get(workspaceId);
-  if (knownSet) {
-    for (const path of knownSet) {
-      listDiffPaths.delete(path);
-    }
-  }
-  workspaceKnownFiles.delete(workspaceId);
-  saveAuxiliaryState();
+export function getSessionFiles(): FileInfo[] {
+  return Array.from(state.sessionFiles.values());
 }
 
 export function saveState(): void {
   try {
     const data = {
-      files: Array.from(state.files.entries()).map(([path, file]) => [path, {
+      files: Array.from(state.sessionFiles.entries()).map(([path, file]) => [path, {
         path: file.path,
         name: file.name,
         isRemote: file.isRemote || false,
@@ -137,7 +64,7 @@ export function saveState(): void {
       // 重试保存
       try {
         const data = {
-          files: Array.from(state.files.entries()).map(([path, file]) => [path, {
+          files: Array.from(state.sessionFiles.entries()).map(([path, file]) => [path, {
             path: file.path,
             name: file.name,
             isRemote: file.isRemote || false,
@@ -165,10 +92,10 @@ export function saveState(): void {
  * 当文件数量超过 MAX_FILES 时，移除最少使用的文件
  */
 function cleanupOldFiles(): void {
-  if (state.files.size <= MAX_FILES) return;
+  if (state.sessionFiles.size <= MAX_FILES) return;
 
   // 按最后访问时间排序
-  const sortedFiles = Array.from(state.files.entries())
+  const sortedFiles = Array.from(state.sessionFiles.entries())
     .sort((a, b) => (b[1].lastModified || 0) - (a[1].lastModified || 0));
 
   // 保留最近的 MAX_FILES 个
@@ -176,9 +103,9 @@ function cleanupOldFiles(): void {
   const filesToRemove = sortedFiles.slice(MAX_FILES);
 
   // 清理旧文件
-  state.files.clear();
+  state.sessionFiles.clear();
   filesToKeep.forEach(([path, file]) => {
-    state.files.set(path, file);
+    state.sessionFiles.set(path, file);
   });
 
   console.log(`已清理 ${filesToRemove.length} 个旧文件`);
@@ -186,7 +113,7 @@ function cleanupOldFiles(): void {
 
 export async function restoreState(loadFile: (path: string, silent: boolean) => Promise<FileData | null>): Promise<void> {
   try {
-    restoreAuxiliaryState();
+    restoreWorkspaceAuxiliaryState();
 
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) return;
@@ -203,7 +130,7 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
         // 如果磁盘文件已被修改，保持 dirty 状态
         const savedDisplayedModified = fileInfo.displayedModified || fileData.lastModified;
 
-        state.files.set(path, {
+        state.sessionFiles.set(path, {
           path: fileData.path,
           name: fileData.filename,
           content: fileData.content,
@@ -221,7 +148,7 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
 
     // 清理不存在的文件：用实际存在的文件覆盖 localStorage
     if (validFiles.length !== data.files.length) {
-      const currentFile = state.files.has(data.currentFile)
+      const currentFile = state.sessionFiles.has(data.currentFile)
         ? data.currentFile
         : null;
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -231,11 +158,11 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
     }
 
     // 恢复当前文件
-    if (data.currentFile && state.files.has(data.currentFile)) {
+    if (data.currentFile && state.sessionFiles.has(data.currentFile)) {
       state.currentFile = data.currentFile;
     } else {
       // 如果保存的当前文件不存在了，切换到第一个文件
-      const firstFile = Array.from(state.files.values())[0];
+      const firstFile = Array.from(state.sessionFiles.values())[0];
       state.currentFile = firstFile ? firstFile.path : null;
     }
   } catch (e) {
@@ -245,14 +172,14 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
 
 export function addOrUpdateFile(fileData: FileData, switchTo: boolean = false): void {
   // 检查是否需要清理（超过限制）
-  if (state.files.size >= MAX_FILES && !state.files.has(fileData.path)) {
+  if (state.sessionFiles.size >= MAX_FILES && !state.sessionFiles.has(fileData.path)) {
     cleanupOldFiles();
   }
 
-  const existing = state.files.get(fileData.path);
+  const existing = state.sessionFiles.get(fileData.path);
   const isNewPath = !existing;  // 新加入到列表，打列表差异蓝点
 
-  state.files.set(fileData.path, {
+  state.sessionFiles.set(fileData.path, {
     path: fileData.path,
     name: fileData.filename,
     content: fileData.content,
@@ -270,10 +197,11 @@ export function addOrUpdateFile(fileData: FileData, switchTo: boolean = false): 
     state.currentFile = fileData.path;
     clearListDiff(fileData.path);
   }
+  clearWorkspacePathMissing(fileData.path);
 
   if (isNewPath) {
     if (!switchTo) {
-      listDiffPaths.add(fileData.path);
+      markListDiff(fileData.path);
     }
   }
 
@@ -281,20 +209,48 @@ export function addOrUpdateFile(fileData: FileData, switchTo: boolean = false): 
 }
 
 export function removeFile(path: string): void {
-  state.files.delete(path);
-  listDiffPaths.delete(path);
+  state.sessionFiles.delete(path);
+  clearListDiff(path);
+  clearWorkspacePathMissing(path);
   if (state.currentFile === path) {
     // 切换到剩余文件中的第一个
-    const remainingFiles = Array.from(state.files.values());
+    const remainingFiles = Array.from(state.sessionFiles.values());
     state.currentFile = remainingFiles.length > 0 ? remainingFiles[0].path : null;
   }
-  saveAuxiliaryState();
   saveState();
 }
 
 export function switchToFile(path: string): void {
   state.currentFile = path;
   clearListDiff(path);
+  clearWorkspacePathMissing(path);
+  saveState();
+}
+
+export function markFileMissing(path: string, switchTo: boolean = false): void {
+  const existing = state.sessionFiles.get(path);
+  const now = Date.now();
+  const name = path.split('/').pop() || existing?.name || path;
+
+  state.sessionFiles.set(path, {
+    path,
+    name,
+    content: existing?.content || '# 文件已删除\n\n该文件已从磁盘删除，且当前无本地缓存内容。',
+    lastModified: existing?.lastModified || now,
+    displayedModified: existing?.displayedModified || now,
+    isRemote: existing?.isRemote || false,
+    isMissing: true,
+    syncedDocId: existing?.syncedDocId,
+    syncedUrl: existing?.syncedUrl,
+    syncedAt: existing?.syncedAt,
+  });
+
+  if (switchTo) {
+    state.currentFile = path;
+    clearListDiff(path);
+  }
+  markWorkspacePathMissing(path);
+
   saveState();
 }
 
@@ -305,10 +261,10 @@ export function setSearchQuery(query: string): void {
 export function getFilteredFiles(): FileInfo[] {
   const query = state.searchQuery.toLowerCase().trim();
   if (!query) {
-    return Array.from(state.files.values());
+    return Array.from(state.sessionFiles.values());
   }
 
-  return Array.from(state.files.values()).filter(file => {
+  return Array.from(state.sessionFiles.values()).filter(file => {
     return file.name.toLowerCase().includes(query) ||
            file.path.toLowerCase().includes(query);
   });

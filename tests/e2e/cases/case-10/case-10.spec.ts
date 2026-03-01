@@ -11,7 +11,7 @@ function overwrite(path: string, content: string): void {
   writeFileSync(path, content, 'utf-8');
 }
 
-test('case-10: file-changed 交互正确', async ({ page }) => {
+test('case-10: file-changed 交互正确（当前/非当前都不自动刷新）', async ({ page }) => {
   if (existsSync(FILE_A)) rmSync(FILE_A);
   if (existsSync(FILE_B)) rmSync(FILE_B);
 
@@ -31,11 +31,30 @@ test('case-10: file-changed 交互正确', async ({ page }) => {
     await expect(itemA).toBeVisible();
     await expect(itemB).toBeVisible();
 
-    // 当前文件 B 修改后应自动刷新正文
-    overwrite(FILE_B, '# B\n\nB v2 auto-updated\n');
+    // 等 watcher 与 mtime 稳定后再改写，避免同毫秒时间戳导致 dirty 不触发
+    await page.waitForTimeout(1200);
+
+    // 当前文件 B 修改后：正文不自动刷新，先保持旧内容并显示 M
+    overwrite(FILE_B, '# B\n\nB v2 waiting-for-refresh\n');
     await expect.poll(async () => {
       return await page.locator('#content').innerText();
-    }, { timeout: 10000 }).toContain('B v2 auto-updated');
+    }, { timeout: 10000 }).toContain('B v1');
+    await expect.poll(async () => {
+      const badge = itemB.locator('.file-item-status .status-badge');
+      return (await badge.count()) > 0 ? (await badge.first().innerText()).trim() : '';
+    }, { timeout: 10000 }).toBe('M');
+
+    // 手动刷新后，当前正文更新，M 清除
+    await page.evaluate(() => (window as any).handleRefreshButtonClick());
+    await expect.poll(async () => {
+      return await page.locator('#content').innerText();
+    }, { timeout: 10000 }).toContain('B v2 waiting-for-refresh');
+    await expect.poll(async () => {
+      const badge = itemB.locator('.file-item-status .status-badge');
+      return await badge.count();
+    }, { timeout: 10000 }).toBe(0);
+
+    await page.waitForTimeout(1200);
 
     // 非当前文件 A 修改后应显示 M
     overwrite(FILE_A, '# A\n\nA v2 waiting-for-open\n');

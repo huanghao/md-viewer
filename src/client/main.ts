@@ -1504,20 +1504,10 @@ function connectSSE() {
     const file = getSessionFile(data.path);
 
     if (file) {
-      // 先更新 lastModified，便于失败兜底时保留 M 状态
+      // 统一策略：仅更新状态，不自动替换正文（当前/非当前一致）
       file.lastModified = data.lastModified;
-
-      if (state.currentFile === data.path) {
-        // 当前文件：自动刷新正文并给轻量视觉提示；若刷新失败保留 M 状态兜底
-        const updated = await syncFileFromDisk(data.path, { silent: true, highlight: true });
-        if (!updated) {
-          renderSidebar();
-          updateToolbarButtons();
-        }
-      } else {
-        // 非当前文件：保持 M 状态，等待用户切换该文件时再自动刷新
-        renderSidebar();
-      }
+      renderSidebar();
+      await updateToolbarButtons();
     }
   });
 

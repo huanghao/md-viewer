@@ -14,6 +14,7 @@ import {
 const ADD_WORKSPACE_DIALOG_ID = 'addWorkspaceDialogOverlay';
 const ADD_WORKSPACE_INPUT_ID = 'addWorkspacePathInput';
 const ADD_WORKSPACE_PREVIEW_ID = 'addWorkspacePathPreview';
+let pendingRemoveWorkspaceId: string | null = null;
 
 function getWorkspaceNameFromPath(path: string): string {
   const parts = path.split('/').filter(Boolean);
@@ -183,13 +184,28 @@ function renderWorkspaceItem(workspace: Workspace): string {
         <span class="workspace-toggle">${toggle}</span>
         <span class="workspace-icon">📁</span>
         <span class="workspace-name">${escapeHtml(workspace.name)}</span>
-        <button
-          class="workspace-remove"
-          title="移除工作区"
-          onclick="event.stopPropagation();handleRemoveWorkspace('${escapeAttr(workspace.id)}')"
-        >
-          ×
-        </button>
+        ${pendingRemoveWorkspaceId === workspace.id ? `
+          <div class="workspace-remove-actions" onclick="event.stopPropagation()">
+            <button
+              class="workspace-remove-confirm"
+              title="确认移除"
+              onclick="handleConfirmRemoveWorkspace('${escapeAttr(workspace.id)}')"
+            >删</button>
+            <button
+              class="workspace-remove-cancel"
+              title="取消"
+              onclick="handleCancelRemoveWorkspace()"
+            >取</button>
+          </div>
+        ` : `
+          <button
+            class="workspace-remove"
+            title="移除工作区"
+            onclick="event.stopPropagation();handleAskRemoveWorkspace('${escapeAttr(workspace.id)}')"
+          >
+            ×
+          </button>
+        `}
       </div>
       ${workspace.isExpanded ? renderFileTree(workspace.id, tree) : ''}
     </div>
@@ -339,15 +355,27 @@ export function bindWorkspaceEvents(): void {
     renderSidebar();
   };
 
-  // 移除工作区
-  (window as any).handleRemoveWorkspace = async (workspaceId: string) => {
+  // 进入移除确认态（非模态）
+  (window as any).handleAskRemoveWorkspace = async (workspaceId: string) => {
+    pendingRemoveWorkspaceId = workspaceId;
+    const { renderSidebar } = await import('./sidebar');
+    renderSidebar();
+  };
+
+  // 取消移除
+  (window as any).handleCancelRemoveWorkspace = async () => {
+    pendingRemoveWorkspaceId = null;
+    const { renderSidebar } = await import('./sidebar');
+    renderSidebar();
+  };
+
+  // 确认移除
+  (window as any).handleConfirmRemoveWorkspace = async (workspaceId: string) => {
     const workspace = state.config.workspaces.find(ws => ws.id === workspaceId);
     if (!workspace) return;
 
-    const ok = confirm(`确定移除工作区 "${workspace.name}" 吗？`);
-    if (!ok) return;
-
     removeWorkspace(workspaceId);
+    pendingRemoveWorkspaceId = null;
 
     const { renderSidebar } = await import('./sidebar');
     renderSidebar();

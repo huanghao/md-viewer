@@ -1195,6 +1195,43 @@ export const styles = `
       color: #cf222e;
     }
 
+    .workspace-remove-actions {
+      display: flex;
+      gap: 4px;
+      margin-left: 8px;
+      flex-shrink: 0;
+    }
+
+    .workspace-remove-confirm,
+    .workspace-remove-cancel {
+      width: 24px;
+      height: 22px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      line-height: 1;
+      font-weight: 600;
+    }
+
+    .workspace-remove-confirm {
+      background: #ffebe9;
+      color: #cf222e;
+    }
+
+    .workspace-remove-confirm:hover {
+      background: #ffd8d3;
+    }
+
+    .workspace-remove-cancel {
+      background: #f6f8fa;
+      color: #57606a;
+    }
+
+    .workspace-remove-cancel:hover {
+      background: #eaeef2;
+    }
+
     .workspace-toggle {
       font-size: 12px;
       color: #57606a;

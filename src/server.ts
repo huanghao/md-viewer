@@ -15,6 +15,8 @@ import {
   handleGetFile,
   handleGetFiles,
   handleGetNearby,
+  handlePathSuggestions,
+  handleDetectPath,
   handleOpenFile,
   handleEvents,
   handleGetRecentParents,
@@ -70,6 +72,8 @@ app.get("/api/files", handleGetFiles);
 
 // API: 获取附近的文件
 app.get("/api/nearby", handleGetNearby);
+app.get("/api/path-suggestions", handlePathSuggestions);
+app.post("/api/detect-path", handleDetectPath);
 
 // API: 同步相关
 app.get("/api/sync/recent-parents", handleGetRecentParents);

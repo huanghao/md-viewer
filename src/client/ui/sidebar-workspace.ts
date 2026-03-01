@@ -2,7 +2,9 @@ import type { Workspace, FileTreeNode, FileInfo } from '../types';
 import { state } from '../state';
 import { escapeHtml, escapeAttr } from '../utils/escape';
 import { getFileListStatus } from '../utils/file-status';
+import { generateDistinctNames } from '../utils/file-names';
 import { showError, showSuccess, showWarning } from './toast';
+import { attachPathAutocomplete } from './path-autocomplete';
 import {
   removeWorkspace,
   toggleWorkspaceExpanded,
@@ -15,6 +17,7 @@ const ADD_WORKSPACE_DIALOG_ID = 'addWorkspaceDialogOverlay';
 const ADD_WORKSPACE_INPUT_ID = 'addWorkspacePathInput';
 const ADD_WORKSPACE_PREVIEW_ID = 'addWorkspacePathPreview';
 let pendingRemoveWorkspaceId: string | null = null;
+let removeOutsideClickBound = false;
 
 function getWorkspaceNameFromPath(path: string): string {
   const parts = path.split('/').filter(Boolean);
@@ -73,6 +76,7 @@ function createAddWorkspaceDialog(): HTMLElement {
 
   const input = overlay.querySelector(`#${ADD_WORKSPACE_INPUT_ID}`) as HTMLTextAreaElement | null;
   if (input) {
+    attachPathAutocomplete(input, { kind: 'directory', markdownOnly: false });
     input.addEventListener('input', updateWorkspacePathPreview);
     input.addEventListener('keydown', (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -149,7 +153,7 @@ function renderWorkspaceSection(): string {
       <div class="section-header">
         <span>工作区</span>
         <div class="section-header-actions">
-          <button class="icon-button" onclick="showAddWorkspaceDialog()" title="添加工作区">➕</button>
+          <button class="icon-button" onclick="focusAddInput && focusAddInput()" title="聚焦添加输入">➕</button>
         </div>
       </div>
 
@@ -191,11 +195,6 @@ function renderWorkspaceItem(workspace: Workspace): string {
               title="确认移除"
               onclick="handleConfirmRemoveWorkspace('${escapeAttr(workspace.id)}')"
             >删</button>
-            <button
-              class="workspace-remove-cancel"
-              title="取消"
-              onclick="handleCancelRemoveWorkspace()"
-            >取</button>
           </div>
         ` : `
           <button
@@ -280,16 +279,27 @@ function renderTreeNode(workspaceId: string, node: FileTreeNode, depth: number):
 
 // 渲染已打开文件区域
 function renderOpenFilesSection(): string {
-  const openFiles = Array.from(state.files.values());
+  const currentWorkspace = state.config.workspaces.find(ws => ws.id === state.currentWorkspace) || null;
+  const workspacePrefix = currentWorkspace ? `${currentWorkspace.path}/` : null;
+
+  const scopedEntries = Array.from(state.files.entries()).filter(([path]) => {
+    if (!workspacePrefix) return true;
+    return path === currentWorkspace!.path || path.startsWith(workspacePrefix);
+  });
+  const scopedMap = new Map(scopedEntries);
+  const openFiles = generateDistinctNames(scopedMap);
 
   if (openFiles.length === 0) {
+    const emptyText = currentWorkspace
+      ? `当前工作区（${currentWorkspace.name}）暂无打开的文件`
+      : '暂无打开的文件';
     return `
       <div class="open-files-section">
         <div class="section-header">
           <span>已打开</span>
         </div>
         <div class="empty-open-files">
-          <p>暂无打开的文件</p>
+          <p>${escapeHtml(emptyText)}</p>
         </div>
       </div>
     `;
@@ -308,6 +318,7 @@ function renderOpenFilesSection(): string {
 // 渲染已打开文件项
 function renderOpenFileItem(file: FileInfo): string {
   const isCurrent = state.currentFile === file.path;
+  const displayName = file.displayName || file.name;
 
   // 获取文件状态（优先级：D > M > 🔵）
   const status = getFileListStatus(file);
@@ -326,7 +337,7 @@ function renderOpenFileItem(file: FileInfo): string {
          onclick="handleFileClick('${escapeAttr(file.path)}')">
       <span class="file-item-status">${statusBadge}</span>
       <span class="open-file-icon">📄</span>
-      <span class="open-file-name">${escapeHtml(file.name)}</span>
+      <span class="open-file-name">${escapeHtml(displayName)}</span>
       <span class="open-file-close" onclick="event.stopPropagation(); handleCloseFile('${escapeAttr(file.path)}')">×</span>
     </div>
   `;
@@ -334,6 +345,24 @@ function renderOpenFileItem(file: FileInfo): string {
 
 // 绑定工作区模式事件
 export function bindWorkspaceEvents(): void {
+  if (!removeOutsideClickBound) {
+    removeOutsideClickBound = true;
+    document.addEventListener('click', async (e) => {
+      if (!pendingRemoveWorkspaceId) return;
+
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+
+      if (target.closest('.workspace-remove-actions') || target.closest('.workspace-remove')) {
+        return;
+      }
+
+      pendingRemoveWorkspaceId = null;
+      const { renderSidebar } = await import('./sidebar');
+      renderSidebar();
+    });
+  }
+
   // 工作区点击
   (window as any).handleWorkspaceClick = async (workspaceId: string) => {
     const workspace = state.config.workspaces.find(ws => ws.id === workspaceId);
@@ -358,13 +387,6 @@ export function bindWorkspaceEvents(): void {
   // 进入移除确认态（非模态）
   (window as any).handleAskRemoveWorkspace = async (workspaceId: string) => {
     pendingRemoveWorkspaceId = workspaceId;
-    const { renderSidebar } = await import('./sidebar');
-    renderSidebar();
-  };
-
-  // 取消移除
-  (window as any).handleCancelRemoveWorkspace = async () => {
-    pendingRemoveWorkspaceId = null;
     const { renderSidebar } = await import('./sidebar');
     renderSidebar();
   };

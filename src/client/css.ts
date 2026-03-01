@@ -225,7 +225,7 @@ export const styles = `
       border-radius: 6px;
       font-size: 13px;
       font-family: inherit;
-      margin-bottom: 8px;
+      margin-bottom: 0;
     }
     .add-file-input::placeholder {
       color: #57606a;
@@ -238,7 +238,125 @@ export const styles = `
     .add-file-hint {
       font-size: 12px;
       color: #57606a;
+      text-align: left;
+      margin-top: 8px;
+    }
+    .add-file-input-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .add-file-button {
+      height: 34px;
+      min-width: 36px;
+      border-radius: 6px;
+      border: 1px solid #0969da;
+      background: #0969da;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0 10px;
+      flex-shrink: 0;
+    }
+    .add-file-button:hover {
+      background: #0550ae;
+      border-color: #0550ae;
+    }
+    .add-file-confirm {
+      margin-top: 10px;
+      border: 1px solid #d0d7de;
+      border-radius: 8px;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .add-file-confirm.state-warning {
+      background: #fff8c5;
+      border-color: #f0d264;
+      color: #7a4e00;
+    }
+    .add-file-confirm.state-directory {
+      background: #eaf5ff;
+      border-color: #a8d3ff;
+      color: #095a9f;
+    }
+    .add-file-confirm.state-error {
+      background: #ffebe9;
+      border-color: #ffb3ad;
+      color: #cf222e;
+    }
+    .add-file-confirm-text {
+      line-height: 1.4;
+      flex: 1;
+    }
+    .add-file-confirm-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .add-file-confirm-button {
+      height: 26px;
+      border-radius: 6px;
+      border: 1px solid #d0d7de;
+      background: #fff;
+      color: #24292e;
+      font-size: 12px;
+      padding: 0 10px;
+      cursor: pointer;
+    }
+    .add-file-confirm-button.primary {
+      border-color: #0969da;
+      background: #0969da;
+      color: #fff;
+      font-weight: 600;
+    }
+    .add-file-confirm-button:hover {
+      filter: brightness(0.98);
+    }
+    .path-autocomplete-panel {
+      position: absolute;
+      z-index: 2500;
+      max-height: 260px;
+      overflow-y: auto;
+      background: #ffffff;
+      border: 1px solid #d0d7de;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(31, 35, 40, 0.12);
+    }
+    .path-autocomplete-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      color: #24292e;
+      border-bottom: 1px solid #f0f2f5;
+    }
+    .path-autocomplete-item:last-child {
+      border-bottom: none;
+    }
+    .path-autocomplete-item:hover,
+    .path-autocomplete-item.active {
+      background: #e8f0fe;
+      color: #0969da;
+    }
+    .path-autocomplete-icon {
+      width: 16px;
       text-align: center;
+      flex-shrink: 0;
+    }
+    .path-autocomplete-text {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     }
 
     .file-list {
@@ -1202,34 +1320,22 @@ export const styles = `
       flex-shrink: 0;
     }
 
-    .workspace-remove-confirm,
-    .workspace-remove-cancel {
-      width: 24px;
+    .workspace-remove-confirm {
+      min-width: 40px;
       height: 22px;
       border: none;
       border-radius: 4px;
       cursor: pointer;
-      font-size: 11px;
+      font-size: 12px;
       line-height: 1;
       font-weight: 600;
-    }
-
-    .workspace-remove-confirm {
       background: #ffebe9;
       color: #cf222e;
+      padding: 0 8px;
     }
 
     .workspace-remove-confirm:hover {
       background: #ffd8d3;
-    }
-
-    .workspace-remove-cancel {
-      background: #f6f8fa;
-      color: #57606a;
-    }
-
-    .workspace-remove-cancel:hover {
-      background: #eaeef2;
     }
 
     .workspace-toggle {

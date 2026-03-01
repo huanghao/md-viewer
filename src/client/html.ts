@@ -76,16 +76,23 @@ export function generateClientHTML(): string {
       <div class="add-file-section">
         <div class="add-file-title">
           <span>➕</span>
-          <span>添加文件</span>
+          <span>添加</span>
         </div>
-        <input
-          type="text"
-          class="add-file-input"
-          id="fileInput"
-          placeholder="输入文件路径并回车"
-          onkeypress="if(event.key==='Enter')addFile()"
-        />
-        <div class="add-file-hint">或拖拽 Markdown 文件到窗口</div>
+        <div class="add-file-input-row">
+          <input
+            type="text"
+            class="add-file-input"
+            id="fileInput"
+            placeholder="输入文件或目录路径"
+            onkeypress="if(event.key==='Enter')addFile()"
+          />
+          <button class="add-file-button" onclick="addFile()">加</button>
+        </div>
+        <div class="add-file-hint">输入 .md 直接添加；目录或其他后缀将提示确认</div>
+        <div class="add-file-confirm" id="addPathConfirm" style="display: none;">
+          <div class="add-file-confirm-text" id="addPathConfirmText"></div>
+          <div class="add-file-confirm-actions" id="addPathConfirmActions"></div>
+        </div>
       </div>
 
       <div class="file-list" id="fileList">

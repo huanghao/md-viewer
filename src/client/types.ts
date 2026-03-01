@@ -72,6 +72,28 @@ export interface NearbyResponse {
   files: Array<{ path: string; name: string }>;
 }
 
+export interface PathSuggestion {
+  path: string;
+  display: string;
+  type: 'file' | 'directory';
+}
+
+export interface PathSuggestionsResponse {
+  baseDir: string;
+  suggestions: PathSuggestion[];
+  error?: string;
+}
+
+export type PathKind = 'md_file' | 'other_file' | 'directory' | 'not_found' | 'invalid';
+
+export interface PathDetectResponse {
+  kind: PathKind;
+  path: string;
+  ext?: string | null;
+  isUrl?: boolean;
+  error?: string;
+}
+
 export interface SyncParent {
   id: string;
   title: string;

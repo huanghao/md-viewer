@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Add Prototype</title>
+  <style>
+    :root {
+      --bg: #f3f7fb;
+      --panel: #fff;
+      --border: #d0d7de;
+      --text: #24292f;
+      --muted: #57606a;
+      --primary: #0969da;
+      --warn-bg: #fff8c5;
+      --warn-t: #7a4e00;
+      --dir-bg: #eaf5ff;
+      --dir-t: #095a9f;
+      --err-bg: #ffebe9;
+      --err-t: #cf222e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at 20% 0%, #e9f1ff, #f7fbff 45%, #f3f7fb 100%);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      color: var(--text);
+    }
+    .app {
+      width: min(980px, 100%);
+      min-height: 620px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 14px 40px rgba(9, 30, 66, .12);
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      overflow: hidden;
+    }
+    .sidebar {
+      padding: 16px;
+      border-right: 1px solid var(--border);
+    }
+    .brand { font-size: 18px; font-weight: 700; margin-bottom: 14px; }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      background: #fbfdff;
+    }
+    .line {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+    }
+    input {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 11px;
+      font-size: 13px;
+      outline: none;
+    }
+    input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(9,105,218,.12);
+    }
+    .btn {
+      border: 1px solid var(--primary);
+      background: var(--primary);
+      color: #fff;
+      border-radius: 8px;
+      padding: 0 12px;
+      font-size: 13px;
+      cursor: pointer;
+      height: 36px;
+    }
+    .hint { margin-top: 8px; font-size: 12px; color: var(--muted); }
+
+    .confirm {
+      margin-top: 10px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 10px;
+      display: none;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .confirm.show { display: flex; }
+    .confirm .txt { font-size: 12px; line-height: 1.35; }
+    .actions { display: flex; gap: 8px; flex-shrink: 0; }
+    .ghost, .solid {
+      height: 28px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #fff;
+      padding: 0 10px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .solid {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .warn { background: var(--warn-bg); border-color: #f0d264; color: var(--warn-t); }
+    .dir  { background: var(--dir-bg);  border-color: #a8d3ff; color: var(--dir-t); }
+    .err  { background: var(--err-bg);  border-color: #ffb3ad; color: var(--err-t); }
+
+    .ws {
+      margin-top: 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .ws-hd {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      font-weight: 600;
+      padding: 10px;
+      border-bottom: 1px solid var(--border);
+      background: #f6f8fa;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .ws-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-bottom: 1px solid #f0f2f4;
+    }
+    .ws-row:last-child { border-bottom: none; }
+    .name { flex: 1; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .x, .del {
+      border: none;
+      border-radius: 5px;
+      height: 22px;
+      min-width: 24px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .x { background: transparent; color: #57606a; }
+    .x:hover { background: #f3f4f6; }
+    .del { background: #ffebe9; color: #cf222e; padding: 0 8px; font-weight: 600; }
+
+    .main {
+      padding: 20px;
+      color: #57606a;
+      font-size: 14px;
+      background: #fafbfd;
+    }
+    .seg {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .seg button {
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 7px;
+      padding: 6px 10px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .seg button.active {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: #eff6ff;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">MD Viewer</div>
+      <div class="seg">
+        <button data-state="default" class="active">默认</button>
+        <button data-state="md">md直接添加</button>
+        <button data-state="other">其他后缀确认</button>
+        <button data-state="dir">目录确认</button>
+        <button data-state="err">错误</button>
+      </div>
+
+      <div class="card">
+        <div class="line">
+          <input id="pathInput" value="/Users/huanghao/workspace/md-viewer/README.md" />
+          <button class="btn">加</button>
+        </div>
+        <div class="hint" id="hint">输入文件或目录路径，回车添加</div>
+
+        <div id="confirmBar" class="confirm">
+          <div class="txt" id="confirmText"></div>
+          <div class="actions" id="confirmActions"></div>
+        </div>
+      </div>
+
+      <div class="ws">
+        <div class="ws-hd">
+          <span>工作区</span>
+          <span style="font-size:11px;color:#6a737d;">+ 聚焦输入</span>
+        </div>
+        <div class="ws-row">
+          <span>📁</span><div class="name">md-viewer</div><button class="x">×</button>
+        </div>
+        <div class="ws-row">
+          <span>📁</span><div class="name">my-openclaw-skills</div><button class="del">删</button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <p><strong>智能识别方案原型：</strong></p>
+      <p>1) `.md` 直接添加，不确认</p>
+      <p>2) 其他后缀：行内提示，确认后添加</p>
+      <p>3) 目录：行内提示，确认作为工作区添加</p>
+      <p>4) 确认条支持点击外部自动消失（原型中仅演示状态）</p>
+    </main>
+  </div>
+
+  <script>
+    const stateButtons = document.querySelectorAll('[data-state]');
+    const input = document.getElementById('pathInput');
+    const hint = document.getElementById('hint');
+    const bar = document.getElementById('confirmBar');
+    const txt = document.getElementById('confirmText');
+    const actions = document.getElementById('confirmActions');
+
+    function setConfirm(cls, text, btn1, btn2 = '取消') {
+      bar.className = `confirm show ${cls}`;
+      txt.textContent = text;
+      actions.innerHTML = `<button class="solid">${btn1}</button><button class="ghost">${btn2}</button>`;
+    }
+
+    function reset() {
+      bar.className = 'confirm';
+      txt.textContent = '';
+      actions.innerHTML = '';
+    }
+
+    function render(s) {
+      if (s === 'default') {
+        input.value = '/Users/huanghao/workspace/md-viewer/README.md';
+        hint.textContent = '输入文件或目录路径，回车添加';
+        reset();
+        return;
+      }
+      if (s === 'md') {
+        input.value = '/Users/huanghao/workspace/md-viewer/TODO.md';
+        hint.textContent = '检测到 Markdown 文件，回车将直接添加';
+        reset();
+        return;
+      }
+      if (s === 'other') {
+        input.value = '/Users/huanghao/workspace/md-viewer/notes.txt';
+        hint.textContent = '输入文件或目录路径，回车添加';
+        setConfirm('warn', '检测到非 Markdown 文件: .txt', '继续添加文件');
+        return;
+      }
+      if (s === 'dir') {
+        input.value = '/Users/huanghao/workspace/md-viewer';
+        hint.textContent = '输入文件或目录路径，回车添加';
+        setConfirm('dir', '检测到目录，是否作为工作区添加？', '添加工作区');
+        return;
+      }
+      input.value = '/Users/huanghao/workspace/not-exists';
+      hint.textContent = '输入文件或目录路径，回车添加';
+      bar.className = 'confirm show err';
+      txt.textContent = '路径不存在或无权限访问';
+      actions.innerHTML = '<button class="ghost">知道了</button>';
+    }
+
+    stateButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        stateButtons.forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        render(btn.dataset.state);
+      });
+    });
+  </script>
+</body>
+</html>

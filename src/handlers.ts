@@ -1,5 +1,6 @@
-import { basename, resolve, dirname, join } from "path";
+import { basename, resolve, dirname, join, extname } from "path";
 import { existsSync, readdirSync, statSync } from "fs";
+import { homedir } from "os";
 import type { Context } from "hono";
 import {
   isUrl,
@@ -23,6 +24,17 @@ import {
   setSyncPreference,
 } from "./sync-storage.ts";
 import { watchFile } from "./file-watcher.ts";
+
+function expandHomePath(input: string): string {
+  if (input === "~") return homedir();
+  if (input.startsWith("~/")) return join(homedir(), input.slice(2));
+  return input;
+}
+
+function isMarkdownFilename(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower.endsWith(".md") || lower.endsWith(".markdown");
+}
 
 // API: 获取文件内容
 export async function handleGetFile(c: Context) {
@@ -140,6 +152,142 @@ export function handleGetNearby(c: Context) {
     });
   } catch (e) {
     return c.json({ error: "读取目录失败: " + (e as Error).message }, 500);
+  }
+}
+
+// API: 路径补全建议（文件/目录）
+export function handlePathSuggestions(c: Context) {
+  const rawInput = (c.req.query("input") || "").trim();
+  const kind = c.req.query("kind") === "directory" ? "directory" : "file";
+  const markdownOnly = c.req.query("markdownOnly") !== "false";
+  const limit = 30;
+
+  const expandedInput = expandHomePath(rawInput);
+  const resolvedInput = expandedInput
+    ? resolve(expandedInput)
+    : process.cwd();
+
+  let targetDir = resolvedInput;
+  let prefix = "";
+
+  try {
+    const hasTrailingSlash = expandedInput.endsWith("/");
+    const isExistingDir = existsSync(resolvedInput) && statSync(resolvedInput).isDirectory();
+
+    if (!hasTrailingSlash && !isExistingDir) {
+      targetDir = dirname(resolvedInput);
+      prefix = basename(resolvedInput);
+    }
+
+    if (!existsSync(targetDir) || !statSync(targetDir).isDirectory()) {
+      return c.json({ baseDir: targetDir, suggestions: [] });
+    }
+
+    const prefixLower = prefix.toLowerCase();
+    const entries = readdirSync(targetDir, { withFileTypes: true });
+    const suggestions: Array<{ path: string; display: string; type: "file" | "directory" }> = [];
+
+    for (const entry of entries) {
+      if (!entry.name.toLowerCase().startsWith(prefixLower)) continue;
+      if (entry.name.startsWith(".")) continue;
+
+      const fullPath = join(targetDir, entry.name);
+
+      if (entry.isDirectory()) {
+        suggestions.push({
+          path: `${fullPath}/`,
+          display: `${entry.name}/`,
+          type: "directory",
+        });
+        continue;
+      }
+
+      if (kind === "directory") continue;
+      if (!entry.isFile()) continue;
+      if (markdownOnly && !isMarkdownFilename(entry.name)) continue;
+
+      suggestions.push({
+        path: fullPath,
+        display: entry.name,
+        type: "file",
+      });
+    }
+
+    const sortedSuggestions = suggestions
+      .sort((a, b) => {
+        if (a.type !== b.type) return a.type === "directory" ? -1 : 1;
+        return a.display.localeCompare(b.display);
+      })
+      .slice(0, limit);
+
+    return c.json({
+      baseDir: targetDir,
+      suggestions: sortedSuggestions,
+    });
+  } catch (e: any) {
+    return c.json({ error: `获取路径建议失败: ${e.message}` }, 500);
+  }
+}
+
+// API: 检测路径类型（md 文件 / 其他文件 / 目录）
+export async function handleDetectPath(c: Context) {
+  try {
+    const body = await c.req.json() as any;
+    const rawPath = typeof body?.path === "string" ? body.path.trim() : "";
+    if (!rawPath) {
+      return c.json({ kind: "invalid", path: "", error: "缺少 path 参数" }, 400);
+    }
+
+    if (isUrl(rawPath)) {
+      const url = new URL(rawPath);
+      const ext = extname(url.pathname || "").toLowerCase();
+      const isMd = ext === ".md" || ext === ".markdown";
+      return c.json({
+        kind: isMd ? "md_file" : "other_file",
+        path: rawPath,
+        ext: ext || null,
+        isUrl: true,
+      });
+    }
+
+    const expandedPath = expandHomePath(rawPath);
+    const resolvedPath = resolve(expandedPath);
+    if (!existsSync(resolvedPath)) {
+      return c.json({ kind: "not_found", path: resolvedPath });
+    }
+
+    let fileStat;
+    try {
+      fileStat = statSync(resolvedPath);
+    } catch (e: any) {
+      return c.json({
+        kind: "invalid",
+        path: resolvedPath,
+        error: e?.message || "无法访问路径",
+      });
+    }
+
+    if (fileStat.isDirectory()) {
+      return c.json({ kind: "directory", path: resolvedPath });
+    }
+
+    if (fileStat.isFile()) {
+      const ext = extname(resolvedPath).toLowerCase();
+      const isMd = ext === ".md" || ext === ".markdown";
+      return c.json({
+        kind: isMd ? "md_file" : "other_file",
+        path: resolvedPath,
+        ext: ext || null,
+      });
+    }
+
+    return c.json({ kind: "invalid", path: resolvedPath, error: "不支持的路径类型" });
+  } catch (error: any) {
+    return c.json({
+      kind: "invalid",
+      path: "",
+      error: error.message || "路径检测失败",
+    }, 500);
   }
 }
 

@@ -3,9 +3,10 @@ import type { FileData } from './types';
 
 // 导入状态管理
 import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFileFromState, switchToFile } from './state';
+import { addWorkspace } from './workspace';
 
 // 导入 API
-import { loadFile, searchFiles, getNearbyFiles, openFile } from './api/files';
+import { loadFile, searchFiles, getNearbyFiles, openFile, detectPathType } from './api/files';
 import { getSyncStatus, getRecentParents, executeSync, getSyncPreferences, saveSyncPreference } from './api/sync';
 
 // 导入工具函数
@@ -17,6 +18,7 @@ import { generateDistinctNames } from './utils/file-names';
 import { renderSidebar } from './ui/sidebar';
 import { showToast, showSuccess, showError, showWarning, showInfo } from './ui/toast';
 import { showSettingsDialog } from './ui/settings';
+import { attachPathAutocomplete } from './ui/path-autocomplete';
 
 // ==================== 消息处理 ====================
 async function onFileLoaded(data: FileData, focus: boolean = false) {
@@ -199,6 +201,85 @@ async function showNearbyMenu(e: Event) {
 
 // ==================== 用户操作 ====================
 
+type PendingAddAction =
+  | { kind: 'add-other-file'; path: string; ext: string | null }
+  | { kind: 'add-workspace'; path: string };
+
+let pendingAddAction: PendingAddAction | null = null;
+
+function getWorkspaceNameFromPath(path: string): string {
+  const parts = path.split('/').filter(Boolean);
+  return parts[parts.length - 1] || 'workspace';
+}
+
+function clearAddConfirm(): void {
+  pendingAddAction = null;
+  const bar = document.getElementById('addPathConfirm') as HTMLElement | null;
+  const text = document.getElementById('addPathConfirmText') as HTMLElement | null;
+  const actions = document.getElementById('addPathConfirmActions') as HTMLElement | null;
+  if (bar) {
+    bar.style.display = 'none';
+    bar.className = 'add-file-confirm';
+  }
+  if (text) text.textContent = '';
+  if (actions) actions.innerHTML = '';
+}
+
+function isAddConfirmVisible(): boolean {
+  const bar = document.getElementById('addPathConfirm') as HTMLElement | null;
+  return !!bar && bar.style.display !== 'none';
+}
+
+function showAddConfirm(
+  message: string,
+  mode: 'warning' | 'directory' | 'error',
+  opts: { primaryLabel?: string; onPrimary?: () => Promise<void> | void; allowCancel?: boolean } = {}
+): void {
+  const bar = document.getElementById('addPathConfirm') as HTMLElement | null;
+  const text = document.getElementById('addPathConfirmText') as HTMLElement | null;
+  const actions = document.getElementById('addPathConfirmActions') as HTMLElement | null;
+  if (!bar || !text || !actions) return;
+
+  text.textContent = message;
+  actions.innerHTML = '';
+  bar.className = `add-file-confirm state-${mode}`;
+  bar.style.display = 'flex';
+
+  if (opts.primaryLabel && opts.onPrimary) {
+    const primary = document.createElement('button');
+    primary.className = 'add-file-confirm-button primary';
+    primary.textContent = opts.primaryLabel;
+    primary.onclick = async () => {
+      await opts.onPrimary!();
+      clearAddConfirm();
+    };
+    actions.appendChild(primary);
+  }
+
+  if (opts.allowCancel !== false) {
+    const cancel = document.createElement('button');
+    cancel.className = 'add-file-confirm-button';
+    cancel.textContent = '取消';
+    cancel.onclick = () => clearAddConfirm();
+    actions.appendChild(cancel);
+  }
+}
+
+async function executePendingAddAction(): Promise<void> {
+  if (!pendingAddAction) return;
+
+  if (pendingAddAction.kind === 'add-other-file') {
+    await addFileByPath(pendingAddAction.path, true);
+    return;
+  }
+
+  const workspace = addWorkspace(getWorkspaceNameFromPath(pendingAddAction.path), pendingAddAction.path);
+  renderSidebar();
+  showSuccess(`已添加工作区: ${workspace.name}`, 2000);
+  const input = document.getElementById('fileInput') as HTMLInputElement | null;
+  if (input) input.value = '';
+}
+
 // 添加文件
 async function addFileByPath(path: string, focus: boolean = true) {
   if (!path.trim()) return;
@@ -213,6 +294,58 @@ async function addFileByPath(path: string, focus: boolean = true) {
     const input = document.getElementById('fileInput') as HTMLInputElement;
     if (input) input.value = '';
   }
+}
+
+async function handleSmartAddInput(path: string): Promise<void> {
+  const trimmed = path.trim();
+  if (!trimmed) return;
+
+  const result = await detectPathType(trimmed);
+  const detectedPath = result.path || trimmed;
+
+  if (result.kind === 'md_file') {
+    clearAddConfirm();
+    await addFileByPath(detectedPath, true);
+    return;
+  }
+
+  if (result.kind === 'other_file') {
+    pendingAddAction = {
+      kind: 'add-other-file',
+      path: detectedPath,
+      ext: result.ext || null
+    };
+    showAddConfirm(
+      `检测到非 Markdown 文件${result.ext ? `: ${result.ext}` : ''}`,
+      'warning',
+      {
+        primaryLabel: '继续添加文件',
+        onPrimary: executePendingAddAction
+      }
+    );
+    return;
+  }
+
+  if (result.kind === 'directory') {
+    pendingAddAction = {
+      kind: 'add-workspace',
+      path: detectedPath
+    };
+    showAddConfirm('检测到目录，是否作为工作区添加？', 'directory', {
+      primaryLabel: '添加工作区',
+      onPrimary: executePendingAddAction
+    });
+    return;
+  }
+
+  if (result.kind === 'not_found') {
+    pendingAddAction = null;
+    showAddConfirm('路径不存在，请检查后重试', 'error', { allowCancel: true });
+    return;
+  }
+
+  pendingAddAction = null;
+  showAddConfirm(result.error || '无法识别输入路径', 'error', { allowCancel: true });
 }
 
 // 切换文件
@@ -996,6 +1129,7 @@ declare global {
     showNearbyMenu: (e: Event) => void;
     addFileByPath: (path: string, focus: boolean) => void;
     refreshFile: (path: string) => void;
+    handleRefreshButtonClick: () => void;
     handleSyncButtonClick: () => void;
     closeSyncDialog: () => void;
     selectRecentParent: (parentId: string, e?: Event) => void;
@@ -1008,12 +1142,17 @@ declare global {
     showSettingsDialog: () => void;
     toggleFontScaleMenu: () => void;
     setFontScale: (scale: number) => void;
+    focusAddInput?: () => void;
   }
 }
 
 window.addFile = () => {
   const input = document.getElementById('fileInput') as HTMLInputElement;
-  if (input) addFileByPath(input.value, true);
+  if (input) {
+    handleSmartAddInput(input.value).catch((err: any) => {
+      showError(`添加失败: ${err?.message || '未知错误'}`);
+    });
+  }
 };
 window.switchFile = switchFile;
 window.removeFile = removeFileHandler;
@@ -1046,6 +1185,35 @@ window.setFontScale = setFontScale;
   renderContent();
 
   setupDragAndDrop();
+  const fileInput = document.getElementById('fileInput') as HTMLInputElement | null;
+  if (fileInput) {
+    attachPathAutocomplete(fileInput, { kind: 'file', markdownOnly: false });
+    fileInput.addEventListener('input', () => {
+      if (pendingAddAction || isAddConfirmVisible()) {
+        clearAddConfirm();
+      }
+    });
+    fileInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && isAddConfirmVisible()) {
+        clearAddConfirm();
+      }
+    });
+  }
+
+  document.addEventListener('click', (e) => {
+    if (!isAddConfirmVisible()) return;
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+    if (target.closest('.add-file-section')) return;
+    clearAddConfirm();
+  });
+
+  window.focusAddInput = () => {
+    const input = document.getElementById('fileInput') as HTMLInputElement | null;
+    if (!input) return;
+    input.focus();
+    input.select();
+  }
   handleURLParams();
   setupKeyboardShortcuts();
 

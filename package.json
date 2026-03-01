@@ -15,6 +15,7 @@
     "cli": "bun run src/cli.ts",
     "admin": "bun run src/cli-admin.ts",
     "test:e2e": "playwright test",
+    "test:e2e:video": "playwright test -c playwright.video.config.ts",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:update": "playwright test --update-snapshots",
     "postinstall": "bash scripts/install-iterm2-dispatcher.sh"

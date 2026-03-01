@@ -6,7 +6,6 @@ import { renderSidebar } from './sidebar';
 if (typeof window !== 'undefined') {
   (window as any).closeSettingsDialog = closeSettingsDialog;
   (window as any).saveSettings = saveSettings;
-  (window as any).removeWorkspaceFromSettings = removeWorkspaceFromSettings;
 }
 
 // 显示设置对话框
@@ -59,67 +58,10 @@ function renderSettingsDialog(): void {
   const body = document.getElementById('settingsDialogBody');
   if (!body) return;
 
-  const config = state.config;
-
   body.innerHTML = `
-    <div class="settings-section">
-      <h3 class="settings-section-title">侧边栏模式</h3>
-      <p class="settings-section-desc">选择侧边栏的显示方式</p>
-
-      <div class="settings-radio-group">
-        <label class="settings-radio-item">
-          <input type="radio" name="sidebarMode" value="simple" ${config.sidebarMode === 'simple' ? 'checked' : ''}>
-          <div class="settings-radio-content">
-            <div class="settings-radio-title">简单模式</div>
-            <div class="settings-radio-desc">输入框 + 文件列表，简洁快速</div>
-          </div>
-        </label>
-
-        <label class="settings-radio-item">
-          <input type="radio" name="sidebarMode" value="workspace" ${config.sidebarMode === 'workspace' ? 'checked' : ''}>
-          <div class="settings-radio-content">
-            <div class="settings-radio-title">工作区模式</div>
-            <div class="settings-radio-desc">工作区 + 目录树 + 已打开文件，适合多工程协作</div>
-          </div>
-        </label>
-      </div>
-    </div>
-
-    ${config.sidebarMode === 'workspace' ? renderWorkspaceSettings() : ''}
-  `;
-}
-
-// 渲染工作区设置
-function renderWorkspaceSettings(): string {
-  const workspaces = state.config.workspaces;
-
-  return `
-    <div class="settings-section">
-      <h3 class="settings-section-title">工作区管理</h3>
-      <p class="settings-section-desc">管理你的工作区列表</p>
-
-      ${workspaces.length === 0 ? `
-        <div class="settings-empty">
-          <p>暂无工作区</p>
-          <p style="font-size: 12px; color: #57606a; margin-top: 8px;">
-            切换到工作区模式后，点击侧边栏的 ➕ 按钮添加工作区
-          </p>
-        </div>
-      ` : `
-        <div class="settings-workspace-list">
-          ${workspaces.map((ws, index) => `
-            <div class="settings-workspace-item">
-              <div class="settings-workspace-info">
-                <div class="settings-workspace-name">📁 ${ws.name}</div>
-                <div class="settings-workspace-path">${ws.path}</div>
-              </div>
-              <button class="settings-workspace-remove" onclick="removeWorkspaceFromSettings(${index})" title="移除">
-                ×
-              </button>
-            </div>
-          `).join('')}
-        </div>
-      `}
+    <div class="settings-empty">
+      <div>更多设置项正在整理中</div>
+      <div style="margin-top: 8px; font-size: 12px;">侧栏模式请在左侧模式行中切换</div>
     </div>
   `;
 }
@@ -134,35 +76,7 @@ export function closeSettingsDialog(): void {
 
 // 保存设置
 export function saveSettings(): void {
-  // 获取侧边栏模式
-  const modeRadio = document.querySelector('input[name="sidebarMode"]:checked') as HTMLInputElement;
-  if (!modeRadio) return;
-
-  const oldMode = state.config.sidebarMode;
-  const newMode = modeRadio.value as 'simple' | 'workspace';
-
-  // 更新配置
-  state.config.sidebarMode = newMode;
   saveConfig(state.config);
-
-  // 如果模式改变了，提示需要刷新
-  if (oldMode !== newMode) {
-    closeSettingsDialog();
-
-    // 显示提示并刷新页面
-    if (confirm('侧边栏模式已更改，需要刷新页面生效。是否立即刷新？')) {
-      window.location.reload();
-    }
-  } else {
-    closeSettingsDialog();
-  }
-}
-
-// 从设置中移除工作区
-export function removeWorkspaceFromSettings(index: number): void {
-  if (confirm('确定要移除这个工作区吗？')) {
-    state.config.workspaces.splice(index, 1);
-    saveConfig(state.config);
-    renderSettingsDialog();
-  }
+  renderSidebar();
+  closeSettingsDialog();
 }

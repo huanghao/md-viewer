@@ -17,12 +17,14 @@ Do not place tool-operational playbooks here unless they are temporary workaroun
 - 任务状态使用统一语义：开始、🔄进行中、⏳等待、✅完成、🚫放弃。
 - 任务事实源以 `TODO.md` 为主，`docs/tasks_dashboard.md` 作为同步看板。
 - 当完成任务超过一半时，可进行 `TODO.md` 清理重排；不得改写原任务描述语义。
+- 用户偏好参考`USER_STYLE.md`
 
 ## Design Principles
 
 - 涉及体验变化（参数、交互、视觉）或复杂策略变化时，先做设计方案再实现。
 - 设计文档放在 `docs/design/`，并把待决策项放在文档最前。
 - 设计文档以产品与流程为主，代码仅用于帮助理解。
+- 如果视觉效果上有明显变化，就不需要再toast通知，不要增加这种干扰效果。
 
 ## Interaction Constraints
 

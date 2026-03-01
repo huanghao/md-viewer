@@ -68,37 +68,22 @@ export function generateClientHTML(): string {
         </h1>
         <!-- 搜索框 -->
         <div id="searchBox"></div>
+        <div id="modeSwitchRow"></div>
+        <div class="quick-action-confirm-host">
+          <div class="add-file-confirm" id="quickActionConfirm" style="display: none;">
+            <div class="add-file-confirm-text" id="quickActionConfirmText"></div>
+            <div class="add-file-confirm-actions" id="quickActionConfirmActions"></div>
+          </div>
+        </div>
         <!-- 当前文件路径 -->
         <div id="currentPath"></div>
-      </div>
-
-      <!-- 添加文件区域 -->
-      <div class="add-file-section">
-        <div class="add-file-title">
-          <span>➕</span>
-          <span>添加</span>
-        </div>
-        <div class="add-file-input-row">
-          <input
-            type="text"
-            class="add-file-input"
-            id="fileInput"
-            placeholder="输入文件或目录路径"
-            onkeypress="if(event.key==='Enter')addFile()"
-          />
-          <button class="add-file-button" onclick="addFile()">加</button>
-        </div>
-        <div class="add-file-hint">输入 .md 直接添加；目录或其他后缀将提示确认</div>
-        <div class="add-file-confirm" id="addPathConfirm" style="display: none;">
-          <div class="add-file-confirm-text" id="addPathConfirmText"></div>
-          <div class="add-file-confirm-actions" id="addPathConfirmActions"></div>
-        </div>
       </div>
 
       <div class="file-list" id="fileList">
         <div class="empty-tip">暂无文件</div>
       </div>
     </aside>
+    <div class="sidebar-resizer" id="sidebarResizer" title="拖拽调整侧边栏宽度"></div>
 
     <!-- 主区域 -->
     <main class="main">

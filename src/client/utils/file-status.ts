@@ -8,9 +8,9 @@ export interface FileListStatus {
 
 /**
  * 获取文件在列表中的显示状态
- * 优先级：isMissing (D) > isDirty (M) > isNew (🔵) > 正常
+ * 优先级：isMissing (D) > isDirty (M) > listDiff (🔵) > 正常
  */
-export function getFileListStatus(file: FileInfo): FileListStatus {
+export function getFileListStatus(file: FileInfo, isListDiff: boolean = false): FileListStatus {
   // 优先级 1：文件不存在
   if (file.isMissing) {
     return {
@@ -30,8 +30,8 @@ export function getFileListStatus(file: FileInfo): FileListStatus {
     };
   }
 
-  // 优先级 3：新文件（未读）
-  if (file.isNew) {
+  // 优先级 3：列表差异（蓝点）
+  if (isListDiff) {
     return {
       badge: 'dot',
       color: '#007AFF',  // 蓝色

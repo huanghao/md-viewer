@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>侧栏模式切换内联化原型</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --line: #dde3ea;
+      --text: #1f2937;
+      --muted: #64748b;
+      --primary: #2563eb;
+      --primary-soft: #e8f0fe;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: linear-gradient(145deg, #eef2f7, #f8fafc);
+      font-family: "SF Pro Text", "PingFang SC", "Segoe UI", sans-serif;
+      color: var(--text);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+    }
+
+    .frame {
+      width: 360px;
+      height: 680px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      padding: 12px 12px 8px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #3b82f6;
+    }
+
+    .search {
+      position: relative;
+    }
+
+    .search input {
+      width: 100%;
+      height: 34px;
+      border: 1px solid #cfd8e3;
+      border-radius: 8px;
+      padding: 0 28px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .search input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    .search .icon {
+      position: absolute;
+      left: 9px;
+      top: 8px;
+      color: #64748b;
+      font-size: 14px;
+    }
+
+    .mode-row {
+      height: 34px;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfe;
+      gap: 6px;
+    }
+
+    .mode-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #475569;
+      letter-spacing: 0.2px;
+    }
+
+    .mode-toggle {
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      color: #64748b;
+      padding: 0;
+      cursor: pointer;
+      transition: all .15s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .mode-toggle:hover {
+      color: #334155;
+      background: #eef2f7;
+    }
+
+    .mode-toggle svg {
+      width: 14px;
+      height: 14px;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .list {
+      padding: 8px;
+      overflow: auto;
+      flex: 1;
+      background: #fff;
+    }
+
+    .item {
+      height: 30px;
+      border-radius: 8px;
+      padding: 0 8px;
+      display: flex;
+      align-items: center;
+      font-size: 13px;
+      color: #334155;
+      margin-bottom: 4px;
+      gap: 6px;
+    }
+
+    .item:hover {
+      background: #f1f5f9;
+    }
+
+    .item.current {
+      background: var(--primary-soft);
+      color: #0f3ea9;
+    }
+
+    .item.tree {
+      padding-left: 24px;
+      color: #475569;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #3b82f6;
+      margin-left: auto;
+    }
+
+    .hint {
+      border-top: 1px solid var(--line);
+      padding: 10px 12px;
+      font-size: 12px;
+      color: var(--muted);
+      background: #fbfdff;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <div class="header">
+      <div class="title"><span class="logo"></span>MD Viewer</div>
+      <div class="search">
+        <span class="icon">🔍</span>
+        <input id="searchInput" value="/Users/huanghao/workspace/md-viewer/" />
+      </div>
+    </div>
+
+    <div class="mode-row">
+      <button class="mode-toggle" id="modeToggle" title="切换到简单模式" aria-label="切换侧栏模式">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M7 7h12"></path>
+          <path d="M16 3l4 4-4 4"></path>
+          <path d="M17 17H5"></path>
+          <path d="M8 13l-4 4 4 4"></path>
+        </svg>
+      </button>
+      <div class="mode-label" id="modeLabel">工作区</div>
+    </div>
+
+    <div class="list" id="list"></div>
+
+    <div class="hint">
+      原型说明：模式切换在侧栏内联完成，无需打开设置页。<br>
+      当前键位建议：`Cmd/Ctrl + K` 聚焦输入，点击标题前图标切换模式。
+    </div>
+  </div>
+
+  <script>
+    const data = {
+      workspace: [
+        { text: '▼ 📁 md-viewer', current: true },
+        { text: '📄 AGENTS.md', tree: true },
+        { text: '📄 TODO.md', tree: true, dot: true },
+        { text: '📁 docs/', tree: true },
+        { text: '📄 quick-add-unified-input.md', tree: true },
+        { text: '▶ 📁 mt-cli', current: false }
+      ],
+      simple: [
+        { text: '📄 TODO.md', current: true, dot: true },
+        { text: '📄 AGENTS.md' },
+        { text: '📄 package.json' },
+        { text: '📄 src/client/main.ts' },
+        { text: '📄 docs/design/sidebar-mode-inline-switch.md' }
+      ]
+    };
+
+    let mode = 'workspace';
+
+    function render() {
+      const list = document.getElementById('list');
+      const modeLabel = document.getElementById('modeLabel');
+      const modeToggle = document.getElementById('modeToggle');
+
+      if (mode === 'workspace') {
+        modeLabel.textContent = '工作区';
+        modeToggle.title = '切换到简单模式';
+      } else {
+        modeLabel.textContent = '文件';
+        modeToggle.title = '切换到工作区模式';
+      }
+
+      list.innerHTML = data[mode].map((it) => `
+        <div class="item ${it.current ? 'current' : ''} ${it.tree ? 'tree' : ''}">
+          <span>${it.text}</span>
+          ${it.dot ? '<span class="dot"></span>' : ''}
+        </div>
+      `).join('');
+    }
+
+    document.getElementById('modeToggle').addEventListener('click', () => {
+      mode = mode === 'workspace' ? 'simple' : 'workspace';
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>

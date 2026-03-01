@@ -2,8 +2,8 @@
 import type { FileData } from './types';
 
 // 导入状态管理
-import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFileFromState, switchToFile } from './state';
-import { addWorkspace } from './workspace';
+import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFileFromState, switchToFile, setSearchQuery } from './state';
+import { addWorkspace, hydrateExpandedWorkspaces } from './workspace';
 
 // 导入 API
 import { loadFile, searchFiles, getNearbyFiles, openFile, detectPathType } from './api/files';
@@ -18,13 +18,85 @@ import { generateDistinctNames } from './utils/file-names';
 import { renderSidebar } from './ui/sidebar';
 import { showToast, showSuccess, showError, showWarning, showInfo } from './ui/toast';
 import { showSettingsDialog } from './ui/settings';
-import { attachPathAutocomplete } from './ui/path-autocomplete';
+
+const SIDEBAR_WIDTH_STORAGE_KEY = 'md-viewer:sidebar-width';
+const SIDEBAR_DEFAULT_WIDTH = 260;
+const SIDEBAR_MIN_WIDTH = 220;
+const SIDEBAR_MAX_WIDTH = 680;
 
 // ==================== 消息处理 ====================
 async function onFileLoaded(data: FileData, focus: boolean = false) {
   addOrUpdateFile(data, focus);
   renderSidebar();
   renderContent();
+}
+
+function getMaxSidebarWidth(): number {
+  // 给主内容至少保留可读宽度
+  return Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, window.innerWidth - 360));
+}
+
+function clampSidebarWidth(width: number): number {
+  return Math.min(getMaxSidebarWidth(), Math.max(SIDEBAR_MIN_WIDTH, Math.round(width)));
+}
+
+function applySidebarWidth(width: number): void {
+  const clamped = clampSidebarWidth(width);
+  document.documentElement.style.setProperty('--sidebar-width', `${clamped}px`);
+}
+
+function initSidebarWidth(): void {
+  const saved = Number(localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY));
+  const width = Number.isFinite(saved) && saved > 0 ? saved : SIDEBAR_DEFAULT_WIDTH;
+  applySidebarWidth(width);
+}
+
+function setupSidebarResize(): void {
+  const resizer = document.getElementById('sidebarResizer');
+  if (!resizer) return;
+
+  let dragging = false;
+
+  const onMove = (event: MouseEvent) => {
+    if (!dragging) return;
+    const width = clampSidebarWidth(event.clientX);
+    applySidebarWidth(width);
+  };
+
+  const onUp = (event: MouseEvent) => {
+    if (!dragging) return;
+    dragging = false;
+    const width = clampSidebarWidth(event.clientX);
+    applySidebarWidth(width);
+    localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(width));
+    document.body.classList.remove('sidebar-resizing');
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onUp);
+  };
+
+  resizer.addEventListener('mousedown', (event) => {
+    if (window.innerWidth <= 900) return;
+    dragging = true;
+    document.body.classList.add('sidebar-resizing');
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    event.preventDefault();
+  });
+
+  resizer.addEventListener('dblclick', () => {
+    applySidebarWidth(SIDEBAR_DEFAULT_WIDTH);
+    localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(SIDEBAR_DEFAULT_WIDTH));
+  });
+
+  window.addEventListener('resize', () => {
+    const current = Number.parseInt(
+      getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width'),
+      10
+    );
+    if (Number.isFinite(current)) {
+      applySidebarWidth(current);
+    }
+  });
 }
 
 // 刷新当前文件（页面加载时自动调用）
@@ -212,21 +284,32 @@ function getWorkspaceNameFromPath(path: string): string {
   return parts[parts.length - 1] || 'workspace';
 }
 
+function looksLikePathInput(value: string): boolean {
+  const v = value.trim();
+  if (!v) return false;
+  if (/^https?:\/\//i.test(v)) return true;
+  if (v.startsWith('/') || v.startsWith('~/') || v.startsWith('./') || v.startsWith('../')) return true;
+  if (v.includes('/') || v.includes('\\')) return true;
+  if (/\.[a-zA-Z0-9]{1,10}$/.test(v)) return true;
+  return false;
+}
+
 function clearAddConfirm(): void {
   pendingAddAction = null;
-  const bar = document.getElementById('addPathConfirm') as HTMLElement | null;
-  const text = document.getElementById('addPathConfirmText') as HTMLElement | null;
-  const actions = document.getElementById('addPathConfirmActions') as HTMLElement | null;
+  const bar = document.getElementById('quickActionConfirm') as HTMLElement | null;
+  const text = document.getElementById('quickActionConfirmText') as HTMLElement | null;
+  const actions = document.getElementById('quickActionConfirmActions') as HTMLElement | null;
   if (bar) {
     bar.style.display = 'none';
     bar.className = 'add-file-confirm';
   }
   if (text) text.textContent = '';
   if (actions) actions.innerHTML = '';
+  document.body.classList.remove('quick-action-confirm-visible');
 }
 
 function isAddConfirmVisible(): boolean {
-  const bar = document.getElementById('addPathConfirm') as HTMLElement | null;
+  const bar = document.getElementById('quickActionConfirm') as HTMLElement | null;
   return !!bar && bar.style.display !== 'none';
 }
 
@@ -235,15 +318,19 @@ function showAddConfirm(
   mode: 'warning' | 'directory' | 'error',
   opts: { primaryLabel?: string; onPrimary?: () => Promise<void> | void; allowCancel?: boolean } = {}
 ): void {
-  const bar = document.getElementById('addPathConfirm') as HTMLElement | null;
-  const text = document.getElementById('addPathConfirmText') as HTMLElement | null;
-  const actions = document.getElementById('addPathConfirmActions') as HTMLElement | null;
+  const searchInput = document.getElementById('searchInput') as HTMLInputElement | null;
+  searchInput?.dispatchEvent(new Event('path-autocomplete-hide'));
+
+  const bar = document.getElementById('quickActionConfirm') as HTMLElement | null;
+  const text = document.getElementById('quickActionConfirmText') as HTMLElement | null;
+  const actions = document.getElementById('quickActionConfirmActions') as HTMLElement | null;
   if (!bar || !text || !actions) return;
 
   text.textContent = message;
   actions.innerHTML = '';
   bar.className = `add-file-confirm state-${mode}`;
   bar.style.display = 'flex';
+  document.body.classList.add('quick-action-confirm-visible');
 
   if (opts.primaryLabel && opts.onPrimary) {
     const primary = document.createElement('button');
@@ -276,8 +363,8 @@ async function executePendingAddAction(): Promise<void> {
   const workspace = addWorkspace(getWorkspaceNameFromPath(pendingAddAction.path), pendingAddAction.path);
   renderSidebar();
   showSuccess(`已添加工作区: ${workspace.name}`, 2000);
-  const input = document.getElementById('fileInput') as HTMLInputElement | null;
-  if (input) input.value = '';
+  setSearchQuery('');
+  renderSidebar();
 }
 
 // 添加文件
@@ -290,9 +377,9 @@ async function addFileByPath(path: string, focus: boolean = true) {
     await openFile(path, focus);
 
 
-    // 清空输入框
-    const input = document.getElementById('fileInput') as HTMLInputElement;
-    if (input) input.value = '';
+    // 清空统一输入框
+    setSearchQuery('');
+    renderSidebar();
   }
 }
 
@@ -364,7 +451,7 @@ function removeFileHandler(path: string) {
 
 // 搜索文件
 async function searchFilesHandler() {
-  const input = document.getElementById('fileInput') as HTMLInputElement;
+  const input = document.getElementById('searchInput') as HTMLInputElement;
   if (!input) return;
 
   const query = input.value.trim();
@@ -403,6 +490,17 @@ function setupDragAndDrop() {
 // ==================== 键盘快捷键 ====================
 function setupKeyboardShortcuts() {
   document.addEventListener('keydown', (e) => {
+    // Cmd-K (Mac) 或 Ctrl-K (Windows/Linux) 聚焦搜索框
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      const input = document.getElementById('searchInput') as HTMLInputElement | null;
+      if (input) {
+        input.focus();
+        input.select();
+      }
+      return;
+    }
+
     // Cmd-W (Mac) 或 Ctrl-W (Windows/Linux) 关闭当前标签页
     if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
       e.preventDefault(); // 阻止关闭浏览器标签
@@ -1124,6 +1222,8 @@ function connectSSE() {
 declare global {
   interface Window {
     addFile: () => void;
+    handleUnifiedInputSubmit?: (value?: string) => void;
+    dismissQuickActionConfirm?: () => void;
     switchFile: (path: string) => void;
     removeFile: (path: string) => void;
     showNearbyMenu: (e: Event) => void;
@@ -1142,16 +1242,29 @@ declare global {
     showSettingsDialog: () => void;
     toggleFontScaleMenu: () => void;
     setFontScale: (scale: number) => void;
-    focusAddInput?: () => void;
   }
 }
 
 window.addFile = () => {
-  const input = document.getElementById('fileInput') as HTMLInputElement;
+  const input = document.getElementById('searchInput') as HTMLInputElement;
   if (input) {
     handleSmartAddInput(input.value).catch((err: any) => {
       showError(`添加失败: ${err?.message || '未知错误'}`);
     });
+  }
+};
+window.handleUnifiedInputSubmit = (value?: string) => {
+  const input = document.getElementById('searchInput') as HTMLInputElement | null;
+  const raw = (typeof value === 'string' ? value : input?.value || '').trim();
+  if (!raw) return;
+  if (!looksLikePathInput(raw)) return;
+  handleSmartAddInput(raw).catch((err: any) => {
+    showError(`添加失败: ${err?.message || '未知错误'}`);
+  });
+};
+window.dismissQuickActionConfirm = () => {
+  if (isAddConfirmVisible()) {
+    clearAddConfirm();
   }
 };
 window.switchFile = switchFile;
@@ -1175,45 +1288,28 @@ window.setFontScale = setFontScale;
 
 // ==================== 初始化 ====================
 (async () => {
+  initSidebarWidth();
+
   // 初始化字体缩放
   initFontScale();
 
   await restoreState(loadFile);
+  await hydrateExpandedWorkspaces();
 
   // 根据配置渲染侧边栏
   renderSidebar();
   renderContent();
 
   setupDragAndDrop();
-  const fileInput = document.getElementById('fileInput') as HTMLInputElement | null;
-  if (fileInput) {
-    attachPathAutocomplete(fileInput, { kind: 'file', markdownOnly: false });
-    fileInput.addEventListener('input', () => {
-      if (pendingAddAction || isAddConfirmVisible()) {
-        clearAddConfirm();
-      }
-    });
-    fileInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && isAddConfirmVisible()) {
-        clearAddConfirm();
-      }
-    });
-  }
-
+  setupSidebarResize();
   document.addEventListener('click', (e) => {
     if (!isAddConfirmVisible()) return;
     const target = e.target as HTMLElement | null;
     if (!target) return;
-    if (target.closest('.add-file-section')) return;
+    if (target.closest('.sidebar-header')) return;
+    if (target.closest('#quickActionConfirm')) return;
     clearAddConfirm();
   });
-
-  window.focusAddInput = () => {
-    const input = document.getElementById('fileInput') as HTMLInputElement | null;
-    if (!input) return;
-    input.focus();
-    input.select();
-  }
   handleURLParams();
   setupKeyboardShortcuts();
 

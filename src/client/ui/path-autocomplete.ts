@@ -4,6 +4,7 @@ import type { PathSuggestion } from '../types';
 interface PathAutocompleteOptions {
   kind: 'file' | 'directory';
   markdownOnly?: boolean;
+  shouldActivate?: (input: string) => boolean;
 }
 
 export function attachPathAutocomplete(
@@ -23,6 +24,12 @@ export function attachPathAutocomplete(
   const isVisible = () => panel.style.display !== 'none';
 
   const hide = () => {
+    // Invalidate pending async refresh results so they can't re-open the panel after hide.
+    requestId += 1;
+    if (debounceTimer !== null) {
+      window.clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
     panel.style.display = 'none';
     suggestions = [];
     activeIndex = -1;
@@ -64,16 +71,32 @@ export function attachPathAutocomplete(
     const selected = suggestions[index];
     if (!selected) return;
 
-    input.value = selected.path;
+    const isDirectory = selected.type === 'directory';
+    const nextValue = isDirectory && !selected.path.endsWith('/')
+      ? `${selected.path}/`
+      : selected.path;
+
+    input.value = nextValue;
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.focus();
     input.setSelectionRange(input.value.length, input.value.length);
     hide();
+    if (isDirectory) {
+      scheduleRefresh();
+    }
   };
 
   const refresh = async () => {
     const query = input.value.trim();
     if (!query) {
+      hide();
+      return;
+    }
+    if (document.body.classList.contains('quick-action-confirm-visible')) {
+      hide();
+      return;
+    }
+    if (options.shouldActivate && !options.shouldActivate(query)) {
       hide();
       return;
     }
@@ -112,6 +135,7 @@ export function attachPathAutocomplete(
 
   input.addEventListener('focus', scheduleRefresh);
   input.addEventListener('input', scheduleRefresh);
+  input.addEventListener('path-autocomplete-hide', hide as EventListener);
 
   input.addEventListener('keydown', (e) => {
     const key = (e as KeyboardEvent).key;
@@ -135,11 +159,24 @@ export function attachPathAutocomplete(
       return;
     }
 
-    if (key === 'Enter' || key === 'Tab') {
+    if (key === 'Tab') {
       if (activeIndex >= 0) {
         e.preventDefault();
         choose(activeIndex);
       }
+      return;
+    }
+
+    if (key === 'Enter') {
+      if ((e as KeyboardEvent).metaKey || (e as KeyboardEvent).ctrlKey) {
+        return;
+      }
+      e.preventDefault();
+      if (activeIndex >= 0) {
+        choose(activeIndex);
+        return;
+      }
+      hide();
       return;
     }
 

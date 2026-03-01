@@ -1,6 +1,7 @@
 export const styles = `
     :root {
       --font-scale: 1.0;
+      --sidebar-width: 260px;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -17,12 +18,31 @@ export const styles = `
 
     /* 左侧边栏 */
     .sidebar {
-      width: 260px;
+      width: var(--sidebar-width);
       background: #fff;
       border-right: 1px solid #e1e4e8;
       display: flex;
       flex-direction: column;
       min-height: 0;
+    }
+    .sidebar-resizer {
+      width: 8px;
+      cursor: col-resize;
+      background: transparent;
+      border-left: 1px solid transparent;
+      border-right: 1px solid transparent;
+      transition: background-color 0.15s ease;
+      flex-shrink: 0;
+    }
+    .sidebar-resizer:hover {
+      background: rgba(9, 105, 218, 0.08);
+    }
+    body.sidebar-resizing {
+      cursor: col-resize;
+      user-select: none;
+    }
+    body.sidebar-resizing .sidebar-resizer {
+      background: rgba(9, 105, 218, 0.12);
     }
     .sidebar-header {
       padding: 16px;
@@ -46,7 +66,7 @@ export const styles = `
       position: relative;
       display: flex;
       align-items: center;
-      margin-bottom: 12px;
+      margin-bottom: 8px;
     }
     .search-icon {
       position: absolute;
@@ -57,7 +77,7 @@ export const styles = `
     }
     .search-input {
       flex: 1;
-      padding: 8px 32px 8px 32px;
+      padding: 8px 30px 8px 30px;
       border: 1px solid #d0d7de;
       border-radius: 6px;
       font-size: 13px;
@@ -85,6 +105,57 @@ export const styles = `
     .search-clear:hover {
       background: #f6f8fa;
       color: #24292e;
+    }
+
+    #modeSwitchRow {
+      margin-bottom: 8px;
+    }
+    .mode-switch-row {
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #57606a;
+    }
+    .mode-switch-icon {
+      width: 20px;
+      height: 20px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: #6b7280;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+    .mode-switch-icon:hover {
+      background: #f1f5f9;
+      color: #374151;
+    }
+    .mode-switch-icon svg {
+      width: 14px;
+      height: 14px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .mode-switch-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #57606a;
+      letter-spacing: 0.2px;
+      user-select: none;
+    }
+
+    .quick-action-confirm-host {
+      margin-top: 6px;
+      position: relative;
+      z-index: 2601;
     }
 
     /* 当前文件路径 */
@@ -209,14 +280,50 @@ export const styles = `
       border-bottom: 1px solid #e1e4e8;
       background: #f6f8fa;
     }
-    .add-file-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: #24292e;
-      margin-bottom: 8px;
+    .sidebar.workspace-mode .sidebar-header {
+      border-bottom: none;
+      padding: 0;
+    }
+    .sidebar.workspace-mode .sidebar-header h1 {
+      height: 48px;
+      margin: 0;
+      padding: 0 12px;
       display: flex;
       align-items: center;
-      gap: 6px;
+    }
+    .sidebar.workspace-mode #searchBox {
+      height: 36px;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+    }
+    .sidebar.workspace-mode #modeSwitchRow {
+      height: 24px;
+      padding: 0 12px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+    }
+    .sidebar.workspace-mode .search-wrapper {
+      margin: 0;
+      width: 100%;
+    }
+    .sidebar.workspace-mode .add-file-section {
+      border-bottom: none;
+      padding: 8px 12px 6px 12px;
+      background: transparent;
+    }
+    .sidebar.workspace-mode .add-file-title {
+      margin-bottom: 4px;
+      font-size: 12px;
+    }
+    .sidebar.workspace-mode .add-file-hint {
+      margin-top: 4px;
+      font-size: 11px;
+      line-height: 1.3;
+    }
+    .sidebar.workspace-mode .workspace-section {
+      padding-top: 2px;
     }
     .add-file-input {
       width: 100%;
@@ -248,20 +355,21 @@ export const styles = `
     }
     .add-file-button {
       height: 34px;
-      min-width: 36px;
+      min-width: 54px;
       border-radius: 6px;
-      border: 1px solid #0969da;
-      background: #0969da;
-      color: #fff;
+      border: 1px solid #d0d7de;
+      background: #fff;
+      color: #57606a;
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 500;
       cursor: pointer;
       padding: 0 10px;
       flex-shrink: 0;
     }
     .add-file-button:hover {
-      background: #0550ae;
-      border-color: #0550ae;
+      background: #f6f8fa;
+      border-color: #b6bec7;
+      color: #24292e;
     }
     .add-file-confirm {
       margin-top: 10px;
@@ -431,10 +539,15 @@ export const styles = `
       white-space: nowrap;
       min-width: 0;
     }
+    .file-item .file-item-status {
+      margin-left: auto;
+      order: 2;
+    }
     .file-item .close {
       opacity: 0;
       padding: 2px 6px;
       border-radius: 4px;
+      order: 3;
     }
     .file-item:hover .close {
       opacity: 1;
@@ -456,6 +569,16 @@ export const styles = `
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      min-width: 0;
+    }
+
+    @media (max-width: 900px) {
+      :root {
+        --sidebar-width: 260px !important;
+      }
+      .sidebar-resizer {
+        display: none;
+      }
     }
 
     /* 工具栏 */
@@ -1253,7 +1376,6 @@ export const styles = `
     .workspace-item {
       margin-bottom: 4px;
     }
-
     .workspace-header {
       display: flex;
       align-items: center;
@@ -1315,9 +1437,33 @@ export const styles = `
 
     .workspace-remove-actions {
       display: flex;
-      gap: 4px;
-      margin-left: 8px;
+      gap: 2px;
+      margin-left: 6px;
       flex-shrink: 0;
+    }
+
+    .workspace-order-btn {
+      width: 22px;
+      height: 22px;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: #57606a;
+      font-size: 12px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0;
+      opacity: 0;
+      transition: opacity 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .workspace-header:hover .workspace-order-btn {
+      opacity: 1;
+    }
+
+    .workspace-order-btn:hover {
+      background: #f6f8fa;
+      color: #24292e;
     }
 
     .workspace-remove-confirm {
@@ -1348,7 +1494,7 @@ export const styles = `
 
     /* 文件树 */
     .file-tree {
-      padding-left: 8px;
+      padding-left: 0;
       margin-top: 4px;
     }
 
@@ -1375,19 +1521,11 @@ export const styles = `
       font-size: 13px;
       color: #24292e;
       user-select: none;
-      gap: 6px;
+      gap: 4px;
       position: relative;
     }
 
     .tree-item:hover {
-      background: #f6f8fa;
-    }
-
-    /* 方案 1：已打开文件浅蓝底 */
-    .tree-item.opened {
-      color: #0969da;
-    }
-    .tree-item.opened:hover {
       background: #f6f8fa;
     }
 
@@ -1397,18 +1535,23 @@ export const styles = `
       font-weight: 400;
     }
 
+    .tree-indent {
+      flex: 0 0 auto;
+      height: 1px;
+    }
+
     .tree-item .file-item-status {
-      width: 14px;
-      height: 14px;
+      width: 10px;
+      height: 10px;
       flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-left: 2px;
+      margin-left: auto;
     }
 
     .tree-toggle {
-      width: 16px;
+      width: 10px;
       font-size: 10px;
       color: #57606a;
       flex-shrink: 0;
@@ -1434,7 +1577,7 @@ export const styles = `
       background: #f6f8fa;
       padding: 2px 6px;
       border-radius: 10px;
-      margin-left: 4px;
+      margin-left: 2px;
     }
 
     .tree-missing-section {

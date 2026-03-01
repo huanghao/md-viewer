@@ -1,8 +1,23 @@
-import { state, setSearchQuery, getFilteredFiles } from '../state';
+import { state, setSearchQuery, getFilteredFiles, hasListDiff } from '../state';
+import { saveConfig } from '../config';
 import { escapeAttr, escapeHtml } from '../utils/escape';
 import { generateDistinctNames } from '../utils/file-names';
 import { getFileListStatus } from '../utils/file-status';
 import { renderWorkspaceSidebar, bindWorkspaceEvents } from './sidebar-workspace';
+
+let lastEscAt = 0;
+let lastEscValue = '';
+import { attachPathAutocomplete } from './path-autocomplete';
+
+export function toggleSidebarMode(): void {
+  state.config.sidebarMode = state.config.sidebarMode === 'workspace' ? 'simple' : 'workspace';
+  saveConfig(state.config);
+  renderSidebar();
+}
+
+if (typeof window !== 'undefined') {
+  (window as any).toggleSidebarMode = toggleSidebarMode;
+}
 
 function rerenderByMode(): void {
   if (state.config.sidebarMode === 'workspace') {
@@ -12,58 +27,113 @@ function rerenderByMode(): void {
   renderFiles();
 }
 
+function looksLikePathInput(value: string): boolean {
+  const v = value.trim();
+  if (!v) return false;
+  if (/^https?:\/\//i.test(v)) return true;
+  if (v.startsWith('/') || v.startsWith('~/') || v.startsWith('./') || v.startsWith('../')) return true;
+  if (v.includes('/') || v.includes('\\')) return true;
+  if (/\.[a-zA-Z0-9]{1,10}$/.test(v)) return true;
+  return false;
+}
+
 // 渲染搜索框
 export function renderSearchBox(): void {
   const container = document.getElementById('searchBox');
   if (!container) return;
 
-  container.innerHTML = `
-    <div class="search-wrapper">
-      <span class="search-icon">🔍</span>
-      <input
-        type="text"
-        class="search-input"
-        placeholder="搜索文件..."
-        value="${escapeAttr(state.searchQuery)}"
-        id="searchInput"
-      />
-      ${state.searchQuery ? '<button class="search-clear" id="searchClear">×</button>' : ''}
-    </div>
-  `;
+  let input = container.querySelector('#searchInput') as HTMLInputElement | null;
+  let clearBtn = container.querySelector('#searchClear') as HTMLButtonElement | null;
 
-  // 绑定事件
-  const input = document.getElementById('searchInput') as HTMLInputElement;
-  if (input) {
+  if (!input || !clearBtn) {
+    container.innerHTML = `
+      <div class="search-wrapper">
+        <span class="search-icon">🔍</span>
+        <input
+          type="text"
+          class="search-input"
+          placeholder="搜索或输入路径（Enter补全，Cmd/Ctrl+Enter添加）"
+          id="searchInput"
+        />
+        <button class="search-clear" id="searchClear">×</button>
+      </div>
+    `;
+
+    input = container.querySelector('#searchInput') as HTMLInputElement | null;
+    clearBtn = container.querySelector('#searchClear') as HTMLButtonElement | null;
+    if (!input || !clearBtn) return;
+
+    // 路径补全仅在“像路径”的输入下触发，避免干扰普通搜索
+    attachPathAutocomplete(input, {
+      kind: 'file',
+      markdownOnly: false,
+      shouldActivate: looksLikePathInput
+    });
+
     input.addEventListener('input', (e) => {
+      (window as any).dismissQuickActionConfirm?.();
       const query = (e.target as HTMLInputElement).value;
-      const cursorPosition = input.selectionStart || 0;
+      lastEscAt = 0;
+      lastEscValue = '';
       setSearchQuery(query);
-      renderSearchBox();
+      if (clearBtn) {
+        clearBtn.style.display = query ? 'block' : 'none';
+      }
       rerenderByMode();
+    });
 
-      // 重新渲染后恢复焦点和光标位置
-      const newInput = document.getElementById('searchInput') as HTMLInputElement;
-      if (newInput) {
-        newInput.focus();
-        newInput.setSelectionRange(cursorPosition, cursorPosition);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        input!.dispatchEvent(new Event('path-autocomplete-hide'));
+        (window as any).handleUnifiedInputSubmit?.(input!.value);
+        return;
+      }
+      if (e.defaultPrevented) {
+        // 自动补全面板已消费 Enter/Tab/Escape，不再触发统一提交逻辑
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        input!.dispatchEvent(new Event('path-autocomplete-hide'));
+        (window as any).handleUnifiedInputSubmit?.(input!.value);
+      }
+      if (e.key === 'Escape') {
+        (window as any).dismissQuickActionConfirm?.();
+        const now = Date.now();
+        const currentValue = input!.value;
+        const isDoubleEsc = now - lastEscAt < 900 && lastEscValue === currentValue;
+        if (isDoubleEsc && currentValue) {
+          setSearchQuery('');
+          input!.value = '';
+          if (clearBtn) clearBtn.style.display = 'none';
+          rerenderByMode();
+          lastEscAt = 0;
+          lastEscValue = '';
+          e.preventDefault();
+          return;
+        }
+        lastEscAt = now;
+        lastEscValue = currentValue;
       }
     });
-  }
 
-  const clearBtn = document.getElementById('searchClear');
-  if (clearBtn) {
     clearBtn.addEventListener('click', () => {
       setSearchQuery('');
-      renderSearchBox();
-      rerenderByMode();
-
-      // 清除后恢复焦点
-      const newInput = document.getElementById('searchInput') as HTMLInputElement;
-      if (newInput) {
-        newInput.focus();
+      if (input) {
+        input.value = '';
       }
+      clearBtn!.style.display = 'none';
+      rerenderByMode();
+      input?.focus();
     });
   }
+
+  // 同步显示（避免输入时强行覆盖用户正在编辑的值）
+  if (document.activeElement !== input && input.value !== state.searchQuery) {
+    input.value = state.searchQuery;
+  }
+  clearBtn.style.display = state.searchQuery ? 'block' : 'none';
 }
 
 // 渲染当前文件路径（已移除，功能由面包屑导航提供）
@@ -74,6 +144,34 @@ export function renderCurrentPath(): void {
   // 隐藏当前路径区域
   container.innerHTML = '';
   container.style.display = 'none';
+}
+
+function renderModeSwitchRow(): void {
+  const container = document.getElementById('modeSwitchRow');
+  if (!container) return;
+
+  const isWorkspace = state.config.sidebarMode === 'workspace';
+  const label = isWorkspace ? '工作区' : '文件';
+  const title = isWorkspace ? '切换到简单模式' : '切换到工作区模式';
+
+  container.innerHTML = `
+    <div class="mode-switch-row">
+      <button
+        class="mode-switch-icon"
+        title="${title}"
+        aria-label="${title}"
+        onclick="window.toggleSidebarMode()"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M16 3l4 4l-4 4"></path>
+          <path d="M10 7l10 0"></path>
+          <path d="M8 13l-4 4l4 4"></path>
+          <path d="M4 17l9 0"></path>
+        </svg>
+      </button>
+      <span class="mode-switch-label">${label}</span>
+    </div>
+  `;
 }
 
 // 渲染文件列表
@@ -120,7 +218,7 @@ export function renderFiles(): void {
       }
 
       // 获取文件状态（优先级：D > M > 🔵）
-      const status = getFileListStatus(file);
+      const status = getFileListStatus(file, hasListDiff(file.path));
       let statusBadge = '&nbsp;'; // 默认使用不间断空格占位
 
       if (status.badge === 'dot') {
@@ -134,9 +232,9 @@ export function renderFiles(): void {
       return `
       <div class="${classes}"
            onclick="window.switchFile('${escapeAttr(file.path)}')">
-        <span class="file-item-status">${statusBadge}</span>
         <span class="icon">📄</span>
         <span class="name">${displayName}</span>
+        <span class="file-item-status">${statusBadge}</span>
         <span class="close" onclick="event.stopPropagation();window.removeFile('${escapeAttr(file.path)}')">×</span>
       </div>
     `}).join('');
@@ -145,14 +243,18 @@ export function renderFiles(): void {
 // 渲染整个侧边栏（根据模式选择）
 export function renderSidebar(): void {
   const mode = state.config.sidebarMode;
+  const container = document.querySelector('.sidebar') as HTMLElement | null;
+  if (container) {
+    container.classList.toggle('workspace-mode', mode === 'workspace');
+  }
 
   // 渲染搜索框
   renderSearchBox();
+  renderModeSwitchRow();
 
   if (mode === 'workspace') {
     // 工作区模式
     renderCurrentPath();  // 工作区模式也显示当前路径
-    const container = document.querySelector('.sidebar') as HTMLElement;
     if (!container) return;
 
     // 查找或创建文件列表容器

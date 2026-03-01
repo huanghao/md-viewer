@@ -17,7 +17,107 @@ export const state: AppState = {
 
 // 状态持久化
 const STORAGE_KEY = 'md-viewer:openFiles';
+const LIST_DIFF_KEY = 'md-viewer:listDiffPaths';
+const WORKSPACE_KNOWN_KEY = 'md-viewer:workspaceKnownFiles';
 const MAX_FILES = 100; // 最大保存文件数量（LRU 限制）
+const listDiffPaths = new Set<string>();
+const workspaceKnownFiles = new Map<string, Set<string>>();
+
+function saveAuxiliaryState(): void {
+  try {
+    localStorage.setItem(LIST_DIFF_KEY, JSON.stringify(Array.from(listDiffPaths)));
+    localStorage.setItem(
+      WORKSPACE_KNOWN_KEY,
+      JSON.stringify(
+        Array.from(workspaceKnownFiles.entries()).map(([workspaceId, paths]) => [workspaceId, Array.from(paths)])
+      )
+    );
+  } catch (e) {
+    console.error('保存列表差异状态失败:', e);
+  }
+}
+
+function restoreAuxiliaryState(): void {
+  listDiffPaths.clear();
+  workspaceKnownFiles.clear();
+
+  try {
+    const savedDiff = localStorage.getItem(LIST_DIFF_KEY);
+    if (savedDiff) {
+      const paths = JSON.parse(savedDiff);
+      if (Array.isArray(paths)) {
+        for (const path of paths) {
+          if (typeof path === 'string' && path) {
+            listDiffPaths.add(path);
+          }
+        }
+      }
+    }
+
+    const savedKnown = localStorage.getItem(WORKSPACE_KNOWN_KEY);
+    if (savedKnown) {
+      const records = JSON.parse(savedKnown);
+      if (Array.isArray(records)) {
+        for (const item of records) {
+          if (!Array.isArray(item) || item.length !== 2) continue;
+          const workspaceId = item[0];
+          const paths = item[1];
+          if (typeof workspaceId !== 'string' || !Array.isArray(paths)) continue;
+          workspaceKnownFiles.set(
+            workspaceId,
+            new Set(paths.filter((path): path is string => typeof path === 'string' && path.length > 0))
+          );
+        }
+      }
+    }
+  } catch (e) {
+    console.error('恢复列表差异状态失败:', e);
+  }
+}
+
+export function hasListDiff(path: string): boolean {
+  return listDiffPaths.has(path);
+}
+
+export function updateWorkspaceListDiff(workspaceId: string, scannedPaths: string[]): void {
+  const scannedSet = new Set(scannedPaths);
+  const knownSet = workspaceKnownFiles.get(workspaceId);
+
+  // 首次扫描仅建立基线，不触发全量蓝点
+  if (!knownSet) {
+    workspaceKnownFiles.set(workspaceId, scannedSet);
+    saveAuxiliaryState();
+    return;
+  }
+
+  // 新扫描到的路径标记蓝点
+  for (const path of scannedSet) {
+    if (!knownSet.has(path)) {
+      listDiffPaths.add(path);
+    }
+  }
+
+  // 从工作区中消失的路径，移除蓝点
+  for (const oldPath of knownSet) {
+    if (!scannedSet.has(oldPath)) {
+      listDiffPaths.delete(oldPath);
+    }
+  }
+
+  workspaceKnownFiles.set(workspaceId, scannedSet);
+  saveAuxiliaryState();
+}
+
+export function removeWorkspaceTracking(workspaceId: string): void {
+  const knownSet = workspaceKnownFiles.get(workspaceId);
+  if (knownSet) {
+    for (const path of knownSet) {
+      listDiffPaths.delete(path);
+    }
+  }
+  workspaceKnownFiles.delete(workspaceId);
+  saveAuxiliaryState();
+}
 
 export function saveState(): void {
   try {
@@ -26,7 +126,6 @@ export function saveState(): void {
         path: file.path,
         name: file.name,
         isRemote: file.isRemote || false,
-        isNew: file.isNew || false,
         isMissing: file.isMissing || false,
         displayedModified: file.displayedModified,
         syncedDocId: file.syncedDocId,
@@ -50,7 +149,6 @@ export function saveState(): void {
             path: file.path,
             name: file.name,
             isRemote: file.isRemote || false,
-            isNew: file.isNew || false,
             isMissing: file.isMissing || false,
             displayedModified: file.displayedModified,
             syncedDocId: file.syncedDocId,
@@ -96,6 +194,8 @@ function cleanupOldFiles(): void {
 
 export async function restoreState(loadFile: (path: string, silent: boolean) => Promise<FileData | null>): Promise<void> {
   try {
+    restoreAuxiliaryState();
+
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) return;
 
@@ -118,7 +218,6 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
           lastModified: fileData.lastModified,
           displayedModified: savedDisplayedModified,
           isRemote: fileData.isRemote || false,
-          isNew: fileInfo.isNew || false,
           isMissing: false,  // 恢复时文件存在，清除 isMissing
           syncedDocId: fileInfo.syncedDocId,
           syncedUrl: fileInfo.syncedUrl,
@@ -159,7 +258,7 @@ export function addOrUpdateFile(fileData: FileData, switchTo: boolean = false): 
   }
 
   const existing = state.files.get(fileData.path);
-  const isNew = !existing;  // 如果是新添加的文件，标记为 isNew
+  const isNewPath = !existing;  // 新加入到列表，打列表差异蓝点
 
   state.files.set(fileData.path, {
     path: fileData.path,
@@ -168,7 +267,6 @@ export function addOrUpdateFile(fileData: FileData, switchTo: boolean = false): 
     lastModified: fileData.lastModified,
     displayedModified: fileData.lastModified,  // 初始化时两者相同
     isRemote: fileData.isRemote || false,
-    isNew: isNew && !switchTo,  // 新文件且不立即切换时标记为未读
     isMissing: false,
     // 保留已有的同步状态
     syncedDocId: existing?.syncedDocId,
@@ -180,30 +278,28 @@ export function addOrUpdateFile(fileData: FileData, switchTo: boolean = false): 
     state.currentFile = fileData.path;
   }
 
+  if (isNewPath) {
+    listDiffPaths.add(fileData.path);
+    saveAuxiliaryState();
+  }
+
   saveState();
 }
 
 export function removeFile(path: string): void {
   state.files.delete(path);
+  listDiffPaths.delete(path);
   if (state.currentFile === path) {
     // 切换到剩余文件中的第一个
     const remainingFiles = Array.from(state.files.values());
     state.currentFile = remainingFiles.length > 0 ? remainingFiles[0].path : null;
   }
+  saveAuxiliaryState();
   saveState();
 }
 
 export function switchToFile(path: string): void {
   state.currentFile = path;
-
-  // 标记为已读
-  const file = state.files.get(path);
-  if (file) {
-    if (file.isNew) {
-      file.isNew = false;
-    }
-  }
-
   saveState();
 }
 

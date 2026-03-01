@@ -7,7 +7,6 @@ export interface FileInfo {
   displayedModified: number;  // 展示内容对应的修改时间
   isRemote: boolean;
   displayName?: string;
-  isNew?: boolean;            // 标识是否为新文件（未读）
   isMissing?: boolean;        // 标识文件是否不存在
 
   // 同步相关

@@ -1,175 +1,201 @@
-# 统一添加输入设计（智能识别：文件/工作区）
+# 统一输入交互设计（搜索 + 补全 + 添加）
 
 日期：2026-03-01  
-状态：设计提案（待确认）  
-版本：v2（替代 Quick Add 命令前缀方案）
+状态：待实现（本版用于收敛交互，不再零碎修补）  
+版本：v3（替代 v2）
 
 ---
 
-## 1. 目标
+## 1. 背景问题
 
-你确认的新方向是：
+当前主要冲突：
 
-1. 输入 `.md` 文件路径：直接添加
-2. 输入其他后缀文件：先提示，确认后添加
-3. 输入目录：提示“作为工作区添加”，确认后添加
-
-关键目标：
-- 保持“一个输入框”统一入口
-- 降低输入负担（不需要 `f/w` 前缀）
-- 不使用模态框（modal/prompt/confirm）
+1. `Enter` 语义冲突：补全列表第一项高亮，但回车执行了“添加”，不符合预期。
+2. 视觉冲突：补全面板与确认条会同时出现，出现遮挡。
+3. 心智冲突：用户无法判断“这次回车到底是补全还是提交”。
 
 ---
 
-## 2. 识别策略
+## 2. 业界基线（简要）
 
-输入 `path` 后，前端调用轻量检测 API（或本地启发 + 后端校验），得到类型：
+可对齐的通用模式（命令面板/组合框/终端补全）：
 
-- `md_file`
-- `other_file`
-- `directory`
-- `not_found` / `invalid`
+1. 当建议列表可交互时，`Enter` 优先作用于“当前建议项”。
+2. `Tab` 用于“补全但不执行”是高频约定（终端/路径输入）。
+3. “执行动作”通常使用明确二次动作（再次 `Enter` 或 `Cmd/Ctrl+Enter`）。
+4. 同一锚点下拉区同一时刻只展示一个层（建议 or 确认），避免叠层冲突。
 
-### 行为映射
-
-- `md_file`：直接执行“添加文件”
-- `other_file`：展示行内提示条，点击“继续添加”才执行
-- `directory`：展示行内提示条，点击“添加工作区”才执行
-- `not_found/invalid`：展示行内错误，不执行
+参考：
+- WAI-ARIA Combobox Keyboard Interaction  
+  https://www.w3.org/WAI/ARIA/apg/patterns/combobox/
+- VS Code Intellisense / suggestion accept behavior  
+  https://code.visualstudio.com/docs/editor/intellisense
+- GitHub Command Palette（命令选择后执行）  
+  https://docs.github.com/en/get-started/accessibility/github-command-palette
+- Raycast Keyboard Shortcuts（Enter 触发 action）  
+  https://manual.raycast.com/keyboard-shortcuts
 
 ---
 
-## 3. 交互原型（ASCII）
+## 3. 设计目标
 
-### 3.1 默认态
+1. 一个输入框同时承载“搜索 + 路径添加”，不引入模态框。
+2. 任何时刻 `Enter` 只有一个明确语义。
+3. 补全与确认互斥，彻底消除遮挡。
+4. 键盘优先，鼠标可选。
+
+---
+
+## 4. 交互模型（推荐方案 S1）
+
+将输入框分成三种状态：
+
+1. `SearchMode`（普通搜索）
+2. `PathAssistMode`（路径输入 + 补全）
+3. `ConfirmMode`（类型检测后的行内确认）
+
+状态由输入内容和面板可见性驱动，不需要用户手动切模式。
+
+### 4.1 进入条件
+
+- 命中“像路径”的输入（`/`, `~/`, `./`, `../`, 含路径分隔符或后缀）=> `PathAssistMode`
+- 其他输入 => `SearchMode`
+
+### 4.2 单一面板原则（关键）
+
+输入框下方只允许出现一个 `input-panel`：
+
+1. 补全时显示 `suggestion-panel`
+2. 需要确认时替换为 `confirm-panel`
+3. 两者绝不同时存在
+
+---
+
+## 5. 键盘语义（最终版）
+
+### 5.1 `SearchMode`
+
+- `Enter`: 仅做搜索上下文提交（当前实现可等同 no-op / 保持过滤）
+- `Tab`: 焦点导航，不触发添加
+- `Esc`:
+  - 第一次：关闭任何面板
+  - 第二次（900ms 内）：清空输入
+
+### 5.2 `PathAssistMode`（补全可见）
+
+- `ArrowUp/Down`: 移动高亮项
+- `Tab`: 接受高亮补全（仅改输入值，不执行添加）
+- `Enter`: 接受高亮补全（仅改输入值，不执行添加）
+- `Cmd/Ctrl+Enter`: 跳过补全，直接进入提交检测流程
+- `Esc`: 关闭补全
+
+说明：补全可见时，`Enter` 不做添加，这一条用于消除歧义。
+
+### 5.3 `PathAssistMode`（补全不可见）
+
+- `Enter`: 执行类型检测并分流
+  - `.md` 文件：直接添加
+  - 其他后缀：进入 `ConfirmMode`
+  - 目录：进入 `ConfirmMode`
+  - 无效路径：错误提示
+
+### 5.4 `ConfirmMode`
+
+- `Enter`: 触发主动作（确认）
+- `Esc`: 取消确认，回到 `PathAssistMode`
+- 点击外部：关闭确认（保留输入值）
+
+---
+
+## 6. 视觉与原型（ASCII）
+
+### 6.1 补全态（只显示建议）
 
 ```text
-┌─ 添加 ───────────────────────────────────────────────┐
-│ [输入路径......................................] [加] │
-│ hint: 输入文件或目录路径，回车添加                    │
-└──────────────────────────────────────────────────────┘
+┌──────────────────────────────────────┐
+│ 🔍 /Users/huanghao/workspace/mt-cli │
+├──────────────────────────────────────┤
+│ 📁 docs/                             │
+│ 📁 man/                              │
+│ 📁 tools/                            │
+│ 📄 AGENTS.md                         │
+└──────────────────────────────────────┘
+hint: Tab/Enter 补全  ·  Cmd/Ctrl+Enter 提交
 ```
 
-### 3.2 输入 .md（直接添加）
+### 6.2 确认态（替换建议，不叠层）
 
 ```text
-用户输入: /Users/xx/todo.md + Enter
-=> 直接添加文件
-Toast: 已添加文件: todo.md
+┌──────────────────────────────────────┐
+│ 🔍 /Users/huanghao/workspace/mt-cli │
+├──────────────────────────────────────┤
+│ 检测到目录，作为工作区添加？         │
+│ [添工作区] [取消]                    │
+└──────────────────────────────────────┘
 ```
 
-### 3.3 输入其他后缀文件（行内确认）
+### 6.3 非 md 文件确认
 
 ```text
-输入: /Users/xx/notes.txt + Enter
-
-┌ 提示 ────────────────────────────────────────────────┐
-│ 检测到非 Markdown 文件: .txt                          │
-│ [继续添加文件] [取消]                                  │
-└──────────────────────────────────────────────────────┘
+┌──────────────────────────────────────┐
+│ 检测到非 Markdown 文件（.txt）       │
+│ [继续添加] [取消]                    │
+└──────────────────────────────────────┘
 ```
 
-### 3.4 输入目录（行内确认）
+---
+
+## 7. 状态机（实现用）
 
 ```text
-输入: /Users/xx/workspace/project + Enter
+Idle
+  -> input(path-like) -> Suggesting
+  -> input(non-path)  -> Searching
 
-┌ 提示 ────────────────────────────────────────────────┐
-│ 检测到目录，是否作为工作区添加？                       │
-│ [添加工作区] [取消]                                    │
-└──────────────────────────────────────────────────────┘
-```
+Suggesting
+  -> Enter/Tab (has active item) -> apply suggestion -> Suggesting/Idle
+  -> Cmd/Ctrl+Enter -> Detecting
+  -> Enter (no panel) -> Detecting
+  -> Esc -> Idle
 
-### 3.5 点其他区域自动收起确认
+Detecting
+  -> md_file -> execute_add_file -> Idle
+  -> other_file -> ConfirmingOther
+  -> directory -> ConfirmingWorkspace
+  -> invalid -> ErrorInline
 
-```text
-当确认条可见时：
-- 点击确认条外部区域 => 自动收起
-- Esc => 自动收起
-```
+ConfirmingOther / ConfirmingWorkspace
+  -> Enter(confirm) -> execute -> Idle
+  -> Esc/outside -> Idle
 
----
-
-## 4. 确认交互设计（非模态）
-
-确认机制采用“输入框下方行内确认条（inline confirm bar）”：
-
-- 不阻塞页面
-- 位置固定（输入框下）
-- 一次只存在一个待确认动作
-- 明确动作按钮（主按钮 + 取消）
-
-### 视觉规范
-
-- 普通提示：浅蓝背景 + 主色按钮
-- 风险提示（非 md）：浅黄背景 + 警示文案
-- 错误提示：浅红背景 + 无确认按钮
-
-### 按钮文案
-
-- 非 md 文件：`继续添加文件`
-- 目录：`添加工作区`
-- 通用取消：`取消`
-
----
-
-## 5. 状态机
-
-```text
-idle
-  -> (submit md_file) -> execute_add_file -> idle
-  -> (submit other_file) -> confirm_other_file
-  -> (submit directory) -> confirm_workspace
-  -> (submit invalid) -> error
-
-confirm_other_file
-  -> (confirm) -> execute_add_file -> idle
-  -> (cancel/outside/esc) -> idle
-
-confirm_workspace
-  -> (confirm) -> execute_add_workspace -> idle
-  -> (cancel/outside/esc) -> idle
-
-error
-  -> (input change) -> idle
+ErrorInline
+  -> input change -> Idle or Suggesting
 ```
 
 ---
 
-## 6. 与现有 UI 对齐
+## 8. 关键实现约束
 
-- 保留当前“添加文件”输入区作为唯一添加入口
-- “工作区 +”按钮改为快捷行为：
-  - 点击后聚焦输入框
-  - 仅作为辅助入口，不单独弹窗
-
-这样保证：
-- 视觉统一（都是同一输入区发起）
-- 心智统一（都是“输入路径 -> 智能判断 -> 必要时确认”）
+1. `suggestion-panel` 与 `confirm-panel` 使用同一挂载容器。
+2. 进入 `ConfirmMode` 前，必须取消补全请求并销毁建议列表。
+3. 补全第一项默认“可见但不预提交”，避免误导。
+4. 必须暴露“强制提交”快捷键：`Cmd/Ctrl+Enter`。
+5. 不使用任何模态框（保持你已确定的设计约束）。
 
 ---
 
-## 7. 失败与边界处理
+## 9. 验收用例（必须全部通过）
 
-- 路径不存在：`路径不存在`（行内错误）
-- 无权限访问：`无权限访问该路径`（行内错误）
-- 工作区重复：`工作区已存在，已切换到该工作区`（toast）
-- 文件已打开：`文件已在列表中，已切换`（toast）
-
----
-
-## 8. 实施步骤（MVP）
-
-1. 增加路径类型检测接口（或在现有接口扩展）
-2. 输入框提交改为“先识别，再分流”
-3. 新增 inline confirm bar 组件
-4. 接入 outside-click / Esc 收起逻辑
-5. 将工作区 `+` 改为聚焦输入框辅助按钮
+1. 输入 `/.../mt-cli`，补全出现，按 `Enter` 仅补全，不触发添加。
+2. 补全关闭后再按 `Enter`，出现“添加工作区”确认。
+3. 任意时刻确认条出现时，不再看到补全列表。
+4. 输入 `.md` 完整路径，`Enter` 一次直接添加。
+5. 输入 `.txt`，`Enter` 出确认，`Enter` 再次确认添加。
+6. 双击 `Esc` 清空输入，且不误触发删除/移除动作。
 
 ---
 
-## 9. 待确认点
+## 10. 决策
 
-1. 非 md 文件确认按钮文案：`继续添加文件` 是否需要更短（如 `继续`）？
-2. 目录确认是否允许二选一：`添加工作区` / `按文件尝试`？
-3. `+` 按钮是否保留，或最终移除？
+本方案（S1）建议直接落地，不再做 A/B 小步试错。  
+后续如果要扩展，仅在该模型上增加“历史输入”与“最近路径”，不改键盘语义。

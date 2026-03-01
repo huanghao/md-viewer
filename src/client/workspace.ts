@@ -1,5 +1,5 @@
 import type { Workspace, FileTreeNode } from './types';
-import { state } from './state';
+import { state, updateWorkspaceListDiff, removeWorkspaceTracking } from './state';
 import { saveConfig } from './config';
 
 // 生成唯一 ID
@@ -46,6 +46,7 @@ export function removeWorkspace(id: string): void {
 
   // 清除文件树缓存
   state.fileTree.delete(id);
+  removeWorkspaceTracking(id);
 
   // 如果删除的是当前工作区，切换到第一个
   if (state.currentWorkspace === id) {
@@ -61,6 +62,20 @@ export function switchWorkspace(id: string): void {
   if (!workspace) return;
 
   state.currentWorkspace = id;
+}
+
+// 调整工作区顺序（按钮上移/下移）
+export function moveWorkspaceByOffset(workspaceId: string, offset: -1 | 1): void {
+  const list = state.config.workspaces;
+  const from = list.findIndex((ws) => ws.id === workspaceId);
+  if (from === -1) return;
+
+  const to = from + offset;
+  if (to < 0 || to >= list.length) return;
+
+  const [moved] = list.splice(from, 1);
+  list.splice(to, 0, moved);
+  saveConfig(state.config);
 }
 
 // 切换工作区展开/折叠状态
@@ -112,12 +127,17 @@ export async function scanWorkspace(workspaceId: string): Promise<FileTreeNode |
   if (!workspace) return null;
 
   try {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 15000);
+
     // 调用后端 API 扫描目录
     const response = await fetch('/api/scan-workspace', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: workspace.path })
+      body: JSON.stringify({ path: workspace.path }),
+      signal: controller.signal,
     });
+    window.clearTimeout(timeoutId);
 
     if (!response.ok) {
       console.error('扫描工作区失败:', await response.text());
@@ -128,11 +148,38 @@ export async function scanWorkspace(workspaceId: string): Promise<FileTreeNode |
 
     // 缓存文件树
     state.fileTree.set(workspaceId, tree);
+    updateWorkspaceListDiff(workspaceId, collectFilePaths(tree));
 
     return tree;
   } catch (e) {
     console.error('扫描工作区失败:', e);
     return null;
+  }
+}
+
+function collectFilePaths(node: FileTreeNode | undefined): string[] {
+  if (!node) return [];
+  if (node.type === 'file') return [node.path];
+
+  const paths: string[] = [];
+  for (const child of node.children || []) {
+    paths.push(...collectFilePaths(child));
+  }
+  return paths;
+}
+
+// 刷新后恢复已展开工作区的目录树，避免出现“已展开但未加载”的占位状态。
+export async function hydrateExpandedWorkspaces(): Promise<void> {
+  const expanded = state.config.workspaces.filter((ws) => ws.isExpanded);
+
+  for (const ws of expanded) {
+    // 忽略失败，失败态由点击时的重试逻辑处理。
+    await scanWorkspace(ws.id);
+  }
+
+  // 刷新后如果没有当前工作区，默认选中第一个工作区。
+  if (!state.currentWorkspace && state.config.workspaces.length > 0) {
+    state.currentWorkspace = state.config.workspaces[0].id;
   }
 }
 

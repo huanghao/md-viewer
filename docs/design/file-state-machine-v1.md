@@ -1,67 +1,68 @@
-# 文件更新与删除状态机（v1 基线）
+# 文件更新与删除状态机（v2 对齐实现）
 
-日期：2026-03-01
+日期：2026-03-02
 
 关联代码：
+- `src/client/state.ts`（sessionFiles）
+- `src/client/workspace-state-*.ts`（diff/missing/persistence）
 - `src/client/main.ts`（SSE 事件处理）
-- `src/client/state.ts`（file state）
-- `src/client/utils/file-status.ts`（M/D 计算）
-- `src/client/ui/sidebar.ts` + `src/client/css.ts`（展示映射）
+- `src/client/ui/sidebar-workspace.ts`（工作区投影）
 
 ## 1) State Table
 
 | StateId | 语义 | 入口条件 | 退出条件 | 不变量 |
 |---|---|---|---|---|
-| `CLEAN` | 文件展示与磁盘一致 | `lastModified <= displayedModified` 且 `isMissing=false` | `file-changed` / `file-deleted` | 不显示 `M/D` |
-| `DIRTY_BG` | 非当前文件有更新 | `lastModified > displayedModified` 且 `isMissing=false` | 用户切换并自动拉新，或手动刷新 | 列表显示 `M` |
-| `MISSING` | 文件已删除（列表仍保留） | `isMissing=true` | 用户关闭该文件；或重试成功恢复 | 显示 `D`，名称删除线 |
-| `ACTIVE_VIEW` | 当前正在阅读 | `state.currentFile === file.path` | 用户切换文件 | 内容区展示 `file.content` |
+| `S.CLEAN` | 会话文件与展示一致 | `isMissing=false` 且 `lastModified <= displayedModified` | `file-changed` / `file-deleted` | tab 正常 |
+| `S.DIRTY_BG` | 会话文件后台变更 | `isMissing=false` 且 `lastModified > displayedModified` | 自动拉新成功/手动刷新 | 列表显示 `M` |
+| `S.MISSING` | 会话文件已删除 | `sessionFiles[path].isMissing=true` | 关闭文件/文件恢复 | tab 与内容区删除态 |
+| `W.NORMAL` | 工作区路径正常 | path 在扫描结果中，且不在 missing 集合 | 扫描消失/删除事件 | 树中正常行 |
+| `W.MISSING` | 工作区路径删除态 | path 在 `workspaceMissingPaths` | 扫描重现/加载成功恢复 | 显示 `D + 红色划线` |
 
-说明：`ACTIVE_VIEW` 与其余状态为正交维度（可组合）。
+说明：
+- `S.*`（会话态）与 `W.*`（工作区态）正交，不互相覆盖。
 
 ## 2) Transition Table
 
 | From | Event | Guard | Side Effects | To |
 |---|---|---|---|---|
-| `CLEAN` | `file-changed` | 当前文件 | 自动读取最新内容并替换正文，触发轻量高亮 | `CLEAN + ACTIVE_VIEW` |
-| `CLEAN` | `file-changed` | 非当前文件 | 更新 `lastModified`，列表渲染 | `DIRTY_BG` |
-| `DIRTY_BG` | `switch-file` | 点击该文件 | 切换后自动拉新，成功则清除 `M` | `CLEAN + ACTIVE_VIEW` |
-| `DIRTY_BG` | `manual-refresh` | 文件存在 | `content/lastModified/displayedModified` 同步 | `CLEAN` |
-| `*` | `file-deleted` | 命中已打开文件 | `isMissing=true`，保留当前正文，不刷新替换 | `MISSING` |
-| `MISSING` | `remove-file` | 用户关闭 | 从状态中删除文件 | 终态 |
+| `S.CLEAN` | `file-changed` | 当前文件 | 自动同步正文 | `S.CLEAN` |
+| `S.CLEAN` | `file-changed` | 非当前文件 | 更新 `lastModified` | `S.DIRTY_BG` |
+| `S.DIRTY_BG` | `switch-file` | 切到该文件且拉新成功 | 同步 `displayedModified` | `S.CLEAN` |
+| `S.*` | `file-deleted` | path 在 `sessionFiles` | `isMissing=true` | `S.MISSING` |
+| `W.NORMAL` | `scan diff: missing` | path 从扫描集消失 | `markWorkspacePathMissing` | `W.MISSING` |
+| `W.MISSING` | `scan diff: reappeared` | path 重新扫描到 | `clearWorkspacePathMissing` | `W.NORMAL` |
+| `W.MISSING` | `click + load fail` | 文件不存在 | `markFileMissing(path)` | `W.MISSING + S.MISSING` |
+| `W.MISSING` | `click + load success` | 文件恢复 | `addOrUpdateFile + clearMissing` | `W.NORMAL + S.CLEAN` |
 
 ## 3) View Mapping
 
 | 状态 | Sidebar | Tabs | Content | Toolbar |
 |---|---|---|---|---|
-| `CLEAN` | 正常 | 正常 | 正常 | 刷新按钮隐藏 |
-| `DIRTY_BG` | `M` 橙色 | 正常 | 非当前文件保持旧内容 | 刷新按钮可作为兜底 |
-| `MISSING` | 红字 + 删除线 + `D` | 红字 + 删除线 | 保留旧内容 | 刷新/同步建议禁用（待完善） |
+| `S.CLEAN` | 正常 | 正常 | 正常正文 | 刷新隐藏 |
+| `S.DIRTY_BG` | `M` | 正常 | 非当前保持旧内容 | 切换后自动同步 |
+| `S.MISSING` | `D + 划线` | 红色划线 tab | 删除提示 + 缓存/占位 | 禁止自动刷新替换 |
+| `W.MISSING` | 工作区“已删除”分组 `D + 划线` | 不强制出现 | 点击后进入删除提示 | - |
 
 ## 4) 不变量
 
-1. `isMissing=true` 时，禁止自动替换正文（避免用户阅读上下文丢失）。
-2. `isMissing=true` 时，列表必须可见 `D` 且文件名删除线。
-3. `lastModified > displayedModified` 必须映射为 `M`（仅非当前文件可见），除非 `isMissing=true`（`D` 优先）。
+1. 未打开文件删除后也必须可见删除态（`W.MISSING`）。
+2. `D` 优先级高于 `M` 与蓝点。
+3. `S.MISSING` 下禁止自动替换正文。
+4. `sessionFiles` 不得被当作工作区全量文件清单。
 
-## 5) 评分（v1 基线）
+## 5) 测试映射
 
-### ICS
-- `S=4`（含一个正交状态）
-- `T=6`
-- `G=6`（增加“当前/非当前”与“自动拉新成功/失败兜底”分支）
-- `A=4`（SSE、loadFile、render 批更新、并发序号保护）
-- `V=4`（sidebar/tabs/content/toolbar）
+- `case-11`：当前文件删除态（`S.MISSING`）
+- `case-12`：工作区删除样式
+- `case-13`：非当前已打开文件删除流程
+- `case-14`：工作区非当前已打开文件删除流程
+- `case-15`：工作区未打开文件删除后立即删除态（`W.MISSING`）
 
-`ICS = 1.0*4 + 1.2*6 + 0.8*6 + 1.5*4 + 0.7*4 = 24.8`
+## 6) 评分（v2）
 
-### CS
-- `SC=0.90`（核心状态定义完整）
-- `TC=0.88`（主迁移已覆盖，删除后恢复分支待细化）
-- `VC=0.91`（当前/非当前刷新策略映射更清晰）
-- `EC=0.80`（新增 case-10 覆盖 file-changed 三条主链路）
-
-`CS = 30*0.90 + 30*0.88 + 20*0.91 + 20*0.80 = 87.6`
+- `ICS` 估算：`~19.8`（见 `state-machine-framework.md`）
+- `CS` 估算：`~95.5`
 
 结论：
-- 当前可运行且一致性达标；建议补“删除态恢复/禁用操作”测试完善边界分支。
+- v2 状态边界清晰，关键删除链路覆盖完整，可作为当前基线。
+

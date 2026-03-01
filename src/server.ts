@@ -13,6 +13,7 @@ import { log } from "./utils.ts";
 import { generateClientHTML } from "./client/html.ts";
 import {
   handleGetFile,
+  handleGetFileAsset,
   handleGetFiles,
   handleGetNearby,
   handlePathSuggestions,
@@ -68,6 +69,7 @@ app.get("/favicon.svg", serveStatic({ path: "./public/favicon.svg" }));
 
 // API: 获取文件内容
 app.get("/api/file", handleGetFile);
+app.get("/api/file-asset", handleGetFileAsset);
 
 // API: 获取目录下的 Markdown 文件列表
 app.get("/api/files", handleGetFiles);

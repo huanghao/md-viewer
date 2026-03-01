@@ -1798,6 +1798,10 @@ export const styles = `
       opacity: 0.95;
     }
 
+    .tree-item.missing .tree-name {
+      text-decoration: line-through;
+    }
+
     .tree-item.missing:hover {
       background: #ffebeb;
     }

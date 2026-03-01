@@ -1,3 +1,10 @@
+tests/e2e/runtime/
+.claude/
+mdv
+md-viewer
+test-results/
+dist/
+
 ########## Node START ##########
 # Logs
 logs
@@ -171,10 +178,3 @@ Temporary Items
 
 ########## Global/macOS END ##########
 
-# Project-specific
-.claude/
-mdv
-md-viewer
-
-# Build artifacts
-dist/

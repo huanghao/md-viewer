@@ -11,6 +11,8 @@ set -euo pipefail
 input="${1:-}"
 working_dir="${2:-}"
 
+echo "#0: $input, $working_dir" >>/tmp/my.log
+
 # 空输入，直接退出
 if [[ -z "$input" ]]; then
   exit 0
@@ -49,16 +51,22 @@ if [[ ! -e "$input" ]]; then
 fi
 
 # 检查文件扩展名
+MDV=/Users/huanghao/.bun/bin/mdv
+echo "#1" >>/tmp/my.log
 if [[ "$input" =~ \.(md|markdown)$ ]]; then
   # Markdown 文件，尝试用 mdv 打开
-  if command -v mdv >/dev/null 2>&1; then
+  echo "#2" >>/tmp/my.log
+  if command -v $MDV >/dev/null 2>&1; then
+    echo "#3: $MDV $input" >>/tmp/my.log
     # mdv 会自己处理错误，失败时回退到 open
-    mdv "$input" 2>/dev/null || open "$input"
+    $MDV "$input" 2>/dev/null || echo $? || open "$input"
   else
+    echo "#4" >>/tmp/my.log
     # mdv 不可用，回退到系统默认
     open "$input"
   fi
 else
+  echo "#5" >>/tmp/my.log
   # 非 Markdown 文件，使用系统默认
   open "$input"
 fi

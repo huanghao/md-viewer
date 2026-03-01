@@ -25,7 +25,7 @@ import {
   getSyncPreferences,
   setSyncPreference,
 } from "./sync-storage.ts";
-import { watchFile } from "./file-watcher.ts";
+import { watchFile, watchWorkspace } from "./file-watcher.ts";
 
 function expandHomePath(input: string): string {
   if (input === "~") return homedir();
@@ -119,6 +119,59 @@ export async function handleGetFile(c: Context) {
     filename: basename(resolvedPath),
     lastModified: getLastModified(resolvedPath),
     isRemote: false,
+  });
+}
+
+function getAssetContentType(path: string): string {
+  const ext = extname(path).toLowerCase();
+  switch (ext) {
+    case ".png":
+      return "image/png";
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".gif":
+      return "image/gif";
+    case ".webp":
+      return "image/webp";
+    case ".svg":
+      return "image/svg+xml";
+    case ".bmp":
+      return "image/bmp";
+    case ".ico":
+      return "image/x-icon";
+    case ".mp4":
+      return "video/mp4";
+    case ".webm":
+      return "video/webm";
+    default:
+      return "application/octet-stream";
+  }
+}
+
+// API: 获取本地静态资源（用于 Markdown 内嵌图片/动图/视频）
+export async function handleGetFileAsset(c: Context) {
+  const path = c.req.query("path");
+  if (!path) return c.json({ error: "缺少 path 参数" }, 400);
+  if (isUrl(path)) return c.json({ error: "不支持远程 URL" }, 400);
+
+  const resolvedPath = resolve(path);
+  if (!existsSync(resolvedPath)) return c.json({ error: "资源不存在" }, 404);
+
+  let stat;
+  try {
+    stat = statSync(resolvedPath);
+  } catch (e) {
+    return c.json({ error: "读取资源失败: " + (e as Error).message }, 500);
+  }
+  if (!stat.isFile()) return c.json({ error: "目标不是文件" }, 400);
+
+  const file = Bun.file(resolvedPath);
+  return new Response(file, {
+    headers: {
+      "Content-Type": getAssetContentType(resolvedPath),
+      "Cache-Control": "no-cache",
+    },
   });
 }
 
@@ -752,6 +805,9 @@ export async function handleScanWorkspace(c: Context) {
     if (!existsSync(resolvedPath)) {
       return c.json({ error: "目录不存在" }, 404);
     }
+
+    // 扫描后开启目录级监听，保证“未打开文件”也能收到删除事件。
+    watchWorkspace(resolvedPath);
 
     const tree = scanDirectory(resolvedPath);
     return c.json(tree);

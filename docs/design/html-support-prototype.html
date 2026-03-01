@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HTML 支持原型（列表 + 新页面）</title>
+    <style>
+      body { margin: 0; font-family: "SF Pro Text", "PingFang SC", sans-serif; background: #f6f8fa; }
+      .layout { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
+      .sidebar { background: #fff; border-right: 1px solid #d0d7de; padding: 14px; }
+      .item { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 8px; }
+      .item:hover { background: #f6f8fa; }
+      .dot { width: 8px; height: 8px; border-radius: 999px; background: #007aff; }
+      .main { padding: 20px; color: #57606a; }
+      .btn { border: 1px solid #0969da; color: #0969da; background: #fff; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="item"><span>README.md</span><span></span></div>
+        <div class="item"><span>landing.html</span><span class="dot"></span></div>
+      </aside>
+      <main class="main">
+        <h3>HTML 文件仅在列表中展示</h3>
+        <p>点击列表中的 <code>.html/.htm</code> 时，触发浏览器新页面打开。</p>
+        <button class="btn" onclick="window.open('https://example.com', '_blank', 'noopener,noreferrer')">模拟点击后新开页</button>
+      </main>
+    </div>
+  </body>
+</html>

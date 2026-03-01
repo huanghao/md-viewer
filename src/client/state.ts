@@ -17,7 +17,6 @@ export const state: AppState = {
 
 // 状态持久化
 const STORAGE_KEY = 'md-viewer:openFiles';
-const LIST_DIFF_KEY = 'md-viewer:listDiffPaths';
 const WORKSPACE_KNOWN_KEY = 'md-viewer:workspaceKnownFiles';
 const MAX_FILES = 100; // 最大保存文件数量（LRU 限制）
 const listDiffPaths = new Set<string>();
@@ -25,7 +24,6 @@ const workspaceKnownFiles = new Map<string, Set<string>>();
 
 function saveAuxiliaryState(): void {
   try {
-    localStorage.setItem(LIST_DIFF_KEY, JSON.stringify(Array.from(listDiffPaths)));
     localStorage.setItem(
       WORKSPACE_KNOWN_KEY,
       JSON.stringify(
@@ -37,28 +35,12 @@ function saveAuxiliaryState(): void {
   }
 }
 
-function isExternallyOpenedFile(path: string): boolean {
-  const lower = path.toLowerCase();
-  return lower.endsWith('.html') || lower.endsWith('.htm');
-}
-
 function restoreAuxiliaryState(): void {
+  // 蓝点为会话内提示，刷新后清空
   listDiffPaths.clear();
   workspaceKnownFiles.clear();
 
   try {
-    const savedDiff = localStorage.getItem(LIST_DIFF_KEY);
-    if (savedDiff) {
-      const paths = JSON.parse(savedDiff);
-      if (Array.isArray(paths)) {
-        for (const path of paths) {
-          if (typeof path === 'string' && path) {
-            listDiffPaths.add(path);
-          }
-        }
-      }
-    }
-
     const savedKnown = localStorage.getItem(WORKSPACE_KNOWN_KEY);
     if (savedKnown) {
       const records = JSON.parse(savedKnown);
@@ -82,6 +64,11 @@ function restoreAuxiliaryState(): void {
 
 export function hasListDiff(path: string): boolean {
   return listDiffPaths.has(path);
+}
+
+export function clearListDiff(path: string): void {
+  if (!listDiffPaths.has(path)) return;
+  listDiffPaths.delete(path);
 }
 
 export function updateWorkspaceListDiff(workspaceId: string, scannedPaths: string[]): void {
@@ -244,12 +231,11 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
     }
 
     // 恢复当前文件
-    if (data.currentFile && state.files.has(data.currentFile) && !isExternallyOpenedFile(data.currentFile)) {
+    if (data.currentFile && state.files.has(data.currentFile)) {
       state.currentFile = data.currentFile;
     } else {
-      // 如果当前文件不存在或属于外部打开类型，切换到第一个可内置渲染文件
-      const firstFile = Array.from(state.files.values()).find((file) => !isExternallyOpenedFile(file.path))
-        || Array.from(state.files.values())[0];
+      // 如果保存的当前文件不存在了，切换到第一个文件
+      const firstFile = Array.from(state.files.values())[0];
       state.currentFile = firstFile ? firstFile.path : null;
     }
   } catch (e) {
@@ -282,11 +268,13 @@ export function addOrUpdateFile(fileData: FileData, switchTo: boolean = false): 
 
   if (switchTo) {
     state.currentFile = fileData.path;
+    clearListDiff(fileData.path);
   }
 
   if (isNewPath) {
-    listDiffPaths.add(fileData.path);
-    saveAuxiliaryState();
+    if (!switchTo) {
+      listDiffPaths.add(fileData.path);
+    }
   }
 
   saveState();
@@ -306,6 +294,7 @@ export function removeFile(path: string): void {
 
 export function switchToFile(path: string): void {
   state.currentFile = path;
+  clearListDiff(path);
   saveState();
 }
 

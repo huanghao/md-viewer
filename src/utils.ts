@@ -14,6 +14,15 @@ export function isMarkdown(path: string): boolean {
   return path.endsWith(".md") || path.endsWith(".markdown");
 }
 
+export function isHtml(path: string): boolean {
+  return path.endsWith(".html") || path.endsWith(".htm");
+}
+
+export function isSupportedTextFile(path: string): boolean {
+  const lower = path.toLowerCase();
+  return isMarkdown(lower) || isHtml(lower);
+}
+
 export function isUrl(path: string): boolean {
   try {
     const url = new URL(path);
@@ -24,6 +33,10 @@ export function isUrl(path: string): boolean {
 }
 
 export function readMarkdownFile(path: string): { content: string; error?: string } {
+  return readTextFile(path);
+}
+
+export function readTextFile(path: string): { content: string; error?: string } {
   try {
     if (!existsSync(path)) {
       return { content: "", error: `文件不存在: ${path}` };
@@ -47,7 +60,7 @@ export function getFileList(dir: string): string[] {
   try {
     const files = readdirSync(dir, { recursive: true }) as string[];
     return files
-      .filter((f) => isMarkdown(f))
+      .filter((f) => isSupportedTextFile(f.toLowerCase()))
       .map((f) => resolve(dir, f))
       .sort();
   } catch {
@@ -61,13 +74,13 @@ export function getFileList(dir: string): string[] {
 const SUPPORTED_TEXT_TYPES = [
   "text/markdown",
   "text/x-markdown",
+  "text/html",
   "text/plain",
   "text/x-plain",
   "application/octet-stream", // 有些服务器用默认类型
 ];
 
 const UNSUPPORTED_TYPES = [
-  "text/html",
   "text/css",
   "text/javascript",
   "application/javascript",
@@ -150,16 +163,6 @@ export async function fetchRemoteMarkdown(url: string): Promise<{ content: strin
     
     const contentType = response.headers.get("content-type") || "";
     const content = await response.text();
-    
-    // 二次检查：如果内容是 HTML 标签开头，也拒绝
-    const trimmed = content.trim().toLowerCase();
-    if (trimmed.startsWith("<!doctype") || trimmed.startsWith("<html") || trimmed.startsWith("<head") || trimmed.startsWith("<body")) {
-      return { 
-        content, 
-        contentType: "text/html",
-        error: "该 URL 返回的是 HTML 网页而非 Markdown 文件。提示: 尝试添加 /README.md 到 URL 末尾"
-      };
-    }
     
     return { content, contentType };
   } catch (e: any) {

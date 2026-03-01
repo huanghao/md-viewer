@@ -27,6 +27,20 @@ export async function createKmDoc(options: {
   markdownFile: string;
 }): Promise<KmDocResult> {
   const cmd = `km-cli doc create --parent-id "${options.parentId}" --title "${options.title}" --markdown-file "${options.markdownFile}" --json`;
+  const outputFallback = (
+    stdout: string | undefined,
+    stderr: string | undefined,
+    message?: string
+  ): string => {
+    const parts = [
+      stdout && stdout.trim() ? `STDOUT:\n${stdout}` : "",
+      stderr && stderr.trim() ? `STDERR:\n${stderr}` : "",
+      message ? `ERROR:\n${message}` : "",
+    ].filter(Boolean);
+
+    if (parts.length > 0) return parts.join("\n\n");
+    return "km-cli 未返回可读输出（stdout/stderr 为空）。请检查 km-cli 登录状态与网络。";
+  };
 
   try {
     const { stdout, stderr } = await execAsync(cmd);
@@ -36,7 +50,7 @@ export async function createKmDoc(options: {
       return {
         success: false,
         error: "km-cli 执行失败",
-        output: `STDOUT:\n${stdout}\n\nSTDERR:\n${stderr}`,
+        output: outputFallback(stdout, stderr),
         command: cmd,
       };
     }
@@ -88,24 +102,18 @@ export async function createKmDoc(options: {
       return {
         success: false,
         error: "无法解析 km-cli 输出",
-        output: stdout,
+        output: outputFallback(stdout, stderr, "无法解析 km-cli 输出"),
         command: cmd,
       };
     }
   } catch (error: any) {
     // 命令执行失败（通常是 exit code 非 0）
-    const output = [
-      error.stdout ? `STDOUT:\n${error.stdout}` : "",
-      error.stderr ? `STDERR:\n${error.stderr}` : "",
-      error.message ? `ERROR:\n${error.message}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n\n");
+    const output = outputFallback(error.stdout, error.stderr, error.message);
 
     return {
       success: false,
       error: "km-cli 执行失败",
-      output: output || error.toString(),
+      output,
       command: cmd,
     };
   }

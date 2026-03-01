@@ -532,7 +532,7 @@ export function bindWorkspaceEvents(): void {
   (window as any).handleFileClick = async (filePath: string) => {
     const lower = filePath.toLowerCase();
     if (lower.endsWith('.html') || lower.endsWith('.htm')) {
-      window.open(`/api/open-in-browser?path=${encodeURIComponent(filePath)}`, '_blank', 'noopener,noreferrer');
+      await (window as any).openExternalFile?.(filePath);
       return;
     }
 

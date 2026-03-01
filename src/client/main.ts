@@ -23,6 +23,7 @@ const SIDEBAR_WIDTH_STORAGE_KEY = 'md-viewer:sidebar-width';
 const SIDEBAR_DEFAULT_WIDTH = 260;
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 680;
+const fileRefreshSeq = new Map<string, number>();
 const PARENT_URL_SKIP_SEGMENTS = new Set(['doc', 'docs', 'page', 'pages', 'content', 'wiki']);
 
 // ==================== 消息处理 ====================
@@ -104,39 +105,60 @@ function setupSidebarResize(): void {
 // 刷新当前文件（页面加载时自动调用）
 async function refreshCurrentFile() {
   if (!state.currentFile) return;
-  const data = await loadFile(state.currentFile);
-  if (data) {
-    const file = state.files.get(data.path);
-    if (file) {
-      file.content = data.content;
-      file.lastModified = data.lastModified;
-      file.displayedModified = data.lastModified;  // 同步时间戳
-      renderContent();
-      renderSidebar();
-    }
-  }
+  await syncFileFromDisk(state.currentFile, { silent: true, highlight: false });
 }
 
 // 手动刷新文件（用户点击刷新按钮）
 async function refreshFile(path: string) {
-  const file = state.files.get(path);
-  if (!file) return;
-
-  const data = await loadFile(path);
-  if (data) {
-    file.content = data.content;
-    file.lastModified = data.lastModified;
-    file.displayedModified = data.lastModified;  // 同步时间戳，消除 dirty 状态
-
-    // 如果当前正在查看这个文件，重新渲染
-    if (state.currentFile === path) {
-      renderContent();
-      showSuccess('文件已刷新', 2000);
-    }
-
-    // 重新渲染侧边栏（M 标识消失）
-    renderSidebar();
+  const updated = await syncFileFromDisk(path, { silent: false, highlight: true });
+  if (updated && state.currentFile === path) {
+    showSuccess('文件已刷新', 2000);
   }
+}
+
+function flashContentUpdated(): void {
+  const container = document.getElementById('content');
+  if (!container) return;
+  container.style.animation = 'flash 700ms ease-out';
+  setTimeout(() => {
+    container.style.animation = '';
+  }, 700);
+}
+
+async function syncFileFromDisk(
+  path: string,
+  options: { silent?: boolean; highlight?: boolean } = {}
+): Promise<boolean> {
+  const file = state.files.get(path);
+  if (!file || file.isMissing) return false;
+
+  const nextSeq = (fileRefreshSeq.get(path) || 0) + 1;
+  fileRefreshSeq.set(path, nextSeq);
+
+  const data = await loadFile(path, options.silent !== false);
+  if (!data) return false;
+
+  if (fileRefreshSeq.get(path) !== nextSeq) return false;
+
+  const targetFile = state.files.get(path) || state.files.get(data.path);
+  if (!targetFile) return false;
+
+  targetFile.content = data.content;
+  targetFile.lastModified = data.lastModified;
+  targetFile.displayedModified = data.lastModified;
+  targetFile.isMissing = false;
+  saveState();
+
+  if (state.currentFile === path || state.currentFile === data.path) {
+    renderContent();
+    if (options.highlight) {
+      flashContentUpdated();
+    }
+  }
+
+  renderSidebar();
+  await updateToolbarButtons();
+  return true;
 }
 
 // ==================== UI 渲染 ====================
@@ -540,6 +562,10 @@ function switchFile(path: string) {
   switchToFile(path);
   renderSidebar();
   renderContent();
+  const file = state.files.get(path);
+  if (file && !file.isMissing && file.lastModified > file.displayedModified) {
+    void syncFileFromDisk(path, { silent: true, highlight: true });
+  }
 }
 
 // 移除文件（关闭标签页和从列表删除是同一个操作）
@@ -861,42 +887,7 @@ async function updateSyncButton() {
 // 点击刷新按钮
 async function handleRefreshButtonClick() {
   if (!state.currentFile) return;
-
-  const file = state.files.get(state.currentFile);
-  if (!file) return;
-
-  try {
-    // 重新加载文件
-    const response = await fetch(`/api/file?path=${encodeURIComponent(state.currentFile)}`);
-    const data = await response.json();
-
-    if (data.error) {
-      showError(`刷新失败: ${data.error}`);
-      return;
-    }
-
-    // 更新文件内容和时间戳
-    file.content = data.content;
-    file.lastModified = data.lastModified;
-    file.displayedModified = data.lastModified; // 同步时间戳，消除 dirty 状态
-
-    // 重新渲染
-    renderContent();
-    renderSidebar(); // 刷新侧边栏，M 标识消失
-    saveState();
-
-    // 可选：添加内容闪烁效果
-    const container = document.getElementById('content');
-    if (container) {
-      container.style.animation = 'flash 1s ease-out';
-      setTimeout(() => {
-        container.style.animation = '';
-      }, 1000);
-    }
-  } catch (e) {
-    console.error('刷新文件失败:', e);
-    showError('刷新文件失败');
-  }
+  await refreshFile(state.currentFile);
 }
 
 // 点击同步按钮
@@ -1432,16 +1423,19 @@ function connectSSE() {
     const file = state.files.get(data.path);
 
     if (file) {
-      // 只更新 lastModified，不更新 content 和 displayedModified
-      // 这样 lastModified > displayedModified，触发 isDirty 状态
+      // 先更新 lastModified，便于失败兜底时保留 M 状态
       file.lastModified = data.lastModified;
 
-      // 重新渲染侧边栏（支持简单模式和工作区模式）
-      renderSidebar();
-
-      // 如果是当前文件，更新工具栏（显示刷新按钮）
       if (state.currentFile === data.path) {
-        updateToolbarButtons();
+        // 当前文件：自动刷新正文并给轻量视觉提示；若刷新失败保留 M 状态兜底
+        const updated = await syncFileFromDisk(data.path, { silent: true, highlight: true });
+        if (!updated) {
+          renderSidebar();
+          updateToolbarButtons();
+        }
+      } else {
+        // 非当前文件：保持 M 状态，等待用户切换该文件时再自动刷新
+        renderSidebar();
       }
     }
   });

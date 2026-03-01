@@ -16,7 +16,8 @@
     "admin": "bun run src/cli-admin.ts",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "test:e2e:update": "playwright test --update-snapshots"
+    "test:e2e:update": "playwright test --update-snapshots",
+    "postinstall": "bash scripts/install-iterm2-dispatcher.sh"
   },
   "dependencies": {
     "chokidar": "^5.0.0",

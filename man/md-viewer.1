@@ -1,22 +1,36 @@
-.TH MD-VIEWER 1 "February 2026" "MD Viewer" "User Commands"
+.TH MD-VIEWER 1 "March 2026" "MD Viewer" "User Commands"
 .SH NAME
 md-viewer \- Markdown file viewer with live reload
 .SH SYNOPSIS
-.B md-viewer-cli
+.B mdv
 [\fIOPTIONS\fR] \fIFILE\fR
+.br
+.B mdv-admin
+\fICOMMAND\fR [\fIOPTIONS\fR]
 .br
 .B bun run dev
 .RI [SERVER\ OPTIONS]
 .SH DESCRIPTION
 MD Viewer is a lightweight Markdown file viewer that provides live preview
 with automatic reload when files change. It consists of a server component
-that serves the web interface and a CLI tool for adding files from the command line.
+that serves the web interface and CLI tools for adding files and managing data.
 .SH CLI COMMANDS
+.SS mdv (Client)
 .TP
-.B md-viewer-cli \fIFILE\fR
+.B mdv \fIFILE\fR
 Add a Markdown file to the viewer. By default, the file will be added and
 switched to. Supports both local file paths and remote URLs (http/https).
+.SS mdv-admin (Administration)
+.TP
+.B mdv-admin stats
+Display statistics about sync records (total files, expired records, recent parents).
+Works with or without running server.
+.TP
+.B mdv-admin cleanup
+Clean up expired sync records (older than 6 months).
+Works with or without running server.
 .SH CLI OPTIONS
+.SS mdv Options
 .TP
 .BR \-p ", " \-\-port " " \fIPORT\fR
 Specify the server port (default: 3000)
@@ -30,24 +44,49 @@ to the newly added file.
 .TP
 .B \-\-help
 Display help information and exit
+.SS mdv-admin Options
+.TP
+.BR \-p ", " \-\-port " " \fIPORT\fR
+Specify the server port (default: 3000)
+.TP
+.BR \-h ", " \-\-host " " \fIHOST\fR
+Specify the server host (default: localhost)
+.TP
+.B \-\-help
+Display help information and exit
 .SH SERVER OPTIONS
 The server can be configured using environment variables:
 .TP
 .B PORT
 Server port number (default: 3000)
 .SH EXAMPLES
+.SS Using mdv (Client)
 .TP
 Add a local file and switch to it:
-.B md-viewer-cli README.md
+.B mdv README.md
 .TP
 Add a file without switching:
-.B md-viewer-cli \-\-no\-focus notes.md
+.B mdv \-\-no\-focus notes.md
 .TP
 Add a file using a specific server port:
-.B md\-viewer-cli \-p 3001 README.md
+.B mdv \-p 3001 README.md
 .TP
 Add a remote Markdown file:
-.B md-viewer-cli https://example.com/doc.md
+.B mdv https://example.com/doc.md
+.SS Using mdv-admin (Administration)
+.TP
+View sync statistics:
+.B mdv-admin stats
+.TP
+Clean up expired records:
+.B mdv-admin cleanup
+.TP
+Check stats on custom port:
+.B mdv-admin stats \-p 3001
+.SS Starting the Server
+.TP
+Start the server on default port:
+.B bun run dev
 .TP
 Start the server on a custom port:
 .B PORT=8080 bun run dev

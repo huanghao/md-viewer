@@ -245,7 +245,14 @@ function renderContent() {
 
   // 使用 marked 渲染 Markdown
   const html = (window as any).marked.parse(file.content);
-  container.innerHTML = `<div class="markdown-body">${html}</div>`;
+  const deletedNotice = file.isMissing
+    ? `
+      <div class="content-file-status deleted">
+        该文件已从磁盘删除，当前内容为本地缓存快照。
+      </div>
+    `
+    : '';
+  container.innerHTML = `${deletedNotice}<div class="markdown-body">${html}</div>`;
 
   // 更新文件元信息（仅显示相对时间）
   const meta = document.getElementById('fileMeta');
@@ -839,6 +846,14 @@ async function updateToolbarButtons() {
 
   const file = state.files.get(state.currentFile);
   if (!file) return;
+
+  if (file.isMissing) {
+    const refreshButton = document.getElementById('refreshButton');
+    const syncButton = document.getElementById('syncButton');
+    if (refreshButton) refreshButton.style.display = 'none';
+    if (syncButton) syncButton.style.display = 'none';
+    return;
+  }
 
   // 更新刷新按钮：只有当文件 dirty 时才显示
   const refreshButton = document.getElementById('refreshButton');
@@ -1454,6 +1469,8 @@ function connectSSE() {
 
       // 如果当前正在查看这个文件，仅提示“已删除”并保留当前正文（不做自动刷新替换）
       if (state.currentFile === data.path) {
+        renderContent();
+        updateToolbarButtons();
         showError('文件已不存在');
       }
     }

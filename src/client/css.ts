@@ -913,6 +913,19 @@ export const styles = `
       background: transparent !important;
       font-size: calc(16px * var(--font-scale));
     }
+    .content-file-status {
+      margin-bottom: 12px;
+      padding: 9px 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .content-file-status.deleted {
+      border-color: #ffd6d1;
+      background: #fff4f2;
+      color: #b42318;
+    }
 
     .markdown-body h1 {
       font-size: calc(2em * var(--font-scale));
@@ -1515,7 +1528,7 @@ export const styles = `
       display: flex;
       align-items: center;
       padding: 6px 12px;
-      cursor: pointer;
+      cursor: default;
       border-radius: 6px;
       font-size: 13px;
       color: #24292e;
@@ -1625,6 +1638,11 @@ export const styles = `
       margin-right: 4px;
       width: 16px;
       text-align: center;
+      cursor: pointer;
+    }
+
+    .workspace-name {
+      cursor: pointer;
     }
 
     /* 文件树 */
@@ -1651,7 +1669,7 @@ export const styles = `
       padding: 4px 8px;
       width: 100%;
       box-sizing: border-box;
-      cursor: pointer;
+      cursor: default;
       border-radius: 4px;
       font-size: 13px;
       color: #24292e;
@@ -1662,6 +1680,10 @@ export const styles = `
 
     .tree-item:hover {
       background: #f6f8fa;
+    }
+
+    .tree-item.file-node {
+      cursor: pointer;
     }
 
     .tree-item.current {
@@ -1691,6 +1713,7 @@ export const styles = `
       color: #57606a;
       flex-shrink: 0;
       text-align: center;
+      cursor: pointer;
     }
 
     .tree-icon {
@@ -1730,7 +1753,7 @@ export const styles = `
     }
 
     .tree-item.missing {
-      color: #8b949e;
+      color: #cf222e;
       text-decoration: line-through;
       background: #fff5f5;
       opacity: 0.95;

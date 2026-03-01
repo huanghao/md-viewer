@@ -195,11 +195,10 @@ function renderWorkspaceItem(workspace: Workspace, index: number, total: number,
 
   return `
     <div class="workspace-item">
-      <div class="workspace-header ${isCurrent ? 'active' : ''}"
-           onclick="handleWorkspaceClick('${escapeAttr(workspace.id)}')">
-        <span class="workspace-toggle">${toggle}</span>
+      <div class="workspace-header ${isCurrent ? 'active' : ''}">
+        <span class="workspace-toggle" onclick="event.stopPropagation();handleWorkspaceToggle('${escapeAttr(workspace.id)}')">${toggle}</span>
         <span class="workspace-icon">📁</span>
-        <span class="workspace-name">${escapeHtml(workspace.name)}</span>
+        <span class="workspace-name" onclick="event.stopPropagation();handleWorkspaceSelect('${escapeAttr(workspace.id)}')">${escapeHtml(workspace.name)}</span>
         ${pendingRemoveWorkspaceId === workspace.id ? `
           <div class="workspace-remove-actions" onclick="event.stopPropagation()">
             ${canMoveUp ? `
@@ -319,6 +318,7 @@ function renderTreeNode(workspaceId: string, node: FileTreeNode, depth: number):
 
     const classes = [
       'tree-item',
+      'file-node',
       isCurrentFile ? 'current' : '',
     ].filter(Boolean).join(' ');
 
@@ -342,10 +342,9 @@ function renderTreeNode(workspaceId: string, node: FileTreeNode, depth: number):
 
   return `
     <div class="tree-node">
-      <div class="tree-item"
-           onclick="handleNodeClick('${escapeAttr(workspaceId)}', '${escapeAttr(node.path)}')">
+      <div class="tree-item directory-node">
         <span class="tree-indent" style="width: ${indentPx}px"></span>
-        <span class="tree-toggle">${hasChildren ? toggle : ''}</span>
+        <span class="tree-toggle" onclick="${hasChildren ? `event.stopPropagation();handleNodeClick('${escapeAttr(workspaceId)}', '${escapeAttr(node.path)}')` : ''}">${hasChildren ? toggle : ''}</span>
         <span class="tree-name">${escapeHtml(node.name)}</span>
         ${node.fileCount ? `<span class="tree-count">${node.fileCount}</span>` : ''}
       </div>
@@ -449,12 +448,11 @@ export function bindWorkspaceEvents(): void {
     });
   }
 
-  // 工作区点击
-  (window as any).handleWorkspaceClick = async (workspaceId: string) => {
+  // 工作区展开/折叠
+  (window as any).handleWorkspaceToggle = async (workspaceId: string) => {
     const workspace = state.config.workspaces.find(ws => ws.id === workspaceId);
     if (!workspace) return;
 
-    // 切换展开/折叠
     toggleWorkspaceExpanded(workspaceId);
 
     // 如果展开且没有加载文件树，则加载
@@ -474,10 +472,13 @@ export function bindWorkspaceEvents(): void {
       }
     }
 
-    // 切换当前工作区
-    switchWorkspace(workspaceId);
+    const { renderSidebar } = await import('./sidebar');
+    renderSidebar();
+  };
 
-    // 重新渲染
+  // 工作区选择（不改变展开状态）
+  (window as any).handleWorkspaceSelect = async (workspaceId: string) => {
+    switchWorkspace(workspaceId);
     const { renderSidebar } = await import('./sidebar');
     renderSidebar();
   };

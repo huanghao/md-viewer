@@ -5,7 +5,8 @@
   "type": "module",
   "bin": {
     "mdv": "./src/cli.ts",
-    "mdv-admin": "./src/cli-admin.ts"
+    "mdv-admin": "./src/cli-admin.ts",
+    "mdv-iterm2-dispatcher": "./scripts/mdv-iterm2-dispatcher.sh"
   },
   "scripts": {
     "build:client": "bun run build.ts",

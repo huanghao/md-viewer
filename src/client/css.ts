@@ -1385,27 +1385,16 @@ export const styles = `
 
     /* 方案 1：已打开文件浅蓝底 */
     .tree-item.opened {
-      background: #eaf2ff;
+      color: #0969da;
     }
     .tree-item.opened:hover {
-      background: #dfeaff;
+      background: #f6f8fa;
     }
 
     .tree-item.current {
       background: #dbeafe;
       color: #0969da;
       font-weight: 400;
-    }
-
-    .tree-item.current::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 3px;
-      bottom: 3px;
-      width: 2px;
-      background: #0969da;
-      border-radius: 2px;
     }
 
     .tree-item .file-item-status {

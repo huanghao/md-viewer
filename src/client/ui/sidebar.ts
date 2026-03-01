@@ -7,7 +7,26 @@ import { renderWorkspaceSidebar, bindWorkspaceEvents } from './sidebar-workspace
 
 let lastEscAt = 0;
 let lastEscValue = '';
+let hasAutoAnchoredCurrentFile = false;
 import { attachPathAutocomplete } from './path-autocomplete';
+
+// 将当前打开的文件滚动到侧边栏40%位置
+function scrollCurrentFileIntoView(container: HTMLElement): void {
+  if (!state.currentFile) return;
+  if (hasAutoAnchoredCurrentFile) return;
+
+  requestAnimationFrame(() => {
+    const currentItem = container.querySelector('.file-item.current, .tree-item.current') as HTMLElement;
+    if (!currentItem) return;
+
+    const targetScrollTop = currentItem.offsetTop - (container.clientHeight * 0.4);
+    const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+    const clampedTop = Math.max(0, Math.min(targetScrollTop, maxScrollTop));
+
+    container.scrollTo({ top: clampedTop, behavior: 'auto' });
+    hasAutoAnchoredCurrentFile = true;
+  });
+}
 
 export function toggleSidebarMode(): void {
   state.config.sidebarMode = state.config.sidebarMode === 'workspace' ? 'simple' : 'workspace';
@@ -238,6 +257,9 @@ export function renderFiles(): void {
         <span class="close" onclick="event.stopPropagation();window.removeFile('${escapeAttr(file.path)}')">×</span>
       </div>
     `}).join('');
+
+  // 滚动当前文件到侧边栏40%位置
+  scrollCurrentFileIntoView(container);
 }
 
 // 渲染整个侧边栏（根据模式选择）
@@ -271,6 +293,9 @@ export function renderSidebar(): void {
 
     // 绑定事件
     bindWorkspaceEvents();
+
+    // 滚动当前文件到侧边栏40%位置
+    scrollCurrentFileIntoView(fileListContainer);
   } else {
     // 简单模式
     renderCurrentPath();

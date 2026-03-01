@@ -2,13 +2,134 @@ import type { Workspace, FileTreeNode, FileInfo } from '../types';
 import { state } from '../state';
 import { escapeHtml, escapeAttr } from '../utils/escape';
 import { getFileListStatus } from '../utils/file-status';
-import { showError, showSuccess } from './toast';
+import { showError, showSuccess, showWarning } from './toast';
 import {
+  removeWorkspace,
   toggleWorkspaceExpanded,
   toggleNodeExpanded,
   scanWorkspace,
   switchWorkspace
 } from '../workspace';
+
+const ADD_WORKSPACE_DIALOG_ID = 'addWorkspaceDialogOverlay';
+const ADD_WORKSPACE_INPUT_ID = 'addWorkspacePathInput';
+const ADD_WORKSPACE_PREVIEW_ID = 'addWorkspacePathPreview';
+
+function getWorkspaceNameFromPath(path: string): string {
+  const parts = path.split('/').filter(Boolean);
+  return parts[parts.length - 1] || 'workspace';
+}
+
+function updateWorkspacePathPreview(): void {
+  const input = document.getElementById(ADD_WORKSPACE_INPUT_ID) as HTMLTextAreaElement | null;
+  const preview = document.getElementById(ADD_WORKSPACE_PREVIEW_ID) as HTMLElement | null;
+  if (!preview) return;
+
+  const value = input?.value.trim() || '';
+  preview.textContent = value || '路径预览：在上方输入后这里会显示完整路径';
+}
+
+function createAddWorkspaceDialog(): HTMLElement {
+  const existing = document.getElementById(ADD_WORKSPACE_DIALOG_ID);
+  if (existing) return existing;
+
+  const overlay = document.createElement('div');
+  overlay.id = ADD_WORKSPACE_DIALOG_ID;
+  overlay.className = 'sync-dialog-overlay add-workspace-overlay';
+  overlay.innerHTML = `
+    <div class="sync-dialog add-workspace-dialog">
+      <div class="sync-dialog-header">
+        <div class="sync-dialog-title">添加工作区</div>
+        <button class="sync-dialog-close" onclick="closeAddWorkspaceDialog()">×</button>
+      </div>
+      <div class="sync-dialog-body">
+        <div class="sync-dialog-field">
+          <label class="sync-dialog-label">📁 工作区路径</label>
+          <textarea
+            id="${ADD_WORKSPACE_INPUT_ID}"
+            class="sync-dialog-input workspace-path-input"
+            rows="3"
+            placeholder="/Users/huanghao/workspace/md-viewer"
+          ></textarea>
+          <div class="workspace-path-hint">支持粘贴长路径。按 Ctrl/Cmd + Enter 快速确认。</div>
+          <div id="${ADD_WORKSPACE_PREVIEW_ID}" class="workspace-path-preview">路径预览：在上方输入后这里会显示完整路径</div>
+        </div>
+      </div>
+      <div class="sync-dialog-footer add-workspace-footer">
+        <button class="sync-dialog-btn" onclick="closeAddWorkspaceDialog()">取消</button>
+        <button class="sync-dialog-btn sync-dialog-btn-primary" onclick="confirmAddWorkspaceDialog()">添加</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      closeAddWorkspaceDialog();
+    }
+  });
+
+  const input = overlay.querySelector(`#${ADD_WORKSPACE_INPUT_ID}`) as HTMLTextAreaElement | null;
+  if (input) {
+    input.addEventListener('input', updateWorkspacePathPreview);
+    input.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        (window as any).confirmAddWorkspaceDialog();
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeAddWorkspaceDialog();
+      }
+    });
+  }
+
+  return overlay;
+}
+
+function showAddWorkspaceDialog(): void {
+  const overlay = createAddWorkspaceDialog();
+  overlay.classList.add('show');
+
+  const input = document.getElementById(ADD_WORKSPACE_INPUT_ID) as HTMLTextAreaElement | null;
+  if (input) {
+    input.value = '';
+    updateWorkspacePathPreview();
+    input.focus();
+  }
+}
+
+function closeAddWorkspaceDialog(): void {
+  const overlay = document.getElementById(ADD_WORKSPACE_DIALOG_ID);
+  if (overlay) {
+    overlay.classList.remove('show');
+  }
+}
+
+async function confirmAddWorkspaceDialog(): Promise<void> {
+  try {
+    const input = document.getElementById(ADD_WORKSPACE_INPUT_ID) as HTMLTextAreaElement | null;
+    const path = input?.value.trim() || '';
+    if (!path) {
+      showWarning('请输入工作区路径');
+      input?.focus();
+      return;
+    }
+
+    const name = getWorkspaceNameFromPath(path);
+    const { addWorkspace } = await import('../workspace');
+    const workspace = addWorkspace(name, path);
+
+    const { renderSidebar } = await import('./sidebar');
+    renderSidebar();
+    closeAddWorkspaceDialog();
+    showSuccess(`已添加工作区: ${workspace.name}`, 2000);
+  } catch (error: any) {
+    console.error('添加工作区失败:', error);
+    showError(`添加工作区失败: ${error?.message || '未知错误'}`);
+  }
+}
 
 // 渲染工作区模式侧边栏
 export function renderWorkspaceSidebar(): string {
@@ -62,6 +183,13 @@ function renderWorkspaceItem(workspace: Workspace): string {
         <span class="workspace-toggle">${toggle}</span>
         <span class="workspace-icon">📁</span>
         <span class="workspace-name">${escapeHtml(workspace.name)}</span>
+        <button
+          class="workspace-remove"
+          title="移除工作区"
+          onclick="event.stopPropagation();handleRemoveWorkspace('${escapeAttr(workspace.id)}')"
+        >
+          ×
+        </button>
       </div>
       ${workspace.isExpanded ? renderFileTree(workspace.id, tree) : ''}
     </div>
@@ -211,6 +339,21 @@ export function bindWorkspaceEvents(): void {
     renderSidebar();
   };
 
+  // 移除工作区
+  (window as any).handleRemoveWorkspace = async (workspaceId: string) => {
+    const workspace = state.config.workspaces.find(ws => ws.id === workspaceId);
+    if (!workspace) return;
+
+    const ok = confirm(`确定移除工作区 "${workspace.name}" 吗？`);
+    if (!ok) return;
+
+    removeWorkspace(workspaceId);
+
+    const { renderSidebar } = await import('./sidebar');
+    renderSidebar();
+    showSuccess(`已移除工作区: ${workspace.name}`, 2000);
+  };
+
   // 目录节点点击
   (window as any).handleNodeClick = async (workspaceId: string, nodePath: string) => {
     toggleNodeExpanded(workspaceId, nodePath);
@@ -253,25 +396,7 @@ export function bindWorkspaceEvents(): void {
   };
 
   // 添加工作区对话框
-  (window as any).showAddWorkspaceDialog = async () => {
-    try {
-      const input = prompt('请输入工作区路径:');
-      if (!input) return;
-
-      const path = input.trim();
-      if (!path) return;
-
-      const name = path.split('/').pop() || 'workspace';
-      const { addWorkspace } = await import('../workspace');
-      const workspace = addWorkspace(name, path);
-
-      const { renderSidebar } = await import('./sidebar');
-      renderSidebar();
-
-      showSuccess(`已添加工作区: ${workspace.name}`, 2000);
-    } catch (error: any) {
-      console.error('添加工作区失败:', error);
-      showError(`添加工作区失败: ${error?.message || '未知错误'}`);
-    }
-  };
+  (window as any).showAddWorkspaceDialog = showAddWorkspaceDialog;
+  (window as any).closeAddWorkspaceDialog = closeAddWorkspaceDialog;
+  (window as any).confirmAddWorkspaceDialog = confirmAddWorkspaceDialog;
 }

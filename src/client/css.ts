@@ -950,6 +950,39 @@ export const styles = `
     .sync-dialog-copy-btn:active {
       background: #e6f7ed;
     }
+    .add-workspace-dialog {
+      max-width: 680px;
+    }
+    .workspace-path-input {
+      resize: vertical;
+      min-height: 92px;
+      font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .workspace-path-hint {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #57606a;
+    }
+    .workspace-path-preview {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      border: 1px solid #d0d7de;
+      background: #f6f8fa;
+      color: #24292e;
+      font-size: 12px;
+      font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      line-height: 1.45;
+      word-break: break-all;
+      max-height: 120px;
+      overflow: auto;
+    }
+    .add-workspace-footer {
+      justify-content: flex-end;
+    }
 
     /* 加载动画 */
     @keyframes spin {
@@ -1131,6 +1164,35 @@ export const styles = `
 
     .workspace-name {
       flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .workspace-remove {
+      opacity: 0;
+      margin-left: 8px;
+      width: 22px;
+      height: 22px;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: #57606a;
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: opacity 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .workspace-header:hover .workspace-remove {
+      opacity: 1;
+    }
+
+    .workspace-remove:hover {
+      background: #ffebe9;
+      color: #cf222e;
     }
 
     .workspace-toggle {

@@ -511,8 +511,49 @@ export const styles = `
       background: #ffebe9;
       color: #cf222e;
     }
-    .file-item .icon {
-      flex-shrink: 0;
+    .file-type-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 5px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid transparent;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      line-height: 1;
+      flex: 0 0 auto;
+      user-select: none;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    .file-type-icon.md {
+      background: #f3f4f6;
+      color: #4b5563;
+      border-color: #d1d5db;
+    }
+    .file-type-icon.html {
+      background: #eaf4ff;
+      color: #0b64c0;
+      border-color: #b9d8fb;
+    }
+    .file-item.current .file-type-icon.html,
+    .tree-item.current .file-type-icon.html {
+      background: #f3f8ff;
+      color: #4f88bf;
+      border-color: #d8e8fb;
+    }
+    .file-item.deleted .file-type-icon,
+    .tree-item.missing .file-type-icon {
+      background: #f8f0f0;
+      color: #b56a6a;
+      border-color: #efdbdb;
+    }
+    .tree-item .file-type-icon {
+      width: 16px;
+      height: 16px;
+      font-size: 9px;
+      border-radius: 4px;
     }
     .new-dot {
       width: 6px;
@@ -912,6 +953,94 @@ export const styles = `
     .markdown-body {
       background: transparent !important;
       font-size: calc(16px * var(--font-scale));
+    }
+    .markdown-body .mermaid-block,
+    .markdown-body .mermaid-fallback-block {
+      margin: 16px 0;
+    }
+    .markdown-body .mermaid-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 6px;
+    }
+    .markdown-body .mermaid-source-toggle {
+      border: 1px solid #d0d7de;
+      background: #fff;
+      color: #57606a;
+      font-size: 12px;
+      line-height: 1;
+      border-radius: 6px;
+      padding: 5px 9px;
+      cursor: pointer;
+    }
+    .markdown-body .mermaid-source-toggle:hover {
+      border-color: #9ca3af;
+      color: #374151;
+    }
+    .markdown-body .mermaid {
+      margin: 0;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+      background: #ffffff;
+      overflow-x: auto;
+    }
+    .markdown-body .mermaid svg {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 0 auto;
+    }
+    .markdown-body .mermaid-fallback-notice {
+      margin: 0 0 8px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid #f0d8a8;
+      background: #fff8e6;
+      color: #8a5a00;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .markdown-body .mermaid-source-panel {
+      margin-top: 8px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #fbfcfe;
+      overflow: hidden;
+    }
+    .markdown-body .mermaid-source-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      border-bottom: 1px solid #e5e7eb;
+      color: #57606a;
+      font-size: 12px;
+    }
+    .markdown-body .mermaid-source-copy {
+      border: 1px solid #d0d7de;
+      background: #fff;
+      color: #57606a;
+      font-size: 12px;
+      line-height: 1;
+      border-radius: 6px;
+      padding: 5px 9px;
+      cursor: pointer;
+    }
+    .markdown-body .mermaid-source-copy:hover {
+      border-color: #9ca3af;
+      color: #374151;
+    }
+    .markdown-body .mermaid-source-copy.copied {
+      color: #1a7f37;
+      border-color: #9bd0aa;
+      background: #f2fbf5;
+    }
+    .markdown-body .mermaid-source-panel pre {
+      margin: 0;
+      border: none;
+      border-radius: 0;
+      background: transparent;
     }
     .content-file-status {
       margin-bottom: 12px;

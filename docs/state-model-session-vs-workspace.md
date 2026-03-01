@@ -67,23 +67,23 @@
 
 ```mermaid
 flowchart TD
-  E1[scanWorkspace] --> W1[updateWorkspaceListDiff]
-  W1 --> S1[listDiffPaths]
-  W1 --> S2[workspaceMissingPaths]
-  S1 --> U1[工作区树蓝点]
-  S2 --> U2[工作区删除态 D/划线]
+  E1["scanWorkspace"] --> W1["updateWorkspaceListDiff"]
+  W1 --> S1["listDiffPaths"]
+  W1 --> S2["workspaceMissingPaths"]
+  S1 --> U1["工作区树蓝点"]
+  S2 --> U2["工作区删除态 D/划线"]
 
-  E2[file-deleted SSE] --> D1{sessionFiles 中存在?}
-  D1 -->|是| D2[sessionFiles[path].isMissing = true]
-  D1 -->|否| D3[markWorkspacePathMissing(path)]
-  D2 --> U3[tabs/正文删除提示]
+  E2["file-deleted SSE"] --> D1{"sessionFiles 中存在?"}
+  D1 -->|是| D2["sessionFiles.path.isMissing = true"]
+  D1 -->|否| D3["markWorkspacePathMissing(path)"]
+  D2 --> U3["tabs/正文删除提示"]
   D3 --> U2
 
-  E3[点击文件加载成功] --> A1[addOrUpdateFile]
-  A1 --> A2[clearWorkspacePathMissing(path)]
-  A1 --> U4[正文 + tabs]
+  E3["点击文件加载成功"] --> A1["addOrUpdateFile"]
+  A1 --> A2["clearWorkspacePathMissing(path)"]
+  A1 --> U4["正文 + tabs"]
 
-  E4[点击文件加载失败(不存在)] --> F1[markFileMissing(path)]
+  E4["点击文件加载失败(不存在)"] --> F1["markFileMissing(path)"]
   F1 --> U3
 ```
 
@@ -102,7 +102,7 @@ flowchart TD
 - `workspace-state.ts`
   - facade 出口，供业务模块稳定引用
 
-## 4. 现状与剩余工作
+## 4. 现状与完成项
 
 已完成：
 - `state.files` 已更名为 `state.sessionFiles`（语义明确）
@@ -110,6 +110,9 @@ flowchart TD
 - 工作区状态已拆分到独立模块：`src/client/workspace-state.ts`
 - 新增正式回归 case：`tests/e2e/cases/case-15/`（未打开文件删除后立即显示删除态）
 
-待继续：
-1. 可选：为 `workspace-state-diff.ts` 增加更细粒度单元测试
-2. 可选：将 `sessionFiles` 与同步状态进一步拆分（sync-state）
+本轮完成：
+1. 已补充 `workspace-state-diff` 细粒度单测：
+- `tests/unit/workspace-state-diff.test.ts`
+2. 已将同步状态从 `sessionFiles` 中拆分：
+- 新增 `src/client/sync-state.ts`
+- `FileInfo` 移除 `synced*` 字段，转由 `sync-state` 独立维护（含本地持久化）

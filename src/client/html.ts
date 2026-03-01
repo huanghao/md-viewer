@@ -52,6 +52,7 @@ export function generateClientHTML(): string {
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css/github-markdown-light.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js/styles/github.css">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"><\/script>
   <style>${styles}</style>
 </head>
 <body>

@@ -3,6 +3,7 @@ import { state, getSessionFile, getSessionFiles, hasSessionFile } from '../state
 import { hasListDiff, isWorkspacePathMissing, getWorkspaceMissingPaths } from '../workspace-state';
 import { escapeHtml, escapeAttr } from '../utils/escape';
 import { getFileListStatus } from '../utils/file-status';
+import { getFileTypeIcon } from '../utils/file-type';
 import { showError, showSuccess, showWarning } from './toast';
 import { attachPathAutocomplete } from './path-autocomplete';
 import {
@@ -304,6 +305,7 @@ function renderTreeNode(workspaceId: string, node: FileTreeNode, depth: number):
     const openedFile = getSessionFile(node.path);
     const listDiff = hasListDiff(node.path);
     const isMissing = !!openedFile?.isMissing || isWorkspacePathMissing(node.path);
+    const typeIcon = getFileTypeIcon(node.path);
 
     // 获取文件状态（优先级：D > M > 蓝点）
     let statusBadge = '&nbsp;';
@@ -333,6 +335,7 @@ function renderTreeNode(workspaceId: string, node: FileTreeNode, depth: number):
              onclick="handleFileClick('${escapeAttr(node.path)}')">
           <span class="tree-indent" style="width: ${indentPx}px"></span>
           <span class="tree-toggle"></span>
+          <span class="file-type-icon ${typeIcon.cls}">${escapeHtml(typeIcon.label)}</span>
           <span class="tree-name">${escapeHtml(node.name)}</span>
           <span class="file-item-status">${statusBadge}</span>
         </div>
@@ -421,10 +424,12 @@ function renderMissingOpenFiles(workspaceId: string, workspacePath: string, tree
     <div class="tree-missing-section">
       <div class="tree-missing-title">已删除</div>
       ${missingRows.map((row) => {
+        const typeIcon = getFileTypeIcon(row.path);
         return `
           <div class="tree-item file-node missing ${row.isCurrent ? 'current' : ''}" onclick="handleFileClick('${escapeAttr(row.path)}')">
             <span class="tree-indent" style="width: 12px"></span>
             <span class="tree-toggle"></span>
+            <span class="file-type-icon ${typeIcon.cls}">${escapeHtml(typeIcon.label)}</span>
             <span class="tree-name">${escapeHtml(row.name)}</span>
             <span class="file-item-status"><span class="status-badge status-deleted">D</span></span>
             ${row.hasRetry ? `<button class="tree-inline-action" title="重试加载" onclick="event.stopPropagation(); handleRetryMissingFile('${escapeAttr(row.path)}')">↻</button>` : ''}

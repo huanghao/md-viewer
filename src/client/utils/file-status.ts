@@ -1,4 +1,5 @@
 import type { FileInfo } from '../types';
+import { getSyncMeta } from '../sync-state';
 
 export interface FileListStatus {
   badge: 'M' | 'D' | 'dot' | null;  // M=Modified, D=Deleted, dot=蓝点
@@ -57,6 +58,6 @@ export function needsRefresh(file: FileInfo): boolean {
 /**
  * 判断文件是否已同步
  */
-export function isSynced(file: FileInfo): boolean {
-  return !!file.syncedDocId;
+export function isSynced(filePath: string): boolean {
+  return !!getSyncMeta(filePath)?.docId;
 }

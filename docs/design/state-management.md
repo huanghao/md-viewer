@@ -110,9 +110,11 @@ Facade 位置：
 - LRU/配额保护已在 `state.ts` 中处理
 
 待增强：
-1. 为 `workspace-state-diff.ts` 增加更细粒度单测
-2. 进一步拆分同步状态（可选 `sync-state`）
-3. 将目录监听与轮询策略统一成可配置策略（可选）
+1. 将目录监听与轮询策略统一成可配置策略（可选）
+
+已完成补充：
+1. `workspace-state-diff` 细粒度单测：`tests/unit/workspace-state-diff.test.ts`
+2. 同步状态拆分：`src/client/sync-state.ts`（与 `sessionFiles` 解耦）
 
 ---
 
@@ -127,4 +129,3 @@ Facade 位置：
 
 对应目录：
 - `tests/e2e/cases/case-11/` 到 `tests/e2e/cases/case-15/`
-

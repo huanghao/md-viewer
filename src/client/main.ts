@@ -14,6 +14,7 @@ import { getSyncStatus, getRecentParents, getSyncParentMeta, executeSync, getSyn
 import { escapeHtml, escapeAttr, escapeJsSingleQuoted } from './utils/escape';
 import { formatRelativeTime, formatFileTime } from './utils/format';
 import { generateDistinctNames } from './utils/file-names';
+import { getSyncMeta, setSyncMeta, clearSyncMeta } from './sync-state';
 
 // 导入 UI 组件
 import { renderSidebar } from './ui/sidebar';
@@ -27,6 +28,7 @@ const SIDEBAR_MAX_WIDTH = 680;
 const fileRefreshSeq = new Map<string, number>();
 const PARENT_URL_SKIP_SEGMENTS = new Set(['doc', 'docs', 'page', 'pages', 'content', 'wiki']);
 let workspacePollRunning = false;
+let mermaidInitialized = false;
 
 // ==================== 消息处理 ====================
 async function onFileLoaded(data: FileData, focus: boolean = false) {
@@ -275,6 +277,130 @@ function rewriteMarkdownAssetUrls(container: HTMLElement, currentFilePath: strin
   });
 }
 
+async function renderMermaidDiagrams(container: HTMLElement): Promise<void> {
+  const mermaid = (window as any).mermaid;
+  if (!mermaid) return;
+
+  const codeBlocks = Array.from(
+    container.querySelectorAll('.markdown-body pre > code.language-mermaid, .markdown-body pre > code.lang-mermaid')
+  ) as HTMLElement[];
+  if (codeBlocks.length === 0) return;
+
+  if (!mermaidInitialized) {
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'neutral',
+      securityLevel: 'loose'
+    });
+    mermaidInitialized = true;
+  }
+
+  const setCopiedState = (button: HTMLButtonElement): void => {
+    const original = button.textContent || '复制';
+    button.textContent = '✓';
+    button.classList.add('copied');
+    window.setTimeout(() => {
+      button.textContent = original;
+      button.classList.remove('copied');
+    }, 900);
+  };
+
+  const createMermaidSourcePanel = (
+    source: string,
+    showByDefault: boolean
+  ): { panel: HTMLDivElement; toggleButton: HTMLButtonElement } => {
+    const panel = document.createElement('div');
+    panel.className = 'mermaid-source-panel';
+    panel.style.display = showByDefault ? 'block' : 'none';
+
+    const head = document.createElement('div');
+    head.className = 'mermaid-source-head';
+    const title = document.createElement('span');
+    title.textContent = 'Mermaid 源码';
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'mermaid-source-copy';
+    copyBtn.textContent = '复制';
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(source);
+        setCopiedState(copyBtn);
+      } catch {
+        // ignore clipboard errors
+      }
+    });
+    head.appendChild(title);
+    head.appendChild(copyBtn);
+
+    const sourcePre = document.createElement('pre');
+    const sourceCode = document.createElement('code');
+    sourceCode.className = 'language-mermaid';
+    sourceCode.textContent = source;
+    sourcePre.appendChild(sourceCode);
+    panel.appendChild(head);
+    panel.appendChild(sourcePre);
+
+    const toggleButton = document.createElement('button');
+    toggleButton.className = 'mermaid-source-toggle';
+    toggleButton.textContent = showByDefault ? '隐藏源码' : '源码';
+    toggleButton.addEventListener('click', () => {
+      const shown = panel.style.display !== 'none';
+      panel.style.display = shown ? 'none' : 'block';
+      toggleButton.textContent = shown ? '源码' : '隐藏源码';
+    });
+
+    return { panel, toggleButton };
+  };
+
+  for (let i = 0; i < codeBlocks.length; i += 1) {
+    const codeEl = codeBlocks[i];
+    const preEl = codeEl.closest('pre');
+    if (!preEl) continue;
+    const source = (codeEl.textContent || '').trim();
+    if (!source) continue;
+
+    try {
+      const renderId = `mdv-mermaid-${Date.now()}-${i}`;
+      const { svg, bindFunctions } = await mermaid.render(renderId, source);
+      const block = document.createElement('div');
+      block.className = 'mermaid-block';
+      const actions = document.createElement('div');
+      actions.className = 'mermaid-actions';
+      const { panel, toggleButton } = createMermaidSourcePanel(source, false);
+      actions.appendChild(toggleButton);
+
+      const host = document.createElement('div');
+      host.className = 'mermaid';
+      host.setAttribute('data-mdv-mermaid', '1');
+      host.innerHTML = svg;
+      block.appendChild(actions);
+      block.appendChild(host);
+      block.appendChild(panel);
+      preEl.replaceWith(block);
+
+      if (typeof bindFunctions === 'function') {
+        bindFunctions(host);
+      }
+    } catch (error) {
+      // 语法错误时回退显示源码，并给出明确提示
+      const block = document.createElement('div');
+      block.className = 'mermaid-fallback-block';
+      const actions = document.createElement('div');
+      actions.className = 'mermaid-actions';
+      const { panel, toggleButton } = createMermaidSourcePanel(source, true);
+      actions.appendChild(toggleButton);
+
+      const notice = document.createElement('div');
+      notice.className = 'mermaid-fallback-notice';
+      notice.textContent = 'Mermaid 语法错误，已回退为原文显示';
+      block.appendChild(actions);
+      block.appendChild(notice);
+      block.appendChild(panel);
+      preEl.replaceWith(block);
+      console.error('Mermaid 渲染失败，已回退原文:', error);
+    }
+  }
+}
+
 function renderContent() {
   const container = document.getElementById('content');
   if (!container) return;
@@ -319,6 +445,7 @@ function renderContent() {
     : '';
   container.innerHTML = `${deletedNotice}<div class="markdown-body">${html}</div>`;
   rewriteMarkdownAssetUrls(container, file.path);
+  void renderMermaidDiagrams(container);
 
   // 更新文件元信息（仅显示相对时间）
   const meta = document.getElementById('fileMeta');
@@ -949,14 +1076,30 @@ async function updateSyncButton() {
   }
 
   button.style.display = 'block';
+  const currentPath = state.currentFile;
+  const cached = getSyncMeta(currentPath);
+  if (cached?.docId) {
+    button.className = 'toolbar-text-button synced';
+    buttonText.textContent = '[✓ 已同步]';
+  } else {
+    button.className = 'toolbar-text-button';
+    buttonText.textContent = '[☁↑ 同步]';
+  }
 
   try {
-    const data = await getSyncStatus(state.currentFile);
+    const data = await getSyncStatus(currentPath);
 
     if (data.docId) {
+      setSyncMeta(currentPath, {
+        docId: data.docId,
+        url: data.url,
+        title: data.title,
+        syncedAt: data.lastSyncTime,
+      });
       button.className = 'toolbar-text-button synced';
       buttonText.textContent = '[✓ 已同步]';
     } else {
+      clearSyncMeta(currentPath);
       button.className = 'toolbar-text-button';
       buttonText.textContent = '[☁↑ 同步]';
     }
@@ -979,6 +1122,16 @@ async function handleSyncButtonClick() {
   if (button && button.classList.contains('syncing')) return;
 
   const data = await getSyncStatus(state.currentFile);
+  if (data.docId) {
+    setSyncMeta(state.currentFile, {
+      docId: data.docId,
+      url: data.url,
+      title: data.title,
+      syncedAt: data.lastSyncTime,
+    });
+  } else {
+    clearSyncMeta(state.currentFile);
+  }
 
   if (data.docId) {
     showSyncedInfoPopover(data);
@@ -1242,6 +1395,12 @@ async function confirmSync() {
     const result = await executeSync(state.currentFile, title, parentId, false);
 
     if (result.success) {
+      setSyncMeta(state.currentFile, {
+        docId: result.docId,
+        url: result.url,
+        title: result.title,
+        syncedAt: Date.now(),
+      });
       if (openAfter && result.url) {
         window.open(result.url, '_blank');
         closeSyncDialog();

@@ -17,6 +17,21 @@ export function isMarkdownFile(path: string): boolean {
 }
 
 /**
+ * 检查是否为 HTML 文件
+ */
+export function isHtmlFile(path: string): boolean {
+  const ext = getFileExtension(path);
+  return ext === 'html' || ext === 'htm';
+}
+
+export function getFileTypeIcon(path: string): { cls: 'md' | 'html'; label: string } {
+  if (isHtmlFile(path)) {
+    return { cls: 'html', label: '<>' };
+  }
+  return { cls: 'md', label: 'M' };
+}
+
+/**
  * 获取文件类型的显示名称
  */
 export function getFileTypeLabel(path: string): string | null {

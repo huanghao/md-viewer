@@ -113,6 +113,14 @@
 
 注：分值用于回归比较，不是绝对质量分。
 
+## 6.1 2026-03-02 补充落地
+
+- 已新增 `workspace-state-diff` 细粒度单测：
+  - `tests/unit/workspace-state-diff.test.ts`
+- 已完成同步状态拆分：
+  - `sessionFiles` 不再承载 `synced*` 字段
+  - 新增独立 `sync-state` 模块维护同步元数据
+
 ---
 
 ## 7. 变更评审模板
@@ -128,4 +136,3 @@
 - Risk: ...
 - Mitigation: ...
 ```
-

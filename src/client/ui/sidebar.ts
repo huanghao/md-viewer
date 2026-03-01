@@ -4,6 +4,7 @@ import { saveConfig } from '../config';
 import { escapeAttr, escapeHtml } from '../utils/escape';
 import { generateDistinctNames } from '../utils/file-names';
 import { getFileListStatus } from '../utils/file-status';
+import { getFileTypeIcon } from '../utils/file-type';
 import { renderWorkspaceSidebar, bindWorkspaceEvents } from './sidebar-workspace';
 
 let lastEscAt = 0;
@@ -220,6 +221,7 @@ export function renderFiles(): void {
     .map(file => {
       const isCurrent = file.path === state.currentFile;
       const isMissing = file.isMissing || false;
+      const typeIcon = getFileTypeIcon(file.path);
       const classes = [
         'file-item',
         isCurrent ? 'current' : '',
@@ -254,7 +256,7 @@ export function renderFiles(): void {
       return `
       <div class="${classes}"
            onclick="window.switchFile('${escapeAttr(file.path)}')">
-        <span class="icon">📄</span>
+        <span class="file-type-icon ${typeIcon.cls}">${escapeHtml(typeIcon.label)}</span>
         <span class="name">${displayName}</span>
         <span class="file-item-status">${statusBadge}</span>
         <span class="close" onclick="event.stopPropagation();window.removeFile('${escapeAttr(file.path)}')">×</span>

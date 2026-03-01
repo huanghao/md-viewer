@@ -8,11 +8,6 @@ export interface FileInfo {
   isRemote: boolean;
   displayName?: string;
   isMissing?: boolean;        // 标识文件是否不存在
-
-  // 同步相关
-  syncedDocId?: string;       // 学城文档 ID
-  syncedUrl?: string;         // 学城文档 URL
-  syncedAt?: number;          // 同步时间
 }
 
 // 工作区类型
@@ -127,4 +122,11 @@ export interface SyncStatusData {
 
 export interface SyncPreferences {
   openAfterSync?: boolean;
+}
+
+export interface SyncMeta {
+  docId?: string;
+  url?: string;
+  title?: string;
+  syncedAt?: number;
 }

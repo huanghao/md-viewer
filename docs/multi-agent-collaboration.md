@@ -1,5 +1,7 @@
 # Multi-Agent Collaboration Rules
 
+This file is the operational playbook (step-level workflows and command-level guidance).
+
 ## Task Lifecycle
 
 1. Before selecting a task:

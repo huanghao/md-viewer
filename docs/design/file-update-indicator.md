@@ -1,5 +1,14 @@
 # 文件更新提示设计方案
 
+> 2026-03-02 实现对齐说明（重要）：
+> - 文中旧字段 `state.sessionFiles` 在当前代码中对应 `state.sessionFiles`。
+> - 工作区删除态已独立为 `workspaceMissingPaths`，不再要求文件先进入 `sessionFiles`。
+> - 未打开文件删除后立即显示 `D + 划线`（见 `case-15`）。
+> - 工作区状态模块已拆分为：
+>   - `workspace-state-diff.ts`
+>   - `workspace-state-missing.ts`
+>   - `workspace-state-persistence.ts`
+
 ## 设计原则
 
 **核心原则：状态解耦，独立维护**
@@ -543,9 +552,9 @@ function getSyncStatus(file: FileInfo): SyncStatus {
 
 ```typescript
 export function addOrUpdateFile(fileData: FileData, switchTo: boolean = false): void {
-  const existing = state.files.get(fileData.path);
+  const existing = state.sessionFiles.get(fileData.path);
 
-  state.files.set(fileData.path, {
+  state.sessionFiles.set(fileData.path, {
     path: fileData.path,
     name: fileData.filename,
     content: fileData.content,
@@ -609,7 +618,7 @@ const eventSource = new EventSource('/api/events');
 // 文件内容变化
 eventSource.addEventListener('file-changed', async (e: any) => {
   const data = JSON.parse(e.data);
-  const file = state.files.get(data.path);
+  const file = state.sessionFiles.get(data.path);
 
   if (file) {
     // 关键：只更新 lastModified，不更新 content 和 displayedModified
@@ -624,7 +633,7 @@ eventSource.addEventListener('file-changed', async (e: any) => {
 // 文件删除
 eventSource.addEventListener('file-deleted', async (e: any) => {
   const data = JSON.parse(e.data);
-  const file = state.files.get(data.path);
+  const file = state.sessionFiles.get(data.path);
 
   if (file) {
     // 标记文件为不存在
@@ -683,7 +692,7 @@ function switchFile(path: string) {
 
 ```typescript
 async function refreshFile(path: string) {
-  const file = state.files.get(path);
+  const file = state.sessionFiles.get(path);
   if (!file) return;
 
   const oldContent = file.content;
@@ -815,7 +824,7 @@ async function confirmSync() {
   // ... 执行同步 ...
 
   if (result.success) {
-    const file = state.files.get(state.currentFile!);
+    const file = state.sessionFiles.get(state.currentFile!);
     if (file) {
       // 只保存同步标记，不保存内容
       file.syncedDocId = result.docId;
@@ -835,7 +844,7 @@ async function confirmSync() {
 async function handleSyncButtonClick() {
   if (!state.currentFile) return;
 
-  const file = state.files.get(state.currentFile);
+  const file = state.sessionFiles.get(state.currentFile);
   if (!file) return;
 
   // 如果已经同步过，提示用户

@@ -1,5 +1,10 @@
 # 学城同步功能设计文档（简化版）
 
+> 2026-03-02 对齐说明：
+> - 客户端会话文件集合字段已由 `state.sessionFiles` 更名为 `state.sessionFiles`。
+> - 工作区删除态与列表差异状态已拆分到 `workspace-state` 模块，不与会话文件集合耦合。
+> - 本文中的同步设计仅描述“同步域状态”，不再承担文件存在性/删除态语义。
+
 ## 功能概述
 
 为 MD Viewer 添加将 Markdown 文件同步到学城（通过 km-cli）的功能，支持快速选择常用位置或手动输入目标位置。
@@ -151,10 +156,10 @@
 
 ### 2. 客户端状态扩展（简化版）
 
-在现有的 `state.files` 中添加同步信息：
+在现有的 `state.sessionFiles` 中添加同步信息：
 
 ```javascript
-state.files.set(path, {
+state.sessionFiles.set(path, {
   path: '/path/to/api.md',
   name: 'api.md',
   content: '# API 文档...',

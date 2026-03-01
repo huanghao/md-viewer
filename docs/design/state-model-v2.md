@@ -1,6 +1,8 @@
-# 文件状态模型 V2（重构提案）
+# 文件状态模型 V2（已落地基线）
 
-日期：2026-03-01
+日期：2026-03-02
+
+状态：已落地（保留本文作为语义说明与演进记录）
 
 ## 背景
 当前状态可用，但语义混杂：
@@ -41,7 +43,7 @@
 
 来源：
 - 工作区模式：`workspace 扫描结果` vs `workspaceKnownFiles` 的差异
-- 简单模式：路径首次加入 `state.files`
+- 简单模式：路径首次加入 `state.sessionFiles`
 
 ### 维度 D：同步状态（SyncState）
 - `unsynced`
@@ -54,14 +56,14 @@
 ## 状态作用域（必须区分）
 
 ### 1) OpenFileState（文件内容态）
-- 作用范围：`state.files`
+- 作用范围：`state.sessionFiles`
 - 包含维度：A/B/C/D
 - UI 投影：简单模式列表、工具栏
 
 ### 2) WorkspaceTreeState（工作区目录树）
 - 作用范围：`state.fileTree`
 - 当前模型：目录快照（非实时）
-- 建议扩展：`workspaceKnownFiles` + `workspaceNewFiles`
+- 建议扩展：`workspaceKnownFiles` + `listDiffPaths`
 - 包含维度：目录发现语义 + 列表差异语义
 
 ---
@@ -92,7 +94,7 @@
 |---|---|---|
 | `isMissing` | Availability | `missing` |
 | `lastModified > displayedModified` | Freshness | `dirty` |
-| `listDiffPaths/workspaceNewFiles` | ListDiff | `diff` |
+| `listDiffPaths` | ListDiff | `diff` |
 | `syncedDocId` 等 | SyncState | `synced` |
 | `state.currentFile` | 选择态 | 非业务状态 |
 | `state.fileTree` | WorkspaceTreeState | 快照，不是 open state |
@@ -117,17 +119,18 @@
 1. 固化 UI 规则：badge 只看 A/B/C。
 2. 文档明确“sync 状态不入列表 badge”。
 
-### Phase 2（补工作区新文件语义）
-1. 新增：
-- `workspaceKnownFiles: Map<workspaceId, Set<path>>`
-- `workspaceNewFiles: Map<workspaceId, Set<path>>`
-2. 扫描差异：首次扫描建基线；后续扫描差异标记为 new。
-3. simple 模式“首次加入列表”也映射到同一蓝点语义（ListDiff）。
+### Phase 2（已完成）
+1. 已新增：
+- `workspaceKnownFiles`（持久化快照）
+- `listDiffPaths`（蓝点）
+- `workspaceMissingPaths`（删除态）
+2. 扫描差异：首次扫描建基线；后续扫描差异标记蓝点与删除态。
+3. simple 模式“首次加入列表”映射到统一 ListDiff 语义。
 
-### Phase 3（实时化）
-1. 增加 workspace watcher（`**/*.md` add/unlink/change）。
-2. SSE 下发 `workspace-changed`。
-3. 客户端对展开中的工作区 debounce 更新。
+### Phase 3（已完成）
+1. 已增加 workspace 目录级 watcher（`**/*.md/*.markdown/*.html/*.htm`）。
+2. 已使用 SSE 事件补充文件变更/删除链路。
+3. 已增加展开工作区轮询扫描作为一致性兜底。
 
 ---
 
@@ -149,17 +152,17 @@
 
 ---
 
-## Review 结论（2026-03-01）
+## Review 结论（更新）
 
 1. 已确认：拆分“工作区新文件提示”与“open unread”。
 2. 已确认：列表 badge 永远只显示 A/B/C，不显示 sync。
-3. 已确认：先做 Phase 2，再做 workspace watcher。
+3. 已完成：Phase 2 与 workspace watcher 落地。
 
 补充确认：
 - 只要文件被工作区“新扫描到”，就显示当前的小蓝点提示。
 - 文件是否“已打开”，不作为蓝点提示的前置条件。
 
 实现提示：
-- `workspaceKnownFiles/workspaceNewFiles` 负责工作区蓝点。
+- `workspaceKnownFiles/listDiffPaths` 负责工作区蓝点。
 - simple 模式首次加入列表同样进入 ListDiff 蓝点语义。
 - 保留统一 UI：蓝点只表示“列表差异”，不表示 open/read。

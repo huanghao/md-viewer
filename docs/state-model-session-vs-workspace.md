@@ -63,6 +63,45 @@
 - 如果文件已在 `sessionFiles`：标记 `isMissing`
 - 否则：仅标记 `workspaceMissingPaths`（不污染 tabs）
 
+## 3.1 状态迁移图（事件 -> 状态 -> UI）
+
+```mermaid
+flowchart TD
+  E1[scanWorkspace] --> W1[updateWorkspaceListDiff]
+  W1 --> S1[listDiffPaths]
+  W1 --> S2[workspaceMissingPaths]
+  S1 --> U1[工作区树蓝点]
+  S2 --> U2[工作区删除态 D/划线]
+
+  E2[file-deleted SSE] --> D1{sessionFiles 中存在?}
+  D1 -->|是| D2[sessionFiles[path].isMissing = true]
+  D1 -->|否| D3[markWorkspacePathMissing(path)]
+  D2 --> U3[tabs/正文删除提示]
+  D3 --> U2
+
+  E3[点击文件加载成功] --> A1[addOrUpdateFile]
+  A1 --> A2[clearWorkspacePathMissing(path)]
+  A1 --> U4[正文 + tabs]
+
+  E4[点击文件加载失败(不存在)] --> F1[markFileMissing(path)]
+  F1 --> U3
+```
+
+## 3.2 模块分层
+
+- `workspace-state-diff.ts`
+  - `listDiffPaths`
+  - `updateWorkspaceListDiff`
+  - `removeWorkspaceTracking`
+  - `restoreWorkspaceAuxiliaryState`
+- `workspace-state-missing.ts`
+  - `workspaceMissingPaths`
+  - missing 查询与标记 API
+- `workspace-state-persistence.ts`
+  - `workspaceKnownFiles` 持久化与恢复
+- `workspace-state.ts`
+  - facade 出口，供业务模块稳定引用
+
 ## 4. 现状与剩余工作
 
 已完成：
@@ -72,5 +111,5 @@
 - 新增正式回归 case：`tests/e2e/cases/case-15/`（未打开文件删除后立即显示删除态）
 
 待继续：
-1. 在 docs 中补状态迁移图（事件 -> 状态 -> UI）
-2. 将 `workspace-state` 的 API 进一步分层：`diff` / `missing` / `persistence`
+1. 可选：为 `workspace-state-diff.ts` 增加更细粒度单元测试
+2. 可选：将 `sessionFiles` 与同步状态进一步拆分（sync-state）

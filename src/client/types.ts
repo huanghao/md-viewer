@@ -109,6 +109,7 @@ export interface SyncResult {
   success: boolean;
   docId?: string;
   url?: string;
+  title?: string;
   error?: string;
   command?: string;
   output?: string;
@@ -118,6 +119,7 @@ export interface SyncStatusData {
   path: string;
   docId?: string;
   url?: string;
+  title?: string;
   lastSyncTime?: number;
   command?: string;
 }

@@ -684,6 +684,36 @@ export const styles = `
     .toolbar-text-button.synced:hover {
       background: rgba(26, 127, 55, 0.08);
     }
+    .sync-info-popover {
+      z-index: 40;
+      border: 1px solid #d0d7de;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16);
+      padding: 10px 12px;
+    }
+    .sync-info-popover-link {
+      display: inline-block;
+      max-width: 100%;
+      color: #0969da;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.4;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      border-bottom: 1px dashed rgba(9, 105, 218, 0.35);
+    }
+    .sync-info-popover-link:hover {
+      border-bottom-color: #0969da;
+    }
+    .sync-info-popover-time {
+      margin-top: 6px;
+      color: #57606a;
+      font-size: 12px;
+      line-height: 1.35;
+    }
 
     /* 面包屑 */
     .breadcrumb {
@@ -924,7 +954,7 @@ export const styles = `
     }
     .sync-dialog {
       background: #fff;
-      border-radius: 12px;
+      border-radius: 10px;
       box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
       width: 90%;
       max-width: 520px;
@@ -932,7 +962,7 @@ export const styles = `
       overflow-y: auto;
     }
     .sync-dialog-header {
-      padding: 20px 24px;
+      padding: 14px 16px;
       border-bottom: 1px solid #e1e4e8;
       display: flex;
       align-items: center;
@@ -961,24 +991,24 @@ export const styles = `
       background: #f6f8fa;
     }
     .sync-dialog-body {
-      padding: 24px;
+      padding: 14px 16px;
     }
     .sync-dialog-field {
-      margin-bottom: 20px;
+      margin-bottom: 12px;
     }
     .sync-dialog-label {
       display: block;
       font-size: 13px;
       font-weight: 600;
       color: #24292e;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
     .sync-dialog-input {
       width: 100%;
-      padding: 8px 12px;
+      padding: 7px 10px;
       border: 1px solid #d1d5da;
       border-radius: 6px;
-      font-size: 14px;
+      font-size: 13px;
       font-family: inherit;
     }
     .sync-dialog-input:focus {
@@ -987,19 +1017,19 @@ export const styles = `
       box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
     }
     .sync-dialog-recent {
-      max-height: 200px;
+      max-height: 168px;
       overflow-y: auto;
       border: 1px solid #d1d5da;
       border-radius: 6px;
-      margin-bottom: 16px;
+      margin-bottom: 8px;
     }
     .sync-dialog-recent-item {
-      padding: 12px;
+      padding: 8px 10px;
       border-bottom: 1px solid #e1e4e8;
       cursor: pointer;
       display: flex;
-      align-items: flex-start;
-      gap: 12px;
+      align-items: center;
+      gap: 8px;
     }
     .sync-dialog-recent-item:last-child {
       border-bottom: none;
@@ -1008,34 +1038,39 @@ export const styles = `
       background: #f6f8fa;
     }
     .sync-dialog-recent-item.selected {
-      background: #ddf4ff;
+      background: #f8fafc;
     }
     .sync-dialog-recent-radio {
-      margin-top: 2px;
+      margin: 0;
     }
-    .sync-dialog-recent-info {
+    .sync-dialog-recent-main {
       flex: 1;
-    }
-    .sync-dialog-recent-title {
-      font-size: 14px;
-      color: #24292e;
-      margin-bottom: 4px;
+      min-width: 0;
       display: flex;
       align-items: center;
       gap: 8px;
+      white-space: nowrap;
     }
-    .sync-dialog-link-icon {
-      font-size: 14px;
+    .sync-dialog-recent-title-link {
+      color: #24292e;
       text-decoration: none;
-      opacity: 0.6;
-      transition: opacity 0.2s;
+      border-bottom: 1px dashed transparent;
+      min-width: 0;
+      max-width: 60%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 13px;
+      line-height: 1.2;
     }
-    .sync-dialog-link-icon:hover {
-      opacity: 1;
+    .sync-dialog-recent-title-link:hover {
+      color: #0969da;
+      border-bottom-color: #0969da;
     }
-    .sync-dialog-recent-meta {
+    .sync-dialog-recent-inline-meta {
       font-size: 12px;
       color: #586069;
+      flex-shrink: 0;
+      line-height: 1.2;
     }
     .sync-dialog-checkbox {
       display: flex;
@@ -1043,22 +1078,79 @@ export const styles = `
       gap: 8px;
       font-size: 13px;
       color: #24292e;
-      margin-bottom: 20px;
+      margin-bottom: 0;
     }
     .sync-dialog-manual-input {
-      margin-top: 12px;
+      margin-top: 8px;
+    }
+    .sync-dialog-parent-meta {
+      margin-top: 6px;
+      min-height: 18px;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .sync-dialog-parent-meta-link {
+      color: #0969da;
+      text-decoration: none;
+      border-bottom: 1px dashed rgba(9, 105, 218, 0.35);
+      display: inline-block;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .sync-dialog-parent-meta-link:hover {
+      border-bottom-color: #0969da;
+    }
+    .sync-dialog-parent-meta-text {
+      color: #374151;
+    }
+    .sync-dialog-parent-meta-muted {
+      color: #6b7280;
     }
     .sync-dialog-footer {
-      padding: 16px 24px;
+      padding: 10px 16px;
       border-top: 1px solid #e1e4e8;
       display: flex;
-      justify-content: center;
-      gap: 12px;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .sync-dialog-status {
+      margin-top: 10px;
+    }
+    .sync-dialog-status-block {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 9px 10px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .sync-dialog-status-block.running {
+      background: #f5f8ff;
+      border-color: #d6e4ff;
+      color: #1d4ed8;
+    }
+    .sync-dialog-status-block.error {
+      background: #fff4f2;
+      border-color: #ffd6d1;
+      color: #b42318;
+    }
+    .sync-dialog-status-block.success {
+      background: #edfdf3;
+      border-color: #c7f0d4;
+      color: #116329;
+    }
+    .sync-dialog-status-message {
+      margin-bottom: 8px;
+    }
+    .sync-dialog-status-line {
+      margin-bottom: 8px;
+      color: #374151;
     }
     .sync-dialog-btn {
-      padding: 8px 16px;
+      padding: 6px 12px;
       border-radius: 6px;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 500;
       cursor: pointer;
       border: 1px solid #d1d5da;
@@ -1069,22 +1161,21 @@ export const styles = `
       background: #f6f8fa;
     }
     .sync-dialog-btn-primary {
-      background: #2ea44f;
+      background: #0969da;
       color: #fff;
-      border-color: #2ea44f;
-      padding: 8px 24px;
+      border-color: #0969da;
     }
     .sync-dialog-btn-primary:hover {
-      background: #2c974b;
+      background: #0550ae;
     }
     .sync-dialog-btn:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
     .sync-dialog-button {
-      padding: 8px 16px;
+      padding: 6px 12px;
       border-radius: 6px;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 500;
       cursor: pointer;
       border: 1px solid #d1d5da;
@@ -1095,38 +1186,50 @@ export const styles = `
       background: #f6f8fa;
     }
     .sync-dialog-button.primary {
-      background: #2ea44f;
+      background: #0969da;
       color: #fff;
-      border-color: #2ea44f;
+      border-color: #0969da;
     }
     .sync-dialog-button.primary:hover {
-      background: #2c974b;
+      background: #0550ae;
     }
     .sync-dialog-button:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
-    .sync-dialog-success {
-      text-align: center;
-      padding: 24px;
-    }
-    .sync-dialog-success-icon {
-      font-size: 48px;
-      color: #2ea44f;
-      margin-bottom: 16px;
-    }
-    .sync-dialog-success-text {
-      font-size: 16px;
-      color: #24292e;
-      margin-bottom: 12px;
-    }
     .sync-dialog-link {
       color: #0969da;
       text-decoration: none;
-      font-size: 14px;
+      font-size: 12px;
+      word-break: break-all;
+    }
+    .sync-dialog-doc-link {
+      color: #0969da;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.4;
+      display: inline-block;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      border-bottom: 1px dashed rgba(9, 105, 218, 0.35);
+    }
+    .sync-dialog-doc-link:hover {
+      border-bottom-color: #0969da;
     }
     .sync-dialog-link:hover {
       text-decoration: underline;
+    }
+    .sync-dialog-link-row {
+      margin-top: -2px;
+      margin-bottom: 10px;
+    }
+    .sync-dialog-meta {
+      font-size: 12px;
+      color: #4b5563;
+      line-height: 1.5;
     }
     .sync-dialog-empty {
       padding: 20px;
@@ -1143,19 +1246,38 @@ export const styles = `
       font-size: 13px;
       margin-bottom: 16px;
     }
-    .sync-dialog-output {
-      background: #f6f8fa;
-      border: 1px solid #d1d5da;
+    .sync-dialog-codepanel {
+      border: 1px solid #e5e7eb;
       border-radius: 6px;
-      padding: 12px;
+      background: #fafbfc;
+      overflow: hidden;
+    }
+    .sync-dialog-codepanel-top {
+      height: 30px;
+      padding: 0 8px 0 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #eceff3;
+      background: #f8fafc;
+    }
+    .sync-dialog-codepanel-title {
+      font-size: 12px;
+      color: #6b7280;
+    }
+    .sync-dialog-output {
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 8px 10px;
       font-family: monospace;
       font-size: 12px;
-      max-height: 200px;
+      max-height: 160px;
       overflow-y: auto;
       white-space: pre-wrap;
       word-break: break-all;
-      user-select: all;
-      margin-top: 12px;
+      user-select: text;
+      margin-top: 0;
       position: relative;
     }
     .sync-dialog-output-header {
@@ -1163,6 +1285,14 @@ export const styles = `
       justify-content: space-between;
       align-items: center;
       margin-bottom: 8px;
+    }
+    .sync-copy-button {
+      margin-left: 0;
+      width: 20px;
+      height: 20px;
+      padding: 0;
+      color: #6b7280;
+      opacity: 0.9;
     }
     .sync-dialog-copy-btn {
       padding: 4px 8px;

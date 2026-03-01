@@ -18,8 +18,10 @@ import {
   handlePathSuggestions,
   handleDetectPath,
   handleOpenFile,
+  handleOpenLocalFile,
   handleEvents,
   handleGetRecentParents,
+  handleGetSyncParentMeta,
   handleSyncExecute,
   handleGetSyncStatus,
   handleCleanupSync,
@@ -77,6 +79,7 @@ app.post("/api/detect-path", handleDetectPath);
 
 // API: 同步相关
 app.get("/api/sync/recent-parents", handleGetRecentParents);
+app.get("/api/sync/parent-meta", handleGetSyncParentMeta);
 app.post("/api/sync/execute", handleSyncExecute);
 app.get("/api/sync/status", handleGetSyncStatus);
 app.post("/api/sync/cleanup", handleCleanupSync);
@@ -86,6 +89,7 @@ app.post("/api/sync/preferences", handleSetSyncPreferences);
 
 // API: CLI 调用 - 打开文件
 app.post("/api/open-file", handleOpenFile);
+app.post("/api/open-local-file", handleOpenLocalFile);
 
 // API: SSE 事件流
 app.get("/api/events", handleEvents);
@@ -107,4 +111,4 @@ export default {
 };
 
 log(`🚀 MD Viewer Server 启动于 http://${HOST}:${PORT}/`);
-log(`📖 使用方法: 在浏览器中打开，然后添加 Markdown 文件路径`);
+log(`📖 使用方法: 在浏览器中打开，然后添加 Markdown/HTML 文件路径`);

@@ -2,12 +2,12 @@
 import type { FileData } from './types';
 
 // 导入状态管理
-import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFileFromState, switchToFile, setSearchQuery } from './state';
+import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFileFromState, switchToFile, setSearchQuery, clearListDiff } from './state';
 import { addWorkspace, hydrateExpandedWorkspaces } from './workspace';
 
 // 导入 API
 import { loadFile, searchFiles, getNearbyFiles, openFile, detectPathType } from './api/files';
-import { getSyncStatus, getRecentParents, executeSync, getSyncPreferences, saveSyncPreference } from './api/sync';
+import { getSyncStatus, getRecentParents, getSyncParentMeta, executeSync, getSyncPreferences, saveSyncPreference } from './api/sync';
 
 // 导入工具函数
 import { escapeHtml, escapeAttr, escapeJsSingleQuoted } from './utils/escape';
@@ -23,6 +23,7 @@ const SIDEBAR_WIDTH_STORAGE_KEY = 'md-viewer:sidebar-width';
 const SIDEBAR_DEFAULT_WIDTH = 260;
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 680;
+const PARENT_URL_SKIP_SEGMENTS = new Set(['doc', 'docs', 'page', 'pages', 'content', 'wiki']);
 
 // ==================== 消息处理 ====================
 async function onFileLoaded(data: FileData, focus: boolean = false) {
@@ -149,6 +150,42 @@ export function renderAll() {
 function isMarkdownContent(file: { name: string; path: string }): boolean {
   const lower = `${file.name} ${file.path}`.toLowerCase();
   return lower.includes('.md') || lower.includes('.markdown');
+}
+
+function normalizeParentIdInput(raw: string): string {
+  const input = (raw || '').trim();
+  if (!input) return '';
+
+  const pickFromPath = (path: string): string => {
+    const segments = path
+      .split('/')
+      .map((s) => decodeURIComponent(s).trim())
+      .filter(Boolean);
+    for (let i = segments.length - 1; i >= 0; i--) {
+      const seg = segments[i];
+      if (!seg) continue;
+      if (PARENT_URL_SKIP_SEGMENTS.has(seg.toLowerCase())) continue;
+      return seg;
+    }
+    return '';
+  };
+
+  if (/^https?:\/\//i.test(input)) {
+    try {
+      const url = new URL(input);
+      const picked = pickFromPath(url.pathname);
+      return picked || input;
+    } catch {
+      return input;
+    }
+  }
+
+  if (input.includes('/')) {
+    const picked = pickFromPath(input);
+    return picked || input;
+  }
+
+  return input;
 }
 
 function renderContent() {
@@ -311,9 +348,31 @@ function isHtmlPath(path: string): boolean {
   return lower.endsWith('.html') || lower.endsWith('.htm');
 }
 
-function openFileInBrowser(path: string): void {
-  const url = `/api/open-in-browser?path=${encodeURIComponent(path)}`;
-  window.open(url, '_blank', 'noopener,noreferrer');
+function isUrlPath(path: string): boolean {
+  return /^https?:\/\//i.test(path);
+}
+
+async function openFileInBrowser(path: string): Promise<void> {
+  clearListDiff(path);
+  renderSidebar();
+
+  if (isUrlPath(path)) {
+    window.open(path, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  try {
+    const response = await fetch('/api/open-local-file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path })
+    });
+    const data = await response.json();
+    if (data?.error) {
+      showError(`打开 HTML 失败: ${data.error}`);
+    }
+  } catch (error: any) {
+    showError(`打开 HTML 失败: ${error?.message || '未知错误'}`);
+  }
 }
 
 function looksLikePathInput(value: string): boolean {
@@ -473,6 +532,7 @@ async function handleSmartAddInput(path: string): Promise<void> {
 
 // 切换文件
 function switchFile(path: string) {
+  removeSyncInfoPopover();
   if (isHtmlPath(path)) {
     openFileInBrowser(path);
     return;
@@ -568,11 +628,181 @@ function handleURLParams() {
 }
 
 // ==================== 同步功能 ====================
+let syncInfoPopoverEl: HTMLElement | null = null;
+
+function removeSyncInfoPopover(): void {
+  if (syncInfoPopoverEl) {
+    syncInfoPopoverEl.remove();
+    syncInfoPopoverEl = null;
+  }
+}
+
+function getSyncDocTitle(syncData: any): string {
+  const raw = (syncData?.title || syncData?.kmTitle || '').toString().trim();
+  if (raw) return raw;
+  const id = (syncData?.docId || syncData?.kmDocId || '').toString().trim();
+  return id ? `文档 ${id}` : '已同步文档';
+}
+
+function showSyncedInfoPopover(syncData: any): void {
+  const button = document.getElementById('syncButton') as HTMLButtonElement | null;
+  if (!button) return;
+
+  const docUrl = (syncData?.url || syncData?.kmUrl || '').toString().trim();
+  if (!docUrl) {
+    showWarning('未找到文档链接');
+    return;
+  }
+
+  const lastSyncTime = Number(syncData?.lastSyncTime);
+  const humanTime = Number.isFinite(lastSyncTime) && lastSyncTime > 0
+    ? `${formatRelativeTime(lastSyncTime)} (${formatFileTime(lastSyncTime)})`
+    : '未知';
+  const docTitle = getSyncDocTitle(syncData);
+
+  const existed = syncInfoPopoverEl;
+  removeSyncInfoPopover();
+  if (existed) return;
+
+  const popover = document.createElement('div');
+  popover.className = 'sync-info-popover';
+  popover.innerHTML = `
+    <a href="${escapeAttr(docUrl)}" target="_blank" class="sync-info-popover-link">${escapeHtml(docTitle)}</a>
+    <div class="sync-info-popover-time">同步时间：${escapeHtml(humanTime)}</div>
+  `;
+
+  document.body.appendChild(popover);
+  syncInfoPopoverEl = popover;
+
+  const rect = button.getBoundingClientRect();
+  const width = Math.max(260, Math.min(360, Math.floor(window.innerWidth * 0.42)));
+  popover.style.width = `${width}px`;
+  popover.style.position = 'fixed';
+  popover.style.top = `${rect.bottom + 8}px`;
+  popover.style.left = `${Math.max(12, Math.min(window.innerWidth - width - 12, rect.right - width))}px`;
+}
+
+function renderSyncCopyButton(onClick: string, tooltip = '复制'): string {
+  return `
+    <button class="copy-filename-button sync-copy-button" onclick="${onClick}">
+      <span class="copy-icon"></span>
+      <span class="check-icon">
+        <svg viewBox="0 0 16 16" fill="currentColor">
+          <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path>
+        </svg>
+      </span>
+      <span class="copy-tooltip">${escapeHtml(tooltip)}</span>
+    </button>
+  `;
+}
+
+function renderSyncCodePanel(title: string, content: string, copyOnClick: string, copyTooltip: string): string {
+  return `
+    <div class="sync-dialog-field">
+      <div class="sync-dialog-codepanel">
+        <div class="sync-dialog-codepanel-top">
+          <span class="sync-dialog-codepanel-title">${escapeHtml(title)}</span>
+          ${renderSyncCopyButton(copyOnClick, copyTooltip)}
+        </div>
+        <div class="sync-dialog-output">${escapeHtml(content)}</div>
+      </div>
+    </div>
+  `;
+}
+
+async function refreshParentMetaPreview(rawValue: string): Promise<void> {
+  const metaEl = document.getElementById('syncParentMeta') as HTMLElement | null;
+  if (!metaEl) return;
+
+  const raw = (rawValue || '').trim();
+  if (!raw) {
+    metaEl.style.display = 'none';
+    metaEl.innerHTML = '';
+    return;
+  }
+
+  const parentId = normalizeParentIdInput(raw);
+  if (!parentId) {
+    metaEl.style.display = 'none';
+    metaEl.innerHTML = '';
+    return;
+  }
+
+  metaEl.style.display = 'block';
+  metaEl.innerHTML = `<span class="sync-dialog-parent-meta-muted">正在获取父文档标题...</span>`;
+
+  try {
+    const data = await getSyncParentMeta(raw);
+    if (!data?.success) {
+      metaEl.innerHTML = `<span class="sync-dialog-parent-meta-muted">未获取到父文档标题</span>`;
+      return;
+    }
+    const title = (data.title || '').trim() || `Parent ${data.parentId || parentId}`;
+    if (data.url) {
+      metaEl.innerHTML = `<a href="${escapeAttr(data.url)}" target="_blank" class="sync-dialog-parent-meta-link">${escapeHtml(title)}</a>`;
+      return;
+    }
+    metaEl.innerHTML = `<span class="sync-dialog-parent-meta-text">${escapeHtml(title)}</span>`;
+  } catch {
+    metaEl.innerHTML = `<span class="sync-dialog-parent-meta-muted">未获取到父文档标题</span>`;
+  }
+}
+
+function setSyncDialogStatus(
+  phase: 'idle' | 'running' | 'error' | 'success',
+  data?: { message?: string; output?: string; title?: string; url?: string; time?: number }
+): void {
+  const runningEl = document.getElementById('syncStatusRunning') as HTMLElement | null;
+  const errorEl = document.getElementById('syncStatusError') as HTMLElement | null;
+  const successEl = document.getElementById('syncStatusSuccess') as HTMLElement | null;
+  if (!runningEl || !errorEl || !successEl) return;
+
+  runningEl.style.display = phase === 'running' ? 'block' : 'none';
+  errorEl.style.display = phase === 'error' ? 'block' : 'none';
+  successEl.style.display = phase === 'success' ? 'block' : 'none';
+
+  if (phase === 'error') {
+    const messageEl = document.getElementById('syncStatusErrorMessage') as HTMLElement | null;
+    const outputEl = document.getElementById('syncStatusErrorOutput') as HTMLElement | null;
+    if (messageEl) {
+      messageEl.textContent = data?.message || '同步失败，保留当前输入，可直接修改后重试。';
+    }
+    if (outputEl) {
+      outputEl.textContent = data?.output || '';
+    }
+  }
+
+  if (phase === 'success') {
+    const titleLink = document.getElementById('syncStatusDocTitle') as HTMLAnchorElement | null;
+    const timeEl = document.getElementById('syncStatusTime') as HTMLElement | null;
+    const outputEl = document.getElementById('syncStatusSuccessOutput') as HTMLElement | null;
+    if (titleLink) {
+      titleLink.textContent = data?.title || '已同步文档';
+      if (data?.url) {
+        titleLink.href = data.url;
+        titleLink.style.pointerEvents = '';
+        titleLink.style.opacity = '';
+      } else {
+        titleLink.removeAttribute('href');
+        titleLink.style.pointerEvents = 'none';
+        titleLink.style.opacity = '0.75';
+      }
+    }
+    if (timeEl) {
+      const ts = data?.time ?? Date.now();
+      timeEl.textContent = `同步时间：${formatRelativeTime(ts)} (${formatFileTime(ts)})`;
+    }
+    if (outputEl) {
+      outputEl.textContent = data?.output || '';
+    }
+  }
+}
 
 // 更新同步按钮状态
 // 更新工具栏按钮（刷新按钮和同步按钮）
 async function updateToolbarButtons() {
   if (!state.currentFile) {
+    removeSyncInfoPopover();
     // 没有当前文件时隐藏所有按钮
     const refreshButton = document.getElementById('refreshButton');
     const syncButton = document.getElementById('syncButton');
@@ -594,6 +824,7 @@ async function updateToolbarButtons() {
   // 更新同步按钮（仅 Markdown 可同步）
   const syncButton = document.getElementById('syncButton');
   if (!isMarkdownContent(file)) {
+    removeSyncInfoPopover();
     if (syncButton) syncButton.style.display = 'none';
     return;
   }
@@ -678,8 +909,9 @@ async function handleSyncButtonClick() {
   const data = await getSyncStatus(state.currentFile);
 
   if (data.docId) {
-    showSyncedFileDialog(data);
+    showSyncedInfoPopover(data);
   } else {
+    removeSyncInfoPopover();
     showSyncDialog();
   }
 }
@@ -706,12 +938,12 @@ async function showSyncDialog() {
   // 开始构建 HTML（移除文件名展示）
   let html = `
     <div class="sync-dialog-field">
-      <label class="sync-dialog-label">📝 标题</label>
+      <label class="sync-dialog-label">标题</label>
       <input type="text" class="sync-dialog-input" id="syncTitle" value="${escapeAttr(defaultTitle)}">
     </div>
 
     <div class="sync-dialog-field">
-      <label class="sync-dialog-label">📍 选择位置</label>
+      <label class="sync-dialog-label">选择位置</label>
   `;
 
   // 最近位置列表（带链接）
@@ -719,15 +951,18 @@ async function showSyncDialog() {
     html += '<div class="sync-dialog-recent">';
     recentData.parents.forEach((parent) => {
       const isDefault = parent.id === recentData.defaultParentId;
+      const titleText = (!parent.title || /^Parent\s+\S+$/i.test(parent.title.trim()))
+        ? parent.id
+        : parent.title;
       html += `
         <div class="sync-dialog-recent-item ${isDefault ? 'selected' : ''}" onclick="window.selectRecentParent('${escapeJsSingleQuoted(parent.id)}', event)">
           <input type="radio" name="recentParent" value="${escapeAttr(parent.id)}" class="sync-dialog-recent-radio" ${isDefault ? 'checked' : ''}>
-          <div class="sync-dialog-recent-info">
-            <div class="sync-dialog-recent-title">
-              ${escapeHtml(parent.title)}
-              ${parent.url ? `<a href="${escapeAttr(parent.url)}" target="_blank" class="sync-dialog-link-icon" onclick="event.stopPropagation()" title="在学城中打开">🔗</a>` : ''}
-            </div>
-            <div class="sync-dialog-recent-meta">ID: ${escapeHtml(parent.id)} · 最后使用：${escapeHtml(formatRelativeTime(parent.lastUsed))}</div>
+          <div class="sync-dialog-recent-main">
+            ${parent.url
+              ? `<a href="${escapeAttr(parent.url)}" target="_blank" class="sync-dialog-recent-title-link" onclick="event.stopPropagation()">${escapeHtml(titleText)}</a>`
+              : `<span class="sync-dialog-recent-title-link">${escapeHtml(titleText)}</span>`
+            }
+            <span class="sync-dialog-recent-inline-meta">#${escapeHtml(parent.id)} · ${escapeHtml(formatRelativeTime(parent.lastUsed))}</span>
           </div>
         </div>
       `;
@@ -741,7 +976,8 @@ async function showSyncDialog() {
     : '输入父文档 ID / URL';
 
   html += `
-    <input type="text" class="sync-dialog-input sync-dialog-manual-input" id="syncParentId" placeholder="${placeholder}">
+    <input type="text" class="sync-dialog-input sync-dialog-manual-input" id="syncParentId" placeholder="${placeholder}" autocomplete="off">
+    <div id="syncParentMeta" class="sync-dialog-parent-meta" style="display:none;"></div>
     </div>
 
     <div class="sync-dialog-field">
@@ -752,17 +988,47 @@ async function showSyncDialog() {
     </div>
 
     <div class="sync-dialog-field">
-      <div class="sync-dialog-output-header">
-        <label class="sync-dialog-label">将执行的命令：</label>
-        <button class="sync-dialog-copy-btn" onclick="window.copySyncCommand()">
-          📋 复制
-        </button>
+      <div class="sync-dialog-codepanel">
+        <div class="sync-dialog-codepanel-top">
+          <span class="sync-dialog-codepanel-title">将执行的命令</span>
+        ${renderSyncCopyButton('window.copySyncCommand(event)', '复制命令')}
+        </div>
+        <div class="sync-dialog-output" id="syncCommandPreview">km-cli doc create --parent-id "..." --title "..." --markdown-file "${escapeHtml(state.currentFile || '')}" --json</div>
       </div>
-      <div class="sync-dialog-output" id="syncCommandPreview">km-cli doc create --parent-id "..." --title "..." --markdown-file "${escapeHtml(state.currentFile || '')}" --json</div>
     </div>
 
     <div class="sync-dialog-footer">
       <button class="sync-dialog-btn sync-dialog-btn-primary" onclick="window.confirmSync()">同步</button>
+    </div>
+
+    <div class="sync-dialog-status">
+      <div class="sync-dialog-status-block running" id="syncStatusRunning" style="display:none;">
+        正在调用 km-cli，请稍候...
+      </div>
+      <div class="sync-dialog-status-block error" id="syncStatusError" style="display:none;">
+        <div class="sync-dialog-status-message" id="syncStatusErrorMessage"></div>
+        <div class="sync-dialog-codepanel">
+          <div class="sync-dialog-codepanel-top">
+            <span class="sync-dialog-codepanel-title">原始返回</span>
+            ${renderSyncCopyButton(`window.copySingleText(document.getElementById('syncStatusErrorOutput')?.textContent || '', event)`, '复制返回')}
+          </div>
+          <div class="sync-dialog-output" id="syncStatusErrorOutput"></div>
+        </div>
+      </div>
+      <div class="sync-dialog-status-block success" id="syncStatusSuccess" style="display:none;">
+        <div class="sync-dialog-status-line">
+          文档：
+          <a href="#" target="_blank" class="sync-dialog-doc-link" id="syncStatusDocTitle">已同步文档</a>
+        </div>
+        <div class="sync-dialog-status-line" id="syncStatusTime"></div>
+        <div class="sync-dialog-codepanel">
+          <div class="sync-dialog-codepanel-top">
+            <span class="sync-dialog-codepanel-title">原始返回</span>
+            ${renderSyncCopyButton(`window.copySingleText(document.getElementById('syncStatusSuccessOutput')?.textContent || '', event)`, '复制返回')}
+          </div>
+          <div class="sync-dialog-output" id="syncStatusSuccessOutput"></div>
+        </div>
+      </div>
     </div>
   `;
 
@@ -775,13 +1041,13 @@ async function showSyncDialog() {
       const fallback = document.createElement('div');
       fallback.className = 'sync-dialog-field';
       fallback.innerHTML = `
-        <div class="sync-dialog-output-header">
-          <label class="sync-dialog-label">将执行的命令：</label>
-          <button class="sync-dialog-copy-btn" onclick="window.copySyncCommand()">
-            📋 复制
-          </button>
+        <div class="sync-dialog-codepanel">
+          <div class="sync-dialog-codepanel-top">
+            <span class="sync-dialog-codepanel-title">将执行的命令</span>
+          ${renderSyncCopyButton('window.copySyncCommand(event)', '复制命令')}
+          </div>
+          <div class="sync-dialog-output" id="syncCommandPreview">km-cli doc create --parent-id "..." --title "..." --markdown-file "${escapeHtml(state.currentFile || '')}" --json</div>
         </div>
-        <div class="sync-dialog-output" id="syncCommandPreview">km-cli doc create --parent-id "..." --title "..." --markdown-file "${escapeHtml(state.currentFile || '')}" --json</div>
       `;
       checkbox.parentNode!.insertBefore(fallback, checkbox);
     }
@@ -805,11 +1071,20 @@ async function showSyncDialog() {
       document.querySelectorAll('.sync-dialog-recent-radio').forEach((radio: any) => {
         radio.checked = false;
       });
+      const metaEl = document.getElementById('syncParentMeta') as HTMLElement | null;
+      if (metaEl) {
+        metaEl.style.display = 'none';
+        metaEl.innerHTML = '';
+      }
       updateCommandPreview();
+    });
+    parentInput.addEventListener('blur', () => {
+      refreshParentMetaPreview(parentInput.value);
     });
   }
 
   updateCommandPreview();
+  setSyncDialogStatus('idle');
 }
 
 // 更新命令预览
@@ -823,12 +1098,7 @@ function updateCommandPreview() {
 
   const title = titleInput?.value || '...';
   let parentId = parentInput?.value.trim() || selectedRadio?.value || '...';
-
-  // 从 URL 提取 ID
-  if (parentId.includes('xuecheng.com')) {
-    const match = parentId.match(/\/doc\/([a-zA-Z0-9_-]+)/);
-    if (match) parentId = match[1];
-  }
+  parentId = normalizeParentIdInput(parentId) || '...';
 
   preview.textContent = `km-cli doc create --parent-id "${parentId}" --title "${title}" --markdown-file "${state.currentFile}" --json`;
 }
@@ -850,6 +1120,11 @@ function selectRecentParent(parentId: string, e?: Event) {
   // 清空手动输入
   const parentInput = document.getElementById('syncParentId') as HTMLInputElement;
   if (parentInput) parentInput.value = '';
+  const metaEl = document.getElementById('syncParentMeta') as HTMLElement | null;
+  if (metaEl) {
+    metaEl.style.display = 'none';
+    metaEl.innerHTML = '';
+  }
 
   updateCommandPreview();
 }
@@ -865,6 +1140,7 @@ async function confirmSync() {
 
   const title = titleInput?.value.trim();
   let parentId = parentInput?.value.trim() || selectedRadio?.value;
+  parentId = normalizeParentIdInput(parentId || '');
 
   if (!title) {
     showWarning('请输入标题');
@@ -874,12 +1150,6 @@ async function confirmSync() {
   if (!parentId) {
     showWarning('请选择位置或输入父文档 ID');
     return;
-  }
-
-  // 从 URL 提取 ID
-  if (parentId.includes('xuecheng.com')) {
-    const match = parentId.match(/\/doc\/([a-zA-Z0-9_-]+)/);
-    if (match) parentId = match[1];
   }
 
   // 保存用户偏好
@@ -894,114 +1164,49 @@ async function confirmSync() {
     button.disabled = true;
     button.textContent = '同步中...';
   }
+  setSyncDialogStatus('running');
 
   try {
     const result = await executeSync(state.currentFile, title, parentId, false);
 
     if (result.success) {
-      showSyncSuccessDialog(result, openAfter);
+      if (openAfter && result.url) {
+        window.open(result.url, '_blank');
+        closeSyncDialog();
+        updateSyncButton();
+        return;
+      }
+      const rawOutput = (typeof result.output === 'string' && result.output.trim())
+        ? result.output
+        : JSON.stringify(result, null, 2);
+      const docTitle = (result.title || '').trim() || '已同步文档';
+      setSyncDialogStatus('success', {
+        title: docTitle,
+        url: result.url || '',
+        output: rawOutput,
+        time: Date.now(),
+      });
+      updateSyncButton();
     } else {
-      showSyncErrorDialog(result);
+      const rawOutput = (typeof result.output === 'string' && result.output.trim())
+        ? result.output
+        : JSON.stringify(result, null, 2);
+      setSyncDialogStatus('error', {
+        message: '同步失败，保留当前输入，可直接修改后重试。',
+        output: rawOutput,
+      });
     }
   } catch (err: any) {
-    showError('同步失败: ' + err.message);
+    setSyncDialogStatus('error', {
+      message: `同步失败: ${err.message}`,
+      output: err?.stack || err?.message || '未知错误',
+    });
+  } finally {
     if (button) {
       button.disabled = false;
       button.textContent = '同步';
     }
   }
-}
-
-// 显示同步成功对话框
-function showSyncSuccessDialog(result: any, openAfter: boolean) {
-  const title = document.getElementById('syncDialogTitle');
-  const body = document.getElementById('syncDialogBody');
-
-  if (!title || !body) return;
-
-  title.textContent = '✓ 同步成功';
-
-  body.innerHTML = `
-    ${result.command ? `
-      <div class="sync-dialog-field">
-        <div class="sync-dialog-output-header">
-          <label class="sync-dialog-label">执行的命令：</label>
-          <button class="sync-dialog-copy-btn" onclick="window.copySingleText('${escapeJsSingleQuoted(result.command)}', event)">
-            📋 复制
-          </button>
-        </div>
-        <div class="sync-dialog-output">${escapeHtml(result.command)}</div>
-      </div>
-    ` : ''}
-
-    ${result.output ? `
-      <div class="sync-dialog-field">
-        <div class="sync-dialog-output-header">
-          <label class="sync-dialog-label">km-cli 返回：</label>
-          <button class="sync-dialog-copy-btn" onclick="window.copySingleText('${escapeJsSingleQuoted(result.output)}', event)">
-            📋 复制
-          </button>
-        </div>
-        <div class="sync-dialog-output">${escapeHtml(result.output)}</div>
-      </div>
-    ` : ''}
-
-    <div class="sync-dialog-success">
-      <div class="sync-dialog-success-icon">✓</div>
-      <div class="sync-dialog-success-text">文档已成功同步到学城</div>
-      ${result.url ? `<a href="${escapeAttr(result.url)}" target="_blank" class="sync-dialog-link">${escapeHtml(result.url)}</a>` : ''}
-    </div>
-
-    <div class="sync-dialog-footer">
-      <button class="sync-dialog-btn sync-dialog-btn-cancel" onclick="window.closeSyncDialog()">关闭</button>
-      ${result.url ? `<button class="sync-dialog-btn sync-dialog-btn-primary" onclick="window.open('${escapeAttr(result.url)}', '_blank')">在浏览器中打开</button>` : ''}
-    </div>
-  `;
-
-  if (openAfter && result.url) {
-    window.open(result.url, '_blank');
-  }
-
-  updateSyncButton();
-}
-
-// 显示同步错误对话框
-function showSyncErrorDialog(result: any) {
-  const title = document.getElementById('syncDialogTitle');
-  const body = document.getElementById('syncDialogBody');
-
-  if (!title || !body) return;
-
-  title.textContent = '✗ 同步失败';
-
-  body.innerHTML = `
-    ${result.command ? `
-      <div class="sync-dialog-field">
-        <div class="sync-dialog-output-header">
-          <label class="sync-dialog-label">执行的命令：</label>
-          <button class="sync-dialog-copy-btn" onclick="window.copySingleText('${escapeJsSingleQuoted(result.command)}', event)">
-            📋 复制
-          </button>
-        </div>
-        <div class="sync-dialog-output">${escapeHtml(result.command)}</div>
-      </div>
-    ` : ''}
-
-    <div class="sync-dialog-field">
-      <div class="sync-dialog-output-header">
-        <label class="sync-dialog-label">km-cli 返回：</label>
-        <button class="sync-dialog-copy-btn" onclick="window.copySingleText('${escapeJsSingleQuoted(result.output || '无输出')}', event)">
-          📋 复制
-        </button>
-      </div>
-      <div class="sync-dialog-output">${escapeHtml(result.output || '无输出')}</div>
-    </div>
-
-    <div class="sync-dialog-footer">
-      <button class="sync-dialog-btn sync-dialog-btn-cancel" onclick="window.closeSyncDialog()">关闭</button>
-      <button class="sync-dialog-btn sync-dialog-btn-primary" onclick="window.copyErrorInfo()">复制错误信息</button>
-    </div>
-  `;
 }
 
 // 显示已同步文件的对话框
@@ -1013,36 +1218,38 @@ async function showSyncedFileDialog(syncData: any) {
   if (!overlay || !title || !body) return;
 
   title.textContent = '文档同步信息';
+  const commandText = syncData.command || '';
+  const rawOutput = (typeof syncData.output === 'string' && syncData.output.trim())
+    ? syncData.output
+    : '';
 
   body.innerHTML = `
     <div class="sync-dialog-field">
-      <label class="sync-dialog-label">📄 本地文件</label>
-      <div style="color: #586069; font-size: 13px;">${escapeHtml(syncData.path)}</div>
+      <div class="sync-dialog-meta">本地文件：${escapeHtml(syncData.path)}</div>
+      ${syncData.lastSyncTime ? `<div class="sync-dialog-meta">最后同步：${escapeHtml(formatFileTime(syncData.lastSyncTime))}</div>` : ''}
     </div>
 
-    ${syncData.command ? `
-      <div class="sync-dialog-field">
-        <div class="sync-dialog-output-header">
-          <label class="sync-dialog-label">执行的命令：</label>
-          <button class="sync-dialog-copy-btn" onclick="window.copySingleText('${escapeJsSingleQuoted(syncData.command)}', event)">
-            📋 复制
-          </button>
-        </div>
-        <div class="sync-dialog-output">${escapeHtml(syncData.command)}</div>
+    ${commandText
+      ? renderSyncCodePanel(
+          '执行命令',
+          commandText,
+          `window.copySingleText('${escapeJsSingleQuoted(commandText)}', event)`,
+          '复制命令'
+        )
+      : ''}
+    ${rawOutput
+      ? renderSyncCodePanel(
+          '原始返回',
+          rawOutput,
+          `window.copySingleText('${escapeJsSingleQuoted(rawOutput)}', event)`,
+          '复制返回'
+        )
+      : ''}
+    ${syncData.url ? `
+      <div class="sync-dialog-link-row">
+        <a href="${escapeAttr(syncData.url)}" target="_blank" class="sync-dialog-link">${escapeHtml(syncData.url)}</a>
       </div>
     ` : ''}
-
-    <div class="sync-dialog-success">
-      <div class="sync-dialog-success-icon">✓</div>
-      <div class="sync-dialog-success-text">此文档已同步到学城</div>
-      ${syncData.url ? `<a href="${escapeAttr(syncData.url)}" target="_blank" class="sync-dialog-link">${escapeHtml(syncData.url)}</a>` : ''}
-      ${syncData.lastSyncTime ? `<div style="color: #586069; font-size: 12px; margin-top: 8px;">最后同步: ${formatFileTime(syncData.lastSyncTime)}</div>` : ''}
-    </div>
-
-    <div class="sync-dialog-footer">
-      <button class="sync-dialog-btn sync-dialog-btn-cancel" onclick="window.closeSyncDialog()">关闭</button>
-      ${syncData.url ? `<button class="sync-dialog-btn sync-dialog-btn-primary" onclick="window.open('${escapeAttr(syncData.url)}', '_blank')">在浏览器中打开</button>` : ''}
-    </div>
   `;
 
   overlay.classList.add('show');
@@ -1054,70 +1261,68 @@ function closeSyncDialog() {
   if (overlay) {
     overlay.classList.remove('show');
   }
+  removeSyncInfoPopover();
 }
 
 // 复制命令
-function copySyncCommand() {
+function copySyncCommand(e?: Event) {
   const preview = document.getElementById('syncCommandPreview');
   if (preview) {
-    navigator.clipboard.writeText(preview.textContent || '').then(() => {
-      showSuccess('命令已复制到剪贴板', 2000);
-    });
+    copyTextWithFeedback(preview.textContent || '', e);
   }
 }
 
-// 复制单个文本
-function copySingleText(text: string, e?: Event) {
-  navigator.clipboard.writeText(text).then(() => {
-    const btn = e && e.target ? (e.target as HTMLElement).closest('.sync-dialog-copy-btn') : null;
-    if (btn) {
-      const originalText = btn.innerHTML;
-      btn.innerHTML = '✓ 已复制';
-      btn.classList.add('copied');
-      setTimeout(() => {
-        btn.innerHTML = originalText;
-        btn.classList.remove('copied');
-      }, 2000);
-    }
-  });
+function resolveCopyFeedbackTarget(e?: Event): HTMLElement | null {
+  if (!e?.target) return null;
+  return (e.target as HTMLElement).closest('.copy-filename-button, .sync-dialog-copy-btn, .sync-dialog-btn') as HTMLElement | null;
 }
 
-// 复制文件名
-function copyFileName(fileName: string, event?: Event) {
-  navigator.clipboard.writeText(fileName).then(() => {
-    // 只显示视觉反馈（对勾），不显示 Toast
-    if (event) {
-      const btn = (event.target as HTMLElement).closest('.copy-filename-button') as HTMLButtonElement;
-      if (btn) {
-        btn.classList.add('success');
-        const tooltip = btn.querySelector('.copy-tooltip');
-        if (tooltip) {
-          const originalText = tooltip.textContent;
-          tooltip.textContent = '已复制';
+function applyCopyFeedback(target: HTMLElement | null): void {
+  if (!target) return;
 
-          // 1秒后恢复
-          setTimeout(() => {
-            btn.classList.remove('success');
-            if (tooltip && originalText) {
-              tooltip.textContent = originalText;
-            }
-          }, 1000);
-        }
-      }
-    }
+  if (target.classList.contains('copy-filename-button')) {
+    target.classList.add('success');
+    const tooltip = target.querySelector('.copy-tooltip');
+    const originalText = tooltip?.textContent;
+    if (tooltip) tooltip.textContent = '已复制';
+    setTimeout(() => {
+      target.classList.remove('success');
+      if (tooltip && originalText) tooltip.textContent = originalText;
+    }, 1000);
+    return;
+  }
+
+  const originalText = target.textContent;
+  target.textContent = '✓ 已复制';
+  setTimeout(() => {
+    if (originalText != null) target.textContent = originalText;
+  }, 1000);
+}
+
+function copyTextWithFeedback(text: string, e?: Event): void {
+  navigator.clipboard.writeText(text).then(() => {
+    applyCopyFeedback(resolveCopyFeedbackTarget(e));
   }).catch(() => {
     showError('复制失败');
   });
 }
 
+// 复制单个文本
+function copySingleText(text: string, e?: Event) {
+  copyTextWithFeedback(text, e);
+}
+
+// 复制文件名
+function copyFileName(fileName: string, event?: Event) {
+  copyTextWithFeedback(fileName, event);
+}
+
 // 复制错误信息
-function copyErrorInfo() {
+function copyErrorInfo(e?: Event) {
   const outputs = document.querySelectorAll('.sync-dialog-output');
   if (outputs.length > 0) {
-    const texts = Array.from(outputs).map(el => el.textContent).join('\n\n');
-    navigator.clipboard.writeText(texts).then(() => {
-      showSuccess('错误信息已复制到剪贴板', 2000);
-    });
+    const texts = Array.from(outputs).map(el => el.textContent || '').join('\n\n');
+    copyTextWithFeedback(texts, e);
   }
 }
 
@@ -1200,6 +1405,7 @@ function closeFontScaleMenu() {
 document.addEventListener('click', (e) => {
   const menu = document.getElementById('fontScaleMenu');
   const button = document.getElementById('fontScaleButton');
+  const syncButton = document.getElementById('syncButton');
 
   if (!menu || !button) return;
 
@@ -1207,7 +1413,14 @@ document.addEventListener('click', (e) => {
   if (!menu.contains(target) && !button.contains(target)) {
     closeFontScaleMenu();
   }
+
+  if (syncInfoPopoverEl && !syncInfoPopoverEl.contains(target) && !syncButton?.contains(target)) {
+    removeSyncInfoPopover();
+  }
 });
+
+window.addEventListener('resize', removeSyncInfoPopover);
+window.addEventListener('scroll', removeSyncInfoPopover, true);
 
 // ==================== SSE 连接 ====================
 function connectSSE() {
@@ -1281,14 +1494,15 @@ declare global {
     closeSyncDialog: () => void;
     selectRecentParent: (parentId: string, e?: Event) => void;
     confirmSync: () => void;
-    copySyncCommand: () => void;
+    copySyncCommand: (e?: Event) => void;
     copySingleText: (text: string, e?: Event) => void;
     copyFileName: (fileName: string) => void;
-    copyErrorInfo: () => void;
+    copyErrorInfo: (e?: Event) => void;
     showToast?: (message: string, type: string) => void;
     showSettingsDialog: () => void;
     toggleFontScaleMenu: () => void;
     setFontScale: (scale: number) => void;
+    openExternalFile?: (path: string) => void | Promise<void>;
   }
 }
 
@@ -1332,6 +1546,7 @@ window.showToast = showToast;
 window.showSettingsDialog = showSettingsDialog;
 window.toggleFontScaleMenu = toggleFontScaleMenu;
 window.setFontScale = setFontScale;
+window.openExternalFile = openFileInBrowser;
 
 // ==================== 初始化 ====================
 (async () => {

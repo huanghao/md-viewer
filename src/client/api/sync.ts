@@ -3,12 +3,23 @@ import type { RecentParentsData, SyncResult, SyncStatusData, SyncPreferences } f
 // 获取同步状态
 export async function getSyncStatus(path: string): Promise<SyncStatusData> {
   const response = await fetch(`/api/sync/status?path=${encodeURIComponent(path)}`);
-  return response.json();
+  const data = await response.json();
+  return {
+    ...data,
+    docId: data?.docId || data?.kmDocId,
+    url: data?.url || data?.kmUrl,
+    title: data?.title || data?.kmTitle,
+  };
 }
 
 // 获取最近使用的父位置
 export async function getRecentParents(): Promise<RecentParentsData> {
   const response = await fetch('/api/sync/recent-parents');
+  return response.json();
+}
+
+export async function getSyncParentMeta(value: string): Promise<{ success: boolean; parentId?: string; title?: string; url?: string; error?: string }> {
+  const response = await fetch(`/api/sync/parent-meta?value=${encodeURIComponent(value)}`);
   return response.json();
 }
 
@@ -23,13 +34,19 @@ export async function executeSync(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      path,
+      filePath: path,
       title,
       parentId,
       isUpdate
     })
   });
-  return response.json();
+  const data = await response.json();
+  return {
+    ...data,
+    docId: data?.docId || data?.kmDocId,
+    url: data?.url || data?.kmUrl,
+    title: data?.title || data?.kmTitle,
+  };
 }
 
 // 获取同步偏好设置

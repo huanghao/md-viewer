@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>同步单页联动原型</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --blue: #0969da;
+      --blue-weak: #e8f1ff;
+      --red-weak: #fff2f0;
+      --red: #cf222e;
+      --green-weak: #edfdf3;
+      --green: #1a7f37;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, #f7fafc 0%, #eef2f7 100%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .wrap {
+      width: min(840px, 100%);
+      display: grid;
+      grid-template-columns: 1fr 260px;
+      gap: 14px;
+      align-items: start;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+      overflow: hidden;
+    }
+    .head {
+      height: 46px;
+      padding: 0 14px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .title {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+    .head-meta {
+      color: var(--muted);
+      font-size: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .body { padding: 14px; }
+    .block { margin-bottom: 12px; }
+    .label {
+      font-size: 12px;
+      color: #374151;
+      margin-bottom: 6px;
+      display: block;
+      font-weight: 600;
+    }
+    .input {
+      width: 100%;
+      height: 34px;
+      border: 1px solid #d0d7de;
+      border-radius: 7px;
+      padding: 0 10px;
+      font-size: 13px;
+      outline: none;
+      background: #fff;
+    }
+    .input:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(9,105,218,0.12);
+    }
+    .row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .recent {
+      border: 1px solid #d0d7de;
+      border-radius: 8px;
+      overflow: hidden;
+      max-height: 132px;
+      overflow-y: auto;
+      margin-bottom: 8px;
+    }
+    .recent-item {
+      height: 34px;
+      border-bottom: 1px solid #eef2f7;
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      cursor: pointer;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .recent-item:last-child { border-bottom: none; }
+    .recent-item:hover { background: #f8fafc; }
+    .recent-item.active { background: var(--blue-weak); }
+    .recent-title {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #1f2937;
+      flex: 1;
+    }
+    .recent-meta {
+      color: var(--muted);
+      flex-shrink: 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .parent-meta {
+      margin-top: 6px;
+      min-height: 18px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .parent-meta a {
+      color: var(--blue);
+      text-decoration: none;
+      border-bottom: 1px dashed rgba(9,105,218,0.35);
+      font-weight: 600;
+      max-width: 100%;
+      display: inline-block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .check {
+      height: 24px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #374151;
+      user-select: none;
+    }
+    .code {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fafbfc;
+      overflow: hidden;
+    }
+    .code-h {
+      height: 28px;
+      border-bottom: 1px solid #eceff3;
+      background: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 9px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    pre {
+      margin: 0;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-all;
+      user-select: text;
+      max-height: 150px;
+      overflow: auto;
+    }
+    .actions {
+      margin-top: 10px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .btn {
+      height: 30px;
+      border-radius: 7px;
+      padding: 0 12px;
+      border: 1px solid #d0d7de;
+      background: #fff;
+      color: #1f2937;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .btn:hover { background: #f8fafc; }
+    .btn.primary {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: #fff;
+    }
+    .btn.primary:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .status {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 12px;
+    }
+    .status h4 {
+      margin: 0 0 8px;
+      font-size: 12px;
+      color: #374151;
+    }
+    .status-line {
+      margin-bottom: 8px;
+      line-height: 1.45;
+    }
+    .status-line:last-child { margin-bottom: 0; }
+    .ok { background: var(--green-weak); border-color: #c7f0d4; color: #116329; }
+    .err { background: var(--red-weak); border-color: #ffd6d1; color: var(--red); }
+    .run { background: #f5f8ff; border-color: #d6e4ff; color: #1e40af; }
+    .hidden { display: none; }
+    .doc-link {
+      color: var(--blue);
+      text-decoration: none;
+      font-weight: 700;
+      border-bottom: 1px dashed rgba(9,105,218,0.35);
+    }
+    .copy {
+      border: 1px solid #d0d7de;
+      background: #fff;
+      border-radius: 4px;
+      height: 20px;
+      min-width: 20px;
+      color: #64748b;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .side {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+      font-size: 12px;
+      color: #475569;
+    }
+    .side h4 {
+      margin: 0 0 10px;
+      color: #334155;
+      font-size: 12px;
+    }
+    .side .item { margin-bottom: 8px; line-height: 1.45; }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      height: 20px;
+      padding: 0 8px;
+      border-radius: 999px;
+      border: 1px solid #dbe5f0;
+      background: #f8fbff;
+      color: #4b5563;
+      font-size: 11px;
+      margin-top: 6px;
+    }
+    @media (max-width: 880px) {
+      .wrap { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="panel">
+      <div class="head">
+        <div class="title">同步到学城（单页面联动）</div>
+        <div class="head-meta" id="headState">idle</div>
+      </div>
+      <div class="body">
+        <div class="block">
+          <label class="label">标题</label>
+          <input id="titleInput" class="input" value="周报：同步交互重构" />
+        </div>
+
+        <div class="block">
+          <label class="label">选择位置</label>
+          <div class="recent" id="recentList"></div>
+          <input id="parentInput" class="input" placeholder="输入父文档 ID / URL" value="https://xuecheng.com/doc/2748" />
+          <div class="parent-meta" id="parentMeta"></div>
+        </div>
+
+        <div class="block">
+          <label class="check"><input id="openAfter" type="checkbox" /> 同步后立即打开</label>
+        </div>
+
+        <div class="block code">
+          <div class="code-h">
+            <span>将执行的命令</span>
+            <button class="copy" id="copyCmd">⧉</button>
+          </div>
+          <pre id="cmdPreview"></pre>
+        </div>
+
+        <div class="actions">
+          <button class="btn" id="retryBtn">重试</button>
+          <button class="btn primary" id="syncBtn">同步</button>
+        </div>
+
+        <div id="statusRunning" class="status run hidden" style="margin-top:10px;">
+          <h4>执行中</h4>
+          <div class="status-line">正在调用 `km-cli`，请稍候...</div>
+        </div>
+
+        <div id="statusError" class="status err hidden" style="margin-top:10px;">
+          <h4>同步失败（保留当前输入，直接重试）</h4>
+          <div class="status-line" id="errorMsg"></div>
+          <div class="code" style="margin-top:8px;">
+            <div class="code-h"><span>原始返回</span><button class="copy" id="copyErr">⧉</button></div>
+            <pre id="errOutput"></pre>
+          </div>
+        </div>
+
+        <div id="statusSuccess" class="status ok hidden" style="margin-top:10px;">
+          <h4>同步成功</h4>
+          <div class="status-line">文档：<a id="docLink" class="doc-link" href="#" target="_blank"></a></div>
+          <div class="status-line" id="syncTime"></div>
+          <div class="code" style="margin-top:8px;">
+            <div class="code-h"><span>原始返回</span><button class="copy" id="copyOk">⧉</button></div>
+            <pre id="okOutput"></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="side">
+      <h4>原型控制</h4>
+      <div class="item">
+        <label><input type="radio" name="resultMode" value="success" checked /> 模拟成功</label><br/>
+        <label><input type="radio" name="resultMode" value="error" /> 模拟失败</label>
+      </div>
+      <div class="item">行为规则：</div>
+      <div class="item">1. 失败后不关闭，留在同页，保留输入，直接重试。</div>
+      <div class="item">2. 成功且勾选“立即打开”时，不展示成功块，只显示短暂提示。</div>
+      <div class="item">3. 成功且未勾选时，在当前页下半区展示标题链接 + 同步时间。</div>
+      <div class="chip">无多页面切换</div>
+    </aside>
+  </div>
+
+  <script>
+    const recentParents = [
+      { id: "2748", title: "同步学城 - 产品文档", url: "https://xuecheng.com/doc/2748", lastUsed: "2分钟前" },
+      { id: "8192", title: "前端交互规范", url: "https://xuecheng.com/doc/8192", lastUsed: "4小时前" },
+      { id: "13001", title: "CLI 设计草案", url: "https://xuecheng.com/doc/13001", lastUsed: "昨天" }
+    ];
+
+    const fakeMetaMap = {
+      "2748": { title: "同步学城 - 产品文档", url: "https://xuecheng.com/doc/2748" },
+      "8192": { title: "前端交互规范", url: "https://xuecheng.com/doc/8192" },
+      "13001": { title: "CLI 设计草案", url: "https://xuecheng.com/doc/13001" }
+    };
+
+    const state = {
+      selectedParentId: "2748",
+      running: false,
+      lastErrorOutput: "",
+      lastOkOutput: ""
+    };
+
+    const ids = {
+      titleInput: document.getElementById('titleInput'),
+      parentInput: document.getElementById('parentInput'),
+      parentMeta: document.getElementById('parentMeta'),
+      openAfter: document.getElementById('openAfter'),
+      cmdPreview: document.getElementById('cmdPreview'),
+      recentList: document.getElementById('recentList'),
+      syncBtn: document.getElementById('syncBtn'),
+      retryBtn: document.getElementById('retryBtn'),
+      statusRunning: document.getElementById('statusRunning'),
+      statusError: document.getElementById('statusError'),
+      statusSuccess: document.getElementById('statusSuccess'),
+      errorMsg: document.getElementById('errorMsg'),
+      errOutput: document.getElementById('errOutput'),
+      okOutput: document.getElementById('okOutput'),
+      docLink: document.getElementById('docLink'),
+      syncTime: document.getElementById('syncTime'),
+      headState: document.getElementById('headState')
+    };
+
+    function normalizeParentId(raw) {
+      const v = (raw || '').trim();
+      if (!v) return '';
+      const skip = new Set(['doc','docs','page','pages','content','wiki']);
+      const pick = (p) => {
+        const segs = p.split('/').map(s => decodeURIComponent(s).trim()).filter(Boolean);
+        for (let i = segs.length - 1; i >= 0; i--) {
+          if (!skip.has(segs[i].toLowerCase())) return segs[i];
+        }
+        return '';
+      };
+      if (/^https?:\/\//i.test(v)) {
+        try { return pick(new URL(v).pathname) || v; } catch { return v; }
+      }
+      if (v.includes('/')) return pick(v) || v;
+      return v;
+    }
+
+    function renderRecent() {
+      ids.recentList.innerHTML = recentParents
+        .map((p) => `
+          <div class="recent-item ${p.id === state.selectedParentId ? 'active' : ''}" data-id="${p.id}">
+            <span class="recent-title">${p.title}</span>
+            <span class="recent-meta">#${p.id} · ${p.lastUsed}</span>
+          </div>
+        `).join('');
+      ids.recentList.querySelectorAll('.recent-item').forEach(el => {
+        el.addEventListener('click', () => {
+          const id = el.getAttribute('data-id');
+          state.selectedParentId = id;
+          ids.parentInput.value = id;
+          renderParentMeta(id);
+          renderRecent();
+          renderCommand();
+        });
+      });
+    }
+
+    function renderCommand() {
+      const title = ids.titleInput.value.trim() || '...';
+      const parentId = normalizeParentId(ids.parentInput.value || state.selectedParentId || '...') || '...';
+      ids.cmdPreview.textContent = `km-cli doc create --parent-id "${parentId}" --title "${title}" --markdown-file "/Users/demo/week.md" --json`;
+    }
+
+    function setPhase(phase) {
+      ids.statusRunning.classList.toggle('hidden', phase !== 'running');
+      ids.statusError.classList.toggle('hidden', phase !== 'error');
+      ids.statusSuccess.classList.toggle('hidden', phase !== 'success');
+      ids.headState.textContent = phase;
+    }
+
+    function renderParentMeta(raw) {
+      const id = normalizeParentId(raw);
+      if (!id) {
+        ids.parentMeta.textContent = '';
+        return;
+      }
+      ids.parentMeta.innerHTML = '<span>正在获取父文档标题...</span>';
+      setTimeout(() => {
+        const meta = fakeMetaMap[id] || { title: `Parent ${id}`, url: `https://xuecheng.com/doc/${id}` };
+        ids.parentMeta.innerHTML = `<a href="${meta.url}" target="_blank">${meta.title}</a>`;
+      }, 240);
+    }
+
+    function nowText() {
+      const d = new Date();
+      const p = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+    }
+
+    function getMode() {
+      const el = document.querySelector('input[name="resultMode"]:checked');
+      return el ? el.value : 'success';
+    }
+
+    function doSync() {
+      if (state.running) return;
+      state.running = true;
+      ids.syncBtn.disabled = true;
+      setPhase('running');
+
+      setTimeout(() => {
+        const mode = getMode();
+        state.running = false;
+        ids.syncBtn.disabled = false;
+
+        if (mode === 'error') {
+          const parentId = normalizeParentId(ids.parentInput.value || state.selectedParentId);
+          const output = `Error: invalid parent-id\nreceived: ${parentId}\nhint: use numeric id in --parent-id`;
+          state.lastErrorOutput = output;
+          ids.errorMsg.textContent = '命令执行失败，表单保留，你可以直接修改后重试。';
+          ids.errOutput.textContent = output;
+          setPhase('error');
+          return;
+        }
+
+        const parentId = normalizeParentId(ids.parentInput.value || state.selectedParentId || '2748');
+        const title = ids.titleInput.value.trim() || '未命名文档';
+        const url = `https://xuecheng.com/doc/${parentId}-${Math.floor(Math.random()*900+100)}`;
+        const output = JSON.stringify({ id: `${parentId}-new`, title, url }, null, 2);
+        state.lastOkOutput = output;
+        ids.okOutput.textContent = output;
+        ids.docLink.textContent = title;
+        ids.docLink.href = url;
+        ids.syncTime.textContent = `同步时间：刚刚 (${nowText()})`;
+
+        if (ids.openAfter.checked) {
+          setPhase('idle');
+          ids.parentMeta.innerHTML = `<span style="color:#116329">已在浏览器打开：<a href="${url}" target="_blank">${title}</a></span>`;
+          return;
+        }
+
+        setPhase('success');
+      }, 850);
+    }
+
+    function copyWithTick(btn, text) {
+      navigator.clipboard.writeText(text).then(() => {
+        const t = btn.textContent;
+        btn.textContent = '✓';
+        setTimeout(() => btn.textContent = t, 900);
+      });
+    }
+
+    ids.titleInput.addEventListener('input', renderCommand);
+    ids.parentInput.addEventListener('input', () => {
+      state.selectedParentId = '';
+      renderRecent();
+      renderCommand();
+      ids.parentMeta.textContent = '';
+    });
+    ids.parentInput.addEventListener('blur', () => renderParentMeta(ids.parentInput.value));
+
+    ids.syncBtn.addEventListener('click', doSync);
+    ids.retryBtn.addEventListener('click', doSync);
+
+    document.getElementById('copyCmd').addEventListener('click', (e) => copyWithTick(e.target, ids.cmdPreview.textContent || ''));
+    document.getElementById('copyErr').addEventListener('click', (e) => copyWithTick(e.target, ids.errOutput.textContent || ''));
+    document.getElementById('copyOk').addEventListener('click', (e) => copyWithTick(e.target, ids.okOutput.textContent || ''));
+
+    renderRecent();
+    renderCommand();
+    renderParentMeta(ids.parentInput.value);
+    setPhase('idle');
+  </script>
+</body>
+</html>

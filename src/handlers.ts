@@ -9,12 +9,14 @@ import {
   getLastModified,
   getFileList,
   log,
+  isSupportedTextFile,
 } from "./utils.ts";
 import { broadcastFileOpened, addClient, removeClient } from "./sse.ts";
 import { createKmDoc, getKmDocMeta } from "./km-cli.ts";
 import {
   getRecentParents,
   addRecentParent,
+  updateRecentParentMeta,
   getSyncedFile,
   saveSyncedFile,
   getDefaultParentId,
@@ -32,8 +34,45 @@ function expandHomePath(input: string): string {
 }
 
 function isMarkdownFilename(name: string): boolean {
-  const lower = name.toLowerCase();
-  return lower.endsWith(".md") || lower.endsWith(".markdown");
+  return isSupportedTextFile(name.toLowerCase());
+}
+
+const PARENT_URL_SKIP_SEGMENTS = new Set(["doc", "docs", "page", "pages", "content", "wiki"]);
+
+function normalizeParentIdInput(raw: string): string {
+  const input = (raw || "").trim();
+  if (!input) return "";
+
+  const pickFromPath = (path: string): string => {
+    const segments = path
+      .split("/")
+      .map((s) => decodeURIComponent(s).trim())
+      .filter(Boolean);
+    for (let i = segments.length - 1; i >= 0; i--) {
+      const seg = segments[i];
+      if (!seg) continue;
+      if (PARENT_URL_SKIP_SEGMENTS.has(seg.toLowerCase())) continue;
+      return seg;
+    }
+    return "";
+  };
+
+  if (/^https?:\/\//i.test(input)) {
+    try {
+      const url = new URL(input);
+      const picked = pickFromPath(url.pathname);
+      return picked || input;
+    } catch {
+      return input;
+    }
+  }
+
+  if (input.includes("/")) {
+    const picked = pickFromPath(input);
+    return picked || input;
+  }
+
+  return input;
 }
 
 // API: 获取文件内容
@@ -43,7 +82,7 @@ export async function handleGetFile(c: Context) {
 
   // 处理远程 URL
   if (isUrl(path)) {
-    const { content, error } = await fetchRemoteMarkdown(path);
+    const { content, error, contentType } = await fetchRemoteMarkdown(path);
     if (error) return c.json({ error }, 400);
 
     const url = new URL(path);
@@ -53,9 +92,9 @@ export async function handleGetFile(c: Context) {
       // 从 hostname 提取，例如 "soul.md" -> "soul.md"
       filename = url.hostname.replace(/^www\./, "");
     }
-    // 如果没有后缀，默认添加 .md
+    // 如果没有后缀，按 content-type 推断默认后缀
     if (!filename.includes(".")) {
-      filename += ".md";
+      filename += contentType?.toLowerCase().includes("text/html") ? ".html" : ".md";
     }
 
     return c.json({
@@ -83,7 +122,7 @@ export async function handleGetFile(c: Context) {
   });
 }
 
-// API: 获取目录下的 Markdown 文件列表
+// API: 获取目录下的可展示文本文件列表（Markdown / HTML）
 export function handleGetFiles(c: Context) {
   const dir = c.req.query("dir") || ".";
   const files = getFileList(resolve(dir));
@@ -109,9 +148,9 @@ export function handleGetNearby(c: Context) {
   const currentFile = basename(resolvedPath);
 
   try {
-    // 获取当前目录的所有 .md 文件（兄弟文件）
+    // 获取当前目录的所有可展示文件（兄弟文件）
     const siblings = readdirSync(currentDir)
-      .filter((f) => f.endsWith(".md"))
+      .filter((f) => isSupportedTextFile(f.toLowerCase()))
       .sort()
       .map((f) => ({
         name: f,
@@ -122,7 +161,7 @@ export function handleGetNearby(c: Context) {
     const parentDir = dirname(currentDir);
     const hasParent = parentDir !== currentDir;
 
-    // 获取子目录（包含 .md 文件的目录）
+    // 获取子目录（包含可展示文件的目录）
     const subdirs = readdirSync(currentDir)
       .filter((f) => {
         const fullPath = join(currentDir, f);
@@ -229,7 +268,7 @@ export function handlePathSuggestions(c: Context) {
   }
 }
 
-// API: 检测路径类型（md 文件 / 其他文件 / 目录）
+// API: 检测路径类型（md/html 文件 / 其他文件 / 目录）
 export async function handleDetectPath(c: Context) {
   try {
     const body = await c.req.json() as any;
@@ -242,8 +281,9 @@ export async function handleDetectPath(c: Context) {
       const url = new URL(rawPath);
       const ext = extname(url.pathname || "").toLowerCase();
       const isMd = ext === ".md" || ext === ".markdown";
+      const isHtml = ext === ".html" || ext === ".htm";
       return c.json({
-        kind: isMd ? "md_file" : "other_file",
+        kind: isMd ? "md_file" : (isHtml ? "html_file" : "other_file"),
         path: rawPath,
         ext: ext || null,
         isUrl: true,
@@ -274,8 +314,9 @@ export async function handleDetectPath(c: Context) {
     if (fileStat.isFile()) {
       const ext = extname(resolvedPath).toLowerCase();
       const isMd = ext === ".md" || ext === ".markdown";
+      const isHtml = ext === ".html" || ext === ".htm";
       return c.json({
-        kind: isMd ? "md_file" : "other_file",
+        kind: isMd ? "md_file" : (isHtml ? "html_file" : "other_file"),
         path: resolvedPath,
         ext: ext || null,
       });
@@ -303,7 +344,7 @@ export async function handleOpenFile(c: Context) {
 
   // 处理远程 URL
   if (isUrl(path)) {
-    const { content, error } = await fetchRemoteMarkdown(path);
+    const { content, error, contentType } = await fetchRemoteMarkdown(path);
     if (error) {
       return c.json({ error }, 400);
     }
@@ -314,7 +355,7 @@ export async function handleOpenFile(c: Context) {
       filename = url.hostname.replace(/^www\./, "");
     }
     if (!filename.includes(".")) {
-      filename += ".md";
+      filename += contentType?.toLowerCase().includes("text/html") ? ".html" : ".md";
     }
 
     const fileInfo = {
@@ -360,6 +401,44 @@ export async function handleOpenFile(c: Context) {
   return c.json({ success: true, filename: fileInfo.filename });
 }
 
+// API: 让系统默认浏览器直接打开本地文件（macOS: open）
+export async function handleOpenLocalFile(c: Context) {
+  try {
+    const body = await c.req.json<{ path?: string }>();
+    const rawPath = body?.path?.trim();
+    if (!rawPath) {
+      return c.json({ error: "缺少 path 参数" }, 400);
+    }
+    if (isUrl(rawPath)) {
+      return c.json({ error: "仅支持本地文件" }, 400);
+    }
+
+    const resolvedPath = resolve(rawPath);
+    if (!existsSync(resolvedPath)) {
+      return c.json({ error: "文件不存在" }, 404);
+    }
+
+    const ext = extname(resolvedPath).toLowerCase();
+    if (ext !== ".html" && ext !== ".htm") {
+      return c.json({ error: "仅支持 html/htm 文件" }, 400);
+    }
+
+    const proc = Bun.spawn(["open", resolvedPath], {
+      stdout: "ignore",
+      stderr: "pipe",
+    });
+    const code = await proc.exited;
+    if (code !== 0) {
+      const err = await new Response(proc.stderr).text();
+      return c.json({ error: err || `open 失败，退出码 ${code}` }, 500);
+    }
+
+    return c.json({ success: true });
+  } catch (error: any) {
+    return c.json({ error: error?.message || "打开失败" }, 500);
+  }
+}
+
 // API: SSE 事件流
 export function handleEvents(c: Context) {
   const stream = new ReadableStream<Uint8Array>({
@@ -391,14 +470,65 @@ export function handleEvents(c: Context) {
 }
 
 // API: 获取最近使用的位置
-export function handleGetRecentParents(c: Context) {
+export async function handleGetRecentParents(c: Context) {
   const parents = getRecentParents();
   const defaultParentId = getDefaultParentId();
 
+  // 兜底修复历史记录中的 "Parent <id>" 占位标题
+  const refreshedParents = await Promise.all(parents.map(async (parent) => {
+    const needsRefresh = !parent.title || /^Parent\s+\S+$/i.test(parent.title.trim());
+    if (!needsRefresh) return parent;
+
+    try {
+      const meta = await getKmDocMeta(parent.id);
+      const nextTitle = meta?.title || parent.title;
+      const nextUrl = meta?.url || parent.url;
+      if ((nextTitle && nextTitle !== parent.title) || (nextUrl && nextUrl !== parent.url)) {
+        updateRecentParentMeta(parent.id, nextTitle, nextUrl);
+      }
+      return {
+        ...parent,
+        title: nextTitle,
+        url: nextUrl,
+      };
+    } catch {
+      return parent;
+    }
+  }));
+
   return c.json({
-    parents,
+    parents: refreshedParents,
     defaultParentId,
   });
+}
+
+// API: 根据父文档输入（ID/URL）获取元信息
+export async function handleGetSyncParentMeta(c: Context) {
+  const raw = (c.req.query("value") || c.req.query("parentId") || "").trim();
+  if (!raw) {
+    return c.json({ success: false, error: "缺少 value 参数" }, 400);
+  }
+
+  const parentId = normalizeParentIdInput(raw);
+  if (!parentId) {
+    return c.json({ success: false, error: "无法解析父文档 ID" }, 400);
+  }
+
+  try {
+    const meta = await getKmDocMeta(parentId);
+    return c.json({
+      success: true,
+      parentId,
+      title: meta?.title || `Parent ${parentId}`,
+      url: meta?.url || meta?.link || "",
+    });
+  } catch (error: any) {
+    return c.json({
+      success: false,
+      parentId,
+      error: error?.message || "获取父文档信息失败",
+    }, 500);
+  }
 }
 
 // API: 执行同步
@@ -412,8 +542,9 @@ export async function handleSyncExecute(c: Context) {
     }>();
 
     const { filePath, parentId, title, openAfterSync = false } = body;
+    const normalizedParentId = normalizeParentIdInput(parentId);
 
-    if (!filePath || !parentId || !title) {
+    if (!filePath || !normalizedParentId || !title) {
       return c.json({ error: "缺少必要参数" }, 400);
     }
 
@@ -425,7 +556,7 @@ export async function handleSyncExecute(c: Context) {
 
     // 调用 km-cli 创建文档
     const result = await createKmDoc({
-      parentId,
+      parentId: normalizedParentId,
       title,
       markdownFile: resolvedPath,
     });
@@ -434,7 +565,7 @@ export async function handleSyncExecute(c: Context) {
       return c.json({
         success: false,
         error: result.error || "同步失败",
-        output: result.output || "",
+        output: result.output || result.error || "km-cli 未返回可读输出",
         command: result.command,
       });
     }
@@ -444,17 +575,17 @@ export async function handleSyncExecute(c: Context) {
       kmDocId: result.docId!,
       kmUrl: result.url!,
       kmTitle: title,
-      parentId,
+      parentId: normalizedParentId,
       lastSyncTime: Date.now(),
       command: result.command,
     });
 
     // 更新最近使用的位置
     // 尝试获取父文档的真实标题
-    let parentTitle = `Parent ${parentId}`;
+    let parentTitle = `Parent ${normalizedParentId}`;
     let parentUrl = result.url!;
     try {
-      const parentMeta = await getKmDocMeta(parentId);
+      const parentMeta = await getKmDocMeta(normalizedParentId);
       if (parentMeta && parentMeta.title) {
         parentTitle = parentMeta.title;
       }
@@ -465,7 +596,7 @@ export async function handleSyncExecute(c: Context) {
       // 获取失败时使用降级方案
       log(`⚠️  获取父文档信息失败，使用降级方案: ${error}`);
     }
-    addRecentParent(parentId, parentTitle, parentUrl);
+    addRecentParent(normalizedParentId, parentTitle, parentUrl);
 
     log(`🔄 同步成功: ${title} -> ${result.url}`);
 
@@ -629,7 +760,7 @@ export async function handleScanWorkspace(c: Context) {
   }
 }
 
-// 扫描目录，构建文件树（只包含 .md 文件和包含 .md 的目录）
+// 扫描目录，构建文件树（只包含 md/html 文件和包含这些文件的目录）
 function scanDirectory(dirPath: string): any {
   const name = basename(dirPath);
   const tree: any = {
@@ -654,12 +785,12 @@ function scanDirectory(dirPath: string): any {
 
       if (entry.isDirectory()) {
         const subTree = scanDirectory(fullPath);
-        // 只添加包含 md 文件的目录
+        // 只添加包含可展示文件的目录
         if (subTree.fileCount > 0) {
           tree.children.push(subTree);
           tree.fileCount += subTree.fileCount;
         }
-      } else if (entry.name.endsWith('.md')) {
+      } else if (isSupportedTextFile(entry.name.toLowerCase())) {
         tree.children.push({
           name: entry.name,
           path: fullPath,

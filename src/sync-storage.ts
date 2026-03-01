@@ -154,7 +154,34 @@ export function addRecentParent(
  */
 export function getRecentParents(): RecentParent[] {
   const records = loadSyncRecords();
-  return records.recentParents;
+  return [...records.recentParents].sort((a, b) => b.lastUsed - a.lastUsed);
+}
+
+/**
+ * 更新最近位置的展示元信息（标题/URL），不改变使用时间与计数
+ */
+export function updateRecentParentMeta(
+  parentId: string,
+  title?: string,
+  url?: string
+): void {
+  const records = loadSyncRecords();
+  const target = records.recentParents.find((p) => p.id === parentId);
+  if (!target) return;
+
+  let changed = false;
+  if (title && title !== target.title) {
+    target.title = title;
+    changed = true;
+  }
+  if (url && url !== target.url) {
+    target.url = url;
+    changed = true;
+  }
+
+  if (changed) {
+    saveSyncRecords(records);
+  }
 }
 
 /**

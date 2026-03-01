@@ -1533,6 +1533,7 @@ export const styles = `
       font-size: 13px;
       color: #24292e;
       user-select: none;
+      min-height: 32px;
     }
 
     .workspace-header:hover {
@@ -1632,16 +1633,45 @@ export const styles = `
       background: #ffd8d3;
     }
 
+    .workspace-toggle,
+    button.workspace-toggle,
+    .workspace-name,
+    button.workspace-name,
+    .tree-toggle,
+    button.tree-toggle,
+    .tree-name,
+    button.tree-name {
+      appearance: none;
+      -webkit-appearance: none;
+      border: none;
+      background: transparent;
+      font: inherit;
+      margin: 0;
+      padding: 0;
+      box-shadow: none;
+      outline: none;
+      text-align: left;
+    }
+
     .workspace-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 20px;
       font-size: 12px;
+      line-height: 1;
       color: #57606a;
       margin-right: 4px;
       width: 16px;
       text-align: center;
       cursor: pointer;
+      flex-shrink: 0;
     }
 
     .workspace-name {
+      display: inline-flex;
+      align-items: center;
+      min-height: 20px;
       cursor: pointer;
     }
 
@@ -1676,6 +1706,7 @@ export const styles = `
       user-select: none;
       gap: 4px;
       position: relative;
+      min-height: 28px;
     }
 
     .tree-item:hover {
@@ -1709,7 +1740,12 @@ export const styles = `
 
     .tree-toggle {
       width: 10px;
+      height: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       font-size: 10px;
+      line-height: 1;
       color: #57606a;
       flex-shrink: 0;
       text-align: center;
@@ -1724,6 +1760,9 @@ export const styles = `
 
     .tree-name {
       flex: 1;
+      display: inline-flex;
+      align-items: center;
+      min-height: 20px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;

@@ -345,7 +345,7 @@ function renderTreeNode(workspaceId: string, node: FileTreeNode, depth: number):
       <div class="tree-item directory-node">
         <span class="tree-indent" style="width: ${indentPx}px"></span>
         <span class="tree-toggle" onclick="${hasChildren ? `event.stopPropagation();handleNodeClick('${escapeAttr(workspaceId)}', '${escapeAttr(node.path)}')` : ''}">${hasChildren ? toggle : ''}</span>
-        <span class="tree-name">${escapeHtml(node.name)}</span>
+        <span class="tree-name" onclick="${hasChildren ? `event.stopPropagation();handleNodeClick('${escapeAttr(workspaceId)}', '${escapeAttr(node.path)}')` : ''}">${escapeHtml(node.name)}</span>
         ${node.fileCount ? `<span class="tree-count">${node.fileCount}</span>` : ''}
       </div>
       ${isExpanded && hasChildren ? `

@@ -283,7 +283,7 @@ function renderFileTree(workspaceId: string, tree: FileTreeNode | undefined, que
   if (!tree.children || tree.children.length === 0) {
     return `
       <div class="file-tree empty">
-        <div class="tree-empty">${query ? '未找到匹配文件' : '此目录下没有 Markdown 文件'}</div>
+        <div class="tree-empty">${query ? '未找到匹配文件' : '此目录下没有 Markdown/HTML 文件'}</div>
       </div>
     `;
   }
@@ -530,6 +530,12 @@ export function bindWorkspaceEvents(): void {
 
   // 文件点击
   (window as any).handleFileClick = async (filePath: string) => {
+    const lower = filePath.toLowerCase();
+    if (lower.endsWith('.html') || lower.endsWith('.htm')) {
+      window.open(`/api/open-in-browser?path=${encodeURIComponent(filePath)}`, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
     // 导入 switchToFile 和渲染函数
     const { switchToFile } = await import('../state');
     const { loadFile } = await import('../api/files');

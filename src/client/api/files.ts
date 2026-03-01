@@ -46,7 +46,7 @@ export async function getPathSuggestions(
   return response.json();
 }
 
-// 检测输入路径类型（md 文件 / 其他文件 / 目录）
+// 检测输入路径类型（md/html 文件 / 其他文件 / 目录）
 export async function detectPathType(path: string): Promise<PathDetectResponse> {
   const response = await fetch('/api/detect-path', {
     method: 'POST',

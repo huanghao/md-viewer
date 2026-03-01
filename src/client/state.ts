@@ -37,6 +37,11 @@ function saveAuxiliaryState(): void {
   }
 }
 
+function isExternallyOpenedFile(path: string): boolean {
+  const lower = path.toLowerCase();
+  return lower.endsWith('.html') || lower.endsWith('.htm');
+}
+
 function restoreAuxiliaryState(): void {
   listDiffPaths.clear();
   workspaceKnownFiles.clear();
@@ -239,11 +244,12 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
     }
 
     // 恢复当前文件
-    if (data.currentFile && state.files.has(data.currentFile)) {
+    if (data.currentFile && state.files.has(data.currentFile) && !isExternallyOpenedFile(data.currentFile)) {
       state.currentFile = data.currentFile;
     } else {
-      // 如果保存的当前文件不存在了，切换到第一个文件
-      const firstFile = Array.from(state.files.values())[0];
+      // 如果当前文件不存在或属于外部打开类型，切换到第一个可内置渲染文件
+      const firstFile = Array.from(state.files.values()).find((file) => !isExternallyOpenedFile(file.path))
+        || Array.from(state.files.values())[0];
       state.currentFile = firstFile ? firstFile.path : null;
     }
   } catch (e) {

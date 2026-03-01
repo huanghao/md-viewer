@@ -30,7 +30,7 @@ export interface FileTreeNode {
   type: 'file' | 'directory';
   children?: FileTreeNode[];
   isExpanded?: boolean;
-  fileCount?: number;  // 目录下的 md 文件数
+  fileCount?: number;  // 目录下的 md/html 文件数
 }
 
 // 应用配置类型
@@ -83,7 +83,7 @@ export interface PathSuggestionsResponse {
   error?: string;
 }
 
-export type PathKind = 'md_file' | 'other_file' | 'directory' | 'not_found' | 'invalid';
+export type PathKind = 'md_file' | 'html_file' | 'other_file' | 'directory' | 'not_found' | 'invalid';
 
 export interface PathDetectResponse {
   kind: PathKind;

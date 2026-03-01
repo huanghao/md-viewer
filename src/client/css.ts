@@ -45,13 +45,17 @@ export const styles = `
       background: rgba(9, 105, 218, 0.12);
     }
     .sidebar-header {
-      padding: 16px;
-      border-bottom: 1px solid #e1e4e8;
+      padding: 0;
+      border-bottom: none;
+      display: flex;
+      flex-direction: column;
     }
     .sidebar-header h1 {
       font-size: 16px;
       color: #24292e;
-      margin-bottom: 12px;
+      height: 48px;
+      margin: 0;
+      padding: 0 12px;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -66,7 +70,8 @@ export const styles = `
       position: relative;
       display: flex;
       align-items: center;
-      margin-bottom: 8px;
+      margin: 0;
+      width: 100%;
     }
     .search-icon {
       position: absolute;
@@ -107,11 +112,21 @@ export const styles = `
       color: #24292e;
     }
 
+    #searchBox {
+      height: 34px;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+    }
     #modeSwitchRow {
-      margin-bottom: 8px;
+      height: 28px;
+      padding: 0 12px;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
     }
     .mode-switch-row {
-      height: 24px;
+      height: 28px;
       display: inline-flex;
       align-items: center;
       gap: 6px;
@@ -145,17 +160,20 @@ export const styles = `
       stroke-linejoin: round;
     }
     .mode-switch-label {
-      font-size: 12px;
-      font-weight: 600;
+      font-size: 13px;
+      font-weight: 500;
       color: #57606a;
       letter-spacing: 0.2px;
       user-select: none;
     }
 
     .quick-action-confirm-host {
-      margin-top: 6px;
+      margin-top: 0;
       position: relative;
       z-index: 2601;
+    }
+    body.quick-action-confirm-visible .quick-action-confirm-host {
+      margin-top: 6px;
     }
 
     /* 当前文件路径 */
@@ -282,31 +300,6 @@ export const styles = `
     }
     .sidebar.workspace-mode .sidebar-header {
       border-bottom: none;
-      padding: 0;
-    }
-    .sidebar.workspace-mode .sidebar-header h1 {
-      height: 48px;
-      margin: 0;
-      padding: 0 12px;
-      display: flex;
-      align-items: center;
-    }
-    .sidebar.workspace-mode #searchBox {
-      height: 36px;
-      padding: 0 12px;
-      display: flex;
-      align-items: center;
-    }
-    .sidebar.workspace-mode #modeSwitchRow {
-      height: 24px;
-      padding: 0 12px;
-      margin-bottom: 6px;
-      display: flex;
-      align-items: center;
-    }
-    .sidebar.workspace-mode .search-wrapper {
-      margin: 0;
-      width: 100%;
     }
     .sidebar.workspace-mode .add-file-section {
       border-bottom: none;
@@ -323,7 +316,7 @@ export const styles = `
       line-height: 1.3;
     }
     .sidebar.workspace-mode .workspace-section {
-      padding-top: 2px;
+      padding-top: 0;
     }
     .add-file-input {
       width: 100%;
@@ -471,7 +464,7 @@ export const styles = `
       flex: 1;
       overflow-y: auto;
       overflow-x: hidden;
-      padding: 8px;
+      padding: 6px 8px 8px;
       min-height: 0;
     }
     .file-item {

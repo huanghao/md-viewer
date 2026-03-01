@@ -26,7 +26,8 @@ const SIDEBAR_MAX_WIDTH = 680;
 
 // ==================== 消息处理 ====================
 async function onFileLoaded(data: FileData, focus: boolean = false) {
-  addOrUpdateFile(data, focus);
+  const shouldFocus = focus && !isHtmlPath(data.path);
+  addOrUpdateFile(data, shouldFocus);
   renderSidebar();
   renderContent();
 }
@@ -145,6 +146,11 @@ export function renderAll() {
   renderContent();
 }
 
+function isMarkdownContent(file: { name: string; path: string }): boolean {
+  const lower = `${file.name} ${file.path}`.toLowerCase();
+  return lower.includes('.md') || lower.includes('.markdown');
+}
+
 function renderContent() {
   const container = document.getElementById('content');
   if (!container) return;
@@ -153,7 +159,7 @@ function renderContent() {
     container.innerHTML = `
       <div class="empty-state">
         <h2>欢迎使用 MD Viewer</h2>
-        <p>在左侧添加 Markdown 文件开始阅读</p>
+        <p>在左侧添加 Markdown/HTML 文件开始阅读</p>
       </div>
     `;
     return;
@@ -161,6 +167,22 @@ function renderContent() {
 
   const file = state.files.get(state.currentFile);
   if (!file) return;
+
+  if (isHtmlPath(file.path)) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <h2>HTML 文件仅支持外部打开</h2>
+        <p>请在列表中点击该文件，在浏览器新页面查看</p>
+      </div>
+    `;
+    const meta = document.getElementById('fileMeta');
+    if (meta) {
+      meta.textContent = formatRelativeTime(file.lastModified);
+    }
+    renderBreadcrumb();
+    updateToolbarButtons();
+    return;
+  }
 
   // 使用 marked 渲染 Markdown
   const html = (window as any).marked.parse(file.content);
@@ -284,6 +306,16 @@ function getWorkspaceNameFromPath(path: string): string {
   return parts[parts.length - 1] || 'workspace';
 }
 
+function isHtmlPath(path: string): boolean {
+  const lower = path.toLowerCase();
+  return lower.endsWith('.html') || lower.endsWith('.htm');
+}
+
+function openFileInBrowser(path: string): void {
+  const url = `/api/open-in-browser?path=${encodeURIComponent(path)}`;
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 function looksLikePathInput(value: string): boolean {
   const v = value.trim();
   if (!v) return false;
@@ -373,9 +405,13 @@ async function addFileByPath(path: string, focus: boolean = true) {
 
   const data = await loadFile(path);
   if (data) {
-    await onFileLoaded(data, focus);
+    const shouldFocus = focus && !isHtmlPath(data.path || path);
+    await onFileLoaded(data, shouldFocus);
     await openFile(path, focus);
 
+    if (focus && isHtmlPath(data.path || path)) {
+      openFileInBrowser(data.path || path);
+    }
 
     // 清空统一输入框
     setSearchQuery('');
@@ -390,7 +426,7 @@ async function handleSmartAddInput(path: string): Promise<void> {
   const result = await detectPathType(trimmed);
   const detectedPath = result.path || trimmed;
 
-  if (result.kind === 'md_file') {
+  if (result.kind === 'md_file' || result.kind === 'html_file') {
     clearAddConfirm();
     await addFileByPath(detectedPath, true);
     return;
@@ -437,6 +473,10 @@ async function handleSmartAddInput(path: string): Promise<void> {
 
 // 切换文件
 function switchFile(path: string) {
+  if (isHtmlPath(path)) {
+    openFileInBrowser(path);
+    return;
+  }
   switchToFile(path);
   renderSidebar();
   renderContent();
@@ -480,7 +520,8 @@ function setupDragAndDrop() {
     e.preventDefault();
     const files = Array.from(e.dataTransfer?.files || []);
     for (const file of files) {
-      if (file.name.endsWith('.md')) {
+      const lowerName = file.name.toLowerCase();
+      if (lowerName.endsWith('.md') || lowerName.endsWith('.markdown') || lowerName.endsWith('.html') || lowerName.endsWith('.htm')) {
         await addFileByPath((file as any).path);
       }
     }
@@ -550,7 +591,13 @@ async function updateToolbarButtons() {
     refreshButton.style.display = isDirty ? 'flex' : 'none';
   }
 
-  // 更新同步按钮
+  // 更新同步按钮（仅 Markdown 可同步）
+  const syncButton = document.getElementById('syncButton');
+  if (!isMarkdownContent(file)) {
+    if (syncButton) syncButton.style.display = 'none';
+    return;
+  }
+
   await updateSyncButton();
 }
 
@@ -643,7 +690,7 @@ async function showSyncDialog() {
   if (!file) return;
 
   const titleMatch = file.content.match(/^#\s+(.+)$/m);
-  const defaultTitle = titleMatch ? titleMatch[1] : file.name.replace('.md', '');
+  const defaultTitle = titleMatch ? titleMatch[1] : file.name.replace(/\.(md|markdown|html?|txt)$/i, '');
 
   const recentData = await getRecentParents();
   const preferences = await getSyncPreferences();

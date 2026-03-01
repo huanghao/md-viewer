@@ -180,7 +180,7 @@ export function renderFiles(): void {
   if (!container) return;
 
   if (state.files.size === 0) {
-    container.innerHTML = '<div class="empty-tip">点击上方添加 Markdown 文件</div>';
+    container.innerHTML = '<div class="empty-tip">点击上方添加 Markdown/HTML 文件</div>';
     return;
   }
 

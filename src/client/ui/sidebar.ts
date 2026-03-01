@@ -4,6 +4,14 @@ import { generateDistinctNames } from '../utils/file-names';
 import { getFileListStatus } from '../utils/file-status';
 import { renderWorkspaceSidebar, bindWorkspaceEvents } from './sidebar-workspace';
 
+function rerenderByMode(): void {
+  if (state.config.sidebarMode === 'workspace') {
+    renderSidebar();
+    return;
+  }
+  renderFiles();
+}
+
 // 渲染搜索框
 export function renderSearchBox(): void {
   const container = document.getElementById('searchBox');
@@ -31,7 +39,7 @@ export function renderSearchBox(): void {
       const cursorPosition = input.selectionStart || 0;
       setSearchQuery(query);
       renderSearchBox();
-      renderFiles();
+      rerenderByMode();
 
       // 重新渲染后恢复焦点和光标位置
       const newInput = document.getElementById('searchInput') as HTMLInputElement;
@@ -47,7 +55,7 @@ export function renderSearchBox(): void {
     clearBtn.addEventListener('click', () => {
       setSearchQuery('');
       renderSearchBox();
-      renderFiles();
+      rerenderByMode();
 
       // 清除后恢复焦点
       const newInput = document.getElementById('searchInput') as HTMLInputElement;

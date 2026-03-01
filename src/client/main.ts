@@ -14,17 +14,14 @@ import { formatRelativeTime, formatFileTime } from './utils/format';
 import { generateDistinctNames } from './utils/file-names';
 
 // 导入 UI 组件
-import { renderFiles, renderTabs, renderSearchBox, renderCurrentPath, renderSidebar } from './ui/sidebar';
+import { renderSidebar } from './ui/sidebar';
 import { showToast, showSuccess, showError, showWarning, showInfo } from './ui/toast';
 import { showSettingsDialog } from './ui/settings';
 
 // ==================== 消息处理 ====================
 async function onFileLoaded(data: FileData, focus: boolean = false) {
   addOrUpdateFile(data, focus);
-  renderSearchBox();
-  renderCurrentPath();
-  renderFiles();
-  renderTabs();
+  renderSidebar();
   renderContent();
 }
 
@@ -39,7 +36,7 @@ async function refreshCurrentFile() {
       file.lastModified = data.lastModified;
       file.displayedModified = data.lastModified;  // 同步时间戳
       renderContent();
-      renderFiles();
+      renderSidebar();
     }
   }
 }
@@ -61,8 +58,8 @@ async function refreshFile(path: string) {
       showSuccess('文件已刷新', 2000);
     }
 
-    // 重新渲染文件列表（M 标识消失）
-    renderFiles();
+    // 重新渲染侧边栏（M 标识消失）
+    renderSidebar();
   }
 }
 
@@ -221,20 +218,14 @@ async function addFileByPath(path: string, focus: boolean = true) {
 // 切换文件
 function switchFile(path: string) {
   switchToFile(path);
-  renderSearchBox();
-  renderCurrentPath();
-  renderFiles();
-  renderTabs();
+  renderSidebar();
   renderContent();
 }
 
 // 移除文件（关闭标签页和从列表删除是同一个操作）
 function removeFileHandler(path: string) {
   removeFileFromState(path);
-  renderSearchBox();
-  renderCurrentPath();
-  renderFiles();
-  renderTabs();
+  renderSidebar();
   renderContent();
 }
 
@@ -382,7 +373,7 @@ async function handleRefreshButtonClick() {
 
     // 重新渲染
     renderContent();
-    renderFiles(); // 刷新文件列表，M 标识消失
+    renderSidebar(); // 刷新侧边栏，M 标识消失
     saveState();
 
     // 可选：添加内容闪烁效果

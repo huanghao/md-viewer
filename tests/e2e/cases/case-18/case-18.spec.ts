@@ -36,6 +36,8 @@ test('case-18: SSE 断线重连后继续接收变更', async ({ page, context })
     await page.waitForTimeout(3600);
 
     overwrite(FILE_A, '# A\n\nA v2 after reconnect\n');
+    await expect(page.locator('#refreshButton')).toBeVisible();
+    await page.locator('#refreshButton').click();
 
     await expect.poll(async () => {
       return await page.locator('#content').innerText();

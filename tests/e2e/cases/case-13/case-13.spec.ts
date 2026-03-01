@@ -1,11 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { existsSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { resetAppStorage } from '../../helpers';
 
 const ROOT = process.cwd();
-const FILE_A = resolve(ROOT, 'docs/design/e2e-non-current-delete-a.md');
-const FILE_B = resolve(ROOT, 'docs/design/e2e-non-current-delete-b.md');
+const CASE_DIR = resolve(ROOT, 'tests/e2e/runtime/case-13');
+const FILE_A = resolve(CASE_DIR, 'e2e-non-current-delete-a.md');
+const FILE_B = resolve(CASE_DIR, 'e2e-non-current-delete-b.md');
 
 function toHex(rgb: string | null): string | null {
   if (!rgb) return null;
@@ -16,6 +17,7 @@ function toHex(rgb: string | null): string | null {
 }
 
 test('case-13: 非当前文件删除流程', async ({ page }) => {
+  if (!existsSync(CASE_DIR)) mkdirSync(CASE_DIR, { recursive: true });
   if (existsSync(FILE_A)) rmSync(FILE_A);
   if (existsSync(FILE_B)) rmSync(FILE_B);
   writeFileSync(FILE_A, '# A\n\nA cached content\n', 'utf-8');

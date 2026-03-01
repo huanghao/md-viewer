@@ -9,7 +9,7 @@
 
 ## 前置
 - 侧边栏模式为 `workspace`
-- 工作区包含 `docs`
+- 工作区包含 `tests/e2e/runtime/case-14`
 - 存在两个测试文件：
   - `e2e-ws-noncurrent-a.md`（将被删除）
   - `e2e-ws-noncurrent-b.md`（当前文件）

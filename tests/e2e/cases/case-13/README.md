@@ -8,7 +8,7 @@
 
 ## 前置条件
 - 简单模式。
-- 已打开两个本地 Markdown 文件 A/B，且 B 为当前文件。
+- 已打开两个本地 Markdown 文件 A/B（位于 `tests/e2e/runtime/case-13/`），且 B 为当前文件。
 
 ## 步骤
 1. 删除非当前文件 A。

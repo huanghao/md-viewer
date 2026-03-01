@@ -30,12 +30,12 @@ test('case-16: 当前文件连续快速修改后最终收敛', async ({ page }) 
     const itemA = page.locator('.file-item.current', { hasText: 'e2e-rapid-write-a.md' });
     await expect(itemA).toBeVisible();
 
-    // 先校验监听链路就绪
-    await page.waitForTimeout(4000);
+    // 先校验监听链路就绪（收到一次变更并进入可刷新状态）
+    await page.waitForTimeout(1200);
     overwrite(FILE_A, '# A\n\nA warmup\n');
     await expect.poll(async () => {
-      return await page.locator('#content').innerText();
-    }, { timeout: 10000 }).toContain('A warmup');
+      return await page.locator('#refreshButton').isVisible();
+    }, { timeout: 10000 }).toBe(true);
 
     // 再短间隔连续写入多个版本，验证最终收敛
     overwrite(FILE_A, '# A\n\nA v2\n');
@@ -45,6 +45,9 @@ test('case-16: 当前文件连续快速修改后最终收敛', async ({ page }) 
     overwrite(FILE_A, '# A\n\nA v4\n');
     await wait(80);
     overwrite(FILE_A, '# A\n\nA v5 FINAL\n');
+
+    await expect(page.locator('#refreshButton')).toBeVisible();
+    await page.locator('#refreshButton').click();
 
     await expect.poll(async () => {
       return await page.locator('#content').innerText();

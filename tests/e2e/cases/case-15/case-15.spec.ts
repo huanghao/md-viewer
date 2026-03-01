@@ -1,14 +1,15 @@
 import { expect, test } from '@playwright/test';
-import { existsSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { resetAppStorage, seedConfig } from '../../helpers';
 
 const ROOT = process.cwd();
-const DOCS_ROOT = resolve(ROOT, 'docs');
-const FILE_A = resolve(ROOT, 'docs/design/e2e-ws-delete-without-open-a.md');
-const FILE_B = resolve(ROOT, 'docs/design/e2e-ws-delete-without-open-b.md');
+const WORKSPACE_ROOT = resolve(ROOT, 'tests/e2e/runtime/case-15');
+const FILE_A = resolve(WORKSPACE_ROOT, 'e2e-ws-delete-without-open-a.md');
+const FILE_B = resolve(WORKSPACE_ROOT, 'e2e-ws-delete-without-open-b.md');
 
 test('case-15: 工作区中未打开文件删除后立即显示删除态', async ({ page }) => {
+  if (!existsSync(WORKSPACE_ROOT)) mkdirSync(WORKSPACE_ROOT, { recursive: true });
   if (existsSync(FILE_A)) rmSync(FILE_A);
   if (existsSync(FILE_B)) rmSync(FILE_B);
   writeFileSync(FILE_A, '# A\n\nA content\n', 'utf-8');
@@ -18,7 +19,7 @@ test('case-15: 工作区中未打开文件删除后立即显示删除态', async
     await resetAppStorage(page);
     await seedConfig(page, {
       sidebarMode: 'workspace',
-      workspaces: [{ id: 'ws-docs', name: 'docs', path: DOCS_ROOT, isExpanded: true }],
+      workspaces: [{ id: 'ws-runtime', name: 'case-15', path: WORKSPACE_ROOT, isExpanded: true }],
     });
 
     const rowAInTree = page.locator('.tree-item.file-node', { hasText: 'e2e-ws-delete-without-open-a.md' }).first();

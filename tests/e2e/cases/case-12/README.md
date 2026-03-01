@@ -7,11 +7,11 @@
 - 右侧显示 `D`
 
 ## 前置条件
-- 工作区模式，`docs` 工作区已展开。
-- 存在测试文件并可在树中打开。
+- 工作区模式，`case-12` 工作区已展开。
+- 存在测试文件并可在树中打开（`tests/e2e/runtime/case-12/e2e-workspace-delete-style.md`）。
 
 ## 步骤
-1. 在 `docs/design` 创建测试文件并打开。
+1. 在 `tests/e2e/runtime/case-12` 创建测试文件并打开。
 2. 删除该文件，等待 `file-deleted` 事件。
 
 ## 预期结果

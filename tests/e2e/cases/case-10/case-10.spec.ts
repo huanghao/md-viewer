@@ -1,17 +1,19 @@
 import { expect, test } from '@playwright/test';
 import { resetAppStorage } from '../../helpers';
-import { existsSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 
 const ROOT = process.cwd();
-const FILE_A = resolve(ROOT, 'docs/design/e2e-file-changed-a.md');
-const FILE_B = resolve(ROOT, 'docs/design/e2e-file-changed-b.md');
+const CASE_DIR = resolve(ROOT, 'tests/e2e/runtime/case-10');
+const FILE_A = resolve(CASE_DIR, 'e2e-file-changed-a.md');
+const FILE_B = resolve(CASE_DIR, 'e2e-file-changed-b.md');
 
 function overwrite(path: string, content: string): void {
   writeFileSync(path, content, 'utf-8');
 }
 
 test('case-10: file-changed 交互正确（当前/非当前都不自动刷新）', async ({ page }) => {
+  if (!existsSync(CASE_DIR)) mkdirSync(CASE_DIR, { recursive: true });
   if (existsSync(FILE_A)) rmSync(FILE_A);
   if (existsSync(FILE_B)) rmSync(FILE_B);
 

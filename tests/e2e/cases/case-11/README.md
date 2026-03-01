@@ -11,7 +11,7 @@
 - 使用仓库内测试文件并通过 UI 打开。
 
 ## 步骤
-1. 创建并打开 `docs/design/e2e-delete-visibility-check.md`。
+1. 创建并打开 `tests/e2e/runtime/case-11/e2e-delete-visibility-check.md`。
 2. 删除该文件（触发 `file-deleted` 事件）。
 
 ## 预期结果

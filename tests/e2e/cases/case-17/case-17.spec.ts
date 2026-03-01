@@ -53,9 +53,13 @@ test('case-17: 删除后同路径重建并恢复监听', async ({ page }) => {
 
     await expect(page.locator('.content-file-status.deleted')).toHaveCount(0);
 
-    // 再次修改，验证 watcher 已恢复
+    // 再次修改，验证 watcher 已恢复（进入可刷新状态）
     await page.waitForTimeout(1200);
     overwrite(FILE_A, '# A\n\nA recreated v3 auto\n');
+    await expect(page.locator('#refreshButton')).toBeVisible();
+    await page.evaluate(async () => {
+      await (window as any).handleRefreshButtonClick();
+    });
     await expect.poll(async () => {
       return await page.locator('#content').innerText();
     }, { timeout: 10000 }).toContain('A recreated v3 auto');

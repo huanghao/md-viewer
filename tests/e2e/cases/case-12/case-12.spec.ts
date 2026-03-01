@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { existsSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { resetAppStorage, seedConfig } from '../../helpers';
 
 const ROOT = process.cwd();
-const FILE = resolve(ROOT, 'docs/design/e2e-workspace-delete-style.md');
-const DOCS_ROOT = resolve(ROOT, 'docs');
+const WORKSPACE_ROOT = resolve(ROOT, 'tests/e2e/runtime/case-12');
+const FILE = resolve(WORKSPACE_ROOT, 'e2e-workspace-delete-style.md');
 
 function toHex(rgb: string | null): string | null {
   if (!rgb) return null;
@@ -16,6 +16,7 @@ function toHex(rgb: string | null): string | null {
 }
 
 test('case-12: 工作区模式删除态样式', async ({ page }) => {
+  if (!existsSync(WORKSPACE_ROOT)) mkdirSync(WORKSPACE_ROOT, { recursive: true });
   if (existsSync(FILE)) rmSync(FILE);
   writeFileSync(FILE, '# workspace delete style\n\nhello\n', 'utf-8');
 
@@ -24,11 +25,11 @@ test('case-12: 工作区模式删除态样式', async ({ page }) => {
     await seedConfig(page, {
       sidebarMode: 'workspace',
       workspaces: [
-        { id: 'ws-docs', name: 'docs', path: DOCS_ROOT, isExpanded: true },
+        { id: 'ws-runtime', name: 'case-12', path: WORKSPACE_ROOT, isExpanded: true },
       ],
     });
 
-    await expect(page.locator('.workspace-header', { hasText: 'docs' })).toBeVisible();
+    await expect(page.locator('.workspace-header', { hasText: 'case-12' })).toBeVisible();
     await expect(page.locator('.tree-loading')).toHaveCount(0);
 
     const targetItem = page.locator('.tree-item.file-node', { hasText: 'e2e-workspace-delete-style.md' }).first();

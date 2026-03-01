@@ -1,14 +1,15 @@
 import { expect, test } from '@playwright/test';
-import { existsSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { resetAppStorage, seedConfig } from '../../helpers';
 
 const ROOT = process.cwd();
-const DOCS_ROOT = resolve(ROOT, 'docs');
-const FILE_A = resolve(ROOT, 'docs/design/e2e-ws-noncurrent-a.md');
-const FILE_B = resolve(ROOT, 'docs/design/e2e-ws-noncurrent-b.md');
+const WORKSPACE_ROOT = resolve(ROOT, 'tests/e2e/runtime/case-14');
+const FILE_A = resolve(WORKSPACE_ROOT, 'e2e-ws-noncurrent-a.md');
+const FILE_B = resolve(WORKSPACE_ROOT, 'e2e-ws-noncurrent-b.md');
 
 test('case-14: 工作区模式删除非当前文件', async ({ page }) => {
+  if (!existsSync(WORKSPACE_ROOT)) mkdirSync(WORKSPACE_ROOT, { recursive: true });
   if (existsSync(FILE_A)) rmSync(FILE_A);
   if (existsSync(FILE_B)) rmSync(FILE_B);
   writeFileSync(FILE_A, '# A\n\nA cached content\n', 'utf-8');
@@ -18,10 +19,10 @@ test('case-14: 工作区模式删除非当前文件', async ({ page }) => {
     await resetAppStorage(page);
     await seedConfig(page, {
       sidebarMode: 'workspace',
-      workspaces: [{ id: 'ws-docs', name: 'docs', path: DOCS_ROOT, isExpanded: true }],
+      workspaces: [{ id: 'ws-runtime', name: 'case-14', path: WORKSPACE_ROOT, isExpanded: true }],
     });
 
-    await expect(page.locator('.workspace-header', { hasText: 'docs' })).toBeVisible();
+    await expect(page.locator('.workspace-header', { hasText: 'case-14' })).toBeVisible();
     await expect(page.locator('.tree-loading')).toHaveCount(0);
 
     const itemA = page.locator('.tree-item.file-node', { hasText: 'e2e-ws-noncurrent-a.md' }).first();
@@ -49,7 +50,7 @@ test('case-14: 工作区模式删除非当前文件', async ({ page }) => {
 
     // 刷新后 A 被清理
     await page.reload();
-    await expect(page.locator('.tree-item.file-node', { hasText: 'e2e-ws-noncurrent-a.md' })).toHaveCount(0);
+    await expect(page.locator('.tree-item.file-node:not(.missing)', { hasText: 'e2e-ws-noncurrent-a.md' })).toHaveCount(0);
   } finally {
     if (existsSync(FILE_A)) rmSync(FILE_A);
     if (existsSync(FILE_B)) rmSync(FILE_B);

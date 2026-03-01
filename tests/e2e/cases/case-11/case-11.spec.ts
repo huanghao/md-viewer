@@ -1,10 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { existsSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { resetAppStorage } from '../../helpers';
 
 const ROOT = process.cwd();
-const FILE = resolve(ROOT, 'docs/design/e2e-delete-visibility-check.md');
+const CASE_DIR = resolve(ROOT, 'tests/e2e/runtime/case-11');
+const FILE = resolve(CASE_DIR, 'e2e-delete-visibility-check.md');
 
 function toHex(rgb: string | null): string | null {
   if (!rgb) return null;
@@ -15,6 +16,7 @@ function toHex(rgb: string | null): string | null {
 }
 
 test('case-11: 当前文件删除后显示持续提示与删除态样式', async ({ page }) => {
+  if (!existsSync(CASE_DIR)) mkdirSync(CASE_DIR, { recursive: true });
   if (existsSync(FILE)) rmSync(FILE);
   writeFileSync(FILE, '# 删除提示可见性测试\n\n用于验证删除态。\n', 'utf-8');
 
@@ -30,6 +32,7 @@ test('case-11: 当前文件删除后显示持续提示与删除态样式', async
     await expect(currentItem).toBeVisible();
     await expect(currentTab).toBeVisible();
 
+    await page.waitForTimeout(1200);
     rmSync(FILE);
 
     await expect.poll(async () => {

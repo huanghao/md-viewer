@@ -5,7 +5,7 @@
 
 ## 前置
 - 侧边栏模式为 `workspace`
-- 工作区包含 `docs`
+- 工作区包含 `tests/e2e/runtime/case-15`
 - 准备两个文件：
   - `e2e-ws-delete-without-open-a.md`（将被删除，且不先打开）
   - `e2e-ws-delete-without-open-b.md`（打开后作为当前文件）

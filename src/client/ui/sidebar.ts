@@ -218,9 +218,11 @@ export function renderFiles(): void {
   container.innerHTML = filesWithDisplay
     .map(file => {
       const isCurrent = file.path === state.currentFile;
+      const isMissing = file.isMissing || false;
       const classes = [
         'file-item',
-        isCurrent ? 'current' : ''
+        isCurrent ? 'current' : '',
+        isMissing ? 'deleted' : ''
       ].filter(Boolean).join(' ');
 
       // 高亮匹配的文本

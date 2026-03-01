@@ -499,6 +499,18 @@ export const styles = `
       border: 2px solid transparent;
       font-weight: 400;
     }
+    .file-item.deleted {
+      color: #cf222e;
+      background: #fff5f5;
+    }
+    .file-item.deleted .name {
+      color: #cf222e;
+      text-decoration: line-through;
+    }
+    .file-item.deleted.current {
+      background: #ffebe9;
+      color: #cf222e;
+    }
     .file-item .icon {
       flex-shrink: 0;
     }

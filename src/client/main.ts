@@ -1458,7 +1458,7 @@ function connectSSE() {
       // 重新渲染侧边栏（支持简单模式和工作区模式）
       renderSidebar();
 
-      // 如果当前正在查看这个文件，显示提示
+      // 如果当前正在查看这个文件，仅提示“已删除”并保留当前正文（不做自动刷新替换）
       if (state.currentFile === data.path) {
         showError('文件已不存在');
       }

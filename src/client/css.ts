@@ -1368,21 +1368,54 @@ export const styles = `
       display: flex;
       align-items: center;
       padding: 4px 8px;
+      width: 100%;
+      box-sizing: border-box;
       cursor: pointer;
       border-radius: 4px;
       font-size: 13px;
       color: #24292e;
       user-select: none;
+      gap: 6px;
+      position: relative;
     }
 
     .tree-item:hover {
       background: #f6f8fa;
     }
 
+    /* 方案 1：已打开文件浅蓝底 */
+    .tree-item.opened {
+      background: #eaf2ff;
+    }
+    .tree-item.opened:hover {
+      background: #dfeaff;
+    }
+
     .tree-item.current {
-      background: #e8f0fe;
+      background: #dbeafe;
       color: #0969da;
       font-weight: 400;
+    }
+
+    .tree-item.current::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 3px;
+      bottom: 3px;
+      width: 2px;
+      background: #0969da;
+      border-radius: 2px;
+    }
+
+    .tree-item .file-item-status {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: 2px;
     }
 
     .tree-toggle {
@@ -1415,79 +1448,62 @@ export const styles = `
       margin-left: 4px;
     }
 
-    /* 已打开文件区域 */
-    .open-files-section {
-      border-top: 1px solid #e1e4e8;
-      padding: 12px 8px;
-      max-height: 200px;
-      overflow-y: auto;
+    .tree-missing-section {
+      margin-top: 6px;
+      padding-left: 8px;
     }
 
-    .empty-open-files {
-      padding: 20px;
-      text-align: center;
-      font-size: 12px;
-      color: #57606a;
+    .tree-missing-title {
+      font-size: 11px;
+      color: #cf222e;
+      padding: 4px 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      font-weight: 600;
     }
 
-    .open-file-item {
-      display: flex;
-      align-items: center;
-      padding: 6px 12px;
-      cursor: pointer;
-      border-radius: 6px;
-      font-size: 13px;
-      color: #24292e;
-      margin-bottom: 2px;
-      gap: 6px;
+    .tree-item.missing {
+      color: #8b949e;
+      text-decoration: line-through;
+      background: #fff5f5;
+      opacity: 0.95;
     }
 
-    .open-file-item:hover {
-      background: #f6f8fa;
+    .tree-item.missing:hover {
+      background: #ffebeb;
     }
 
-    .open-file-item.current {
-      background: #e8f0fe;
-      color: #0969da;
-      font-weight: 400;
-    }
-
-    .open-file-item .file-item-status {
-      width: 14px;
-      height: 14px;
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .open-file-icon {
-      font-size: 14px;
-      flex-shrink: 0;
-    }
-
-    .open-file-name {
-      flex: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .open-file-close {
-      opacity: 0;
-      padding: 2px 6px;
+    .tree-inline-action {
+      border: 1px solid #d0d7de;
       border-radius: 4px;
-      font-size: 16px;
+      background: #fff;
       color: #57606a;
+      font-size: 11px;
+      line-height: 1;
+      padding: 2px 5px;
+      cursor: pointer;
+      flex-shrink: 0;
     }
 
-    .open-file-item:hover .open-file-close {
-      opacity: 1;
+    .tree-inline-action:hover {
+      border-color: #0969da;
+      color: #0969da;
     }
 
-    .open-file-close:hover {
-      background: #ff4444;
-      color: white;
+    .tree-inline-action.danger:hover {
+      border-color: #cf222e;
+      color: #cf222e;
+      background: #ffebe9;
+    }
+
+    /* 已移除：独立已打开文件区域，状态已合并到工作区文件树 */
+    .open-files-section,
+    .empty-open-files,
+    .open-file-item,
+    .open-file-icon,
+    .open-file-name,
+    .open-file-close {
+      display: none;
     }
 
     /* 空工作区提示 */

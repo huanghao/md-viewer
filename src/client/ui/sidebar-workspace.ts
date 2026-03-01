@@ -2,7 +2,6 @@ import type { Workspace, FileTreeNode, FileInfo } from '../types';
 import { state } from '../state';
 import { escapeHtml, escapeAttr } from '../utils/escape';
 import { getFileListStatus } from '../utils/file-status';
-import { generateDistinctNames } from '../utils/file-names';
 import { showError, showSuccess, showWarning } from './toast';
 import { attachPathAutocomplete } from './path-autocomplete';
 import {
@@ -140,7 +139,6 @@ async function confirmAddWorkspaceDialog(): Promise<void> {
 export function renderWorkspaceSidebar(): string {
   return `
     ${renderWorkspaceSection()}
-    ${renderOpenFilesSection()}
   `;
 }
 
@@ -207,6 +205,7 @@ function renderWorkspaceItem(workspace: Workspace): string {
         `}
       </div>
       ${workspace.isExpanded ? renderFileTree(workspace.id, tree) : ''}
+      ${workspace.isExpanded ? renderMissingOpenFiles(workspace.id, workspace.path, tree) : ''}
     </div>
   `;
 }
@@ -238,15 +237,36 @@ function renderFileTree(workspaceId: string, tree: FileTreeNode | undefined): st
 
 // 渲染文件树节点
 function renderTreeNode(workspaceId: string, node: FileTreeNode, depth: number): string {
-  const indent = '  '.repeat(depth);
+  const indentPx = 8 + depth * 12;
   const isCurrentFile = state.currentFile === node.path;
 
   if (node.type === 'file') {
+    const openedFile = state.files.get(node.path);
+    const isOpened = !!openedFile;
+
+    // 获取文件状态（仅对已打开文件）
+    let statusBadge = '&nbsp;';
+    if (openedFile) {
+      const status = getFileListStatus(openedFile);
+      if (status.badge === 'dot') {
+        statusBadge = '<span class="new-dot"></span>';
+      } else if (status.badge) {
+        statusBadge = `<span class="status-badge status-${status.type}" style="color: ${status.color}">${status.badge}</span>`;
+      }
+    }
+
+    const classes = [
+      'tree-item',
+      isCurrentFile ? 'current' : '',
+      isOpened ? 'opened' : '',
+    ].filter(Boolean).join(' ');
+
     return `
       <div class="tree-node">
-        <div class="tree-item ${isCurrentFile ? 'current' : ''}"
+        <div class="${classes}" style="padding-left: ${indentPx}px"
              onclick="handleFileClick('${escapeAttr(node.path)}')">
-          ${indent}<span class="tree-toggle"></span>
+          <span class="tree-toggle"></span>
+          <span class="file-item-status">${statusBadge}</span>
           <span class="tree-icon">📄</span>
           <span class="tree-name">${escapeHtml(node.name)}</span>
         </div>
@@ -261,9 +281,9 @@ function renderTreeNode(workspaceId: string, node: FileTreeNode, depth: number):
 
   return `
     <div class="tree-node">
-      <div class="tree-item"
+      <div class="tree-item" style="padding-left: ${indentPx}px"
            onclick="handleNodeClick('${escapeAttr(workspaceId)}', '${escapeAttr(node.path)}')">
-        ${indent}<span class="tree-toggle">${hasChildren ? toggle : ''}</span>
+        <span class="tree-toggle">${hasChildren ? toggle : ''}</span>
         <span class="tree-icon">📁</span>
         <span class="tree-name">${escapeHtml(node.name)}</span>
         ${node.fileCount ? `<span class="tree-count">${node.fileCount}</span>` : ''}
@@ -277,68 +297,48 @@ function renderTreeNode(workspaceId: string, node: FileTreeNode, depth: number):
   `;
 }
 
-// 渲染已打开文件区域
-function renderOpenFilesSection(): string {
-  const currentWorkspace = state.config.workspaces.find(ws => ws.id === state.currentWorkspace) || null;
-  const workspacePrefix = currentWorkspace ? `${currentWorkspace.path}/` : null;
-
-  const scopedEntries = Array.from(state.files.entries()).filter(([path]) => {
-    if (!workspacePrefix) return true;
-    return path === currentWorkspace!.path || path.startsWith(workspacePrefix);
-  });
-  const scopedMap = new Map(scopedEntries);
-  const openFiles = generateDistinctNames(scopedMap);
-
-  if (openFiles.length === 0) {
-    const emptyText = currentWorkspace
-      ? `当前工作区（${currentWorkspace.name}）暂无打开的文件`
-      : '暂无打开的文件';
-    return `
-      <div class="open-files-section">
-        <div class="section-header">
-          <span>已打开</span>
-        </div>
-        <div class="empty-open-files">
-          <p>${escapeHtml(emptyText)}</p>
-        </div>
-      </div>
-    `;
+function collectTreeFilePaths(node: FileTreeNode | undefined, bag: Set<string>): void {
+  if (!node) return;
+  if (node.type === 'file') {
+    bag.add(node.path);
+    return;
   }
-
-  return `
-    <div class="open-files-section">
-      <div class="section-header">
-        <span>已打开</span>
-      </div>
-      ${openFiles.map(file => renderOpenFileItem(file)).join('')}
-    </div>
-  `;
+  (node.children || []).forEach((child) => collectTreeFilePaths(child, bag));
 }
 
-// 渲染已打开文件项
-function renderOpenFileItem(file: FileInfo): string {
-  const isCurrent = state.currentFile === file.path;
-  const displayName = file.displayName || file.name;
+// 文件已从磁盘删除后，不会出现在扫描树里；这里保留一个特殊区块给重试/关闭操作。
+function renderMissingOpenFiles(workspaceId: string, workspacePath: string, tree: FileTreeNode | undefined): string {
+  const filePathsInTree = new Set<string>();
+  collectTreeFilePaths(tree, filePathsInTree);
 
-  // 获取文件状态（优先级：D > M > 🔵）
-  const status = getFileListStatus(file);
-  let statusBadge = '&nbsp;'; // 默认使用不间断空格占位
+  const workspacePrefix = `${workspacePath}/`;
+  const missingFiles = Array.from(state.files.values()).filter((file) => {
+    if (!file.isMissing) return false;
+    if (!file.path.startsWith(workspacePrefix)) return false;
+    return !filePathsInTree.has(file.path);
+  });
 
-  if (status.badge === 'dot') {
-    // 蓝色圆点
-    statusBadge = '<span class="new-dot"></span>';
-  } else if (status.badge) {
-    // M 或 D 字母标识
-    statusBadge = `<span class="status-badge status-${status.type}" style="color: ${status.color}">${status.badge}</span>`;
+  if (missingFiles.length === 0) {
+    return '';
   }
 
   return `
-    <div class="open-file-item ${isCurrent ? 'current' : ''}"
-         onclick="handleFileClick('${escapeAttr(file.path)}')">
-      <span class="file-item-status">${statusBadge}</span>
-      <span class="open-file-icon">📄</span>
-      <span class="open-file-name">${escapeHtml(displayName)}</span>
-      <span class="open-file-close" onclick="event.stopPropagation(); handleCloseFile('${escapeAttr(file.path)}')">×</span>
+    <div class="tree-missing-section">
+      <div class="tree-missing-title">已删除（仍在打开列表）</div>
+      ${missingFiles.map((file) => {
+        const isCurrent = state.currentFile === file.path;
+        const fileName = file.path.split('/').pop() || file.name;
+        return `
+          <div class="tree-item missing ${isCurrent ? 'current' : ''}" onclick="handleFileClick('${escapeAttr(file.path)}')">
+            <span class="tree-toggle"></span>
+            <span class="file-item-status"><span class="status-badge status-deleted">D</span></span>
+            <span class="tree-icon">📄</span>
+            <span class="tree-name">${escapeHtml(fileName)}</span>
+            <button class="tree-inline-action" title="重试加载" onclick="event.stopPropagation(); handleRetryMissingFile('${escapeAttr(file.path)}')">↻</button>
+            <button class="tree-inline-action danger" title="关闭文件" onclick="event.stopPropagation(); handleCloseFile('${escapeAttr(file.path)}')">×</button>
+          </div>
+        `;
+      }).join('')}
     </div>
   `;
 }
@@ -443,6 +443,19 @@ export function bindWorkspaceEvents(): void {
     // 重新渲染
     const main = await import('../main');
     (main as any).renderAll();
+  };
+
+  // 重试加载已删除文件（例如文件恢复后）
+  (window as any).handleRetryMissingFile = async (filePath: string) => {
+    const { loadFile } = await import('../api/files');
+    const { addOrUpdateFile } = await import('../state');
+    const fileData = await loadFile(filePath);
+    if (!fileData) return;
+
+    addOrUpdateFile(fileData, state.currentFile === filePath);
+    const main = await import('../main');
+    (main as any).renderAll();
+    showSuccess('文件已重新加载', 2000);
   };
 
   // 添加工作区对话框

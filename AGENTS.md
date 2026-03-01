@@ -88,6 +88,12 @@ When modifying server-side code:
 - Update TODO.md when completing tasks
 - Build client code before committing if you changed client files
 
+## UI Design Constraints
+
+- 默认不要使用模态框（system `alert/confirm/prompt` 或自定义 modal）承载常规输入/编辑流程
+- 优先使用非模态交互：页面内嵌输入、侧栏表单、行内编辑或抽屉
+- 仅在高风险且不可逆操作（如删除）中允许确认框
+
 ---
 
 ## Multi-Agent Collaboration Rules

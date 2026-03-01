@@ -1,4 +1,8 @@
 export const styles = `
+    :root {
+      --font-scale: 1.0;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -356,6 +360,64 @@ export const styles = `
       white-space: nowrap;
     }
 
+    /* 字体缩放按钮 */
+    .font-scale-button {
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 400;
+      font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Consolas', monospace;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      color: #9ca3af;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+      position: relative;
+    }
+
+    .font-scale-button:hover {
+      background: rgba(0, 0, 0, 0.04);
+      color: #6b7280;
+    }
+
+    /* 字体缩放菜单 */
+    .font-scale-menu {
+      position: absolute;
+      top: 48px;
+      right: 80px;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      padding: 4px 0;
+      min-width: 80px;
+      z-index: 1000;
+    }
+
+    .font-scale-option {
+      padding: 6px 16px;
+      font-size: 13px;
+      color: #374151;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Consolas', monospace;
+    }
+
+    .font-scale-option:hover {
+      background: #f3f4f6;
+    }
+
+    .font-scale-option.active {
+      color: #3b82f6;
+      font-weight: 500;
+    }
+
+    .font-scale-option.active::after {
+      content: ' ✓';
+      margin-left: 8px;
+    }
+
     /* 纯文本工具栏按钮 */
     .toolbar-text-button {
       padding: 4px 8px;
@@ -573,6 +635,31 @@ export const styles = `
     }
     .markdown-body {
       background: transparent !important;
+      font-size: calc(16px * var(--font-scale));
+    }
+
+    .markdown-body h1 {
+      font-size: calc(2em * var(--font-scale));
+    }
+
+    .markdown-body h2 {
+      font-size: calc(1.5em * var(--font-scale));
+    }
+
+    .markdown-body h3 {
+      font-size: calc(1.25em * var(--font-scale));
+    }
+
+    .markdown-body h4 {
+      font-size: calc(1em * var(--font-scale));
+    }
+
+    .markdown-body h5 {
+      font-size: calc(0.875em * var(--font-scale));
+    }
+
+    .markdown-body h6 {
+      font-size: calc(0.85em * var(--font-scale));
     }
     .empty-state {
       text-align: center;

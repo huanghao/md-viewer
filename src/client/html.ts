@@ -5,6 +5,9 @@ import { join } from "path";
 // 判断是否为开发模式
 const isDev = process.env.NODE_ENV !== 'production';
 
+// 版本号：用于强制刷新浏览器缓存
+const VERSION = Date.now().toString();
+
 // 生产模式：启动时读取一次并缓存
 let cachedClientScript: string | null = null;
 
@@ -40,8 +43,12 @@ export function generateClientHTML(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>MD Viewer - Markdown Viewer</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
+  <!-- Version: ${VERSION} -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css/github-markdown-light.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js/styles/github.css">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>
@@ -101,7 +108,19 @@ export function generateClientHTML(): string {
         <button class="toolbar-text-button" id="syncButton" onclick="handleSyncButtonClick()" title="同步到学城">
           <span id="syncButtonText">[☁↑ 同步]</span>
         </button>
+        <button class="font-scale-button" id="fontScaleButton" onclick="toggleFontScaleMenu()" title="调整字体大小">
+          <span id="fontScaleText">100%</span>
+        </button>
         <span class="file-meta" id="fileMeta"></span>
+      </div>
+
+      <!-- 字体缩放菜单 -->
+      <div class="font-scale-menu" id="fontScaleMenu" style="display: none;">
+        <div class="font-scale-option" onclick="setFontScale(0.75)">75%</div>
+        <div class="font-scale-option" onclick="setFontScale(1.0)">100%</div>
+        <div class="font-scale-option" onclick="setFontScale(1.25)">125%</div>
+        <div class="font-scale-option" onclick="setFontScale(1.5)">150%</div>
+        <div class="font-scale-option" onclick="setFontScale(2.0)">200%</div>
       </div>
 
       <!-- 标签页 -->

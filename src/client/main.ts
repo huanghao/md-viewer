@@ -852,6 +852,94 @@ function copyErrorInfo() {
   }
 }
 
+// ==================== 字体缩放功能 ====================
+let currentFontScale = 1.0;
+
+// 初始化字体缩放
+function initFontScale() {
+  // 从 localStorage 恢复
+  const saved = localStorage.getItem('fontScale');
+  if (saved) {
+    currentFontScale = parseFloat(saved);
+  }
+  applyFontScale();
+}
+
+// 应用字体缩放
+function applyFontScale() {
+  document.documentElement.style.setProperty('--font-scale', currentFontScale.toString());
+  updateFontScaleDisplay();
+
+  // 保存到 localStorage
+  localStorage.setItem('fontScale', currentFontScale.toString());
+}
+
+// 更新显示
+function updateFontScaleDisplay() {
+  const button = document.getElementById('fontScaleText');
+  if (button) {
+    const percent = Math.round(currentFontScale * 100);
+    button.textContent = `${percent}%`;
+  }
+
+  // 更新菜单中的选中状态
+  const options = document.querySelectorAll('.font-scale-option');
+  options.forEach((option) => {
+    option.classList.remove('active');
+  });
+
+  // 标记当前选中的选项
+  const currentPercent = Math.round(currentFontScale * 100);
+  options.forEach((option) => {
+    const text = option.textContent?.trim();
+    if (text === `${currentPercent}%`) {
+      option.classList.add('active');
+    }
+  });
+}
+
+// 设置字体缩放
+function setFontScale(scale: number) {
+  currentFontScale = scale;
+  applyFontScale();
+  closeFontScaleMenu();
+}
+
+// 切换菜单显示
+function toggleFontScaleMenu() {
+  const menu = document.getElementById('fontScaleMenu');
+  if (!menu) return;
+
+  const isVisible = menu.style.display !== 'none';
+  if (isVisible) {
+    closeFontScaleMenu();
+  } else {
+    menu.style.display = 'block';
+    updateFontScaleDisplay();
+  }
+}
+
+// 关闭菜单
+function closeFontScaleMenu() {
+  const menu = document.getElementById('fontScaleMenu');
+  if (menu) {
+    menu.style.display = 'none';
+  }
+}
+
+// 点击外部关闭菜单
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('fontScaleMenu');
+  const button = document.getElementById('fontScaleButton');
+
+  if (!menu || !button) return;
+
+  const target = e.target as HTMLElement;
+  if (!menu.contains(target) && !button.contains(target)) {
+    closeFontScaleMenu();
+  }
+});
+
 // ==================== SSE 连接 ====================
 function connectSSE() {
   const eventSource = new EventSource('/api/events');
@@ -866,8 +954,8 @@ function connectSSE() {
       // 这样 lastModified > displayedModified，触发 isDirty 状态
       file.lastModified = data.lastModified;
 
-      // 重新渲染文件列表，显示 M 标识
-      renderFiles();
+      // 重新渲染侧边栏（支持简单模式和工作区模式）
+      renderSidebar();
 
       // 如果是当前文件，更新工具栏（显示刷新按钮）
       if (state.currentFile === data.path) {
@@ -885,8 +973,8 @@ function connectSSE() {
       // 标记文件为不存在
       file.isMissing = true;
 
-      // 重新渲染文件列表，显示 D 标识
-      renderFiles();
+      // 重新渲染侧边栏（支持简单模式和工作区模式）
+      renderSidebar();
 
       // 如果当前正在查看这个文件，显示提示
       if (state.currentFile === data.path) {
@@ -927,6 +1015,8 @@ declare global {
     copyErrorInfo: () => void;
     showToast?: (message: string, type: string) => void;
     showSettingsDialog: () => void;
+    toggleFontScaleMenu: () => void;
+    setFontScale: (scale: number) => void;
   }
 }
 
@@ -950,9 +1040,14 @@ window.copyFileName = copyFileName;
 window.copyErrorInfo = copyErrorInfo;
 window.showToast = showToast;
 window.showSettingsDialog = showSettingsDialog;
+window.toggleFontScaleMenu = toggleFontScaleMenu;
+window.setFontScale = setFontScale;
 
 // ==================== 初始化 ====================
 (async () => {
+  // 初始化字体缩放
+  initFontScale();
+
   await restoreState(loadFile);
 
   // 根据配置渲染侧边栏

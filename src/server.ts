@@ -52,6 +52,10 @@ const app = new Hono();
 
 // 前端页面
 app.get("/", (c) => {
+  // 设置 no-cache 头，确保浏览器不缓存 HTML
+  c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+  c.header('Pragma', 'no-cache');
+  c.header('Expires', '0');
   return c.html(generateClientHTML());
 });
 

@@ -7,22 +7,31 @@ function generateId(): string {
   return `ws-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
+function normalizeWorkspacePath(path: string): string {
+  return path.trim().replace(/\/+$/, '');
+}
+
 // 添加工作区
 export function addWorkspace(name: string, path: string): Workspace {
+  const normalizedPath = normalizeWorkspacePath(path);
+  const existing = state.config.workspaces.find(ws => ws.path === normalizedPath);
+  if (existing) {
+    state.currentWorkspace = existing.id;
+    return existing;
+  }
+
   const workspace: Workspace = {
     id: generateId(),
     name,
-    path,
-    isExpanded: true
+    path: normalizedPath,
+    isExpanded: false
   };
 
   state.config.workspaces.push(workspace);
   saveConfig(state.config);
 
-  // 设置为当前工作区
-  if (!state.currentWorkspace) {
-    state.currentWorkspace = workspace.id;
-  }
+  // 添加后切换到新工作区
+  state.currentWorkspace = workspace.id;
 
   return workspace;
 }

@@ -2,8 +2,8 @@ import type { Workspace, FileTreeNode, FileInfo } from '../types';
 import { state } from '../state';
 import { escapeHtml, escapeAttr } from '../utils/escape';
 import { getFileListStatus } from '../utils/file-status';
+import { showError, showSuccess } from './toast';
 import {
-  getCurrentWorkspace,
   toggleWorkspaceExpanded,
   toggleNodeExpanded,
   scanWorkspace,
@@ -254,16 +254,24 @@ export function bindWorkspaceEvents(): void {
 
   // 添加工作区对话框
   (window as any).showAddWorkspaceDialog = async () => {
-    const path = prompt('请输入工作区路径:');
-    if (!path) return;
+    try {
+      const input = prompt('请输入工作区路径:');
+      if (!input) return;
 
-    const name = path.split('/').pop() || 'workspace';
+      const path = input.trim();
+      if (!path) return;
 
-    const { addWorkspace } = await import('../workspace');
-    addWorkspace(name, path);
+      const name = path.split('/').pop() || 'workspace';
+      const { addWorkspace } = await import('../workspace');
+      const workspace = addWorkspace(name, path);
 
-    // 重新渲染
-    const { renderSidebar } = await import('./sidebar');
-    renderSidebar();
+      const { renderSidebar } = await import('./sidebar');
+      renderSidebar();
+
+      showSuccess(`已添加工作区: ${workspace.name}`, 2000);
+    } catch (error: any) {
+      console.error('添加工作区失败:', error);
+      showError(`添加工作区失败: ${error?.message || '未知错误'}`);
+    }
   };
 }

@@ -462,9 +462,9 @@ export async function handleInferWorkspace(c: Context) {
 }
 
 // API: 扫描工作区，构建文件树
-export function handleScanWorkspace(c: Context) {
+export async function handleScanWorkspace(c: Context) {
   try {
-    const { path } = c.req.json() as any;
+    const { path } = await c.req.json() as any;
     if (!path) {
       return c.json({ error: "缺少 path 参数" }, 400);
     }

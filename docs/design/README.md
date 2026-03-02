@@ -17,4 +17,5 @@
 - [20260301-sidebar-mode-inline-switch](./20260301-sidebar-mode-inline-switch/)
 - [20260301-toolbar-redesign](./20260301-toolbar-redesign/)
 - [20260301-workspace-reorder-interactions](./20260301-workspace-reorder-interactions/)
+- [20260302-tab-management](./20260302-tab-management/)
 - [20260302-sync-continue-after-local-change](./20260302-sync-continue-after-local-change/)

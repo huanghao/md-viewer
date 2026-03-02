@@ -47,6 +47,12 @@ Do not place tool-operational playbooks here unless they are temporary workaroun
 - `docs/配置说明.md`
 - `showHelp()` 输出
 
+文档治理与索引入口：
+
+- `docs/README.md`
+- `docs/文档治理规范.md`
+- `docs/文档模板.md`
+
 ## Testing Docs
 
 - 测试用例目录（每个 case 自包含）：`tests/e2e/cases/case-*/`

@@ -33,10 +33,20 @@ let syncDialogInteractionBound = false;
 
 // ==================== 消息处理 ====================
 async function onFileLoaded(data: FileData, focus: boolean = false) {
+  const previousFile = state.currentFile;
   const shouldFocus = focus && !isHtmlPath(data.path);
   addOrUpdateFile(data, shouldFocus);
   renderSidebar();
   renderContent();
+  if (shouldFocus && previousFile !== data.path) {
+    scrollContentToTop();
+  }
+}
+
+function scrollContentToTop(): void {
+  const container = document.getElementById('content');
+  if (!container) return;
+  container.scrollTo({ top: 0, behavior: 'auto' });
 }
 
 function getMaxSidebarWidth(): number {
@@ -775,9 +785,13 @@ function switchFile(path: string) {
     openFileInBrowser(path);
     return;
   }
+  const previousFile = state.currentFile;
   switchToFile(path);
   renderSidebar();
   renderContent();
+  if (previousFile !== path) {
+    scrollContentToTop();
+  }
   const file = state.sessionFiles.get(path);
   if (file && !file.isMissing && file.lastModified > file.displayedModified) {
     void syncFileFromDisk(path, { silent: true, highlight: true });

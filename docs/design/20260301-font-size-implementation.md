@@ -179,8 +179,8 @@ font-size: calc(16px * var(--font-scale));
 - `src/client/main.ts` - 添加缩放逻辑
 
 **设计文档：**
-- `docs/design/font-size-control.md` - 设计方案
-- `docs/design/font-size-implementation.md` - 实施总结（本文档）
+- `docs/design/20260301-font-size-control.md` - 设计方案
+- `docs/design/20260301-font-size-implementation.md` - 实施总结（本文档）
 
 **更新文档：**
 - `TODO.md` - 标记任务完成

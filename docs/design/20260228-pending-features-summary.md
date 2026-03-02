@@ -8,7 +8,7 @@
 
 ## 1. 侧边栏样式优化
 
-**设计文档**：`docs/design/sidebar-styling.md`
+**设计文档**：`docs/design/20260228-sidebar-styling.md`
 **P0 状态**：✅ 已完成
 **P1 状态**：✅ 已完成
 
@@ -30,7 +30,7 @@
 
 ## 2. 输入新文件
 
-**设计文档**：`docs/design/file-input-redesign.md`
+**设计文档**：`docs/design/20260228-file-input-redesign.md`
 **P0 状态**：✅ 已完成（774f533）
 
 ### P1（增强功能）- 未完成
@@ -58,7 +58,7 @@
 
 ## 3. 文件路径输入提示（工作区模式）
 
-**设计文档**：`docs/design/file-path-autocomplete.md`
+**设计文档**：`docs/design/20260228-file-path-autocomplete.md`
 **P0 状态**：✅ 已完成（a0c61e0, 2bd1815）
 **当前方案**：工作区模式（可配置切换）
 

@@ -23,7 +23,7 @@
 ## 同步：无本地状态时支持手动关联远端文档 [⏳等待 - 2026-03-02]
 - 当文件没有本地同步状态时，支持用户输入/选择已有远端 docId 建立初始绑定
 - 绑定成功后进入“版本递增新建（v2/v3）”流程
-- 设计文档：`docs/design/sync-continue-after-local-change.md`
+- 设计文档：`docs/design/20260302-sync-continue-after-local-change.md`
 
 ## 刷新后的高亮
 1）高亮具体内容，而不是整个屏幕亮一下然后消失。做一下设计跟我对齐
@@ -46,7 +46,7 @@
 -->
 
 ## 怎么能让agent自己在某些框架下自己产生需求（任务）[✅完成 - 2026-03-01]
-- 设计文档：docs/design/agent-task-generation.md
+- 设计文档：docs/design/20260301-agent-task-generation.md
 - 推荐方案：混合方案（规则驱动 + AI 驱动）
 - 包含内容：
   - 6 个示例规则（测试覆盖率、代码质量、性能、依赖更新、文档、技术债务）
@@ -56,7 +56,7 @@
 - 完成日期：2026-03-01
 
 ## 如果我在这个工程中留下的对话和交互越多，agent能不能学到我的”风格”，以便未来自己做类似的选择，或者提出更多的问题和需求？[✅完成 - 2026-03-01]
-- 设计文档：docs/design/agent-style-learning.md
+- 设计文档：docs/design/20260301-agent-style-learning.md
 - 风格指南：USER_STYLE.md（已创建）
 - 推荐方案：LLM 上下文学习 + 定期更新
 - 包含内容：
@@ -68,7 +68,7 @@
 - 完成日期：2026-03-01
 
 ## 怎么对这个工程做harness engineering [✅完成 - 2026-03-01]
-- 设计文档：docs/design/harness-engineering.md
+- 设计文档：docs/design/20260301-harness-engineering.md
 - 核心理念：10x-100x 倍速迭代，快速验证，安全实验，数据驱动
 - 实施方案：
   - 层次 1：基础测试 Harness（单元测试、E2E、视觉回归）
@@ -88,7 +88,7 @@
 
 ## 优化在iterm2中的体验 [✅完成 - 2026-03-01]
 展示在iterm2输出中的md文件名，我可以直接到mdv中打开吗？
-- 完整文档：docs/design/iterm2-integration.md（设计+配置+示例）
+- 完整文档：docs/design/20260301-iterm2-integration.md（设计+配置+示例）
 - **推荐方案：Semantic History + Dispatcher（方案 A）**
   - ✅ 体验最好 - Cmd+点击即可
   - ✅ 路径兼容性强 - 支持绝对路径、相对路径、basename
@@ -106,7 +106,7 @@
 
 
 ## 设计统一的UI样式 [⏳等待 - 2026-03-01]
-- 设计文档：docs/design/ui-design-system.md
+- 设计文档：docs/design/20260301-ui-design-system.md
 - 内容：设计令牌、组件规范、业界标准参考
 - 推荐：建立 design-tokens.ts 统一管理设计变量
 - 状态：设计完成，等待实施
@@ -114,7 +114,7 @@
 ## 增加划词评论功能 [⏳等待 - 2026-03-01]
 agent会生成很多文档，我需要有针对的提问，确认等。agent会针对进行回复，这个来回有很多轮，直到收敛或者放弃。
 这个过程怎么能被标准化下来，加速后续我和agent的协作效率和质量
-- 设计文档：docs/design/inline-comments.md
+- 设计文档：docs/design/20260301-inline-comments.md
 - 推荐方案：Markdown 注释语法（立即可用，无需开发）
 - 语法：`<!-- @comment:user:timestamp -->`
 - 状态：设计完成，等待实施

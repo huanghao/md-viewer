@@ -15,9 +15,9 @@
 
 | 任务名称 | 来源 | 设计文档 | 说明 |
 |---------|------|----------|------|
-| 优化在iterm2中的体验 | TODO.md / 设计类任务 | docs/design/iterm2-integration.md | 设计完成，等待用户配置 iTerm2 |
-| 设计统一的UI样式 | TODO.md / 设计类任务 | docs/design/ui-design-system.md | 设计完成，等待实施 |
-| 增加划词评论功能 | TODO.md / 设计类任务 | docs/design/inline-comments.md | 设计完成，等待实施 |
+| 优化在iterm2中的体验 | TODO.md / 设计类任务 | docs/design/20260301-iterm2-integration.md | 设计完成，等待用户配置 iTerm2 |
+| 设计统一的UI样式 | TODO.md / 设计类任务 | docs/design/20260301-ui-design-system.md | 设计完成，等待实施 |
+| 增加划词评论功能 | TODO.md / 设计类任务 | docs/design/20260301-inline-comments.md | 设计完成，等待实施 |
 
 ## 未开始任务
 
@@ -33,16 +33,16 @@
 |---------|------|----------|---------------|
 | M状态提示可能有bug | TODO.md / 🤖 已完成任务 / 普通类任务 | 2026-03-01 | 修复工作区模式未显示 M 状态问题 |
 | 前端代码更新在我浏览器里经常会看不到效果 | TODO.md / 🤖 已完成任务 / 普通类任务 | 2026-03-01 | 增加 no-cache 策略与响应头 |
-| 字体大小+-调整的功能 | TODO.md / 🤖 已完成任务 / 设计类任务 | 2026-03-01 | docs/design/font-size-control.md |
-| 页面上输入文件路径的地方能不能给些输入提示 | TODO.md / 🤖 已完成任务 / 设计类任务 | 2026-02-28 | docs/design/file-path-autocomplete.md |
+| 字体大小+-调整的功能 | TODO.md / 🤖 已完成任务 / 设计类任务 | 2026-03-01 | docs/design/20260301-font-size-control.md |
+| 页面上输入文件路径的地方能不能给些输入提示 | TODO.md / 🤖 已完成任务 / 设计类任务 | 2026-02-28 | docs/design/20260228-file-path-autocomplete.md |
 | 同步到学城的详情页上 | TODO.md / 🤖 已完成任务 / 设计类任务 | 2026-02-28 | 同步详情页交互与信息优化 |
 | 文件展示标记，sse部分 | TODO.md / 🤖 已完成任务 / 设计类任务 | 2026-03-01 | SSE 事件链路检查完成 |
-| 怎么解决多个agent同时工作时产生的冲突 | TODO.md / 📝 待处理任务 | 2026-03-01 | docs/design/multi-agent-conflict.md |
-| 怎么能让agent自己在某些框架下自己产生需求（任务） | TODO.md / 📝 待处理任务 | 2026-03-01 | docs/design/agent-task-generation.md |
-| 怎么避免我和你在TODO文件中的编辑冲突？ | TODO.md / 📝 待处理任务 | 2026-03-01 | docs/design/todo-conflict-resolution.md |
-| 如果我在这个工程中留下的对话和交互越多，agent能不能学到我的”风格” | TODO.md / 📝 待处理任务 | 2026-03-01 | docs/design/agent-style-learning.md |
-| 怎么对这个工程做harness engineering | TODO.md / 📝 待处理任务 | 2026-03-01 | docs/design/harness-engineering.md |
-| 有没有可能干脆都不是md出文字设计，而是直接出原型，然后我来选？ | TODO.md / 📝 待处理任务 | 2026-03-01 | docs/design/prototype-first-design.md |
+| 怎么解决多个agent同时工作时产生的冲突 | TODO.md / 📝 待处理任务 | 2026-03-01 | docs/design/20260301-multi-agent-conflict.md |
+| 怎么能让agent自己在某些框架下自己产生需求（任务） | TODO.md / 📝 待处理任务 | 2026-03-01 | docs/design/20260301-agent-task-generation.md |
+| 怎么避免我和你在TODO文件中的编辑冲突？ | TODO.md / 📝 待处理任务 | 2026-03-01 | docs/design/20260301-todo-conflict-resolution.md |
+| 如果我在这个工程中留下的对话和交互越多，agent能不能学到我的”风格” | TODO.md / 📝 待处理任务 | 2026-03-01 | docs/design/20260301-agent-style-learning.md |
+| 怎么对这个工程做harness engineering | TODO.md / 📝 待处理任务 | 2026-03-01 | docs/design/20260301-harness-engineering.md |
+| 有没有可能干脆都不是md出文字设计，而是直接出原型，然后我来选？ | TODO.md / 📝 待处理任务 | 2026-03-01 | docs/design/20260301-prototype-first-design.md |
 
 ## 备注
 

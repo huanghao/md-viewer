@@ -512,7 +512,7 @@ class PrototypeAnalytics {
 #### 传统流程（当前）
 
 ```
-1. Agent: 创建设计文档 docs/design/font-size-control.md
+1. Agent: 创建设计文档 docs/design/20260301-font-size-control.md
 2. User: 阅读文档（5-10 分钟）
 3. User: 选择方案 A
 4. Agent: 实现方案 A

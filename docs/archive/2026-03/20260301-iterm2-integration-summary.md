@@ -81,7 +81,7 @@ iTerm2 Semantic History 提供 5 个参数：
 # → 拼接: \5/\1 = /Users/huanghao/project/README.md
 ```
 
-更多示例详见：`docs/design/iterm2-integration.md`
+更多示例详见：`docs/design/20260301-iterm2-integration.md`
 
 ### Dispatcher 流程
 ```
@@ -118,7 +118,7 @@ mdv-iterm2-dispatcher 处理：
 
 ### 备选方案
 如果您担心侵入性，可以使用 **Smart Selection**（右键菜单，精确匹配）。
-详见：`docs/design/iterm2-integration.md`
+详见：`docs/design/20260301-iterm2-integration.md`
 
 ---
 
@@ -152,12 +152,12 @@ mdv-iterm2-dispatcher \1 \5
 
 ### Q: 想要更低侵入性的方案？
 使用 Smart Selection（右键菜单）：
-详见 `docs/design/iterm2-integration.md` 方案 B
+详见 `docs/design/20260301-iterm2-integration.md` 方案 B
 
 ---
 
 ## 相关文档
 
-- **完整文档**: `docs/design/iterm2-integration.md`（设计+配置+示例）
+- **完整文档**: `docs/design/20260301-iterm2-integration.md`（设计+配置+示例）
 - **构建文档**: `BUILD.md`（安装说明）
 - **iTerm2 官方**: https://iterm2.com/documentation-preferences-profiles-advanced.html

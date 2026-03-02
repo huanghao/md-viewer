@@ -45,7 +45,7 @@ which mdv-iterm2-dispatcher
 ### 测试 4: 相对路径 .md 文件
 ```bash
 ~/bin/mdv-iterm2-dispatcher \
-  "docs/design/iterm2-integration.md" \
+  "docs/design/20260301-iterm2-integration.md" \
   "/Users/huanghao/workspace/md-viewer"
 # 输出: ✅ 已添加并切换: iterm2-integration.md
 ```
@@ -193,7 +193,7 @@ which mdv-iterm2-dispatcher
 - ✅ 性能良好
 
 下一步：
-1. 用户按照 `docs/design/iterm2-integration.md` 配置 iTerm2
+1. 用户按照 `docs/design/20260301-iterm2-integration.md` 配置 iTerm2
 2. 按照 `docs/testing/20260301-iterm2-manual-test.md` 进行手动测试
 3. 收集反馈，必要时调整
 

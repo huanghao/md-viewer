@@ -47,7 +47,7 @@ cd /Users/huanghao/workspace/md-viewer
 ls docs/design/
 ```
 
-**操作**：Cmd+点击任何 `.md` 文件（如 `iterm2-integration.md`）
+**操作**：Cmd+点击任何 `.md` 文件（如 `20260301-iterm2-integration.md`）
 
 **预期结果**：
 - ✅ 文件在 MD Viewer 中打开
@@ -79,7 +79,7 @@ cd /Users/huanghao/workspace/md-viewer
 find . -name "*.md" | head -5
 ```
 
-**操作**：Cmd+点击任何路径（如 `./README.md` 或 `./docs/design/iterm2-integration.md`）
+**操作**：Cmd+点击任何路径（如 `./README.md` 或 `./docs/design/20260301-iterm2-integration.md`）
 
 **预期结果**：
 - ✅ 相对路径正确解析
@@ -92,7 +92,7 @@ find . -name "*.md" | head -5
 在项目目录运行：
 ```bash
 cd /Users/huanghao/workspace/md-viewer
-grep -n "iTerm2" docs/design/iterm2-integration.md | head -3
+grep -n "iTerm2" docs/design/20260301-iterm2-integration.md | head -3
 ```
 
 **操作**：Cmd+点击文件路径

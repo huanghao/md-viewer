@@ -4,12 +4,12 @@
 状态：Draft（按 2026-03-02 新约束重写）
 
 配套产物：
-- 交互文档：`docs/design/sync-versioning-interaction.md`
-- 可视原型：`docs/design/sync-versioning-prototype.html`
+- 交互文档：`docs/design/20260302-sync-versioning-interaction.md`
+- 可视原型：`docs/design/20260302-sync-continue-after-local-change/sync-versioning-prototype.html`
 - 重做原型（你要求的两页）：
-  - `docs/design/sync-page-prototype.html`
-  - `docs/design/sync-button-popup-prototype.html`
-- 当前确认版（单页整合）：`docs/design/sync-unified-single-page-prototype.html`
+  - `docs/design/20260302-sync-continue-after-local-change/sync-page-prototype.html`
+  - `docs/design/20260302-sync-continue-after-local-change/sync-button-popup-prototype.html`
+- 当前确认版（单页整合）：`docs/design/20260302-sync-continue-after-local-change/sync-unified-single-page-prototype.html`
 
 ## 待决策项（仅剩实现细节）
 

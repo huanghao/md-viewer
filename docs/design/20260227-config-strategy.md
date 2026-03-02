@@ -81,7 +81,7 @@
 1. 在 `DEFAULT_CONFIG` 中添加默认值
 2. 更新 `Config` 接口
 3. 更新 `man/md-viewer.config.5`
-4. 更新 `docs/design/config-strategy.md`（本文档）
+4. 更新 `docs/design/20260227-config-strategy.md`（本文档）
 
 ### 废弃配置项
 

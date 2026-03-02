@@ -207,7 +207,7 @@ Agent 可以在这里更新进展
         {
           "author": "Claude-A",
           "timestamp": "2026-03-01T12:00:00Z",
-          "content": "设计文档已完成：docs/design/iterm2-integration.md"
+          "content": "设计文档已完成：docs/design/20260301-iterm2-integration.md"
         },
         {
           "author": "user",
@@ -488,11 +488,11 @@ exit 0
 ## 🤖 Agent 任务进展
 
 ### 优化在iterm2中的体验 [✅完成 - 2026-03-01]
-- 设计文档：docs/design/iterm2-integration.md
+- 设计文档：docs/design/20260301-iterm2-integration.md
 ...
 
 ### 字体大小调整功能 [✅完成 - 2026-03-01]
-- 设计文档：docs/design/font-size-control.md
+- 设计文档：docs/design/20260301-font-size-control.md
 ...
 
 <!-- ==================== 共享区 ==================== -->

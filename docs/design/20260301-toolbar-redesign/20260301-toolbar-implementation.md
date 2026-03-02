@@ -133,9 +133,9 @@
 - `src/client/css.ts` - Linear 风格样式
 
 **设计文档：**
-- `docs/design/toolbar-redesign.md` - 设计方案文档
-- `docs/design/toolbar-mockup.txt` - ASCII 对比图
-- `docs/design/toolbar-implementation.md` - 实施总结（本文档）
+- `docs/design/20260301-toolbar-redesign.md` - 设计方案文档
+- `docs/design/20260301-toolbar-redesign/toolbar-mockup.txt` - ASCII 对比图
+- `docs/design/20260301-toolbar-implementation.md` - 实施总结（本文档）
 
 ## 后续优化
 

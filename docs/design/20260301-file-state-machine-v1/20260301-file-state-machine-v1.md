@@ -60,7 +60,7 @@
 
 ## 6) 评分（v2）
 
-- `ICS` 估算：`~19.8`（见 `state-machine-framework.md`）
+- `ICS` 估算：`~19.8`（见 `20260301-state-machine-framework.md`）
 - `CS` 估算：`~95.5`
 
 结论：

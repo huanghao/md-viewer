@@ -120,7 +120,7 @@ comments:
 
 **实现：**
 ```
-docs/design/logo-redesign.md        # 文档
+docs/design/20260228-logo-redesign.md        # 文档
 docs/design/.comments/logo-redesign.json  # 评论数据
 ```
 

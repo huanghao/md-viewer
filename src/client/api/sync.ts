@@ -6,9 +6,13 @@ export async function getSyncStatus(path: string): Promise<SyncStatusData> {
   const data = await response.json();
   return {
     ...data,
+    path,
     docId: data?.docId || data?.kmDocId,
     url: data?.url || data?.kmUrl,
     title: data?.title || data?.kmTitle,
+    baseTitle: data?.baseTitle,
+    version: typeof data?.version === 'number' ? data.version : undefined,
+    history: Array.isArray(data?.history) ? data.history : [],
   };
 }
 
@@ -27,8 +31,7 @@ export async function getSyncParentMeta(value: string): Promise<{ success: boole
 export async function executeSync(
   path: string,
   title: string,
-  parentId: string,
-  isUpdate: boolean = false
+  parentId: string
 ): Promise<SyncResult> {
   const response = await fetch('/api/sync/execute', {
     method: 'POST',
@@ -36,8 +39,7 @@ export async function executeSync(
     body: JSON.stringify({
       filePath: path,
       title,
-      parentId,
-      isUpdate
+      parentId
     })
   });
   const data = await response.json();

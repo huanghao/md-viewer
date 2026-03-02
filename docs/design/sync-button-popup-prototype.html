@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>同步按钮 Popup 原型</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --line: #d0d7de;
+      --text: #1f2328;
+      --sub: #57606a;
+      --blue: #0969da;
+      --green: #1a7f37;
+      --red: #cf222e;
+      --warn: #9a6700;
+      --card: #fff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "SF Pro Text", "PingFang SC", "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top right, #eff6ff 0%, var(--bg) 55%);
+      color: var(--text);
+      padding: 24px;
+    }
+    .shell { max-width: 980px; margin: 0 auto; }
+    .title { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+    .desc { color: var(--sub); margin-bottom: 14px; }
+    .toolbar {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+    }
+    .btn {
+      border: 1px solid #b8d5ff;
+      background: #eef6ff;
+      color: var(--blue);
+      border-radius: 8px;
+      padding: 7px 11px;
+      font-size: 13px;
+      cursor: default;
+    }
+    .popup {
+      position: absolute;
+      right: 12px;
+      top: 48px;
+      width: 340px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: 0 10px 28px rgba(31, 35, 40, 0.12);
+      overflow: hidden;
+    }
+    .head {
+      padding: 10px 12px;
+      border-bottom: 1px solid #e8ecf1;
+      font-size: 13px;
+      font-weight: 700;
+      background: #f6f8fa;
+    }
+    .section { padding: 10px 12px; border-top: 1px solid #f0f3f6; }
+    .section:first-of-type { border-top: 0; }
+    .k { color: var(--sub); font-size: 12px; }
+    .v { font-size: 13px; margin-top: 2px; }
+    .state { margin-top: 4px; font-size: 12px; color: var(--green); }
+    .actions { display: grid; gap: 6px; }
+    .item {
+      border: 1px solid #e5e8eb;
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 13px;
+      background: #fff;
+    }
+    .item.primary { border-color: #b8d5ff; background: #eef6ff; color: var(--blue); }
+    .item.warn { border-color: #f2d99a; background: #fff8df; color: var(--warn); }
+    .item.danger { border-color: #f1b8be; background: #fff3f5; color: var(--red); }
+    .hint {
+      margin-top: 14px;
+      background: #fff;
+      border: 1px dashed #c9d1d9;
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 12px;
+      color: var(--sub);
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="title">原型 2：同步按钮 Popup 页面</div>
+    <div class="desc">用途：展示用户点“同步按钮”后弹出的轻量操作层（不是完整步骤页）。</div>
+
+    <div class="toolbar">
+      <div>/docs/spec.md</div>
+      <button class="btn">↑ 继续同步(v4)</button>
+
+      <div class="popup">
+        <div class="head">同步操作</div>
+
+        <div class="section">
+          <div class="k">当前绑定</div>
+          <div class="v">v3 · spec-v3 · docId=123456</div>
+          <div class="state">状态：可继续同步（非 M）</div>
+        </div>
+
+        <div class="section actions">
+          <div class="item primary">继续同步（创建 v4）</div>
+          <div class="item">打开同步页面（查看步骤）</div>
+          <div class="item">查看历史（倒序）</div>
+        </div>
+
+        <div class="section actions">
+          <div class="item warn">若处于 M：先刷新后同步</div>
+          <div class="item">一键还原到最近成功版本</div>
+          <div class="item danger">一键清除本地同步状态</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hint">
+      说明：
+      1）Popup 只做“快速入口”，不承载复杂步骤。<br>
+      2）详细过程（每步成功/失败、重试、放弃）在“同步页面”完成。<br>
+      3）每次继续同步都是 create 新文档，不会 update 旧文档。
+    </div>
+  </div>
+</body>
+</html>

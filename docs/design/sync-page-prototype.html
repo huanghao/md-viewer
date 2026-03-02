@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>同步页面原型</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --card: #fff;
+      --line: #d8dee4;
+      --text: #1f2328;
+      --sub: #57606a;
+      --blue: #0969da;
+      --green: #1a7f37;
+      --red: #cf222e;
+      --yellow: #9a6700;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "SF Pro Text", "PingFang SC", "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
+      color: var(--text);
+      padding: 20px;
+    }
+    .wrap { max-width: 1180px; margin: 0 auto; }
+    .title { font-size: 24px; font-weight: 700; margin-bottom: 6px; }
+    .desc { color: var(--sub); margin-bottom: 14px; }
+    .layout { display: grid; grid-template-columns: 1.1fr 1fr; gap: 14px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+    }
+    .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .mono { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--sub); }
+    .state { font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 8px; }
+    .ok { background: #e8f5eb; color: var(--green); }
+    .warn { background: #fff4d6; color: var(--yellow); }
+    .fail { background: #fff1f2; color: var(--red); }
+    .step-list { margin-top: 12px; display: grid; gap: 8px; }
+    .step {
+      border: 1px solid #e8ecf1;
+      border-radius: 10px;
+      padding: 10px;
+      display: grid;
+      grid-template-columns: 96px 1fr;
+      gap: 10px;
+      align-items: start;
+    }
+    .label { font-size: 12px; font-weight: 700; color: var(--sub); }
+    .body { font-size: 13px; line-height: 1.55; }
+    .error {
+      margin-top: 6px;
+      border: 1px solid #f1b8be;
+      background: #fff3f5;
+      color: var(--red);
+      border-radius: 8px;
+      padding: 6px;
+      font-size: 12px;
+    }
+    .actions { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 8px;
+      padding: 7px 10px;
+      font-size: 13px;
+      cursor: default;
+    }
+    .btn.primary { border-color: #b8d5ff; color: var(--blue); background: #eef6ff; }
+    .btn.danger { border-color: #f1b8be; color: var(--red); background: #fff3f5; }
+    .history { margin-top: 12px; border: 1px solid #e8ecf1; border-radius: 10px; overflow: hidden; }
+    .history-head { background: #f6f8fa; border-bottom: 1px solid #e8ecf1; padding: 8px 10px; font-size: 12px; color: var(--sub); }
+    .hrow {
+      display: grid;
+      grid-template-columns: 60px 1fr 90px;
+      gap: 8px;
+      padding: 9px 10px;
+      border-top: 1px solid #eef1f4;
+      font-size: 12px;
+    }
+    .hrow:first-of-type { border-top: 0; }
+    .k { color: var(--sub); }
+    .aside-title { font-weight: 700; margin-bottom: 10px; }
+    .block { border: 1px dashed #c9d1d9; border-radius: 10px; padding: 10px; margin-bottom: 10px; }
+    .block h4 { margin: 0 0 6px; font-size: 13px; }
+    .block p { margin: 0; font-size: 12px; color: var(--sub); line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="title">原型 1：同步页面（完整流程）</div>
+    <div class="desc">用途：展示“继续同步”时的完整步骤、失败恢复、历史倒序、一键清除/还原。</div>
+
+    <div class="layout">
+      <section class="card">
+        <div class="row">
+          <div>
+            <div><strong>文件：</strong>/docs/spec.md</div>
+            <div class="mono">当前绑定：v3 · 下一版本：v4 · 本地状态：已刷新（可同步）</div>
+          </div>
+          <div class="state ok">READY</div>
+        </div>
+
+        <div class="step-list">
+          <div class="step">
+            <div class="label">步骤 1 成功</div>
+            <div class="body">预检查：本地文件、非远端、非 M，允许开始同步。</div>
+          </div>
+          <div class="step">
+            <div class="label">步骤 2 成功</div>
+            <div class="body">计算版本：`spec` -> `spec-v4`，本次将创建新文档，不改旧文档。</div>
+          </div>
+          <div class="step">
+            <div class="label">步骤 3 失败</div>
+            <div class="body">
+              创建远端文档（`km-cli doc create`）失败。
+              <div class="error">Error: network timeout。可以重试当前步骤或放弃本次。</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="label">步骤 4 等待</div>
+            <div class="body">写入本地状态（activeVersion/history）未执行。</div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn primary">重试当前步骤</button>
+          <button class="btn">重试整次同步</button>
+          <button class="btn">放弃本次</button>
+          <button class="btn">一键还原</button>
+          <button class="btn danger">一键清除</button>
+        </div>
+
+        <div class="history">
+          <div class="history-head">同步历史（按时间倒序，最新在上）</div>
+          <div class="hrow"><div>v4</div><div>spec-v4 · failed · 2026-03-02 17:20</div><div class="fail">failed</div></div>
+          <div class="hrow"><div>v3</div><div>spec-v3 · docId=123456 · 2026-03-02 16:58</div><div class="ok">success</div></div>
+          <div class="hrow"><div>v2</div><div>spec-v2 · docId=112233 · 2026-03-02 15:03</div><div class="ok">success</div></div>
+          <div class="hrow"><div>v1</div><div>spec · docId=998877 · 2026-03-02 11:22</div><div class="ok">success</div></div>
+        </div>
+      </section>
+
+      <aside class="card">
+        <div class="aside-title">状态说明（给评审看）</div>
+        <div class="block">
+          <h4>BLOCKED_M（禁止同步）</h4>
+          <p>若文件处于 M，按钮显示“先刷新后同步”，步骤页不允许启动。</p>
+        </div>
+        <div class="block">
+          <h4>远端不可控</h4>
+          <p>每次都 create 新文档，不调用 update，不改任何旧远端文档。</p>
+        </div>
+        <div class="block">
+          <h4>失败后状态安全</h4>
+          <p>失败不会覆盖当前 active 绑定；可重试、放弃、还原。</p>
+        </div>
+      </aside>
+    </div>
+  </div>
+</body>
+</html>

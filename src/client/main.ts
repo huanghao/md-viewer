@@ -214,6 +214,12 @@ function normalizeParentIdInput(raw: string): string {
   return input;
 }
 
+function stripVersionSuffix(title: string): string {
+  const trimmed = (title || '').trim();
+  if (!trimmed) return trimmed;
+  return trimmed.replace(/-v\d+$/i, '').trim();
+}
+
 function normalizeJoinedPath(baseDir: string, relativePath: string): string {
   const merged = `${baseDir}/${relativePath}`;
   const isAbsolute = merged.startsWith('/');
@@ -1088,13 +1094,27 @@ async function updateSyncButton() {
 
   button.style.display = 'block';
   const currentPath = state.currentFile;
+  const file = state.sessionFiles.get(currentPath);
+  const isDirty = !!file && file.lastModified > file.displayedModified;
+
+  // M 状态下禁止同步，必须先刷新
+  if (isDirty) {
+    button.className = 'toolbar-text-button';
+    buttonText.textContent = '[先刷新后同步]';
+    button.title = '文件有未刷新改动，请先刷新';
+    button.setAttribute('aria-disabled', 'true');
+    return;
+  }
+  button.removeAttribute('aria-disabled');
+  button.title = '同步到学城';
+
   const cached = getSyncMeta(currentPath);
   if (cached?.docId) {
     button.className = 'toolbar-text-button synced';
-    buttonText.textContent = '[✓ 已同步]';
+    buttonText.textContent = `[↑ 继续同步(v${(cached.version || 1) + 1})]`;
   } else {
     button.className = 'toolbar-text-button';
-    buttonText.textContent = '[☁↑ 同步]';
+    buttonText.textContent = '[☁↑ 首次同步]';
   }
 
   try {
@@ -1106,13 +1126,15 @@ async function updateSyncButton() {
         url: data.url,
         title: data.title,
         syncedAt: data.lastSyncTime,
+        baseTitle: data.baseTitle,
+        version: data.version,
       });
       button.className = 'toolbar-text-button synced';
-      buttonText.textContent = '[✓ 已同步]';
+      buttonText.textContent = `[↑ 继续同步(v${(data.version || 1) + 1})]`;
     } else {
       clearSyncMeta(currentPath);
       button.className = 'toolbar-text-button';
-      buttonText.textContent = '[☁↑ 同步]';
+      buttonText.textContent = '[☁↑ 首次同步]';
     }
   } catch (e) {
     console.error('获取同步状态失败:', e);
@@ -1128,6 +1150,11 @@ async function handleRefreshButtonClick() {
 // 点击同步按钮
 async function handleSyncButtonClick() {
   if (!state.currentFile) return;
+  const file = state.sessionFiles.get(state.currentFile);
+  if (file && file.lastModified > file.displayedModified) {
+    showWarning('请先刷新文件，再继续同步');
+    return;
+  }
 
   const button = document.getElementById('syncButton');
   if (button && button.classList.contains('syncing')) return;
@@ -1139,17 +1166,15 @@ async function handleSyncButtonClick() {
       url: data.url,
       title: data.title,
       syncedAt: data.lastSyncTime,
+      baseTitle: data.baseTitle,
+      version: data.version,
     });
   } else {
     clearSyncMeta(state.currentFile);
   }
 
-  if (data.docId) {
-    showSyncedInfoPopover(data);
-  } else {
-    removeSyncInfoPopover();
-    showSyncDialog();
-  }
+  removeSyncInfoPopover();
+  showSyncDialog();
 }
 
 // 显示同步对话框
@@ -1158,7 +1183,12 @@ async function showSyncDialog() {
   if (!file) return;
 
   const titleMatch = file.content.match(/^#\s+(.+)$/m);
-  const defaultTitle = titleMatch ? titleMatch[1] : file.name.replace(/\.(md|markdown|html?|txt)$/i, '');
+  const guessedTitle = titleMatch ? titleMatch[1] : file.name.replace(/\.(md|markdown|html?|txt)$/i, '');
+  const syncStatus = await getSyncStatus(state.currentFile!);
+  const currentVersion = syncStatus.version || 0;
+  const baseTitle = syncStatus.baseTitle || stripVersionSuffix(syncStatus.title || guessedTitle);
+  const nextVersion = currentVersion + 1;
+  const nextTitle = nextVersion <= 1 ? baseTitle : `${baseTitle}-v${nextVersion}`;
 
   const recentData = await getRecentParents();
   const preferences = await getSyncPreferences();
@@ -1171,11 +1201,18 @@ async function showSyncDialog() {
 
   title.textContent = '同步到学城';
 
-  // 开始构建 HTML（移除文件名展示）
+  // 开始构建 HTML（操作在上，执行反馈在下，历史在最下）
   let html = `
     <div class="sync-dialog-field">
-      <label class="sync-dialog-label">标题</label>
-      <input type="text" class="sync-dialog-input" id="syncTitle" value="${escapeAttr(defaultTitle)}">
+      <div class="sync-dialog-meta">当前文件：${escapeHtml(state.currentFile || '')}</div>
+      <div class="sync-dialog-meta">当前版本：${currentVersion > 0 ? `v${currentVersion}` : '未绑定'} · 下一版本：v${nextVersion}</div>
+      <div class="sync-dialog-meta">本次将创建：${escapeHtml(nextTitle)}</div>
+      <input type="hidden" id="syncCurrentVersion" value="${currentVersion}">
+    </div>
+
+    <div class="sync-dialog-field">
+      <label class="sync-dialog-label">基础标题（自动生成 -vN）</label>
+      <input type="text" class="sync-dialog-input" id="syncTitle" value="${escapeAttr(baseTitle)}">
     </div>
 
     <div class="sync-dialog-field">
@@ -1229,7 +1266,7 @@ async function showSyncDialog() {
           <span class="sync-dialog-codepanel-title">将执行的命令</span>
         ${renderSyncCopyButton('window.copySyncCommand(event)', '复制命令')}
         </div>
-        <div class="sync-dialog-output" id="syncCommandPreview">km-cli doc create --parent-id "..." --title "..." --markdown-file "${escapeHtml(state.currentFile || '')}" --json</div>
+        <div class="sync-dialog-output" id="syncCommandPreview">km-cli doc create --parent-id "..." --title "${escapeHtml(nextTitle)}" --markdown-file "${escapeHtml(state.currentFile || '')}" --json</div>
       </div>
     </div>
 
@@ -1266,6 +1303,25 @@ async function showSyncDialog() {
         </div>
       </div>
     </div>
+    <div class="sync-dialog-field">
+      <div class="sync-dialog-codepanel">
+        <div class="sync-dialog-codepanel-top">
+          <span class="sync-dialog-codepanel-title">历史版本（按时间倒序）</span>
+        </div>
+        <div class="sync-dialog-output" id="syncHistoryList">${
+          (syncStatus.history || []).length === 0
+            ? '暂无历史记录'
+            : (syncStatus.history || [])
+                .map((item) => {
+                  const version = `v${item.version}`;
+                  const status = item.status || 'success';
+                  const doc = item.kmDocId ? `docId=${item.kmDocId}` : (item.error || '-');
+                  return `${version} | ${status} | ${item.kmTitle} | ${formatFileTime(item.syncedAt)} | ${doc}`;
+                })
+                .join('\n')
+        }</div>
+      </div>
+    </div>
   `;
 
   body.innerHTML = html;
@@ -1282,7 +1338,7 @@ async function showSyncDialog() {
             <span class="sync-dialog-codepanel-title">将执行的命令</span>
           ${renderSyncCopyButton('window.copySyncCommand(event)', '复制命令')}
           </div>
-          <div class="sync-dialog-output" id="syncCommandPreview">km-cli doc create --parent-id "..." --title "..." --markdown-file "${escapeHtml(state.currentFile || '')}" --json</div>
+          <div class="sync-dialog-output" id="syncCommandPreview">km-cli doc create --parent-id "..." --title "${escapeHtml(nextTitle)}" --markdown-file "${escapeHtml(state.currentFile || '')}" --json</div>
         </div>
       `;
       checkbox.parentNode!.insertBefore(fallback, checkbox);
@@ -1329,14 +1385,18 @@ function updateCommandPreview() {
   const titleInput = document.getElementById('syncTitle') as HTMLInputElement;
   const parentInput = document.getElementById('syncParentId') as HTMLInputElement;
   const selectedRadio = document.querySelector('.sync-dialog-recent-radio:checked') as HTMLInputElement;
+  const versionInput = document.getElementById('syncCurrentVersion') as HTMLInputElement | null;
 
   if (!preview || !state.currentFile) return;
 
-  const title = titleInput?.value || '...';
+  const baseTitle = (titleInput?.value || '').trim() || '...';
+  const currentVersion = Number(versionInput?.value || 0) || 0;
+  const nextVersion = currentVersion + 1;
+  const versionedTitle = nextVersion <= 1 ? baseTitle : `${baseTitle}-v${nextVersion}`;
   let parentId = parentInput?.value.trim() || selectedRadio?.value || '...';
   parentId = normalizeParentIdInput(parentId) || '...';
 
-  preview.textContent = `km-cli doc create --parent-id "${parentId}" --title "${title}" --markdown-file "${state.currentFile}" --json`;
+  preview.textContent = `km-cli doc create --parent-id "${parentId}" --title "${versionedTitle}" --markdown-file "${state.currentFile}" --json`;
 }
 
 // 选择最近位置
@@ -1403,14 +1463,17 @@ async function confirmSync() {
   setSyncDialogStatus('running');
 
   try {
-    const result = await executeSync(state.currentFile, title, parentId, false);
+    const result = await executeSync(state.currentFile, title, parentId);
 
     if (result.success) {
+      const now = Date.now();
       setSyncMeta(state.currentFile, {
         docId: result.docId,
         url: result.url,
         title: result.title,
-        syncedAt: Date.now(),
+        syncedAt: now,
+        baseTitle: result.baseTitle,
+        version: result.version,
       });
       if (openAfter && result.url) {
         window.open(result.url, '_blank');
@@ -1426,8 +1489,20 @@ async function confirmSync() {
         title: docTitle,
         url: result.url || '',
         output: rawOutput,
-        time: Date.now(),
+        time: now,
       });
+      const status = await getSyncStatus(state.currentFile);
+      const historyEl = document.getElementById('syncHistoryList');
+      if (historyEl) {
+        historyEl.textContent = (status.history || [])
+          .map((item) => {
+            const version = `v${item.version}`;
+            const s = item.status || 'success';
+            const doc = item.kmDocId ? `docId=${item.kmDocId}` : (item.error || '-');
+            return `${version} | ${s} | ${item.kmTitle} | ${formatFileTime(item.syncedAt)} | ${doc}`;
+          })
+          .join('\n') || '暂无历史记录';
+      }
       updateSyncButton();
     } else {
       const rawOutput = (typeof result.output === 'string' && result.output.trim())
@@ -1437,6 +1512,18 @@ async function confirmSync() {
         message: '同步失败，保留当前输入，可直接修改后重试。',
         output: rawOutput,
       });
+      const status = await getSyncStatus(state.currentFile);
+      const historyEl = document.getElementById('syncHistoryList');
+      if (historyEl) {
+        historyEl.textContent = (status.history || [])
+          .map((item) => {
+            const version = `v${item.version}`;
+            const s = item.status || 'success';
+            const doc = item.kmDocId ? `docId=${item.kmDocId}` : (item.error || '-');
+            return `${version} | ${s} | ${item.kmTitle} | ${formatFileTime(item.syncedAt)} | ${doc}`;
+          })
+          .join('\n') || '暂无历史记录';
+      }
     }
   } catch (err: any) {
     setSyncDialogStatus('error', {

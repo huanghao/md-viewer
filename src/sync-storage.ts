@@ -30,16 +30,52 @@ export interface SyncedFileInfo {
   kmDocId: string;
   kmUrl: string;
   kmTitle: string;
+  baseTitle: string;
+  version: number;
   parentId: string;
   lastSyncTime: number;
   command?: string; // 执行的命令
 }
 
+export interface SyncHistoryEntry {
+  version: number;
+  kmDocId?: string;
+  kmUrl?: string;
+  kmTitle: string;
+  parentId: string;
+  status: "success" | "failed" | "abandoned";
+  syncedAt: number;
+  command?: string;
+  error?: string;
+}
+
 export interface SyncRecords {
   recentParents: RecentParent[];
   syncedFiles: Record<string, SyncedFileInfo>;
+  syncedHistory?: Record<string, SyncHistoryEntry[]>;
   defaultParentId?: string;
   preferences?: Record<string, any>;
+}
+
+function normalizeSyncRecords(records: any): SyncRecords {
+  const normalized: SyncRecords = {
+    recentParents: Array.isArray(records?.recentParents) ? records.recentParents : [],
+    syncedFiles: records?.syncedFiles && typeof records.syncedFiles === "object" ? records.syncedFiles : {},
+    syncedHistory: records?.syncedHistory && typeof records.syncedHistory === "object" ? records.syncedHistory : {},
+    defaultParentId: typeof records?.defaultParentId === "string" ? records.defaultParentId : undefined,
+    preferences: records?.preferences && typeof records.preferences === "object" ? records.preferences : {},
+  };
+
+  for (const info of Object.values(normalized.syncedFiles)) {
+    if (typeof (info as SyncedFileInfo).version !== "number") {
+      (info as SyncedFileInfo).version = 1;
+    }
+    if (!(info as SyncedFileInfo).baseTitle) {
+      (info as SyncedFileInfo).baseTitle = (info as SyncedFileInfo).kmTitle;
+    }
+  }
+
+  return normalized;
 }
 
 /**
@@ -50,12 +86,13 @@ export function loadSyncRecords(): SyncRecords {
     return {
       recentParents: [],
       syncedFiles: {},
+      syncedHistory: {},
     };
   }
 
   try {
     const content = readFileSync(SYNC_RECORDS_PATH, "utf-8");
-    const records = JSON.parse(content);
+    const records = normalizeSyncRecords(JSON.parse(content));
 
     // 自动清理过期的同步记录
     cleanupExpiredSyncRecords(records);
@@ -66,6 +103,7 @@ export function loadSyncRecords(): SyncRecords {
     return {
       recentParents: [],
       syncedFiles: {},
+      syncedHistory: {},
     };
   }
 }
@@ -81,6 +119,9 @@ function cleanupExpiredSyncRecords(records: SyncRecords): void {
   for (const [filePath, info] of Object.entries(records.syncedFiles)) {
     if (now - info.lastSyncTime > SYNC_RECORD_MAX_AGE) {
       delete records.syncedFiles[filePath];
+      if (records.syncedHistory) {
+        delete records.syncedHistory[filePath];
+      }
       cleanedCount++;
     }
   }
@@ -210,7 +251,28 @@ export function getSyncedFile(filePath: string): SyncedFileInfo | null {
 export function removeSyncedFile(filePath: string): void {
   const records = loadSyncRecords();
   delete records.syncedFiles[filePath];
+  if (records.syncedHistory) {
+    delete records.syncedHistory[filePath];
+  }
   saveSyncRecords(records);
+}
+
+export function appendSyncHistory(filePath: string, entry: SyncHistoryEntry, maxEntries = 20): void {
+  const records = loadSyncRecords();
+  if (!records.syncedHistory) {
+    records.syncedHistory = {};
+  }
+  const list = records.syncedHistory[filePath] || [];
+  list.push(entry);
+  list.sort((a, b) => a.syncedAt - b.syncedAt);
+  records.syncedHistory[filePath] = list.slice(-maxEntries);
+  saveSyncRecords(records);
+}
+
+export function getSyncHistory(filePath: string): SyncHistoryEntry[] {
+  const records = loadSyncRecords();
+  const list = records.syncedHistory?.[filePath] || [];
+  return [...list].sort((a, b) => b.syncedAt - a.syncedAt);
 }
 
 /**

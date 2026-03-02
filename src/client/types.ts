@@ -108,9 +108,24 @@ export interface SyncResult {
   docId?: string;
   url?: string;
   title?: string;
+  baseTitle?: string;
+  version?: number;
+  versionedTitle?: string;
   error?: string;
   command?: string;
   output?: string;
+}
+
+export interface SyncHistoryItem {
+  version: number;
+  kmDocId?: string;
+  kmUrl?: string;
+  kmTitle: string;
+  parentId: string;
+  status: 'success' | 'failed' | 'abandoned';
+  syncedAt: number;
+  command?: string;
+  error?: string;
 }
 
 export interface SyncStatusData {
@@ -118,8 +133,11 @@ export interface SyncStatusData {
   docId?: string;
   url?: string;
   title?: string;
+  baseTitle?: string;
+  version?: number;
   lastSyncTime?: number;
   command?: string;
+  history?: SyncHistoryItem[];
 }
 
 export interface SyncPreferences {
@@ -131,4 +149,6 @@ export interface SyncMeta {
   url?: string;
   title?: string;
   syncedAt?: number;
+  baseTitle?: string;
+  version?: number;
 }

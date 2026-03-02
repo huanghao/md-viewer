@@ -19,7 +19,9 @@ import {
   addRecentParent,
   updateRecentParentMeta,
   getSyncedFile,
+  getSyncHistory,
   saveSyncedFile,
+  appendSyncHistory,
   getDefaultParentId,
   cleanupAllExpiredRecords,
   getSyncRecordsStats,
@@ -74,6 +76,12 @@ function normalizeParentIdInput(raw: string): string {
   }
 
   return input;
+}
+
+function stripVersionSuffix(title: string): string {
+  const trimmed = (title || "").trim();
+  if (!trimmed) return trimmed;
+  return trimmed.replace(/-v\d+$/i, "").trim();
 }
 
 // API: 获取文件内容
@@ -625,19 +633,37 @@ export async function handleSyncExecute(c: Context) {
       return c.json({ error: "文件不存在" }, 404);
     }
 
-    // 调用 km-cli 创建文档
+    const now = Date.now();
+    const previous = getSyncedFile(resolvedPath);
+    const baseTitle = previous?.baseTitle || stripVersionSuffix(title);
+    const nextVersion = (previous?.version || 0) + 1;
+    const versionedTitle = nextVersion <= 1 ? baseTitle : `${baseTitle}-v${nextVersion}`;
+
+    // 调用 km-cli 创建文档（每次都 create，不 update）
     const result = await createKmDoc({
       parentId: normalizedParentId,
-      title,
+      title: versionedTitle,
       markdownFile: resolvedPath,
     });
 
     if (!result.success) {
+      appendSyncHistory(resolvedPath, {
+        version: nextVersion,
+        kmTitle: versionedTitle,
+        parentId: normalizedParentId,
+        status: "failed",
+        syncedAt: now,
+        command: result.command,
+        error: result.output || result.error || "同步失败",
+      });
       return c.json({
         success: false,
         error: result.error || "同步失败",
         output: result.output || result.error || "km-cli 未返回可读输出",
         command: result.command,
+        version: nextVersion,
+        baseTitle,
+        versionedTitle,
       });
     }
 
@@ -645,9 +671,21 @@ export async function handleSyncExecute(c: Context) {
     saveSyncedFile(resolvedPath, {
       kmDocId: result.docId!,
       kmUrl: result.url!,
-      kmTitle: title,
+      kmTitle: versionedTitle,
+      baseTitle,
+      version: nextVersion,
       parentId: normalizedParentId,
-      lastSyncTime: Date.now(),
+      lastSyncTime: now,
+      command: result.command,
+    });
+    appendSyncHistory(resolvedPath, {
+      version: nextVersion,
+      kmDocId: result.docId!,
+      kmUrl: result.url!,
+      kmTitle: versionedTitle,
+      parentId: normalizedParentId,
+      status: "success",
+      syncedAt: now,
       command: result.command,
     });
 
@@ -669,16 +707,19 @@ export async function handleSyncExecute(c: Context) {
     }
     addRecentParent(normalizedParentId, parentTitle, parentUrl);
 
-    log(`🔄 同步成功: ${title} -> ${result.url}`);
+    log(`🔄 同步成功: ${versionedTitle} -> ${result.url}`);
 
     return c.json({
       success: true,
       kmDocId: result.docId,
       kmUrl: result.url,
-      kmTitle: title,
+      kmTitle: versionedTitle,
       openAfterSync,
       command: result.command,
       output: result.output,
+      version: nextVersion,
+      baseTitle,
+      versionedTitle,
     });
   } catch (error: any) {
     return c.json({
@@ -696,9 +737,10 @@ export function handleGetSyncStatus(c: Context) {
 
   const resolvedPath = resolve(path);
   const syncInfo = getSyncedFile(resolvedPath);
+  const history = getSyncHistory(resolvedPath);
 
   if (!syncInfo) {
-    return c.json({ synced: false });
+    return c.json({ synced: false, history: [] });
   }
 
   return c.json({
@@ -706,7 +748,10 @@ export function handleGetSyncStatus(c: Context) {
     kmDocId: syncInfo.kmDocId,
     kmUrl: syncInfo.kmUrl,
     kmTitle: syncInfo.kmTitle,
+    baseTitle: syncInfo.baseTitle,
+    version: syncInfo.version,
     lastSyncTime: syncInfo.lastSyncTime,
+    history,
   });
 }
 

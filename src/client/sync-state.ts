@@ -29,6 +29,8 @@ export function restoreSyncState(): void {
         url: typeof meta.url === 'string' ? meta.url : undefined,
         title: typeof meta.title === 'string' ? meta.title : undefined,
         syncedAt: typeof meta.syncedAt === 'number' ? meta.syncedAt : undefined,
+        baseTitle: typeof meta.baseTitle === 'string' ? meta.baseTitle : undefined,
+        version: typeof meta.version === 'number' ? meta.version : undefined,
       });
     }
   } catch (e) {
@@ -46,6 +48,8 @@ export function setSyncMeta(path: string, meta: SyncMeta): void {
     url: meta.url,
     title: meta.title,
     syncedAt: meta.syncedAt,
+    baseTitle: meta.baseTitle,
+    version: meta.version,
   });
   persistSyncState();
 }

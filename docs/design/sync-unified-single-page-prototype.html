@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>同步单页整合原型</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --line: #d0d7de;
+      --text: #1f2328;
+      --muted: #57606a;
+      --blue: #0969da;
+      --green: #1a7f37;
+      --red: #cf222e;
+      --yellow: #9a6700;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
+      color: var(--text);
+      font-family: "SF Pro Text", "PingFang SC", "Segoe UI", sans-serif;
+      padding: 24px;
+    }
+    .wrap { max-width: 980px; margin: 0 auto; }
+    .title { font-size: 24px; font-weight: 700; }
+    .desc { margin-top: 6px; color: var(--muted); }
+
+    .panel {
+      margin-top: 16px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .section {
+      padding: 14px;
+      border-top: 1px solid #eef1f4;
+    }
+    .section:first-child { border-top: 0; }
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .field {
+      border: 1px solid #e6eaef;
+      border-radius: 10px;
+      padding: 10px;
+      background: #fff;
+    }
+    .label { font-size: 12px; color: var(--muted); }
+    .value { margin-top: 4px; font-size: 13px; }
+
+    .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      border-radius: 9px;
+      padding: 8px 12px;
+      font-size: 13px;
+      cursor: default;
+    }
+    .btn.primary { border-color: #b8d5ff; background: #eef6ff; color: var(--blue); }
+    .btn.success { border-color: #b7dfc1; background: #edf8f0; color: var(--green); }
+    .btn.warn { border-color: #f0d28a; background: #fff8df; color: var(--yellow); }
+    .btn.danger { border-color: #f4bcc2; background: #fff3f5; color: var(--red); }
+
+    .status {
+      border: 1px solid #e6eaef;
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 13px;
+      line-height: 1.55;
+      background: #fff;
+    }
+    .status.ok { border-color: #b7dfc1; background: #f4fbf6; }
+    .status.err { border-color: #f4bcc2; background: #fff4f5; }
+    .mono {
+      margin-top: 8px;
+      background: #f6f8fa;
+      border: 1px solid #e6eaef;
+      border-radius: 8px;
+      padding: 8px;
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 12px;
+      color: #39414a;
+      white-space: pre-wrap;
+    }
+
+    .history {
+      border: 1px solid #e6eaef;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .h-head {
+      display: grid;
+      grid-template-columns: 62px 1fr 80px 140px;
+      gap: 8px;
+      padding: 9px 10px;
+      font-size: 12px;
+      color: var(--muted);
+      background: #f6f8fa;
+      border-bottom: 1px solid #e6eaef;
+    }
+    .h-row {
+      display: grid;
+      grid-template-columns: 62px 1fr 80px 140px;
+      gap: 8px;
+      padding: 10px;
+      font-size: 12px;
+      border-top: 1px solid #eef1f4;
+      align-items: center;
+    }
+    .h-row:first-of-type { border-top: 0; }
+    .tag-ok { color: var(--green); font-weight: 600; }
+    .tag-fail { color: var(--red); font-weight: 600; }
+    .tag-abandon { color: #6e7781; font-weight: 600; }
+
+    .note {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="title">同步原型（单页整合）</div>
+    <div class="desc">基于现有同步页改造：操作在上，执行反馈在中，历史版本倒序在下。仅 1 个 API（create），不做多步流程页。</div>
+
+    <section class="panel">
+      <div class="section">
+        <div class="section-title">操作区</div>
+        <div class="grid">
+          <div class="field">
+            <div class="label">当前文件</div>
+            <div class="value">/docs/spec.md</div>
+          </div>
+          <div class="field">
+            <div class="label">基础标题</div>
+            <div class="value">spec</div>
+          </div>
+          <div class="field">
+            <div class="label">当前绑定版本</div>
+            <div class="value">v3（docId=123456）</div>
+          </div>
+          <div class="field">
+            <div class="label">将创建新版本</div>
+            <div class="value">v4（标题：spec-v4）</div>
+          </div>
+          <div class="field">
+            <div class="label">同步位置（parentId）</div>
+            <div class="value">987654</div>
+          </div>
+          <div class="field">
+            <div class="label">本地文件状态</div>
+            <div class="value">已刷新（可同步）</div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:10px;">
+          <button class="btn primary">继续同步（创建 v4）</button>
+          <button class="btn">放弃本次</button>
+          <button class="btn">一键还原</button>
+          <button class="btn danger">一键清除</button>
+          <button class="btn warn">若是 M：先刷新后同步（禁用态）</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">执行反馈区</div>
+
+        <div class="status ok">
+          <strong>最近一次执行：</strong>成功创建 `spec-v4`，本地 active 已切换到 v4。
+          <div class="mono">km-cli doc create --parent-id "987654" --title "spec-v4" --markdown-file "/docs/spec.md" --json</div>
+        </div>
+
+        <div class="status err" style="margin-top:10px;">
+          <strong>失败示例：</strong>网络超时，未写入新 active，仍保持 v3。
+          <div class="mono">STDERR:\nError: network timeout\n\n建议：重试“继续同步”或放弃本次。</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">历史版本（倒序）</div>
+        <div class="history">
+          <div class="h-head">
+            <div>版本</div><div>标题 / 文档</div><div>状态</div><div>时间</div>
+          </div>
+          <div class="h-row">
+            <div>v4</div>
+            <div>spec-v4 · docId=667788</div>
+            <div class="tag-ok">success</div>
+            <div>2026-03-02 18:02</div>
+          </div>
+          <div class="h-row">
+            <div>v4</div>
+            <div>spec-v4 · create failed</div>
+            <div class="tag-fail">failed</div>
+            <div>2026-03-02 17:58</div>
+          </div>
+          <div class="h-row">
+            <div>v3</div>
+            <div>spec-v3 · docId=123456</div>
+            <div class="tag-ok">success</div>
+            <div>2026-03-02 17:10</div>
+          </div>
+          <div class="h-row">
+            <div>v2</div>
+            <div>spec-v2 · docId=112233</div>
+            <div class="tag-ok">success</div>
+            <div>2026-03-02 15:03</div>
+          </div>
+          <div class="h-row">
+            <div>v1</div>
+            <div>spec · docId=998877</div>
+            <div class="tag-abandon">abandoned</div>
+            <div>2026-03-02 11:22</div>
+          </div>
+        </div>
+
+        <div class="note">
+          说明：
+          1）每次继续同步都 create 新文档，不 update。
+          2）历史不是“最后一次”，而是每次都留痕并按时间倒序展示。
+          3）失败不覆盖当前有效绑定（active 保持在最近成功版本）。
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

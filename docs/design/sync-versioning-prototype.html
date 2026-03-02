@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sync Versioning Prototype</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --line: #d0d7de;
+      --text: #1f2328;
+      --muted: #59636e;
+      --ok: #1a7f37;
+      --warn: #9a6700;
+      --err: #cf222e;
+      --info: #0969da;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "SF Pro Display", "Segoe UI", "PingFang SC", sans-serif;
+      background: linear-gradient(180deg, #f8fbff 0%, #f4f6f9 100%);
+      color: var(--text);
+    }
+    .app { display: grid; grid-template-columns: 1fr 420px; min-height: 100vh; }
+    .main { padding: 20px; }
+    .toolbar {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 7px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .btn.sync { color: var(--info); border-color: #b6d7ff; background: #eef6ff; }
+    .btn.blocked { color: var(--warn); border-color: #eac54f; background: #fff8df; cursor: not-allowed; }
+    .btn.failed { color: var(--err); border-color: #f3b1b7; background: #fff1f2; }
+    .content {
+      margin-top: 14px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+      min-height: 280px;
+      color: var(--muted);
+    }
+    .panel {
+      border-left: 1px solid var(--line);
+      background: #fff;
+      padding: 16px;
+    }
+    .title { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+    .meta {
+      font-size: 12px;
+      color: var(--muted);
+      background: #f6f8fa;
+      border: 1px solid #e5e8eb;
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+    .steps { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+    .step {
+      padding: 10px 12px;
+      border-top: 1px solid #eef1f4;
+      display: grid;
+      grid-template-columns: 90px 1fr;
+      gap: 10px;
+      align-items: start;
+    }
+    .step:first-child { border-top: 0; }
+    .status { font-size: 12px; font-weight: 600; }
+    .s-running { color: var(--info); }
+    .s-ok { color: var(--ok); }
+    .s-fail { color: var(--err); }
+    .desc { font-size: 13px; }
+    .error {
+      margin-top: 4px;
+      color: var(--err);
+      background: #fff3f4;
+      border: 1px solid #f6c2c7;
+      border-radius: 6px;
+      padding: 6px;
+      font-size: 12px;
+    }
+    .actions { display: flex; gap: 8px; margin-top: 12px; }
+    .history {
+      margin-top: 14px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .history .h-title {
+      padding: 10px 12px;
+      background: #f6f8fa;
+      border-bottom: 1px solid #e5e8eb;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 54px 1fr 82px;
+      gap: 8px;
+      padding: 10px 12px;
+      border-top: 1px solid #eef1f4;
+      font-size: 12px;
+      align-items: center;
+    }
+    .row:first-of-type { border-top: 0; }
+    .tag-ok { color: var(--ok); }
+    .tag-fail { color: var(--err); }
+    .tag-abandon { color: #6e7781; }
+    .more {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      gap: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <main class="main">
+      <div class="toolbar">
+        <div>docs/spec.md · 状态：`M` 已清除，可同步</div>
+        <button class="btn sync">↑ 继续同步(v4)</button>
+      </div>
+      <div class="content">
+        内容区（示意）<br>
+        - 若是 M：按钮改为「先刷新后同步」（禁用）<br>
+        - 同步成功后仅更新状态，不出现独立成功页
+      </div>
+    </main>
+
+    <aside class="panel">
+      <div class="title">同步步骤面板</div>
+      <div class="meta">
+        当前绑定：v3 -> km://123456<br>
+        下一个版本：v4（标题：spec-v4）<br>
+        本地状态：已刷新（可同步）
+      </div>
+
+      <section class="steps">
+        <div class="step">
+          <div class="status s-ok">成功</div>
+          <div class="desc">预检查：本地文件、非远端、非 M</div>
+        </div>
+        <div class="step">
+          <div class="status s-ok">成功</div>
+          <div class="desc">计算版本：v3 -> v4</div>
+        </div>
+        <div class="step">
+          <div class="status s-fail">失败</div>
+          <div class="desc">
+            创建远端文档：`km-cli doc create`
+            <div class="error">km-cli returned non-zero exit code. 可重试或放弃。</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="status">等待</div>
+          <div class="desc">写本地状态：activeVersion / history</div>
+        </div>
+      </section>
+
+      <div class="actions">
+        <button class="btn failed">重试当前步骤</button>
+        <button class="btn">重试整次同步</button>
+        <button class="btn">放弃本次</button>
+      </div>
+
+      <section class="history">
+        <div class="h-title">同步历史（按时间倒序）</div>
+        <div class="row">
+          <div>v4</div>
+          <div>spec-v4 · failed · 2026-03-02 15:48</div>
+          <div class="tag-fail">failed</div>
+        </div>
+        <div class="row">
+          <div>v3</div>
+          <div>spec-v3 · km://123456 · 2026-03-02 15:21</div>
+          <div class="tag-ok">success</div>
+        </div>
+        <div class="row">
+          <div>v2</div>
+          <div>spec-v2 · km://112233 · 2026-03-02 14:08</div>
+          <div class="tag-ok">success</div>
+        </div>
+        <div class="row">
+          <div>v1</div>
+          <div>spec · km://998877 · 2026-03-02 11:12</div>
+          <div class="tag-ok">success</div>
+        </div>
+      </section>
+
+      <div class="more">
+        <span>一键还原</span>
+        <span>一键清除</span>
+      </div>
+    </aside>
+  </div>
+</body>
+</html>

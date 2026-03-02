@@ -8,6 +8,7 @@ import {
   fetchRemoteMarkdown,
   getLastModified,
   getFileList,
+  searchFilesInRoots,
   log,
   isSupportedTextFile,
 } from "./utils.ts";
@@ -177,6 +178,23 @@ export async function handleGetFileAsset(c: Context) {
 
 // API: 获取目录下的可展示文本文件列表（Markdown / HTML）
 export function handleGetFiles(c: Context) {
+  const query = (c.req.query("query") || "").trim();
+  const limitRaw = Number(c.req.query("limit") || "50");
+  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(200, limitRaw)) : 50;
+
+  if (query) {
+    const url = new URL(c.req.url);
+    const roots = url.searchParams.getAll("root").map((p) => p.trim()).filter(Boolean);
+    const effectiveRoots = roots.length > 0 ? roots : [process.cwd()];
+    const matched = searchFilesInRoots(query, effectiveRoots, limit);
+
+    return c.json({
+      files: matched.map((f) => ({ path: f, name: basename(f) })),
+      roots: effectiveRoots.map((root) => resolve(root)),
+      query,
+    });
+  }
+
   const dir = c.req.query("dir") || ".";
   const files = getFileList(resolve(dir));
   return c.json({ files: files.map((f) => ({ path: f, name: basename(f) })) });

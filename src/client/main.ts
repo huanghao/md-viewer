@@ -282,7 +282,9 @@ async function renderMermaidDiagrams(container: HTMLElement): Promise<void> {
   if (!mermaid) return;
 
   const codeBlocks = Array.from(
-    container.querySelectorAll('.markdown-body pre > code.language-mermaid, .markdown-body pre > code.lang-mermaid')
+    container.querySelectorAll(
+      '.markdown-body pre > code.language-mermaid, .markdown-body pre > code.lang-mermaid, .markdown-body pre > code.language-flowchart, .markdown-body pre > code.lang-flowchart'
+    )
   ) as HTMLElement[];
   if (codeBlocks.length === 0) return;
 
@@ -355,7 +357,14 @@ async function renderMermaidDiagrams(container: HTMLElement): Promise<void> {
     const codeEl = codeBlocks[i];
     const preEl = codeEl.closest('pre');
     if (!preEl) continue;
-    const source = (codeEl.textContent || '').trim();
+    const sourceRaw = (codeEl.textContent || '').trim();
+    if (!sourceRaw) continue;
+    const isFlowchartFence =
+      codeEl.classList.contains('language-flowchart') || codeEl.classList.contains('lang-flowchart');
+    const firstLine = sourceRaw.split('\n').find((line) => line.trim().length > 0)?.trim().toLowerCase() || '';
+    const source = isFlowchartFence && !firstLine.startsWith('flowchart') && !firstLine.startsWith('graph')
+      ? `flowchart TD\n${sourceRaw}`
+      : sourceRaw;
     if (!source) continue;
 
     try {
@@ -776,15 +785,17 @@ function removeFileHandler(path: string) {
 }
 
 // 搜索文件
-async function searchFilesHandler() {
-  const input = document.getElementById('searchInput') as HTMLInputElement;
-  if (!input) return;
-
-  const query = input.value.trim();
+async function searchFilesHandler(rawQuery?: string) {
+  const input = document.getElementById('searchInput') as HTMLInputElement | null;
+  const query = (typeof rawQuery === 'string' ? rawQuery : input?.value || '').trim();
   if (!query) return;
 
   try {
-    const data = await searchFiles(query);
+    const workspaceRoots = state.config.workspaces.map((ws) => ws.path).filter(Boolean);
+    const data = await searchFiles(query, {
+      roots: workspaceRoots,
+      limit: 50,
+    });
     if (data.files && data.files.length > 0) {
       // 显示搜索结果（简单实现：添加第一个）
       await addFileByPath(data.files[0].path);
@@ -1747,7 +1758,12 @@ window.handleUnifiedInputSubmit = (value?: string) => {
   const input = document.getElementById('searchInput') as HTMLInputElement | null;
   const raw = (typeof value === 'string' ? value : input?.value || '').trim();
   if (!raw) return;
-  if (!looksLikePathInput(raw)) return;
+  if (!looksLikePathInput(raw)) {
+    searchFilesHandler(raw).catch((err: any) => {
+      showError(`搜索失败: ${err?.message || '未知错误'}`);
+    });
+    return;
+  }
   handleSmartAddInput(raw).catch((err: any) => {
     showError(`添加失败: ${err?.message || '未知错误'}`);
   });

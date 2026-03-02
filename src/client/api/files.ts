@@ -18,8 +18,18 @@ export async function loadFile(path: string, silent: boolean = false): Promise<F
 }
 
 // 搜索文件
-export async function searchFiles(query: string): Promise<FilesResponse> {
-  const response = await fetch(`/api/files?query=${encodeURIComponent(query)}`);
+export async function searchFiles(
+  query: string,
+  options: { roots?: string[]; limit?: number } = {}
+): Promise<FilesResponse> {
+  const params = new URLSearchParams({ query });
+  if (options.limit && Number.isFinite(options.limit)) {
+    params.set('limit', String(options.limit));
+  }
+  for (const root of options.roots || []) {
+    if (root.trim()) params.append('root', root.trim());
+  }
+  const response = await fetch(`/api/files?${params.toString()}`);
   return response.json();
 }
 

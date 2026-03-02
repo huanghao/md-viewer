@@ -1,5 +1,5 @@
 import { readFileSync, existsSync, statSync, readdirSync } from "fs";
-import { resolve, basename } from "path";
+import { resolve, basename, relative } from "path";
 
 // ==================== 日志 ====================
 
@@ -66,6 +66,63 @@ export function getFileList(dir: string): string[] {
   } catch {
     return [];
   }
+}
+
+interface SearchCandidate {
+  path: string;
+  root: string;
+  score: number;
+}
+
+function scoreFileMatch(query: string, filePath: string, root: string): number {
+  const lowerQuery = query.toLowerCase();
+  const lowerName = basename(filePath).toLowerCase();
+  const lowerRel = relative(root, filePath).toLowerCase();
+
+  if (lowerName === lowerQuery) return 400;
+  if (lowerName.startsWith(lowerQuery)) return 320;
+  if (lowerName.includes(lowerQuery)) return 240;
+  if (lowerRel.includes(lowerQuery)) return 160;
+  return 0;
+}
+
+export function searchFilesInRoots(query: string, roots: string[], limit: number = 50): string[] {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return [];
+
+  const uniqueRoots: string[] = [];
+  const seenRoots = new Set<string>();
+
+  for (const root of roots) {
+    const resolved = resolve(root);
+    if (seenRoots.has(resolved)) continue;
+    seenRoots.add(resolved);
+    uniqueRoots.push(resolved);
+  }
+
+  const candidates: SearchCandidate[] = [];
+  const seenPaths = new Set<string>();
+
+  for (const root of uniqueRoots) {
+    const files = getFileList(root);
+    for (const filePath of files) {
+      if (seenPaths.has(filePath)) continue;
+      const score = scoreFileMatch(normalizedQuery, filePath, root);
+      if (score <= 0) continue;
+      seenPaths.add(filePath);
+      candidates.push({ path: filePath, root, score });
+    }
+  }
+
+  candidates.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    const relA = relative(a.root, a.path);
+    const relB = relative(b.root, b.path);
+    if (relA.length !== relB.length) return relA.length - relB.length;
+    return a.path.localeCompare(b.path);
+  });
+
+  return candidates.slice(0, limit).map((item) => item.path);
 }
 
 // ==================== 远程文件相关 ====================

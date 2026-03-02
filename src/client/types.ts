@@ -61,6 +61,8 @@ export interface FileData {
 
 export interface FilesResponse {
   files: Array<{ path: string; name: string }>;
+  roots?: string[];
+  query?: string;
 }
 
 export interface NearbyResponse {

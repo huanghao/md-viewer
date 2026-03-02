@@ -29,6 +29,7 @@ const fileRefreshSeq = new Map<string, number>();
 const PARENT_URL_SKIP_SEGMENTS = new Set(['doc', 'docs', 'page', 'pages', 'content', 'wiki']);
 let workspacePollRunning = false;
 let mermaidInitialized = false;
+let syncDialogInteractionBound = false;
 
 // ==================== 消息处理 ====================
 async function onFileLoaded(data: FileData, focus: boolean = false) {
@@ -1226,11 +1227,69 @@ async function handleSyncButtonClick() {
   }
 
   removeSyncInfoPopover();
+  ensureSyncDialogInteraction();
   showSyncDialog();
+}
+
+function ensureSyncDialogChrome(): void {
+  const overlay = document.getElementById('syncDialogOverlay');
+  if (!overlay) return;
+
+  const dialog = overlay.querySelector('.sync-dialog') as HTMLElement | null;
+  if (!dialog) return;
+
+  let header = dialog.querySelector('.sync-dialog-header') as HTMLElement | null;
+  if (!header) {
+    header = document.createElement('div');
+    header.className = 'sync-dialog-header';
+    header.innerHTML = `
+      <div class="sync-dialog-title" id="syncDialogTitle">同步到学城</div>
+      <button class="sync-dialog-close" type="button" aria-label="关闭同步窗口">×</button>
+    `;
+    dialog.insertBefore(header, dialog.firstChild);
+  }
+
+  let closeBtn = header.querySelector('.sync-dialog-close') as HTMLButtonElement | null;
+  if (!closeBtn) {
+    closeBtn = document.createElement('button');
+    closeBtn.className = 'sync-dialog-close';
+    closeBtn.type = 'button';
+    closeBtn.setAttribute('aria-label', '关闭同步窗口');
+    closeBtn.textContent = '×';
+    header.appendChild(closeBtn);
+  }
+}
+
+function ensureSyncDialogInteraction(): void {
+  ensureSyncDialogChrome();
+  const overlay = document.getElementById('syncDialogOverlay');
+  if (!overlay || syncDialogInteractionBound) return;
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      closeSyncDialog();
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (!overlay.classList.contains('show')) return;
+    closeSyncDialog();
+  });
+
+  overlay.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+    if (!target.closest('.sync-dialog-close')) return;
+    closeSyncDialog();
+  });
+
+  syncDialogInteractionBound = true;
 }
 
 // 显示同步对话框
 async function showSyncDialog() {
+  ensureSyncDialogChrome();
   const file = state.sessionFiles.get(state.currentFile!);
   if (!file) return;
 
@@ -1561,6 +1620,7 @@ async function confirmSync() {
 
 // 显示已同步文件的对话框
 async function showSyncedFileDialog(syncData: any) {
+  ensureSyncDialogChrome();
   const overlay = document.getElementById('syncDialogOverlay');
   const title = document.getElementById('syncDialogTitle');
   const body = document.getElementById('syncDialogBody');
@@ -1923,6 +1983,7 @@ function startWorkspacePolling() {
 
 // ==================== 初始化 ====================
 (async () => {
+  ensureSyncDialogInteraction();
   initSidebarWidth();
 
   // 初始化字体缩放

@@ -114,5 +114,5 @@
 
 ## 相关文档
 
-- [md-viewer(1)](../man/md-viewer.1) - 命令行手册
-- [md-viewer.config(5)](../man/md-viewer.config.5) - 配置文件手册
+- [md-viewer(1)](../../man/md-viewer.1) - 命令行手册
+- [md-viewer.config(5)](../../man/md-viewer.config.5) - 配置文件手册

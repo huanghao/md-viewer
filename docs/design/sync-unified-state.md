@@ -27,8 +27,8 @@
 
 ## 与你要求对齐
 - 失败后不关闭，留在当前页面，保留所有输入。
-- 成功信息中的链接使用 `[文档标题](超链接)` 形态，不展示裸 URL 作为主要入口。
+- 成功信息中的链接使用“文档标题（链接地址）”形态，不展示裸 URL 作为主要入口。
 - 文本块支持局部选择；整体复制依旧有复制按钮。
 
 ## 交互原型
-- [sync-unified-state-prototype.html](/Users/huanghao/workspace/md-viewer/docs/design/sync-unified-state-prototype.html)
+- [sync-unified-state-prototype.html](./sync-unified-state-prototype.html)

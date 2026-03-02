@@ -39,4 +39,4 @@
 - 同步能力仍面向 Markdown，不支持 HTML 一键同步。
 
 ## 原型稿
-- [html-support-prototype.html](/Users/huanghao/workspace/md-viewer/docs/design/html-support-prototype.html)
+- [html-support-prototype.html](./html-support-prototype.html)

@@ -1,5 +1,5 @@
 // 导入类型
-import type { FileData } from './types';
+import type { FileData, SyncHistoryItem } from './types';
 
 // 导入状态管理
 import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFileFromState, switchToFile, setSearchQuery, markFileMissing, getSessionFile } from './state';
@@ -953,6 +953,58 @@ function renderSyncCodePanel(title: string, content: string, copyOnClick: string
   `;
 }
 
+function renderSyncHistoryRows(history: SyncHistoryItem[]): string {
+  if (!history || history.length === 0) {
+    return '<div class="sync-history-empty">暂无历史记录</div>';
+  }
+
+  return `
+    <table class="sync-history-table">
+      <thead>
+        <tr>
+          <th class="sync-history-col-version">版本</th>
+          <th class="sync-history-col-status">状态</th>
+          <th>标题</th>
+          <th class="sync-history-col-time">时间</th>
+          <th class="sync-history-col-doc">文档 / 错误</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${history.map((item) => {
+          const status = item.status === 'failed' ? 'failed' : 'success';
+          const statusText = status === 'failed' ? '失败' : '成功';
+          const versionText = item.version > 0 ? `v${item.version}` : '-';
+          const titleText = item.kmTitle || '-';
+          const timeText = item.syncedAt ? formatFileTime(item.syncedAt) : '-';
+          let docOrError = '-';
+          if (item.kmDocId) {
+            docOrError = item.kmUrl
+              ? `<a href="${escapeAttr(item.kmUrl)}" target="_blank" class="sync-history-link">${escapeHtml(item.kmDocId)}</a>`
+              : escapeHtml(item.kmDocId);
+          } else if (item.error) {
+            docOrError = `<span class="sync-history-error" title="${escapeAttr(item.error)}">${escapeHtml(item.error)}</span>`;
+          }
+          return `
+            <tr>
+              <td class="sync-history-col-version">${escapeHtml(versionText)}</td>
+              <td class="sync-history-col-status"><span class="sync-history-status is-${status}">${statusText}</span></td>
+              <td title="${escapeAttr(titleText)}">${escapeHtml(titleText)}</td>
+              <td class="sync-history-col-time">${escapeHtml(timeText)}</td>
+              <td class="sync-history-col-doc">${docOrError}</td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function refreshSyncHistoryList(history: SyncHistoryItem[]): void {
+  const historyEl = document.getElementById('syncHistoryList');
+  if (!historyEl) return;
+  historyEl.innerHTML = renderSyncHistoryRows(history || []);
+}
+
 async function refreshParentMetaPreview(rawValue: string): Promise<void> {
   const metaEl = document.getElementById('syncParentMeta') as HTMLElement | null;
   if (!metaEl) return;
@@ -1308,18 +1360,7 @@ async function showSyncDialog() {
         <div class="sync-dialog-codepanel-top">
           <span class="sync-dialog-codepanel-title">历史版本（按时间倒序）</span>
         </div>
-        <div class="sync-dialog-output" id="syncHistoryList">${
-          (syncStatus.history || []).length === 0
-            ? '暂无历史记录'
-            : (syncStatus.history || [])
-                .map((item) => {
-                  const version = `v${item.version}`;
-                  const status = item.status || 'success';
-                  const doc = item.kmDocId ? `docId=${item.kmDocId}` : (item.error || '-');
-                  return `${version} | ${status} | ${item.kmTitle} | ${formatFileTime(item.syncedAt)} | ${doc}`;
-                })
-                .join('\n')
-        }</div>
+        <div class="sync-dialog-history" id="syncHistoryList">${renderSyncHistoryRows(syncStatus.history || [])}</div>
       </div>
     </div>
   `;
@@ -1492,17 +1533,7 @@ async function confirmSync() {
         time: now,
       });
       const status = await getSyncStatus(state.currentFile);
-      const historyEl = document.getElementById('syncHistoryList');
-      if (historyEl) {
-        historyEl.textContent = (status.history || [])
-          .map((item) => {
-            const version = `v${item.version}`;
-            const s = item.status || 'success';
-            const doc = item.kmDocId ? `docId=${item.kmDocId}` : (item.error || '-');
-            return `${version} | ${s} | ${item.kmTitle} | ${formatFileTime(item.syncedAt)} | ${doc}`;
-          })
-          .join('\n') || '暂无历史记录';
-      }
+      refreshSyncHistoryList(status.history || []);
       updateSyncButton();
     } else {
       const rawOutput = (typeof result.output === 'string' && result.output.trim())
@@ -1513,17 +1544,7 @@ async function confirmSync() {
         output: rawOutput,
       });
       const status = await getSyncStatus(state.currentFile);
-      const historyEl = document.getElementById('syncHistoryList');
-      if (historyEl) {
-        historyEl.textContent = (status.history || [])
-          .map((item) => {
-            const version = `v${item.version}`;
-            const s = item.status || 'success';
-            const doc = item.kmDocId ? `docId=${item.kmDocId}` : (item.error || '-');
-            return `${version} | ${s} | ${item.kmTitle} | ${formatFileTime(item.syncedAt)} | ${doc}`;
-          })
-          .join('\n') || '暂无历史记录';
-      }
+      refreshSyncHistoryList(status.history || []);
     }
   } catch (err: any) {
     setSyncDialogStatus('error', {

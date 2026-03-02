@@ -1434,6 +1434,92 @@ export const styles = `
       margin-top: 0;
       position: relative;
     }
+    .sync-dialog-history {
+      background: #fff;
+      border: none;
+      border-radius: 0;
+      max-height: 220px;
+      overflow: auto;
+    }
+    .sync-history-empty {
+      padding: 10px;
+      font-size: 12px;
+      color: #6b7280;
+    }
+    .sync-history-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 12px;
+      color: #374151;
+    }
+    .sync-history-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      text-align: left;
+      font-weight: 600;
+      color: #6b7280;
+      background: #f8fafc;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 7px 8px;
+    }
+    .sync-history-table td {
+      border-bottom: 1px solid #f0f2f5;
+      padding: 7px 8px;
+      vertical-align: top;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+    .sync-history-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .sync-history-col-version {
+      width: 56px;
+      color: #6b7280;
+    }
+    .sync-history-col-status {
+      width: 64px;
+    }
+    .sync-history-col-time {
+      width: 136px;
+      color: #6b7280;
+      white-space: nowrap;
+    }
+    .sync-history-col-doc {
+      width: 150px;
+    }
+    .sync-history-status {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 38px;
+      height: 20px;
+      border-radius: 999px;
+      padding: 0 8px;
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 20px;
+    }
+    .sync-history-status.is-success {
+      background: #ecfdf3;
+      color: #166534;
+    }
+    .sync-history-status.is-failed {
+      background: #fef2f2;
+      color: #b42318;
+    }
+    .sync-history-link {
+      color: #0969da;
+      text-decoration: none;
+      border-bottom: 1px dashed rgba(9, 105, 218, 0.35);
+    }
+    .sync-history-link:hover {
+      border-bottom-color: #0969da;
+    }
+    .sync-history-error {
+      color: #b42318;
+    }
     .sync-dialog-output-header {
       display: flex;
       justify-content: space-between;

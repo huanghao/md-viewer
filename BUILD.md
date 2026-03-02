@@ -30,7 +30,7 @@ mdv-admin --help               # Show admin CLI usage
 - `bun link` registers the package and creates `mdv` and `mdv-admin` commands
 - `bun install` triggers the postinstall hook which installs `mdv-iterm2-dispatcher`
 - The dispatcher script is only needed if you want to use iTerm2 Semantic History (Cmd+click)
-- See `docs/design/iterm2-integration.md` for iTerm2 configuration
+- See `docs/design/20260301-iterm2-integration.md` for iTerm2 configuration
 
 ### CLI Usage
 

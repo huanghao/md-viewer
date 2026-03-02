@@ -19,17 +19,25 @@
 ## 2. 专题与设计文档
 
 - [design/](./design/)
-- [testing-filewatcher-plan](./testing-filewatcher-plan.md)
-- [testing-e2e-user-story](./testing-e2e-user-story.md)
 - [state-model-session-vs-workspace](./state-model-session-vs-workspace.md)
-- [state-sync-risk-analysis](./state-sync-risk-analysis.md)
 
-## 3. 协作与流程
+## 3. 测试与调研（进行中）
+
+- [testing/README](./testing/README.md)
+- [research/README](./research/README.md)
+
+## 4. 协作与流程
 
 - [multi-agent-collaboration](./multi-agent-collaboration.md)
 - [tasks_dashboard](./tasks_dashboard.md)
 
-## 4. 定期整理规范（建议执行）
+## 5. 归档文档（历史记录）
+
+- [archive/README](./archive/README.md)
+- [archive/2026-02](./archive/2026-02/README.md)
+- [archive/2026-03](./archive/2026-03/README.md)
+
+## 6. 定期整理规范（建议执行）
 
 - 详细规则见：[文档治理规范](./文档治理规范.md)
 - 新文档建议使用：[文档模板](./文档模板.md)

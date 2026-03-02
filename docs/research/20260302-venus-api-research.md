@@ -189,7 +189,7 @@ flowchart TD
 
 | 标题 | 链接 | 说明 |
 |---|---|---|
-| [Venus 调研补充（本页）](./venus-api-research.md) | `docs/venus-api-research.md` | 当前汇总文档 |
+| [Venus 调研补充（本页）](./20260302-venus-api-research.md) | `docs/research/20260302-venus-api-research.md` | 当前汇总文档 |
 | [美团技术：数据安全保护新探索（水印背景）](https://tech.meituan.com/2018/05/20/data-security-protection-new-exploration.html) | 外部公开文章 | 水印与溯源背景 |
 | [AWS：Serverless File Processing](https://docs.aws.amazon.com/lambda/latest/dg/file-processing-app.html) | 官方文档 | 上传后异步处理参考架构 |
 | [Cloudinary：On-the-fly vs Eager Transformations](https://support.cloudinary.com/hc/en-us/articles/202521172-Should-I-use-on-the-fly-or-eager-transformations) | 官方支持文档 | 实时处理两种模式对比 |

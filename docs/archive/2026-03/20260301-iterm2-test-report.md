@@ -84,7 +84,7 @@ which mdv-iterm2-dispatcher
    - 测试路径解析
    - 测试文件类型判断
 
-3. **`docs/iterm2-manual-test.md`** - 手动测试指南
+3. **`docs/testing/20260301-iterm2-manual-test.md`** - 手动测试指南
    - 7 个测试场景
    - 详细的操作步骤
    - 预期结果说明
@@ -145,7 +145,7 @@ which mdv-iterm2-dispatcher
 3. ⏳ 验证浏览器中的 MD Viewer 是否正确打开
 4. ⏳ 测试多次点击是否正确切换文件
 
-**测试指南**: 见 `docs/iterm2-manual-test.md`
+**测试指南**: 见 `docs/testing/20260301-iterm2-manual-test.md`
 
 ---
 
@@ -194,7 +194,7 @@ which mdv-iterm2-dispatcher
 
 下一步：
 1. 用户按照 `docs/design/iterm2-integration.md` 配置 iTerm2
-2. 按照 `docs/iterm2-manual-test.md` 进行手动测试
+2. 按照 `docs/testing/20260301-iterm2-manual-test.md` 进行手动测试
 3. 收集反馈，必要时调整
 
 ---

@@ -443,6 +443,6 @@ mdv-iterm2-dispatcher \1 \5
 
 ## 相关文档
 
-- **快速总结**：`docs/iterm2-integration-summary.md`
+- **快速总结**：`docs/archive/2026-03/20260301-iterm2-integration-summary.md`
 - **构建文档**：`BUILD.md`（安装说明）
 - **iTerm2 官方文档**：https://iterm2.com/documentation-preferences-profiles-advanced.html

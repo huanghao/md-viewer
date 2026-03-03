@@ -31,24 +31,24 @@ echo ""
 
 # 检查 3: dispatcher 脚本
 echo "3. 检查 mdv-iterm2-dispatcher 脚本..."
-if [[ -x "$HOME/bin/mdv-iterm2-dispatcher" ]]; then
-  echo "   ✅ dispatcher 已安装: $HOME/bin/mdv-iterm2-dispatcher"
+if command -v mdv-iterm2-dispatcher >/dev/null 2>&1; then
+  echo "   ✅ dispatcher 已安装: $(which mdv-iterm2-dispatcher)"
 else
-  echo "   ❌ dispatcher 未安装或没有执行权限"
-  echo "      请运行: bun install"
+  echo "   ❌ dispatcher 未安装"
+  echo "      请运行: bun link"
   EXIT_CODE=1
 fi
 echo ""
 
-# 检查 4: ~/bin 是否在 PATH 中
-echo "4. 检查 ~/bin 是否在 PATH 中..."
-if [[ ":$PATH:" == *":$HOME/bin:"* ]]; then
-  echo "   ✅ ~/bin 在 PATH 中"
+# 检查 4: ~/.bun/bin 是否在 PATH 中
+echo "4. 检查 ~/.bun/bin 是否在 PATH 中..."
+if [[ ":$PATH:" == *":$HOME/.bun/bin:"* ]]; then
+  echo "   ✅ ~/.bun/bin 在 PATH 中"
 else
-  echo "   ⚠️  ~/bin 不在 PATH 中"
+  echo "   ⚠️  ~/.bun/bin 不在 PATH 中"
   echo "      dispatcher 可能无法被 iTerm2 找到"
   echo "      请添加到 ~/.zshrc 或 ~/.bashrc:"
-  echo "      export PATH=\"\$HOME/bin:\$PATH\""
+  echo "      export PATH=\"\$HOME/.bun/bin:\$PATH\""
   EXIT_CODE=1
 fi
 echo ""
@@ -68,7 +68,7 @@ echo "6. 测试 dispatcher 功能..."
 TEST_FILE="/tmp/test-mdv-$$.md"
 echo "# Test" > "$TEST_FILE"
 
-if "$HOME/bin/mdv-iterm2-dispatcher" "$TEST_FILE" "/tmp" 2>&1 | grep -q "已添加\|添加并切换"; then
+if mdv-iterm2-dispatcher "$TEST_FILE" "/tmp" 2>&1 | grep -q "已添加\|添加并切换"; then
   echo "   ✅ dispatcher 工作正常"
 else
   echo "   ❌ dispatcher 测试失败"
@@ -94,7 +94,8 @@ if [[ $EXIT_CODE -eq 0 ]]; then
   echo "     - Cmd+点击 README.md"
   echo "     - 应该在浏览器中打开 MD Viewer"
   echo ""
-  echo "详细说明: docs/design/iterm2-integration.md"
+  echo "快速指南: docs/design/iTerm2-配置步骤.md"
+  echo "完整文档: docs/design/20260301-iterm2-integration.md"
 else
   echo "❌ 有些检查未通过，请先解决上述问题"
 fi

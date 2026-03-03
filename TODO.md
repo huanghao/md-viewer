@@ -88,23 +88,26 @@
 
 
 
-## 优化在iterm2中的体验 [✅完成 - 2026-03-01]
+## 优化在iterm2中的体验 [✅完成 - 2026-03-04]
 展示在iterm2输出中的md文件名，我可以直接到mdv中打开吗？
 - 完整文档：docs/design/20260301-iterm2-integration.md（设计+配置+示例）
 - **推荐方案：Semantic History + Dispatcher（方案 A）**
   - ✅ 体验最好 - Cmd+点击即可
   - ✅ 路径兼容性强 - 支持绝对路径、相对路径、basename
-  - ✅ 自动安装 - `bun link` 自动部署 dispatcher 到 ~/bin/
+  - ✅ 自动安装 - `bun link` 自动部署到 ~/.bun/bin/
   - ✅ 完善回退 - 非 .md 文件使用系统默认行为
-- **备选方案：Smart Selection（方案 C）**
+- **备选方案：Smart Selection（方案 B）**
   - ✅ 侵入性最低 - 只匹配 .md 文件，右键菜单触发
 - 实施内容：
   - ✅ Dispatcher 脚本（处理 \1 和 \5 参数）
-  - ✅ 安装脚本（自动部署到 ~/bin/）
-  - ✅ postinstall 钩子（bun link 自动安装）
-  - ✅ 测试脚本（验证各种路径格式）
+  - ✅ 动态查找 mdv 命令（不硬编码路径）
+  - ✅ 清理调试日志
+  - ✅ 通过 package.json bin 字段自动安装
+  - ✅ 测试验证（2026-03-04）
   - ✅ 完整文档（配置步骤、参数说明、示例）
-- 状态：代码完成，文档完成，等待用户配置和验收
+  - ✅ 修复报告：docs/design/20260304-iterm2-integration-fix.md
+- 状态：✅ 代码完成，测试通过，文档完善
+- 下一步：用户在 iTerm2 中配置并验证
 
 
 ## 设计统一的UI样式 [⏳等待 - 2026-03-01]

@@ -880,8 +880,15 @@ export const styles = `
     /* 标签页 */
     .tabs {
       display: flex;
+      align-items: stretch;
       background: #f6f8fa;
       border-bottom: 1px solid #e1e4e8;
+      overflow: visible;
+    }
+    .tabs-scroll {
+      display: flex;
+      flex: 1;
+      min-width: 0;
       overflow-x: auto;
     }
     .tab {
@@ -916,6 +923,172 @@ export const styles = `
       background: #ff4444;
       color: white;
       border-radius: 4px;
+    }
+    .tab-manager-wrap {
+      position: relative;
+      flex-shrink: 0;
+      border-left: 1px solid #e1e4e8;
+    }
+    .tab-manager-toggle {
+      height: 100%;
+      min-height: 36px;
+      padding: 0 12px;
+      border: none;
+      border-radius: 0;
+      border-left: 1px solid transparent;
+      background: #f6f8fa;
+      color: #4b5563;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .tab-manager-toggle:hover,
+    .tab-manager-toggle.active {
+      background: #fff;
+      color: #0969da;
+    }
+    .tab-manager-panel {
+      display: none;
+      position: absolute;
+      right: 6px;
+      top: calc(100% + 6px);
+      width: 320px;
+      max-height: 380px;
+      padding: 10px;
+      border: 1px solid #d0d7de;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+      z-index: 2100;
+    }
+    .tab-manager-panel.show {
+      display: block;
+    }
+    .tab-manager-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .tab-manager-actions-row {
+      flex-wrap: wrap;
+    }
+    .tab-manager-action {
+      border: 1px solid #d1d5da;
+      border-radius: 6px;
+      background: #fff;
+      color: #334155;
+      font-size: 12px;
+      padding: 4px 8px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .tab-manager-action:hover {
+      border-color: #0969da;
+      color: #0969da;
+      background: #eff6ff;
+    }
+    .tab-manager-action.danger:hover {
+      border-color: #ef4444;
+      color: #b42318;
+      background: #fff1f2;
+    }
+    .tab-manager-search {
+      width: 100%;
+      padding: 7px 9px;
+      border: 1px solid #d1d5da;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    .tab-manager-search:focus {
+      outline: none;
+      border-color: #0969da;
+      box-shadow: 0 0 0 2px rgba(9, 105, 218, 0.12);
+    }
+    .tab-manager-sort {
+      border: 1px solid #d1d5da;
+      border-radius: 6px;
+      background: #fff;
+      color: #374151;
+      font-size: 12px;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+    .tab-manager-sort.active {
+      border-color: #0969da;
+      color: #0969da;
+      background: #eef6ff;
+    }
+    .tab-manager-list {
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      overflow: auto;
+      max-height: 280px;
+    }
+    .tab-manager-empty {
+      padding: 12px;
+      color: #6b7280;
+      font-size: 12px;
+      text-align: center;
+    }
+    .tab-manager-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 10px;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .tab-manager-item:last-child {
+      border-bottom: none;
+    }
+    .tab-manager-item:hover {
+      background: #f8fafc;
+    }
+    .tab-manager-item.active {
+      background: #eff6ff;
+    }
+    .tab-manager-name {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #1f2937;
+    }
+    .tab-manager-actions {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tab-manager-status {
+      display: inline-block;
+      min-width: 14px;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .tab-manager-status.status-modified {
+      color: #9a6700;
+    }
+    .tab-manager-status.status-deleted {
+      color: #b42318;
+    }
+    .tab-manager-close {
+      width: 20px;
+      height: 20px;
+      border: 1px solid #d1d5da;
+      border-radius: 4px;
+      background: #fff;
+      color: #6b7280;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0;
+    }
+    .tab-manager-close:hover {
+      border-color: #ef4444;
+      color: #ef4444;
     }
 
     /* 文件类型徽章 */

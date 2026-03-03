@@ -5,6 +5,7 @@ import { escapeAttr, escapeHtml } from '../utils/escape';
 import { generateDistinctNames } from '../utils/file-names';
 import { getFileListStatus } from '../utils/file-status';
 import { getFileTypeIcon } from '../utils/file-type';
+import { getTabBatchTargets, type TabBatchAction } from '../utils/tab-batch';
 import { renderWorkspaceSidebar, bindWorkspaceEvents } from './sidebar-workspace';
 
 let lastEscAt = 0;
@@ -15,9 +16,11 @@ let tabManagerQuery = '';
 let tabManagerSort: 'recent' | 'name' = 'recent';
 let tabManagerGlobalBound = false;
 let tabManagerListScrollTop = 0;
+let tabsScrollLeft = 0;
+let tabsScrollHandlerBound = false;
+let lastTabsRenderKey = '';
 const tabAccessOrder: string[] = [];
 import { attachPathAutocomplete } from './path-autocomplete';
-type TabBatchAction = 'close-others' | 'close-right' | 'close-unmodified' | 'close-all';
 
 // 将当前打开的文件滚动到侧边栏40%位置
 function scrollCurrentFileIntoView(container: HTMLElement): void {
@@ -97,32 +100,37 @@ function ensureTabManagerGlobalEvents(): void {
   });
 }
 
-function getTabBatchTargets(action: TabBatchAction, filesWithDisplay: ReturnType<typeof generateDistinctNames>): string[] {
-  const currentPath = state.currentFile;
-  if (!currentPath || filesWithDisplay.length === 0) return [];
+function ensureTabsScrollHandler(): void {
+  if (tabsScrollHandlerBound) return;
+  tabsScrollHandlerBound = true;
 
-  if (action === 'close-others' || action === 'close-all') {
-    return filesWithDisplay.filter((f) => f.path !== currentPath).map((f) => f.path);
-  }
+  const container = document.getElementById('tabs');
+  if (!container) return;
 
-  if (action === 'close-right') {
-    const currentIndex = filesWithDisplay.findIndex((f) => f.path === currentPath);
-    if (currentIndex < 0) return [];
-    return filesWithDisplay.slice(currentIndex + 1).map((f) => f.path);
-  }
-
-  return filesWithDisplay
-    .filter((f) => {
-      if (f.path === currentPath) return false;
-      const status = getFileListStatus(f, hasListDiff(f.path));
-      return status.type === 'normal' || status.type === 'new';
-    })
-    .map((f) => f.path);
+  // 使用事件委托，只绑定一次
+  container.addEventListener('scroll', (event) => {
+    const target = event.target as HTMLElement;
+    if (target.classList.contains('tabs-scroll')) {
+      tabsScrollLeft = target.scrollLeft;
+    } else if (target.classList.contains('tab-manager-list')) {
+      tabManagerListScrollTop = target.scrollTop;
+    }
+  }, { passive: true, capture: true });
 }
 
 function applyTabBatchAction(action: TabBatchAction): void {
   const filesWithDisplay = generateDistinctNames(state.sessionFiles);
-  const targets = getTabBatchTargets(action, filesWithDisplay);
+  const targets = getTabBatchTargets(
+    action,
+    filesWithDisplay,
+    state.currentFile,
+    (path) => {
+      const file = filesWithDisplay.find((f) => f.path === path);
+      if (!file) return false;
+      const status = getFileListStatus(file, hasListDiff(file.path));
+      return status.type === 'normal' || status.type === 'new';
+    }
+  );
   const removeHandler = (window as any).removeFile as ((path: string) => void) | undefined;
   if (!removeHandler || targets.length === 0) {
     renderTabs();
@@ -408,22 +416,58 @@ export function renderTabs(): void {
   const container = document.getElementById('tabs');
   if (!container) return;
   ensureTabManagerGlobalEvents();
+  ensureTabsScrollHandler();
 
+  // 保存 tab-manager-list 的滚动位置
   const prevList = container.querySelector('.tab-manager-list') as HTMLElement | null;
   if (prevList) {
     tabManagerListScrollTop = prevList.scrollTop;
+  }
+
+  // 保存 tabs-scroll 的滚动位置
+  const prevTabsScroll = container.querySelector('.tabs-scroll') as HTMLElement | null;
+  if (prevTabsScroll) {
+    tabsScrollLeft = prevTabsScroll.scrollLeft;
   }
 
   if (allFiles.length === 0) {
     container.innerHTML = '';
     container.style.display = 'none';
     tabManagerOpen = false;
+    lastTabsRenderKey = '';
     return;
   }
 
+  const filesWithDisplay = generateDistinctNames(state.sessionFiles);
+  const tabsRenderSnapshot = filesWithDisplay
+    .map((file) => {
+      const status = getFileListStatus(file, hasListDiff(file.path));
+      return [
+        file.path,
+        file.displayName || file.name,
+        file.isMissing ? '1' : '0',
+        file.path === state.currentFile ? '1' : '0',
+        status.type,
+        status.badge || ''
+      ].join('|');
+    })
+    .join('||');
+  const nextTabsRenderKey = [
+    state.currentFile || '',
+    tabManagerOpen ? '1' : '0',
+    tabManagerSort,
+    tabManagerQuery,
+    tabsRenderSnapshot
+  ].join('###');
+
+  // 当 tabs 可见数据没有变化时，避免重复重建 DOM 导致滚动条闪烁
+  if (nextTabsRenderKey === lastTabsRenderKey) {
+    return;
+  }
+  lastTabsRenderKey = nextTabsRenderKey;
+
   touchTabAccess(state.currentFile);
   container.style.display = 'flex';
-  const filesWithDisplay = generateDistinctNames(state.sessionFiles);
 
   const tabsHtml = filesWithDisplay
     .map(file => {
@@ -481,16 +525,21 @@ export function renderTabs(): void {
       }).join('');
 
   const batchCount = {
-    others: getTabBatchTargets('close-others', filesWithDisplay).length,
-    right: getTabBatchTargets('close-right', filesWithDisplay).length,
-    unmodified: getTabBatchTargets('close-unmodified', filesWithDisplay).length,
-    all: getTabBatchTargets('close-all', filesWithDisplay).length,
+    others: getTabBatchTargets('close-others', filesWithDisplay, state.currentFile, () => false).length,
+    right: getTabBatchTargets('close-right', filesWithDisplay, state.currentFile, () => false).length,
+    unmodified: getTabBatchTargets('close-unmodified', filesWithDisplay, state.currentFile, (path) => {
+      const file = filesWithDisplay.find((f) => f.path === path);
+      if (!file) return false;
+      const status = getFileListStatus(file, hasListDiff(file.path));
+      return status.type === 'normal' || status.type === 'new';
+    }).length,
+    all: getTabBatchTargets('close-all', filesWithDisplay, state.currentFile, () => false).length,
   };
 
   container.innerHTML = `
     <div class="tabs-scroll">${tabsHtml}</div>
     <div class="tab-manager-wrap">
-      <button class="tab-manager-toggle ${tabManagerOpen ? 'active' : ''}" type="button" onclick="event.stopPropagation();window.toggleTabManager()">≡ Tabs</button>
+      <button class="tab-manager-toggle ${tabManagerOpen ? 'active' : ''}" type="button" onclick="event.stopPropagation();window.toggleTabManager()">≡ Tabs (${filesWithDisplay.length})</button>
       <div class="tab-manager-panel ${tabManagerOpen ? 'show' : ''}" onclick="event.stopPropagation()">
         <div class="tab-manager-row tab-manager-actions-row">
           <button class="tab-manager-action" type="button" data-action="close-others" onclick="window.applyTabBatchAction('close-others')">关闭其他 (${batchCount.others})</button>
@@ -510,11 +559,16 @@ export function renderTabs(): void {
     </div>
   `;
 
-  const listEl = container.querySelector('.tab-manager-list') as HTMLElement | null;
-  if (listEl) {
-    listEl.scrollTop = tabManagerListScrollTop;
-    listEl.addEventListener('scroll', () => {
-      tabManagerListScrollTop = listEl.scrollTop;
-    });
-  }
+  // 使用 requestAnimationFrame 延迟恢复滚动位置，避免闪烁
+  requestAnimationFrame(() => {
+    const listEl = container.querySelector('.tab-manager-list') as HTMLElement | null;
+    if (listEl && tabManagerListScrollTop > 0) {
+      listEl.scrollTop = tabManagerListScrollTop;
+    }
+
+    const tabsScrollEl = container.querySelector('.tabs-scroll') as HTMLElement | null;
+    if (tabsScrollEl && tabsScrollLeft > 0) {
+      tabsScrollEl.scrollLeft = tabsScrollLeft;
+    }
+  });
 }

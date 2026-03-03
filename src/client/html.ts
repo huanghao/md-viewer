@@ -127,6 +127,17 @@ export function generateClientHTML(): string {
         </div>
       </div>
     </main>
+
+    <!-- 批注侧边栏 -->
+    <aside class="annotation-sidebar" id="annotationSidebar">
+      <div class="annotation-sidebar-header">
+        <h3>批注列表</h3>
+        <span class="annotation-tip">选中文本即可添加批注</span>
+      </div>
+      <div class="annotation-list" id="annotationList">
+        <div class="annotation-empty">无批注（选中文本即可添加）</div>
+      </div>
+    </aside>
   </div>
 
   <!-- 同步对话框 -->
@@ -139,6 +150,32 @@ export function generateClientHTML(): string {
       <div class="sync-dialog-body" id="syncDialogBody">
         <!-- 动态内容 -->
       </div>
+    </div>
+  </div>
+
+  <!-- 批注创建浮窗 -->
+  <div id="annotationComposer" class="annotation-composer hidden">
+    <div class="annotation-composer-header">
+      <div class="annotation-composer-title">添加批注</div>
+    </div>
+    <div id="composerQuote" class="annotation-composer-quote"></div>
+    <textarea id="composerNote" rows="3" placeholder="输入批注内容..."></textarea>
+    <div class="annotation-composer-actions">
+      <button id="composerCancelBtn" class="annotation-btn">取消</button>
+      <button id="composerSaveBtn" class="annotation-btn annotation-btn-primary">保存</button>
+    </div>
+  </div>
+
+  <!-- 批注查看浮窗 -->
+  <div id="annotationPopover" class="annotation-popover hidden">
+    <div class="annotation-popover-header">
+      <div class="annotation-popover-title">批注</div>
+      <button id="popoverCloseBtn" class="annotation-btn annotation-btn-icon">×</button>
+    </div>
+    <div id="popoverQuote" class="annotation-popover-quote"></div>
+    <div id="popoverNote" class="annotation-popover-note"></div>
+    <div class="annotation-popover-actions">
+      <button id="popoverDeleteBtn" class="annotation-btn annotation-btn-danger">删除批注</button>
     </div>
   </div>
 

@@ -2392,4 +2392,200 @@ export const styles = `
     }
 
     /* 设置按钮已统一为 toolbar-button 样式 */
+
+    /* ==================== 圈点批注功能 ==================== */
+
+    /* 批注侧边栏 */
+    .annotation-sidebar {
+      width: 280px;
+      background: #f6f8fa;
+      border-left: 1px solid #e1e4e8;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .annotation-sidebar-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid #e1e4e8;
+      background: #fff;
+    }
+    .annotation-sidebar-header h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #24292e;
+      margin: 0 0 4px 0;
+    }
+    .annotation-tip {
+      font-size: 12px;
+      color: #57606a;
+    }
+    .annotation-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+    .annotation-empty {
+      padding: 20px;
+      text-align: center;
+      color: #6a737d;
+      font-size: 13px;
+    }
+    .annotation-item {
+      background: #fff;
+      border: 1px solid #e1e4e8;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .annotation-item:hover {
+      border-color: #0969da;
+      box-shadow: 0 2px 8px rgba(9, 105, 218, 0.1);
+    }
+    .annotation-quote {
+      font-size: 12px;
+      color: #57606a;
+      margin-bottom: 8px;
+      padding: 8px;
+      background: #fff8c5;
+      border-radius: 4px;
+      line-height: 1.4;
+    }
+    .annotation-note {
+      font-size: 13px;
+      color: #24292e;
+      line-height: 1.5;
+      margin-bottom: 8px;
+    }
+    .annotation-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .annotation-btn {
+      padding: 4px 10px;
+      font-size: 12px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      background: #fff;
+      color: #24292e;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .annotation-btn:hover {
+      background: #f6f8fa;
+      border-color: #b6bec7;
+    }
+    .annotation-btn-primary {
+      background: #0969da;
+      border-color: #0969da;
+      color: #fff;
+    }
+    .annotation-btn-primary:hover {
+      background: #0550ae;
+      border-color: #0550ae;
+    }
+    .annotation-btn-danger {
+      color: #cf222e;
+      border-color: #cf222e;
+    }
+    .annotation-btn-danger:hover {
+      background: #ffebe9;
+    }
+    .annotation-btn-icon {
+      padding: 2px 6px;
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    /* 批注高亮标记 */
+    .annotation-mark {
+      background: #ffe9a8;
+      border-bottom: 2px solid #e3a000;
+      border-radius: 2px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .annotation-mark:hover {
+      background: #ffe08a;
+    }
+
+    /* 批注浮窗 */
+    .annotation-composer,
+    .annotation-popover {
+      position: fixed;
+      z-index: 9999;
+      width: 360px;
+      background: #fff;
+      border: 1px solid #d0d7de;
+      border-radius: 12px;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+      padding: 16px;
+    }
+    .annotation-composer.hidden,
+    .annotation-popover.hidden {
+      display: none;
+    }
+    .annotation-composer-header,
+    .annotation-popover-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .annotation-composer-title,
+    .annotation-popover-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #24292e;
+    }
+    .annotation-composer-quote,
+    .annotation-popover-quote {
+      padding: 10px;
+      background: #fff8c5;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #5a4b2e;
+      margin-bottom: 12px;
+      max-height: 80px;
+      overflow-y: auto;
+      line-height: 1.4;
+    }
+    .annotation-composer textarea {
+      width: 100%;
+      min-height: 80px;
+      padding: 10px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      font-size: 14px;
+      resize: vertical;
+      margin-bottom: 12px;
+      font-family: inherit;
+    }
+    .annotation-composer textarea:focus {
+      outline: none;
+      border-color: #0969da;
+      box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
+    }
+    .annotation-popover-note {
+      font-size: 14px;
+      color: #24292e;
+      line-height: 1.6;
+      margin-bottom: 12px;
+      white-space: pre-wrap;
+    }
+    .annotation-composer-actions,
+    .annotation-popover-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    /* 响应式：窄屏时隐藏批注侧边栏 */
+    @media (max-width: 1200px) {
+      .annotation-sidebar {
+        display: none;
+      }
+    }
 `;

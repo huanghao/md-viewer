@@ -21,6 +21,15 @@ import { renderSidebar } from './ui/sidebar';
 import { showToast, showSuccess, showError, showWarning, showInfo } from './ui/toast';
 import { showSettingsDialog } from './ui/settings';
 
+// 导入批注功能
+import {
+  initAnnotationElements,
+  applyAnnotations,
+  renderAnnotationList,
+  handleSelectionForAnnotation,
+  setAnnotations,
+} from './annotation';
+
 const SIDEBAR_WIDTH_STORAGE_KEY = 'md-viewer:sidebar-width';
 const SIDEBAR_DEFAULT_WIDTH = 260;
 const SIDEBAR_MIN_WIDTH = 220;
@@ -469,9 +478,13 @@ function renderContent() {
       </div>
     `
     : '';
-  container.innerHTML = `${deletedNotice}<div class="markdown-body">${html}</div>`;
+  container.innerHTML = `${deletedNotice}<div class="markdown-body" id="reader">${html}</div>`;
+  container.setAttribute('data-current-file', file.path);
   rewriteMarkdownAssetUrls(container, file.path);
   void renderMermaidDiagrams(container);
+
+  // 应用批注高亮
+  applyAnnotations();
 
   // 更新文件元信息（仅显示相对时间）
   const meta = document.getElementById('fileMeta');
@@ -788,6 +801,11 @@ function switchFile(path: string) {
   const previousFile = state.currentFile;
   switchToFile(path);
   renderSidebar();
+
+  // 加载新文件的批注
+  setAnnotations(path);
+  renderAnnotationList(path);
+
   renderContent();
   if (previousFile !== path) {
     scrollContentToTop();
@@ -2003,12 +2021,22 @@ function startWorkspacePolling() {
   // 初始化字体缩放
   initFontScale();
 
+  // 初始化批注功能
+  initAnnotationElements();
+
   await restoreState(loadFile);
   await hydrateExpandedWorkspaces();
   startWorkspacePolling();
 
   // 根据配置渲染侧边栏
   renderSidebar();
+
+  // 加载当前文件的批注
+  if (state.currentFile) {
+    setAnnotations(state.currentFile);
+    renderAnnotationList(state.currentFile);
+  }
+
   renderContent();
 
   setupDragAndDrop();
@@ -2023,6 +2051,13 @@ function startWorkspacePolling() {
   });
   handleURLParams();
   setupKeyboardShortcuts();
+
+  // 添加批注文本选中监听
+  document.addEventListener('mouseup', () => {
+    setTimeout(() => {
+      handleSelectionForAnnotation(state.currentFile);
+    }, 0);
+  });
 
   // 页面刷新时，自动刷新当前正在展示的文件
   await refreshCurrentFile();

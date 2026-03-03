@@ -2152,32 +2152,13 @@ export const styles = `
       align-items: center;
       overflow: hidden;
       min-height: 20px;
-      gap: 1px;
     }
     .tree-name-full {
       min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .tree-name-head {
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
       flex: 1 1 auto;
-    }
-    .tree-name-ellipsis {
-      flex: 0 0 auto;
-      color: #6b7280;
-      line-height: 1;
-    }
-    .tree-name-tail {
-      flex: 0 0 auto;
-      white-space: nowrap;
-      max-width: 70%;
       overflow: hidden;
       text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .tree-count {
@@ -2404,26 +2385,80 @@ export const styles = `
       flex-direction: column;
       min-height: 0;
       overflow: hidden;
+      transition: width 0.3s ease, transform 0.3s ease;
+    }
+    .annotation-sidebar.collapsed {
+      width: 40px;
     }
     .annotation-sidebar-header {
       padding: 12px 16px;
       border-bottom: 1px solid #e1e4e8;
       background: #fff;
+      transition: padding 0.3s ease;
+    }
+    .annotation-sidebar.collapsed .annotation-sidebar-header {
+      padding: 12px 8px;
+    }
+    .annotation-sidebar-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
     }
     .annotation-sidebar-header h3 {
       font-size: 14px;
       font-weight: 600;
       color: #24292e;
-      margin: 0 0 4px 0;
+      margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      transition: opacity 0.2s ease;
+    }
+    .annotation-sidebar.collapsed .annotation-sidebar-header h3 {
+      opacity: 0;
+      width: 0;
+    }
+    .annotation-sidebar-toggle {
+      padding: 4px 8px;
+      background: transparent;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      cursor: pointer;
+      color: #57606a;
+      font-size: 18px;
+      line-height: 1;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    .annotation-sidebar-toggle:hover {
+      background: #f6f8fa;
+      border-color: #0969da;
+      color: #0969da;
+    }
+    .annotation-sidebar.collapsed .annotation-sidebar-toggle .toggle-icon {
+      transform: rotate(180deg);
+      display: inline-block;
     }
     .annotation-tip {
       font-size: 12px;
       color: #57606a;
+      white-space: nowrap;
+      overflow: hidden;
+      transition: opacity 0.2s ease;
+    }
+    .annotation-sidebar.collapsed .annotation-tip {
+      opacity: 0;
+      height: 0;
     }
     .annotation-list {
       flex: 1;
       overflow-y: auto;
       padding: 12px;
+      transition: opacity 0.2s ease;
+    }
+    .annotation-sidebar.collapsed .annotation-list {
+      opacity: 0;
+      pointer-events: none;
     }
     .annotation-empty {
       padding: 20px;
@@ -2443,6 +2478,25 @@ export const styles = `
     .annotation-item:hover {
       border-color: #0969da;
       box-shadow: 0 2px 8px rgba(9, 105, 218, 0.1);
+    }
+    .annotation-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .annotation-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 32px;
+      height: 20px;
+      padding: 0 6px;
+      background: #0969da;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 10px;
+      line-height: 1;
     }
     .annotation-quote {
       font-size: 12px;

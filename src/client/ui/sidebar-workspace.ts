@@ -4,6 +4,7 @@ import { hasListDiff, isWorkspacePathMissing, getWorkspaceMissingPaths, getKnown
 import { escapeHtml, escapeAttr } from '../utils/escape';
 import { getFileListStatus } from '../utils/file-status';
 import { getFileTypeIcon } from '../utils/file-type';
+import { stripWorkspaceTreeDisplayExtension } from '../utils/workspace-file-name';
 import { showError, showSuccess, showWarning } from './toast';
 import { attachPathAutocomplete } from './path-autocomplete';
 import {
@@ -28,27 +29,10 @@ function getWorkspaceNameFromPath(path: string): string {
   return parts[parts.length - 1] || 'workspace';
 }
 
-function splitLongFileName(name: string): { head: string; tail: string } | null {
-  if (!name || name.length <= 28) return null;
-  const tailLen = Math.min(18, Math.max(12, Math.floor(name.length * 0.45)));
-  const headLen = Math.max(8, 28 - tailLen);
-  if (name.length <= headLen + tailLen + 1) return null;
-  return {
-    head: name.slice(0, headLen),
-    tail: name.slice(-tailLen),
-  };
-}
-
 function renderFileNameWithTailPriority(name: string): string {
-  const split = splitLongFileName(name);
-  if (!split) {
-    return `<span class="tree-name-full">${escapeHtml(name)}</span>`;
-  }
-  return `
-    <span class="tree-name-head">${escapeHtml(split.head)}</span>
-    <span class="tree-name-ellipsis">…</span>
-    <span class="tree-name-tail">${escapeHtml(split.tail)}</span>
-  `;
+  // 始终保留完整文本，省略交给 CSS，避免“缩窄后放大不还原”的不可逆截断
+  const stripped = stripWorkspaceTreeDisplayExtension(name) || name;
+  return `<span class="tree-name-full">${escapeHtml(stripped)}</span>`;
 }
 
 function collectTreeFilePaths(node: FileTreeNode | undefined, bag: Set<string>): void {

@@ -139,6 +139,7 @@ async function main() {
   try {
     const shouldFocus = !options.noFocus;
     await openFile(options.host, options.port, targetPath, shouldFocus);
+    process.exit(0);
   } catch (e: any) {
     if (e.cause?.code === "ECONNREFUSED") {
       console.error(`❌ 无法连接到 Server (${options.host}:${options.port})`);

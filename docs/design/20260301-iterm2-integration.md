@@ -205,19 +205,19 @@ README.md
 
 ```bash
 # 在项目目录运行
-bun link       # 注册包，安装 mdv 和 mdv-admin
-bun install    # 触发 postinstall，安装 mdv-iterm2-dispatcher
+bun link       # 注册包，安装所有命令
 ```
 
 这会安装：
-- `mdv` 和 `mdv-admin` 命令（通过 bun link）
-- `mdv-iterm2-dispatcher` 脚本（通过 postinstall 到 ~/bin/）
+- `mdv` - 打开文件的 CLI 命令
+- `mdv-admin` - 管理命令
+- `mdv-iterm2-dispatcher` - iTerm2 集成脚本
 
 验证安装：
 ```bash
 which mdv                      # ~/.bun/bin/mdv
 which mdv-admin                # ~/.bun/bin/mdv-admin
-which mdv-iterm2-dispatcher    # ~/bin/mdv-iterm2-dispatcher
+which mdv-iterm2-dispatcher    # ~/.bun/bin/mdv-iterm2-dispatcher
 ```
 
 #### 2. 配置 iTerm2 Semantic History
@@ -414,22 +414,23 @@ mdv-iterm2-dispatcher \1 \5
 ### ✅ 已完成
 
 1. **Dispatcher 脚本** - `scripts/mdv-iterm2-dispatcher.sh`
-   - 支持 `\1` 和 `\5` 参数
-   - 处理各种路径格式（绝对、相对、basename）
-   - 文件类型判断（.md/.markdown）
-   - 完善的错误回退机制
+   - ✅ 支持 `\1` 和 `\5` 参数
+   - ✅ 处理各种路径格式（绝对、相对、basename）
+   - ✅ 文件类型判断（.md/.markdown）
+   - ✅ 完善的错误回退机制
+   - ✅ 动态查找 mdv 命令（不再硬编码路径）
+   - ✅ 移除调试日志（可选启用）
 
-2. **安装脚本** - `scripts/install-iterm2-dispatcher.sh`
-   - 自动安装到 `~/bin/`
-   - 检查文件是否已存在
-   - 检查 PATH 配置
-   - 显示配置说明
+2. **自动安装** - `package.json` bin 字段
+   - ✅ `bun link` 自动安装到 `~/.bun/bin/`
+   - ✅ 创建符号链接指向项目脚本
+   - ✅ 自动更新（修改脚本后立即生效）
 
-3. **自动安装** - `package.json` postinstall
-   - `bun link` 自动触发安装
-
-4. **测试脚本** - `scripts/test-dispatcher.sh`
-   - 验证各种路径格式
+3. **测试验证** - 2026-03-04
+   - ✅ 命令正确安装到 `~/.bun/bin/`
+   - ✅ dispatcher 工作正常
+   - ✅ 路径解析正确
+   - ✅ 文件类型判断准确
 
 ### 📋 验收标准
 
@@ -437,7 +438,7 @@ mdv-iterm2-dispatcher \1 \5
 2. ✅ 非 `.md` 点击行为保持系统默认，不被影响
 3. ✅ 支持多种路径格式（绝对、相对、basename）
 4. ✅ `mdv` 不可用或服务未启动时，行为可预期（回退）
-5. ⏳ 完成一次端到端用户验证
+5. ⏳ 完成一次端到端用户验证（需要在 iTerm2 中实际配置和测试）
 
 ---
 

@@ -66,3 +66,6 @@ export function removeWorkspaceTracking(workspaceId: string): void {
   }
 }
 
+export function getKnownWorkspacePathsSnapshot(workspaceId: string): string[] {
+  return Array.from(getKnownWorkspacePaths(workspaceId) || []);
+}

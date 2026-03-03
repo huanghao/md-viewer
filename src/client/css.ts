@@ -2116,14 +2116,13 @@ export const styles = `
       height: 1px;
     }
 
-    .tree-item .file-item-status {
-      width: 10px;
-      height: 10px;
+    .tree-item .tree-status-inline {
+      width: 14px;
+      height: 14px;
       flex-shrink: 0;
-      display: flex;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
-      margin-left: auto;
     }
 
     .tree-toggle {
@@ -2148,12 +2147,37 @@ export const styles = `
 
     .tree-name {
       flex: 1;
+      min-width: 0;
       display: inline-flex;
       align-items: center;
+      overflow: hidden;
       min-height: 20px;
+      gap: 1px;
+    }
+    .tree-name-full {
+      min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .tree-name-head {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1 1 auto;
+    }
+    .tree-name-ellipsis {
+      flex: 0 0 auto;
+      color: #6b7280;
+      line-height: 1;
+    }
+    .tree-name-tail {
+      flex: 0 0 auto;
+      white-space: nowrap;
+      max-width: 70%;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .tree-count {

@@ -2,6 +2,7 @@ export {
   hasListDiff,
   markListDiff,
   clearListDiff,
+  getKnownWorkspacePathsSnapshot,
   restoreWorkspaceAuxiliaryState,
   updateWorkspaceListDiff,
   removeWorkspaceTracking,
@@ -13,4 +14,3 @@ export {
   isWorkspacePathMissing,
   getWorkspaceMissingPaths,
 } from './workspace-state-missing';
-

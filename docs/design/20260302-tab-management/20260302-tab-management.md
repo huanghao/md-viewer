@@ -126,4 +126,5 @@
 ## 相关文档
 
 - 浏览器 tab 管理交互调研：`./20260302-browser-tab-interaction-research.md`
+- 长文件名显示策略调研：`./20260303-long-filename-display-strategy.md`
 - 原型：`./tab-management-prototype.html`

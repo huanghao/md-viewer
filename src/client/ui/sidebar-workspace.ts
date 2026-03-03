@@ -1,6 +1,6 @@
 import type { Workspace, FileTreeNode, FileInfo } from '../types';
 import { state, getSessionFile, getSessionFiles, hasSessionFile } from '../state';
-import { hasListDiff, isWorkspacePathMissing, getWorkspaceMissingPaths } from '../workspace-state';
+import { hasListDiff, isWorkspacePathMissing, getWorkspaceMissingPaths, getKnownWorkspacePathsSnapshot } from '../workspace-state';
 import { escapeHtml, escapeAttr } from '../utils/escape';
 import { getFileListStatus } from '../utils/file-status';
 import { getFileTypeIcon } from '../utils/file-type';
@@ -26,6 +26,128 @@ const failedWorkspaceIds = new Set<string>();
 function getWorkspaceNameFromPath(path: string): string {
   const parts = path.split('/').filter(Boolean);
   return parts[parts.length - 1] || 'workspace';
+}
+
+function splitLongFileName(name: string): { head: string; tail: string } | null {
+  if (!name || name.length <= 28) return null;
+  const tailLen = Math.min(18, Math.max(12, Math.floor(name.length * 0.45)));
+  const headLen = Math.max(8, 28 - tailLen);
+  if (name.length <= headLen + tailLen + 1) return null;
+  return {
+    head: name.slice(0, headLen),
+    tail: name.slice(-tailLen),
+  };
+}
+
+function renderFileNameWithTailPriority(name: string): string {
+  const split = splitLongFileName(name);
+  if (!split) {
+    return `<span class="tree-name-full">${escapeHtml(name)}</span>`;
+  }
+  return `
+    <span class="tree-name-head">${escapeHtml(split.head)}</span>
+    <span class="tree-name-ellipsis">…</span>
+    <span class="tree-name-tail">${escapeHtml(split.tail)}</span>
+  `;
+}
+
+function collectTreeFilePaths(node: FileTreeNode | undefined, bag: Set<string>): void {
+  if (!node) return;
+  if (node.type === 'file') {
+    bag.add(node.path);
+    return;
+  }
+  (node.children || []).forEach((child) => collectTreeFilePaths(child, bag));
+}
+
+function annotateDirectoryFileCount(node: FileTreeNode): number {
+  if (node.type === 'file') return 1;
+  let count = 0;
+  for (const child of node.children || []) {
+    count += annotateDirectoryFileCount(child);
+  }
+  node.fileCount = count;
+  return count;
+}
+
+function buildTreeFromPaths(workspace: Workspace, filePaths: string[]): FileTreeNode {
+  const workspacePath = workspace.path.replace(/\/+$/, '');
+  const root: FileTreeNode = {
+    name: workspace.name,
+    path: workspacePath,
+    type: 'directory',
+    isExpanded: true,
+    children: [],
+  };
+
+  const directoryMap = new Map<string, FileTreeNode>([[workspacePath, root]]);
+
+  const sortedPaths = Array.from(new Set(filePaths)).sort((a, b) => a.localeCompare(b, 'zh-CN'));
+  for (const fullPath of sortedPaths) {
+    if (!fullPath.startsWith(`${workspacePath}/`)) continue;
+    const relative = fullPath.slice(workspacePath.length + 1);
+    const parts = relative.split('/').filter(Boolean);
+    if (parts.length === 0) continue;
+
+    let currentPath = workspacePath;
+    let currentNode = root;
+
+    for (let i = 0; i < parts.length; i += 1) {
+      const part = parts[i];
+      const isFile = i === parts.length - 1;
+      currentPath = `${currentPath}/${part}`;
+
+      if (isFile) {
+        const exists = (currentNode.children || []).some((child) => child.path === currentPath);
+        if (!exists) {
+          currentNode.children!.push({
+            name: part,
+            path: currentPath,
+            type: 'file',
+          });
+        }
+      } else {
+        let dirNode = directoryMap.get(currentPath);
+        if (!dirNode) {
+          dirNode = {
+            name: part,
+            path: currentPath,
+            type: 'directory',
+            isExpanded: true,
+            children: [],
+          };
+          directoryMap.set(currentPath, dirNode);
+          currentNode.children!.push(dirNode);
+        }
+        currentNode = dirNode;
+      }
+    }
+  }
+
+  annotateDirectoryFileCount(root);
+  return root;
+}
+
+function buildSearchTree(workspace: Workspace, originalTree: FileTreeNode | undefined, query: string): FileTreeNode | undefined {
+  if (!query) return originalTree;
+  const lowerQuery = query.toLowerCase();
+  const candidates = new Set<string>();
+
+  const treePaths = new Set<string>();
+  collectTreeFilePaths(originalTree, treePaths);
+  treePaths.forEach((path) => candidates.add(path));
+  getKnownWorkspacePathsSnapshot(workspace.id).forEach((path) => candidates.add(path));
+  getSessionFiles()
+    .filter((file) => file.path.startsWith(`${workspace.path.replace(/\/+$/, '')}/`))
+    .forEach((file) => candidates.add(file.path));
+
+  const matched = Array.from(candidates).filter((path) => {
+    const basename = path.split('/').pop() || '';
+    return path.toLowerCase().includes(lowerQuery) || basename.toLowerCase().includes(lowerQuery);
+  });
+
+  if (matched.length === 0) return undefined;
+  return buildTreeFromPaths(workspace, matched);
 }
 
 function updateWorkspacePathPreview(): void {
@@ -181,7 +303,7 @@ function renderEmptyWorkspace(): string {
 function renderWorkspaceItem(workspace: Workspace, index: number, total: number, query: string): string {
   const isCurrent = state.currentWorkspace === workspace.id;
   const originalTree = state.fileTree.get(workspace.id);
-  const tree = query ? filterTreeByQuery(originalTree, query) : originalTree;
+  const tree = query ? buildSearchTree(workspace, originalTree, query) : originalTree;
   const shouldExpand = query ? true : workspace.isExpanded;
   const toggle = shouldExpand ? '▼' : '▶';
   const canMoveUp = index > 0;
@@ -336,8 +458,8 @@ function renderTreeNode(workspaceId: string, node: FileTreeNode, depth: number):
           <span class="tree-indent" style="width: ${indentPx}px"></span>
           <span class="tree-toggle"></span>
           <span class="file-type-icon ${typeIcon.cls}">${escapeHtml(typeIcon.label)}</span>
-          <span class="tree-name">${escapeHtml(node.name)}</span>
-          <span class="file-item-status">${statusBadge}</span>
+          <span class="tree-status-inline">${statusBadge}</span>
+          <span class="tree-name" title="${escapeAttr(node.name)}">${renderFileNameWithTailPriority(node.name)}</span>
         </div>
       </div>
     `;
@@ -363,15 +485,6 @@ function renderTreeNode(workspaceId: string, node: FileTreeNode, depth: number):
       ` : ''}
     </div>
   `;
-}
-
-function collectTreeFilePaths(node: FileTreeNode | undefined, bag: Set<string>): void {
-  if (!node) return;
-  if (node.type === 'file') {
-    bag.add(node.path);
-    return;
-  }
-  (node.children || []).forEach((child) => collectTreeFilePaths(child, bag));
 }
 
 // 文件已从磁盘删除后，不会出现在扫描树里；这里保留一个特殊区块给重试/关闭操作。
@@ -430,8 +543,8 @@ function renderMissingOpenFiles(workspaceId: string, workspacePath: string, tree
             <span class="tree-indent" style="width: 12px"></span>
             <span class="tree-toggle"></span>
             <span class="file-type-icon ${typeIcon.cls}">${escapeHtml(typeIcon.label)}</span>
-            <span class="tree-name">${escapeHtml(row.name)}</span>
-            <span class="file-item-status"><span class="status-badge status-deleted">D</span></span>
+            <span class="tree-status-inline"><span class="status-badge status-deleted">D</span></span>
+            <span class="tree-name" title="${escapeAttr(row.name)}">${renderFileNameWithTailPriority(row.name)}</span>
             ${row.hasRetry ? `<button class="tree-inline-action" title="重试加载" onclick="event.stopPropagation(); handleRetryMissingFile('${escapeAttr(row.path)}')">↻</button>` : ''}
             ${row.hasClose ? `<button class="tree-inline-action danger" title="关闭文件" onclick="event.stopPropagation(); handleCloseFile('${escapeAttr(row.path)}')">×</button>` : ''}
           </div>
@@ -439,29 +552,6 @@ function renderMissingOpenFiles(workspaceId: string, workspacePath: string, tree
       }).join('')}
     </div>
   `;
-}
-
-function filterTreeByQuery(tree: FileTreeNode | undefined, query: string): FileTreeNode | undefined {
-  if (!tree || !query) return tree;
-
-  const selfMatched = tree.name.toLowerCase().includes(query) || tree.path.toLowerCase().includes(query);
-  if (tree.type === 'file') {
-    return selfMatched ? { ...tree } : undefined;
-  }
-
-  const children = (tree.children || [])
-    .map((child) => filterTreeByQuery(child, query))
-    .filter(Boolean) as FileTreeNode[];
-
-  if (selfMatched || children.length > 0) {
-    return {
-      ...tree,
-      isExpanded: true,
-      children
-    };
-  }
-
-  return undefined;
 }
 
 // 绑定工作区模式事件

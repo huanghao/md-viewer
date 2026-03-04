@@ -1,113 +1,113 @@
 .TH MD-VIEWER 1 "March 2026" "MD Viewer" "User Commands"
 .SH NAME
-md-viewer \- Markdown file viewer with live reload
+mdv, mdv-admin \- CLI tools for MD Viewer file opening and local state ops
 .SH SYNOPSIS
 .B mdv
-[\fIOPTIONS\fR] \fIFILE\fR
+[\fIGLOBAL OPTIONS\fR] \fIFILE\fR
+.br
+.B mdv
+comments \fISUBCOMMAND\fR [\fIOPTIONS\fR]
 .br
 .B mdv-admin
 \fICOMMAND\fR [\fIOPTIONS\fR]
-.br
-.B bun run dev
-.RI [SERVER\ OPTIONS]
 .SH DESCRIPTION
-MD Viewer is a lightweight Markdown file viewer that provides live preview
-with automatic reload when files change. It consists of a server component
-that serves the web interface and CLI tools for adding files and managing data.
-.SH CLI COMMANDS
-.SS mdv (Client)
+\fBmdv\fR is the client CLI for MD Viewer. It can open local/remote Markdown files
+in a running MD Viewer server, and query local comments/annotations from SQLite.
+.PP
+\fBmdv-admin\fR is the operations CLI for sync record statistics and cleanup.
+.SH GLOBAL OPTIONS
+.TP
+.BR \-p ", " \-\-port " " \fIPORT\fR
+Server port (default: 3000)
+.TP
+.BR \-h ", " \-\-host " " \fIHOST\fR
+Server host (default: localhost)
+.TP
+.B \-\-no\-focus
+Add file without switching focus.
+.TP
+.B \-\-json
+Output in JSON format (recommended for agents).
+.TP
+.BR \-\-limit " " \fIN\fR
+Result limit for comment list/get (default: 20).
+.TP
+.BR \-\-offset " " \fIN\fR
+Result offset for pagination (default: 0).
+.TP
+.B \-\-help
+Show help.
+.SH COMMANDS
+.SS mdv open
 .TP
 .B mdv \fIFILE\fR
-Add a Markdown file to the viewer. By default, the file will be added and
-switched to. Supports both local file paths and remote URLs (http/https).
-.SS mdv-admin (Administration)
+Add a local/remote Markdown file to viewer. By default, switch to that file.
+.RS
+.IP
+Supported input:
+\fB/path/to/file.md\fR, \fB./relative.md\fR, \fBhttps://...\fR
+.RE
+.SS mdv comments
+.TP
+.B mdv comments list
+List documents that have comments, ordered by latest update time desc.
+.RS
+.IP
+Options: \fB--limit\fR, \fB--offset\fR, \fB--json\fR
+.RE
+.TP
+.B mdv comments get --file \fIFILE\fR
+Get comments for one document.
+.RS
+.IP
+Options: \fB--file\fR, \fB--limit\fR, \fB--offset\fR, \fB--json\fR
+.RE
+.SS mdv-admin
 .TP
 .B mdv-admin stats
-Display statistics about sync records (total files, expired records, recent parents).
-Works with or without running server.
+Show sync record statistics.
 .TP
 .B mdv-admin cleanup
 Clean up expired sync records (older than 6 months).
-Works with or without running server.
-.SH CLI OPTIONS
-.SS mdv Options
-.TP
-.BR \-p ", " \-\-port " " \fIPORT\fR
-Specify the server port (default: 3000)
-.TP
-.BR \-h ", " \-\-host " " \fIHOST\fR
-Specify the server host (default: localhost)
-.TP
-.B \-\-no\-focus
-Add the file without switching to it. By default, the viewer will switch
-to the newly added file.
-.TP
-.B \-\-help
-Display help information and exit
-.SS mdv-admin Options
-.TP
-.BR \-p ", " \-\-port " " \fIPORT\fR
-Specify the server port (default: 3000)
-.TP
-.BR \-h ", " \-\-host " " \fIHOST\fR
-Specify the server host (default: localhost)
-.TP
-.B \-\-help
-Display help information and exit
-.SH SERVER OPTIONS
-The server can be configured using environment variables:
-.TP
-.B PORT
-Server port number (default: 3000)
 .SH EXAMPLES
-.SS Using mdv (Client)
 .TP
-Add a local file and switch to it:
+Open and focus one file:
 .B mdv README.md
 .TP
-Add a file without switching:
-.B mdv \-\-no\-focus notes.md
+Open one file without focus:
+.B mdv --no-focus docs/note.md
 .TP
-Add a file using a specific server port:
-.B mdv \-p 3001 README.md
+Open with custom port:
+.B mdv -p 3001 README.md
 .TP
-Add a remote Markdown file:
-.B mdv https://example.com/doc.md
-.SS Using mdv-admin (Administration)
+List commented docs:
+.B mdv comments list --limit 50
 .TP
-View sync statistics:
+Get one file comments in JSON:
+.B mdv comments get --file README.md --json
+.TP
+Show sync stats:
 .B mdv-admin stats
 .TP
-Clean up expired records:
+Cleanup expired sync records:
 .B mdv-admin cleanup
-.TP
-Check stats on custom port:
-.B mdv-admin stats \-p 3001
-.SS Starting the Server
-.TP
-Start the server on default port:
-.B bun run dev
-.TP
-Start the server on a custom port:
-.B PORT=8080 bun run dev
 .SH FILES
 .TP
 .I ~/.config/md-viewer/config.json
-User configuration file. See
-.BR md-viewer.config (5)
-for details.
+Config file. See
+.BR md-viewer.config (5).
 .TP
-.I ~/.local/share/md-viewer/
-Application data directory
+.I ~/.config/md-viewer/annotations.db
+Local SQLite comments/annotations storage.
+.TP
+.I ~/.config/md-viewer/sync-records.json
+Sync records storage for mdv-admin.
 .SH ENVIRONMENT
 .TP
 .B PORT
-Server listening port (default: 3000)
+Server listening port (default: 3000).
+.TP
+.B HOST
+Server host (default: localhost).
 .SH SEE ALSO
 .BR md-viewer.config (5)
-.SH BUGS
-Report bugs at: https://github.com/yourusername/md-viewer/issues
-.SH AUTHOR
-MD Viewer was created for personal use.
-.SH COPYRIGHT
-MIT License

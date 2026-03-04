@@ -31,6 +31,9 @@ import {
   handleSetSyncPreferences,
   handleInferWorkspace,
   handleScanWorkspace,
+  handleGetAnnotations,
+  handleSaveAnnotations,
+  handleMigrateAnnotations,
 } from "./handlers.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
 
@@ -99,6 +102,11 @@ app.get("/api/events", handleEvents);
 // API: 工作区相关
 app.post("/api/infer-workspace", handleInferWorkspace);
 app.post("/api/scan-workspace", handleScanWorkspace);
+
+// API: 批注相关（SQLite 持久化）
+app.get("/api/annotations", handleGetAnnotations);
+app.post("/api/annotations", handleSaveAnnotations);
+app.post("/api/annotations/migrate", handleMigrateAnnotations);
 
 // ==================== 启动服务 ====================
 

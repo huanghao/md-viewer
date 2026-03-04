@@ -3,6 +3,8 @@
  */
 
 import { escapeHtml } from './utils/escape';
+import { fetchAnnotations, saveAnnotationsRemote, migrateAnnotationsRemote } from './api/annotations';
+import { resolveAnnotationAnchor } from './utils/annotation-anchor';
 
 // ==================== 类型定义 ====================
 export interface Annotation {
@@ -12,6 +14,10 @@ export interface Annotation {
   quote: string;
   note: string;
   createdAt: number;
+  quotePrefix?: string;
+  quoteSuffix?: string;
+  status?: 'anchored' | 'unanchored' | 'resolved';
+  confidence?: number;
 }
 
 interface AnnotationState {
@@ -44,11 +50,15 @@ export function loadAnnotations(filePath: string): Annotation[] {
 
 export function saveAnnotations(filePath: string, annotations: Annotation[]): void {
   localStorage.setItem(getStorageKey(filePath), JSON.stringify(annotations));
+  void saveAnnotationsRemote(filePath, annotations).catch(() => {
+    // 服务端不可用时，保持 localStorage 兜底
+  });
 }
 
 export function setAnnotations(filePath: string | null): void {
   if (filePath) {
     state.annotations = loadAnnotations(filePath);
+    void hydrateAnnotationsFromRemote(filePath);
   } else {
     state.annotations = [];
   }
@@ -58,8 +68,36 @@ export function setAnnotations(filePath: string | null): void {
   hidePopover(true);
 }
 
+async function hydrateAnnotationsFromRemote(filePath: string): Promise<void> {
+  try {
+    const remote = await fetchAnnotations(filePath);
+    if (!Array.isArray(remote)) return;
+    state.annotations = remote;
+    localStorage.setItem(getStorageKey(filePath), JSON.stringify(remote));
+    renderAnnotationList(filePath);
+    applyAnnotations();
+  } catch {
+    // ignore
+  }
+}
+
 export function getAnnotations(): Annotation[] {
   return state.annotations;
+}
+
+export function getAllAnnotationsFromLocalStorage(): Record<string, Annotation[]> {
+  const result: Record<string, Annotation[]> = {};
+  const prefix = 'md-viewer:annotations:';
+  for (let i = 0; i < localStorage.length; i += 1) {
+    const key = localStorage.key(i);
+    if (!key || !key.startsWith(prefix)) continue;
+    const filePath = key.slice(prefix.length);
+    const annotations = loadAnnotations(filePath);
+    if (annotations.length > 0) {
+      result[filePath] = annotations;
+    }
+  }
+  return result;
 }
 
 // ==================== DOM 元素引用 ====================
@@ -129,6 +167,10 @@ function placeFloating(el: HTMLElement, x: number, y: number): void {
   const top = clamp(y, 8, window.innerHeight - height - 8);
   el.style.left = `${left}px`;
   el.style.top = `${top}px`;
+}
+
+function getReaderText(root: HTMLElement): string {
+  return getTextNodes(root).map((node) => node.nodeValue || '').join('');
 }
 
 // ==================== UI 操作 ====================
@@ -306,7 +348,42 @@ function attachAnnotationEvents(): void {
 }
 
 export function applyAnnotations(): void {
-  const sorted = [...state.annotations].sort((a, b) => b.start - a.start);
+  const el = getElements();
+  if (el.reader) {
+    const text = getReaderText(el.reader);
+    let changed = false;
+    for (const ann of state.annotations) {
+      const resolved = resolveAnnotationAnchor(text, ann);
+      const nextStatus = resolved.status;
+      if (ann.start !== resolved.start) {
+        ann.start = resolved.start;
+        changed = true;
+      }
+      if (ann.length !== resolved.length) {
+        ann.length = resolved.length;
+        changed = true;
+      }
+      if ((ann.status || 'anchored') !== nextStatus) {
+        ann.status = nextStatus;
+        changed = true;
+      }
+      if (ann.confidence !== resolved.confidence) {
+        ann.confidence = resolved.confidence;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      const currentFile = el.content?.getAttribute('data-current-file');
+      if (currentFile) {
+        saveAnnotations(currentFile, state.annotations);
+      }
+    }
+  }
+
+  const sorted = [...state.annotations]
+    .filter((a) => (a.status || 'anchored') !== 'unanchored')
+    .sort((a, b) => b.start - a.start);
   for (const ann of sorted) {
     applySingleAnnotation(ann);
   }
@@ -329,6 +406,7 @@ export function renderAnnotationList(filePath: string | null): void {
     <div class="annotation-item" data-annotation-id="${ann.id}">
       <div class="annotation-quote">「${escapeHtml(ann.quote.substring(0, 100))}${ann.quote.length > 100 ? '...' : ''}」</div>
       <div class="annotation-note">${ann.note || '（无文字说明）'}</div>
+      ${(ann.status || 'anchored') === 'unanchored' ? '<div class="annotation-note" style="color:#cf222e;">定位失败：原文已变化</div>' : ''}
       <div class="annotation-actions">
         <button class="annotation-btn" data-action="jump" data-id="${ann.id}">定位</button>
         <button class="annotation-btn annotation-btn-danger" data-action="delete" data-id="${ann.id}">删除</button>
@@ -371,6 +449,11 @@ export function handleSelectionForAnnotation(filePath: string | null): void {
   const start = globalOffsetForPosition(el.reader, range.startContainer, range.startOffset);
   const end = globalOffsetForPosition(el.reader, range.endContainer, range.endOffset);
   if (start < 0 || end <= start) return;
+  const fullText = getReaderText(el.reader);
+  const prefixWindow = 32;
+  const suffixWindow = 32;
+  const quotePrefix = fullText.slice(Math.max(0, start - prefixWindow), start);
+  const quoteSuffix = fullText.slice(end, Math.min(fullText.length, end + suffixWindow));
 
   const rect = range.getBoundingClientRect();
   showComposer(rect.left, rect.bottom + 8, quote, {
@@ -378,6 +461,10 @@ export function handleSelectionForAnnotation(filePath: string | null): void {
     start,
     length: end - start,
     quote,
+    quotePrefix,
+    quoteSuffix,
+    status: 'anchored',
+    confidence: 1,
   });
 
   selection.removeAllRanges();
@@ -385,6 +472,8 @@ export function handleSelectionForAnnotation(filePath: string | null): void {
 
 // ==================== 初始化 ====================
 export function initAnnotationElements(): void {
+  void migrateLegacyAnnotationsOnce();
+
   // 绑定全局事件
   document.getElementById('composerSaveBtn')?.addEventListener('click', () => {
     const contentEl = document.getElementById('content');
@@ -424,4 +513,22 @@ export function initAnnotationElements(): void {
       hidePopover(true);
     }
   });
+}
+
+async function migrateLegacyAnnotationsOnce(): Promise<void> {
+  const migrationKey = 'md-viewer:annotation-migrated-v1';
+  if (localStorage.getItem(migrationKey) === 'true') return;
+
+  const byPath = getAllAnnotationsFromLocalStorage();
+  if (Object.keys(byPath).length === 0) {
+    localStorage.setItem(migrationKey, 'true');
+    return;
+  }
+
+  try {
+    await migrateAnnotationsRemote(byPath);
+    localStorage.setItem(migrationKey, 'true');
+  } catch {
+    // 保持可重试，不设置迁移完成标记
+  }
 }

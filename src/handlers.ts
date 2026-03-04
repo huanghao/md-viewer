@@ -29,6 +29,7 @@ import {
   setSyncPreference,
 } from "./sync-storage.ts";
 import { watchFile, watchWorkspace } from "./file-watcher.ts";
+import { listAnnotations, replaceAnnotations, importLegacyAnnotations } from "./annotation-storage.ts";
 
 function expandHomePath(input: string): string {
   if (input === "~") return homedir();
@@ -932,6 +933,45 @@ function scanDirectory(dirPath: string): any {
   }
 
   return tree;
+}
+
+// API: 获取批注（按文件）
+export async function handleGetAnnotations(c: Context) {
+  try {
+    const filePath = c.req.query("path") || "";
+    if (!filePath) return c.json({ annotations: [] });
+    const annotations = listAnnotations(filePath);
+    return c.json({ annotations });
+  } catch (error: any) {
+    return c.json({ error: error?.message || "获取批注失败" }, 500);
+  }
+}
+
+// API: 保存批注（整量替换）
+export async function handleSaveAnnotations(c: Context) {
+  try {
+    const body = await c.req.json();
+    const path = typeof body?.path === "string" ? body.path : "";
+    const annotations = Array.isArray(body?.annotations) ? body.annotations : [];
+    if (!path) return c.json({ error: "缺少 path 参数" }, 400);
+
+    const result = replaceAnnotations(path, annotations);
+    return c.json({ success: true, saved: result.saved });
+  } catch (error: any) {
+    return c.json({ error: error?.message || "保存批注失败" }, 500);
+  }
+}
+
+// API: 从 localStorage 一次性迁移批注到 SQLite
+export async function handleMigrateAnnotations(c: Context) {
+  try {
+    const body = await c.req.json();
+    const byPath = body?.byPath && typeof body.byPath === "object" ? body.byPath : {};
+    const result = importLegacyAnnotations(byPath);
+    return c.json({ success: true, ...result });
+  } catch (error: any) {
+    return c.json({ error: error?.message || "迁移批注失败" }, 500);
+  }
 }
 
 // 辅助函数

@@ -16,7 +16,7 @@ jobs:
           - os: macos-latest
             platform: darwin-arm64
             target: bun-darwin-aarch64
-          - os: macos-13
+          - os: macos-latest
             platform: darwin-x64
             target: bun-darwin-x64-baseline
           - os: ubuntu-latest
@@ -36,7 +36,13 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        run: bun install
+        run: |
+          for i in 1 2 3; do
+            bun install && break || {
+              echo "Attempt $i failed, retrying..."
+              sleep 5
+            }
+          done
 
       - name: Build
         run: |

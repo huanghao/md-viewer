@@ -5,7 +5,6 @@
  */
 
 import { Hono } from "hono";
-import { serveStatic } from "hono/bun";
 import { marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
@@ -37,6 +36,13 @@ import {
 } from "./handlers.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
 
+// ==================== 嵌入的静态资源 ====================
+
+const FAVICON_SVG = `<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="16" cy="16" r="16" fill="#3b82f6"/>
+  <path d="M 9 11 L 9 21 L 11 21 L 11 14.5 L 16 19.5 L 21 14.5 L 21 21 L 23 21 L 23 11 L 16 18.5 Z" fill="white"/>
+</svg>`;
+
 // ==================== 初始化配置 ====================
 
 initConfig();
@@ -67,8 +73,12 @@ app.get("/", (c) => {
   return c.html(generateClientHTML());
 });
 
-// 静态文件服务（favicon 等）
-app.get("/favicon.svg", serveStatic({ path: "./public/favicon.svg" }));
+// 嵌入的静态资源
+app.get("/favicon.svg", (c) => {
+  c.header('Content-Type', 'image/svg+xml');
+  c.header('Cache-Control', 'public, max-age=31536000'); // 缓存 1 年
+  return c.body(FAVICON_SVG);
+});
 
 // API: 获取文件内容
 app.get("/api/file", handleGetFile);
@@ -103,7 +113,7 @@ app.get("/api/events", handleEvents);
 app.post("/api/infer-workspace", handleInferWorkspace);
 app.post("/api/scan-workspace", handleScanWorkspace);
 
-// API: 批注相关（SQLite 持久化）
+// API: 评论相关（SQLite 持久化）
 app.get("/api/annotations", handleGetAnnotations);
 app.post("/api/annotations", handleSaveAnnotations);
 app.post("/api/annotations/migrate", handleMigrateAnnotations);
@@ -113,12 +123,15 @@ app.post("/api/annotations/migrate", handleMigrateAnnotations);
 const PORT = getServerPort(config);
 const HOST = getServerHost(config);
 
-export default {
-  port: PORT,
-  hostname: HOST,
-  fetch: app.fetch,
-  idleTimeout: 255, // SSE 长连接 255 秒超时（Bun 最大值）
-};
+// 检测是否被直接运行（bun run src/server.ts）或被 import
+if (import.meta.main) {
+  Bun.serve({
+    port: PORT,
+    hostname: HOST,
+    fetch: app.fetch,
+    idleTimeout: 255, // SSE 长连接 255 秒超时（Bun 最大值）
+  });
 
-log(`🚀 MD Viewer Server 启动于 http://${HOST}:${PORT}/`);
-log(`📖 使用方法: 在浏览器中打开，然后添加 Markdown/HTML 文件路径`);
+  log(`🚀 MD Viewer Server 启动于 http://${HOST}:${PORT}/`);
+  log(`📖 使用方法: 在浏览器中打开，然后添加 Markdown/HTML 文件路径`);
+}

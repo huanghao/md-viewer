@@ -19,3 +19,4 @@
 - [20260301-workspace-reorder-interactions](./20260301-workspace-reorder-interactions/)
 - [20260302-tab-management](./20260302-tab-management/)
 - [20260302-sync-continue-after-local-change](./20260302-sync-continue-after-local-change/)
+- [20260305-comment-ui-redesign](./20260305-comment-ui-redesign/)

@@ -5,16 +5,14 @@
   "type": "module",
   "bin": {
     "mdv": "./src/cli.ts",
-    "mdv-admin": "./src/cli-admin.ts",
     "mdv-iterm2-dispatcher": "./scripts/mdv-iterm2-dispatcher.sh"
   },
   "scripts": {
     "build:client": "bun run build.ts",
     "build:client:watch": "bun run build.ts --watch",
     "dev": "bun --watch run src/server.ts",
-    "build": "bun run build:client && bun build src/server.ts --compile --outfile=md-viewer",
+    "build": "bun run build:client && bun run scripts/embed-client.ts && bun build src/cli.ts --compile --outfile=mdv",
     "cli": "bun run src/cli.ts",
-    "admin": "bun run src/cli-admin.ts",
     "test:e2e": "playwright test",
     "test:e2e:video": "playwright test -c playwright.video.config.ts",
     "test:e2e:headed": "playwright test --headed",

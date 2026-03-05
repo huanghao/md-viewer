@@ -8,8 +8,8 @@
 
 ```
 /usr/local/bin/
-├── mdv              ← 60MB TypeScript 编译的二进制（统一 CLI）
-└── mdv-iterm2-dispatcher  ← 2KB Shell 脚本
+├── mdv                    ← 60MB 无依赖二进制（CLI + Server）
+└── mdv-iterm2-dispatcher  ← 4KB Shell 脚本
 ```
 
 ---
@@ -18,15 +18,25 @@
 
 ```bash
 # 服务管理
-mdv server start/stop/restart/status
+mdv server start           # 前台运行（默认，Ctrl+C 停止）
+mdv server start --daemon  # 后台运行
+mdv server stop/restart/status
+mdv logs [--tail N]        # 查看日志
 
-# 文件操作（自动启动服务）
-mdv open README.md
-mdv README.md          # 简写
+# 文件操作
+mdv <file>                 # 打开文件（自动启动服务）
 
-# 配置和统计
-mdv config get/set
-mdv stats
+# 运维统计
+mdv stats                  # 服务器状态 + 同步记录 + 日志大小
+
+# 评论功能
+mdv comments list/get/stats
+
+# 配置管理
+mdv config [get|set]
+
+# 数据清理
+mdv cleanup                # 清理过期同步记录
 ```
 
 ---
@@ -37,112 +47,104 @@ mdv stats
 
 ```
 mdv (60MB 二进制) =
-  ├── CLI 模块（解析命令）
+  ├── CLI 模块（命令解析）
   ├── Server 模块（HTTP 服务）
-  └── 前端资源（嵌入）
+  ├── 前端资源（完全嵌入）
+  │   ├── client.js (100KB)
+  │   ├── CSS (内联)
+  │   └── favicon.svg (内联)
+  └── 数据存储（SQLite）
 ```
 
-### 2. 实现方式
+### 2. 服务管理
 
-**src/cli-unified.ts** - 新的统一入口:
-
+**前台模式（默认）**:
 ```typescript
-#!/usr/bin/env bun
-
-const command = process.argv[2];
-
-switch (command) {
-  case "server":
-    handleServer(process.argv[3]); // start/stop/status
-    break;
-  case "open":
-    ensureServerRunning();
-    openFile(process.argv[3]);
-    break;
-  case "config":
-    handleConfig(process.argv.slice(3));
-    break;
-  case "stats":
-    ensureServerRunning();
-    showStats();
-    break;
-  default:
-    // 默认打开文件
-    if (existsSync(command)) {
-      ensureServerRunning();
-      openFile(command);
-    }
-}
+// mdv server start
+// 直接运行 server，阻塞在前台
+await import("./server.ts");
 ```
 
-**服务管理**:
-
+**后台模式**:
 ```typescript
-// PID 文件: ~/.config/md-viewer/server.pid
-
-function startServer() {
-  // 启动后台服务
-  const child = spawn(process.execPath, ["server"], {
-    detached: true,
-    stdio: "ignore"
-  });
-  child.unref();
-  writeFileSync(PID_FILE, String(child.pid));
-}
-
-function stopServer() {
-  const pid = readFileSync(PID_FILE);
-  process.kill(Number(pid));
-}
+// mdv server start --daemon
+// spawn 子进程，PID 文件管理
+spawn(process.execPath, ["--internal-server-mode"], {
+  detached: true,
+  stdio: ["ignore", logFd, logFd]
+});
 ```
 
-**前端资源嵌入**:
+### 3. 前端资源嵌入
 
-```typescript
-// src/server.ts
-import clientHTML from "../dist-client/index.html" with { type: "text" };
+**构建流程**:
+1. `bun run build:client` → `dist/client.js`
+2. `bun run scripts/embed-client.ts` → `src/client/embedded-client.ts`
+3. `bun build --compile src/cli.ts` → `mdv` (60MB)
 
-app.get("/", (c) => c.html(clientHTML));
+**嵌入内容**:
+- ✅ client.js (100KB) - 通过 `embedded-client.ts`
+- ✅ CSS - 内联在 `html.ts`
+- ✅ favicon.svg - 内联在 `server.ts`
+- ⚠️ CDN 依赖 - 保留（marked, mermaid, highlight.js）
+
+### 4. 数据持久化
+
+**位置**: `~/.config/md-viewer/`
 ```
-
-### 3. 编译
-
-```bash
-# 构建前端
-bun run build:client
-
-# 编译统一二进制
-bun build --compile src/cli-unified.ts --outfile=mdv
+~/.config/md-viewer/
+├── config.json           # 用户配置
+├── server.pid            # 服务器 PID（后台模式）
+├── server.log            # 服务器日志
+├── annotations.db        # 评论数据（SQLite）
+└── sync-records.json     # 同步记录
 ```
 
 ---
 
 ## 实施任务
 
-### Phase 1: 核心重构
+### Phase 1: 核心重构 ✅
 
-- [ ] 创建 `src/cli-unified.ts`
-- [ ] 实现服务管理（start/stop/status）
-- [ ] 实现文件打开（自动启动服务）
-- [ ] 前端资源嵌入到 server.ts
-- [ ] 本地测试
+- [x] 合并 cli.ts + cli-admin.ts
+- [x] 实现服务管理（start/stop/restart/status）
+- [x] 实现日志系统（输出到文件 + logs 命令）
+- [x] 实现文件打开（自动启动服务）
+- [x] 实现配置管理（config get/set）
+- [x] 实现运维统计（stats：服务器+同步+日志）
+- [x] 实现评论功能（comments list/get/stats）
+- [x] 实现数据清理（cleanup）
+- [x] 本地测试
+- [x] 更新 package.json
+- [x] 更新构建脚本
 
-### Phase 2: 构建系统
+### Phase 2: 前端资源嵌入 ✅
 
-- [ ] `scripts/build-all.sh` - 多平台编译
-- [ ] `scripts/package.sh` - 打包 tarball
-- [ ] 本地安装测试
+- [x] 修改 server.ts 嵌入 favicon.svg
+- [x] 创建 `scripts/embed-client.ts` 嵌入 client.js
+- [x] 修改 `html.ts` 使用嵌入的脚本
+- [x] 修改 `cli.ts` 支持前台/后台模式
+- [x] 修改 `server.ts` 支持被 import 启动
+- [x] 测试单一二进制（无外部文件依赖）
+- [x] 测试独立运行（完全隔离目录）
 
-### Phase 3: Homebrew
+### Phase 3: Homebrew Formula ✅
 
-- [ ] 创建 `Formula/md-viewer.rb`
-- [ ] 创建 Tap 仓库
-- [ ] 本地测试安装
+- [x] 创建 `Formula/md-viewer.rb`
+- [x] 创建 `Formula/md-viewer-local.rb`（本地测试）
+- [x] 创建 `scripts/package.sh`（打包脚本）
+- [x] 创建 `scripts/update-formula-sha.sh`（更新 SHA256）
+- [x] 定义下载 URL（GitHub Release）
+- [x] 定义安装步骤
+- [x] 本地测试安装（成功）
+- [x] 创建 Formula README
 
-### Phase 4: CI/CD
+### Phase 4: CI/CD ✅
 
-- [ ] `.github/workflows/release.yml` - 自动构建
-- [ ] `.github/workflows/update-formula.yml` - 自动更新
+- [x] `.github/workflows/release.yml` - 自动构建多平台二进制
+- [x] 自动上传到 GitHub Release
+- [x] 自动计算 SHA256
+- [ ] 自动更新 Homebrew Formula（手动脚本已创建）
 - [ ] 测试发布流程
 
 ### Phase 5: 发布
@@ -157,12 +159,78 @@ bun build --compile src/cli-unified.ts --outfile=mdv
 
 1. **语言**: TypeScript（保持一致性）
 2. **架构**: 单一二进制（CLI + Server）
-3. **资源**: 嵌入前端（无外部依赖）
+3. **资源**: 完全嵌入（client.js + CSS + favicon）
 4. **大小**: 60MB（可接受）
-5. **服务**: 后台运行，PID 文件管理
+5. **服务**: 前台运行为主（符合容器化习惯）
+6. **命令**: 合并所有功能到 `mdv`
+7. **分发**: GitHub Release 直接提供二进制
 
 ---
 
-## 下一步
+## 当前状态
 
-开始 Phase 1，创建 `src/cli-unified.ts`？
+**Phase 1 & 2 已完成** ✅
+
+### 核心功能
+- ✅ 统一 CLI 实现（src/cli.ts，700+ 行）
+- ✅ 所有功能完整（server/config/stats/comments/cleanup）
+- ✅ 前端资源完全嵌入（client.js + CSS + favicon）
+- ✅ 二进制大小 60MB（包含完整 server）
+- ✅ 完全独立运行（无外部文件依赖）
+
+### 服务管理
+- ✅ 前台模式：`mdv server start`（默认，阻塞运行）
+- ⚠️ 后台模式：`mdv server start --daemon`（有问题，待优化）
+- ✅ 停止/重启/状态：完全正常
+
+### 测试验证
+- ✅ 帮助信息正常
+- ✅ 前台 server 启动成功
+- ✅ HTTP 服务正常响应
+- ✅ 独立目录运行成功（无依赖）
+- ✅ 构建流程完整
+
+**Phase 3 & 4 已完成** ✅
+
+### Homebrew 安装测试
+- ✅ Formula 创建完成
+- ✅ 本地 tap 测试成功
+- ✅ `brew install` 安装成功
+- ✅ 二进制运行正常
+- ✅ Server 启动成功
+
+### CI/CD
+- ✅ GitHub Actions workflow 创建完成
+- ✅ 多平台构建配置（darwin-arm64/x64, linux-x64/arm64）
+- ✅ 自动打包和上传
+- ✅ SHA256 自动计算
+
+### 脚本工具
+- ✅ `scripts/build-all.sh` - 构建脚本
+- ✅ `scripts/package.sh` - 打包脚本
+- ✅ `scripts/update-formula-sha.sh` - 更新 Formula SHA256
+- ✅ `scripts/embed-client.ts` - 嵌入前端资源
+
+**下一步**: Phase 5 - 发布 v0.1.0（打 tag 触发 CI）
+
+## 发布流程
+
+```bash
+# 1. 构建和打包
+./scripts/build-all.sh 0.1.0
+./scripts/package.sh 0.1.0
+
+# 2. 打 tag 触发 CI
+git tag -a v0.1.0 -m "Release v0.1.0"
+git push origin v0.1.0
+
+# 3. 等待 CI 完成后，更新 Formula
+./scripts/update-formula-sha.sh 0.1.0
+git add Formula/md-viewer.rb
+git commit -m "chore: update formula for v0.1.0"
+git push
+
+# 4. 测试安装
+brew tap huanghao/md-viewer
+brew install md-viewer
+```

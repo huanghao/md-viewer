@@ -333,11 +333,15 @@ function getAnchorTrack(ann: Annotation): 'exact' | 'reanchored' | 'orphan' {
 
 function matchesFilter(ann: Annotation, filter: AnnotationFilter): boolean {
   const isOrphan = ann.status === 'unanchored' || getAnchorTrack(ann) === 'orphan';
-  if (filter === 'all') return !isOrphan;
+  if (filter === 'all') return true;
   if (filter === 'open') return !isResolved(ann) && !isOrphan;
   if (filter === 'resolved') return isResolved(ann) && !isOrphan;
   if (filter === 'orphan') return isOrphan;
   return true;
+}
+
+export function getAnnotationCurrentFilePath(): string | null {
+  return state.currentFilePath;
 }
 
 function iconSvg(type: 'up' | 'down' | 'check' | 'trash' | 'comment' | 'list' | 'filter' | 'close'): string {

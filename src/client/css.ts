@@ -2388,6 +2388,46 @@ export const styles = `
       background: #f6f8fa;
       border-radius: 6px;
     }
+    .settings-kv-grid {
+      display: grid;
+      grid-template-columns: 130px 1fr;
+      gap: 8px 10px;
+      font-size: 12px;
+      color: #374151;
+      padding: 10px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #fafbfc;
+      margin-bottom: 10px;
+    }
+    .settings-kv-grid > div:nth-child(2n + 1) {
+      color: #6b7280;
+    }
+    .settings-key-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      max-height: 140px;
+      overflow: auto;
+      padding: 8px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #fff;
+    }
+    .settings-key-chip {
+      font-size: 11px;
+      line-height: 1;
+      color: #4b5563;
+      border: 1px solid #d1d5db;
+      border-radius: 999px;
+      padding: 4px 8px;
+      background: #f9fafb;
+    }
+    .settings-actions-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
 
     /* 设置按钮已统一为 toolbar-button 样式 */
 
@@ -2888,22 +2928,8 @@ export const styles = `
       cursor: move;
       user-select: none;
     }
-    .annotation-composer textarea {
-      width: 100%;
-      min-height: 34px;
-      padding: 8px;
-      border: 1px solid #d0d7de;
-      border-radius: 6px;
-      font-size: 13px;
-      line-height: 1.5;
-      resize: none;
-      font-family: inherit;
-      overflow-y: hidden;
-    }
-    .annotation-composer textarea:focus {
-      outline: none;
-      border-color: #0969da;
-      box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
+    .annotation-composer .annotation-composer-input {
+      margin-top: 0;
     }
     .annotation-popover-note {
       font-size: 13px;

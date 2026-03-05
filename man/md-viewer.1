@@ -47,6 +47,9 @@ Reply content (for \fBcomments reply\fR).
 .BR \-\-author " " \fINAME\fR
 Reply author (required for \fBcomments reply\fR), e.g. \fBcodex\fR/\fBclaude\fR.
 .TP
+.BR \-\-input " " \fIPATH|-\fR
+Batch reply input JSON file path, or \fB-\fR for stdin.
+.TP
 .B \-\-help
 Show help.
 .SH COMMANDS
@@ -81,6 +84,16 @@ Reply to one comment thread by serial (\fB2\fR) or raw ID.
 .IP
 Options: \fB--file\fR, \fB--seq\fR/\fB--id\fR, \fB--author\fR, \fB--text\fR, \fB--json\fR
 .RE
+.TP
+.B mdv comments reply-batch --file \fIFILE\fR --author \fINAME\fR --input \fIPATH|-\fR
+Batch reply to multiple comments with one author.
+.RS
+.IP
+Input JSON:
+\fB{"replies":[{"id":"#2","text":"..."},{"seq":5,"text":"..."}]}\fR
+.IP
+Options: \fB--file\fR, \fB--author\fR, \fB--input\fR, \fB--json\fR
+.RE
 .SS mdv-admin
 .TP
 .B mdv-admin stats
@@ -107,6 +120,12 @@ Get one file comments in JSON:
 .TP
 Reply one comment:
 .B mdv comments reply --file README.md --seq 2 --author codex --text "ack, will update"
+.TP
+Batch reply from file:
+.B mdv comments reply-batch --file README.md --author codex --input replies.json
+.TP
+Batch reply from stdin:
+.B cat replies.json | mdv comments reply-batch --file README.md --author codex --input -
 .TP
 Show sync stats:
 .B mdv-admin stats

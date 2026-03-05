@@ -29,7 +29,7 @@ import {
   setSyncPreference,
 } from "./sync-storage.ts";
 import { watchFile, watchWorkspace } from "./file-watcher.ts";
-import { listAnnotations, replaceAnnotations, importLegacyAnnotations } from "./annotation-storage.ts";
+import { listAnnotations, replaceAnnotations, importLegacyAnnotations, clearAllAnnotations } from "./annotation-storage.ts";
 
 function expandHomePath(input: string): string {
   if (input === "~") return homedir();
@@ -971,6 +971,16 @@ export async function handleMigrateAnnotations(c: Context) {
     return c.json({ success: true, ...result });
   } catch (error: any) {
     return c.json({ error: error?.message || "迁移评论失败" }, 500);
+  }
+}
+
+// API: 清空所有评论（SQLite）
+export async function handleClearAllAnnotations(c: Context) {
+  try {
+    const result = clearAllAnnotations();
+    return c.json({ success: true, ...result });
+  } catch (error: any) {
+    return c.json({ error: error?.message || "清空评论失败" }, 500);
   }
 }
 

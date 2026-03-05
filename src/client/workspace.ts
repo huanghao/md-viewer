@@ -19,6 +19,46 @@ function normalizeWorkspacePath(path: string): string {
   return path.trim().replace(/\/+$/, '');
 }
 
+function findBestWorkspaceForFile(filePath: string): Workspace | null {
+  const normalizedFilePath = normalizeWorkspacePath(filePath);
+  let best: Workspace | null = null;
+  for (const ws of state.config.workspaces) {
+    const root = normalizeWorkspacePath(ws.path);
+    if (!(normalizedFilePath === root || normalizedFilePath.startsWith(`${root}/`))) continue;
+    if (!best || root.length > normalizeWorkspacePath(best.path).length) {
+      best = ws;
+    }
+  }
+  return best;
+}
+
+function expandDirectoryChain(workspaceId: string, workspacePath: string, filePath: string): void {
+  const tree = state.fileTree.get(workspaceId);
+  if (!tree) return;
+  const root = normalizeWorkspacePath(workspacePath);
+  const target = normalizeWorkspacePath(filePath);
+  if (!(target === root || target.startsWith(`${root}/`))) return;
+
+  const relative = target === root ? '' : target.slice(root.length + 1);
+  const parts = relative.split('/').filter(Boolean);
+  if (parts.length <= 1) return;
+
+  let changed = false;
+  let current = root;
+  for (let i = 0; i < parts.length - 1; i += 1) {
+    current = `${current}/${parts[i]}`;
+    const node = findNodeByPath(tree, current);
+    if (node && node.type === 'directory' && node.isExpanded === false) {
+      node.isExpanded = true;
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    setWorkspaceExpandedState(workspaceId, collectExpandedStateFromTree(tree));
+  }
+}
+
 // 添加工作区
 export function addWorkspace(name: string, path: string): Workspace {
   const normalizedPath = normalizeWorkspacePath(path);
@@ -201,6 +241,27 @@ export async function hydrateExpandedWorkspaces(): Promise<void> {
   if (!state.currentWorkspace && state.config.workspaces.length > 0) {
     state.currentWorkspace = state.config.workspaces[0].id;
   }
+}
+
+// 在工作区模式下根据文件路径自动展开目录树并定位工作区
+export async function revealFileInWorkspace(filePath: string): Promise<void> {
+  const workspace = findBestWorkspaceForFile(filePath);
+  if (!workspace) return;
+
+  // 切换到对应工作区
+  state.currentWorkspace = workspace.id;
+
+  // 确保工作区本身是展开状态
+  if (!workspace.isExpanded) {
+    workspace.isExpanded = true;
+    saveConfig(state.config);
+  }
+
+  // 懒加载树后再展开祖先目录
+  if (!state.fileTree.has(workspace.id)) {
+    await scanWorkspace(workspace.id);
+  }
+  expandDirectoryChain(workspace.id, workspace.path, filePath);
 }
 
 // 切换目录展开/折叠状态

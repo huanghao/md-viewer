@@ -36,13 +36,16 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
+        shell: bash
         run: |
+          set +e
           for i in 1 2 3; do
-            bun install && break || {
+            bun install && { set -e; break; } || {
               echo "Attempt $i failed, retrying..."
               sleep 5
             }
           done
+          set -e
 
       - name: Build
         run: |

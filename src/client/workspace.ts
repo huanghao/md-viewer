@@ -2,7 +2,13 @@ import type { Workspace, FileTreeNode } from './types';
 import { state } from './state';
 import { updateWorkspaceListDiff, removeWorkspaceTracking } from './workspace-state';
 import { saveConfig } from './config';
-import { mergeDirectoryExpandedState } from './workspace-tree-expansion';
+import { mergeDirectoryExpandedState, applyDirectoryExpandedState } from './workspace-tree-expansion';
+import {
+  collectExpandedStateFromTree,
+  getWorkspaceExpandedState,
+  removeWorkspaceExpandedState,
+  setWorkspaceExpandedState,
+} from './workspace-tree-expansion-persistence';
 
 // 生成唯一 ID
 function generateId(): string {
@@ -49,6 +55,7 @@ export function removeWorkspace(id: string): void {
   // 清除文件树缓存
   state.fileTree.delete(id);
   removeWorkspaceTracking(id);
+  removeWorkspaceExpandedState(id);
 
   // 如果删除的是当前工作区，切换到第一个
   if (state.currentWorkspace === id) {
@@ -153,9 +160,14 @@ export async function scanWorkspace(workspaceId: string): Promise<FileTreeNode |
     if (previousTree) {
       mergeDirectoryExpandedState(previousTree, tree);
     }
+    const persistedExpandedState = getWorkspaceExpandedState(workspaceId);
+    if (persistedExpandedState && persistedExpandedState.size > 0) {
+      applyDirectoryExpandedState(tree, persistedExpandedState);
+    }
 
     // 缓存文件树
     state.fileTree.set(workspaceId, tree);
+    setWorkspaceExpandedState(workspaceId, collectExpandedStateFromTree(tree));
     updateWorkspaceListDiff(workspaceId, collectFilePaths(tree));
 
     return tree;
@@ -200,6 +212,7 @@ export function toggleNodeExpanded(workspaceId: string, nodePath: string): void 
   if (node && node.type === 'directory') {
     const currentlyExpanded = node.isExpanded !== false;
     node.isExpanded = !currentlyExpanded;
+    setWorkspaceExpandedState(workspaceId, collectExpandedStateFromTree(tree));
   }
 }
 

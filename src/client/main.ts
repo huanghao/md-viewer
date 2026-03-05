@@ -1426,6 +1426,7 @@ async function showSyncDialog() {
 
     <div class="sync-dialog-footer">
       <button class="sync-dialog-btn sync-dialog-btn-primary" onclick="window.confirmSync()">同步</button>
+      <div class="sync-dialog-shortcut-hint">快捷键：Cmd/Ctrl + Enter</div>
     </div>
 
     <div class="sync-dialog-status">
@@ -1496,6 +1497,12 @@ async function showSyncDialog() {
 
   if (titleInput) {
     titleInput.addEventListener('input', updateCommandPreview);
+    titleInput.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      if (!(event.metaKey || event.ctrlKey)) return;
+      event.preventDefault();
+      void confirmSync();
+    });
   }
   if (parentInput) {
     parentInput.addEventListener('input', () => {
@@ -1515,6 +1522,12 @@ async function showSyncDialog() {
     });
     parentInput.addEventListener('blur', () => {
       refreshParentMetaPreview(parentInput.value);
+    });
+    parentInput.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      if (!(event.metaKey || event.ctrlKey)) return;
+      event.preventDefault();
+      void confirmSync();
     });
   }
 

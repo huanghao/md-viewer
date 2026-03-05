@@ -472,12 +472,13 @@ function printComments(path: string, json: boolean, limit: number, offset: numbe
     console.log(JSON.stringify(result, null, 2));
     return;
   }
-  console.log(`# ${result.path}`);
-  console.log(`共 ${result.total} 条，当前返回 ${result.annotations.length} 条`);
-  console.log("");
-  for (const ann of result.annotations) {
-    const statusTag = ann.status === "unanchored" ? " [定位失败]" : "";
-    console.log(`${ann.id} ${formatCompactTime(ann.createdAt)}${statusTag}`);
+  if (result.annotations.length === 0) {
+    console.log("无评论");
+    return;
+  }
+
+  for (const [index, ann] of result.annotations.entries()) {
+    console.log(`#${offset + index + 1}`);
     const quoted = (ann.quote || "")
       .split("\n")
       .map((line) => `> ${line}`)

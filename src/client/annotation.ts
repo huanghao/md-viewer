@@ -968,6 +968,14 @@ export function initAnnotationElements(): void {
   });
 
   document.getElementById('composerCancelBtn')?.addEventListener('click', hideComposer);
+  getElements().composerNote?.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    if (!(event.metaKey || event.ctrlKey)) return;
+    event.preventDefault();
+    const contentEl = document.getElementById('content');
+    const filePath = contentEl?.getAttribute('data-current-file');
+    if (filePath) savePendingAnnotation(filePath);
+  });
   getElements().quickAdd?.addEventListener('click', (event) => {
     event.stopPropagation();
     openComposerFromPending();

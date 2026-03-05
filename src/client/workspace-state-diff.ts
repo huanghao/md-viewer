@@ -5,6 +5,7 @@ import {
   setKnownWorkspacePaths,
 } from './workspace-state-persistence';
 import { clearWorkspacePathMissing, markWorkspacePathMissing } from './workspace-state-missing';
+import { restoreWorkspaceExpandedStateFromStorage } from './workspace-tree-expansion-persistence';
 
 const listDiffPaths = new Set<string>();
 
@@ -25,6 +26,7 @@ export function restoreWorkspaceAuxiliaryState(): void {
   // 蓝点为会话内提示，刷新后清空
   listDiffPaths.clear();
   restoreWorkspaceKnownFilesFromStorage();
+  restoreWorkspaceExpandedStateFromStorage();
 }
 
 export function updateWorkspaceListDiff(workspaceId: string, scannedPaths: string[]): void {

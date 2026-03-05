@@ -194,6 +194,7 @@ export function generateClientHTML(): string {
       </div>
     </div>
     <textarea id="composerNote" rows="3" placeholder="输入评论内容..."></textarea>
+    <div class="annotation-composer-hint">换行：Enter · 保存：Cmd/Ctrl + Enter</div>
   </div>
 
   <!-- 划词后快速评论入口 -->

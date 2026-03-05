@@ -23,22 +23,29 @@ echo "2️⃣  嵌入客户端脚本..."
 bun run scripts/embed-client.ts
 echo ""
 
-# 当前平台
-CURRENT_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-CURRENT_ARCH=$(uname -m)
+# 目标平台
+if [[ -n "${BUN_TARGET:-}" ]]; then
+  TARGET="$BUN_TARGET"
+  echo "目标平台: ${TARGET} (交叉编译)"
+else
+  CURRENT_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+  CURRENT_ARCH=$(uname -m)
 
-if [[ "$CURRENT_ARCH" == "arm64" ]]; then
-  CURRENT_ARCH="aarch64"
-elif [[ "$CURRENT_ARCH" == "x86_64" ]]; then
-  CURRENT_ARCH="x64"
+  if [[ "$CURRENT_ARCH" == "arm64" ]]; then
+    CURRENT_ARCH="aarch64"
+  elif [[ "$CURRENT_ARCH" == "x86_64" ]]; then
+    CURRENT_ARCH="x64"
+  fi
+
+  TARGET="bun-${CURRENT_OS}-${CURRENT_ARCH}"
+  echo "当前平台: ${TARGET}"
 fi
-
-echo "当前平台: ${CURRENT_OS}-${CURRENT_ARCH}"
 echo ""
 
 # 编译 mdv
-echo "3️⃣  编译 mdv (${CURRENT_OS}-${CURRENT_ARCH})..."
+echo "3️⃣  编译 mdv (${TARGET})..."
 bun build --compile \
+  --target="${TARGET}" \
   --outfile="${BUILD_DIR}/mdv" \
   src/cli.ts
 

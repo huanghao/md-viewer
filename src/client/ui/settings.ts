@@ -1,6 +1,7 @@
 import { state } from '../state';
 import { saveConfig } from '../config';
 import { renderSidebar } from './sidebar';
+import { showError, showSuccess } from './toast';
 
 // 初始化：绑定全局函数
 if (typeof window !== 'undefined') {
@@ -58,12 +59,41 @@ function renderSettingsDialog(): void {
   const body = document.getElementById('settingsDialogBody');
   if (!body) return;
 
+  const snapshot = getClientStateSnapshot();
   body.innerHTML = `
-    <div class="settings-empty">
-      <div>更多设置项正在整理中</div>
-      <div style="margin-top: 8px; font-size: 12px;">侧栏模式请在左侧模式行中切换</div>
+    <div class="settings-section">
+      <div class="settings-section-title">客户端状态</div>
+      <div class="settings-section-desc">用于排查本地缓存是否脏数据，可直接清理。</div>
+      <div class="settings-kv-grid">
+        <div>当前文件</div><div>${escapeHtml(snapshot.currentFile || '无')}</div>
+        <div>已打开文件数</div><div>${snapshot.openFilesCount}</div>
+        <div>工作区数</div><div>${snapshot.workspaceCount}</div>
+        <div>评论缓存文件数</div><div>${snapshot.annotationFileCount}</div>
+        <div>md-viewer 本地键数</div><div>${snapshot.mdvKeyCount}</div>
+        <div>localStorage 总键数</div><div>${snapshot.localStorageKeyCount}</div>
+      </div>
+      <div class="settings-key-list">
+        ${snapshot.mdvKeys.map((key) => `<span class="settings-key-chip">${escapeHtml(key)}</span>`).join('')}
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-title">数据清理</div>
+      <div class="settings-section-desc">清理后会自动刷新页面。</div>
+      <div class="settings-actions-row">
+        <button class="sync-dialog-button" id="clearAllCommentsBtn">清空所有评论</button>
+        <button class="sync-dialog-button" id="clearClientStateBtn">清理客户端状态</button>
+      </div>
     </div>
   `;
+
+  const clearClientStateBtn = document.getElementById('clearClientStateBtn');
+  clearClientStateBtn?.addEventListener('click', () => {
+    clearClientState();
+  });
+  const clearAllCommentsBtn = document.getElementById('clearAllCommentsBtn');
+  clearAllCommentsBtn?.addEventListener('click', () => {
+    void clearAllComments();
+  });
 }
 
 // 关闭设置对话框
@@ -79,4 +109,82 @@ export function saveSettings(): void {
   saveConfig(state.config);
   renderSidebar();
   closeSettingsDialog();
+}
+
+interface ClientStateSnapshot {
+  currentFile: string | null;
+  openFilesCount: number;
+  workspaceCount: number;
+  annotationFileCount: number;
+  mdvKeyCount: number;
+  localStorageKeyCount: number;
+  mdvKeys: string[];
+}
+
+function getClientStateSnapshot(): ClientStateSnapshot {
+  const allKeys: string[] = [];
+  for (let i = 0; i < localStorage.length; i += 1) {
+    const key = localStorage.key(i);
+    if (key) allKeys.push(key);
+  }
+  allKeys.sort();
+  const mdvKeys = allKeys.filter((key) => key.startsWith('md-viewer:'));
+  const annotationFileCount = mdvKeys.filter((key) => key.startsWith('md-viewer:annotations:')).length;
+  return {
+    currentFile: state.currentFile,
+    openFilesCount: state.sessionFiles.size,
+    workspaceCount: state.config.workspaces.length,
+    annotationFileCount,
+    mdvKeyCount: mdvKeys.length,
+    localStorageKeyCount: allKeys.length,
+    mdvKeys,
+  };
+}
+
+function clearClientState(): void {
+  const toDelete: string[] = [];
+  for (let i = 0; i < localStorage.length; i += 1) {
+    const key = localStorage.key(i);
+    if (!key) continue;
+    if (key.startsWith('md-viewer:')) toDelete.push(key);
+  }
+  for (const key of toDelete) {
+    localStorage.removeItem(key);
+  }
+  showSuccess(`已清理客户端状态（${toDelete.length} 项）`, 1800);
+  window.setTimeout(() => window.location.reload(), 250);
+}
+
+async function clearAllComments(): Promise<void> {
+  try {
+    const response = await fetch('/api/annotations/clear', { method: 'POST' });
+    const data = await response.json();
+    if (!response.ok || data?.success !== true) {
+      throw new Error(data?.error || `HTTP ${response.status}`);
+    }
+    const keysToDelete: string[] = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      if (key.startsWith('md-viewer:annotations:')) keysToDelete.push(key);
+      if (key === 'md-viewer:annotation-panel-open-by-file') keysToDelete.push(key);
+      if (key === 'md-viewer:annotation-migrated-v1') keysToDelete.push(key);
+    }
+    for (const key of keysToDelete) {
+      localStorage.removeItem(key);
+    }
+    showSuccess(`已清空评论（${data?.deleted || 0} 条）`, 1800);
+    window.setTimeout(() => window.location.reload(), 250);
+  } catch (error: any) {
+    showError(`清空评论失败: ${error?.message || '未知错误'}`, 2600);
+  }
+}
+
+function escapeHtml(input: string): string {
+  return String(input || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }

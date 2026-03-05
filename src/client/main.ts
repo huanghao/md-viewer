@@ -4,7 +4,7 @@ import type { FileData, SyncHistoryItem } from './types';
 // 导入状态管理
 import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFileFromState, switchToFile, setSearchQuery, markFileMissing, getSessionFile } from './state';
 import { clearListDiff, markWorkspacePathMissing } from './workspace-state';
-import { addWorkspace, hydrateExpandedWorkspaces, scanWorkspace } from './workspace';
+import { addWorkspace, hydrateExpandedWorkspaces, scanWorkspace, revealFileInWorkspace } from './workspace';
 
 // 导入 API
 import { loadFile, searchFiles, getNearbyFiles, openFile, detectPathType } from './api/files';
@@ -27,6 +27,7 @@ import {
   renderAnnotationList,
   handleSelectionForAnnotation,
   setAnnotations,
+  getAnnotationCurrentFilePath,
   syncAnnotationSidebarLayout,
   dismissAnnotationPopupByEscape,
 } from './annotation';
@@ -40,14 +41,14 @@ const PARENT_URL_SKIP_SEGMENTS = new Set(['doc', 'docs', 'page', 'pages', 'conte
 let workspacePollRunning = false;
 let mermaidInitialized = false;
 let syncDialogInteractionBound = false;
-let lastAnnotationFilePath: string | null = null;
-
 function syncAnnotationsForCurrentFile(force = false): void {
   const nextPath = state.currentFile && !isHtmlPath(state.currentFile) ? state.currentFile : null;
-  if (force || nextPath !== lastAnnotationFilePath) {
+  const currentAnnotationFilePath = getAnnotationCurrentFilePath();
+  if (force || nextPath !== currentAnnotationFilePath) {
     setAnnotations(nextPath);
-    lastAnnotationFilePath = nextPath;
   }
+  // 重新应用批注到当前正文，避免文件切换后残留上一个文件的高亮/状态。
+  applyAnnotations();
   renderAnnotationList(nextPath);
 }
 
@@ -56,8 +57,10 @@ async function onFileLoaded(data: FileData, focus: boolean = false) {
   const previousFile = state.currentFile;
   const shouldFocus = focus && !isHtmlPath(data.path);
   addOrUpdateFile(data, shouldFocus);
+  if (shouldFocus && state.config.sidebarMode === 'workspace') {
+    await revealFileInWorkspace(data.path);
+  }
   if (shouldFocus && previousFile !== data.path) {
-    lastAnnotationFilePath = null;
   }
   renderSidebar();
   renderContent();
@@ -813,14 +816,12 @@ function switchFile(path: string) {
   removeSyncInfoPopover();
   if (isHtmlPath(path)) {
     openFileInBrowser(path);
-    lastAnnotationFilePath = null;
     syncAnnotationsForCurrentFile(true);
     return;
   }
   const previousFile = state.currentFile;
   switchToFile(path);
   renderSidebar();
-  lastAnnotationFilePath = null;
 
   renderContent();
   syncAnnotationsForCurrentFile(true);

@@ -534,6 +534,88 @@ function replyComment(path: string, ref: { id?: string; serial?: number }, text:
   console.log(text.trim());
 }
 
+interface ReplyBatchItem {
+  id?: string;
+  seq?: number;
+  text: string;
+}
+
+async function loadReplyBatchItems(input: string): Promise<ReplyBatchItem[]> {
+  const source = String(input || "").trim();
+  if (!source) {
+    throw new Error("缺少 --input");
+  }
+  const raw = source === "-"
+    ? await new Response(Bun.stdin.stream()).text()
+    : readFileSync(resolve(source), "utf-8");
+  let parsed: any;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("批量输入必须是 JSON");
+  }
+  const rows = Array.isArray(parsed?.replies) ? parsed.replies : [];
+  if (rows.length === 0) {
+    throw new Error("批量输入为空，缺少 replies[]");
+  }
+  const items: ReplyBatchItem[] = [];
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const id = typeof row.id === "string" ? row.id.trim() : "";
+    const seq = Number(row.seq);
+    const text = String(row.text || "").trim();
+    if ((!id && (!Number.isFinite(seq) || seq <= 0)) || !text) continue;
+    items.push({
+      id: id || undefined,
+      seq: Number.isFinite(seq) && seq > 0 ? Math.floor(seq) : undefined,
+      text,
+    });
+  }
+  if (items.length === 0) {
+    throw new Error("批量输入无有效项（每项需要 id/seq + text）");
+  }
+  return items;
+}
+
+async function replyCommentBatch(
+  path: string,
+  author: string,
+  input: string,
+  json: boolean
+): Promise<void> {
+  const items = await loadReplyBatchItems(input);
+  const results = items.map((item, index) => {
+    const ref = item.seq ? { serial: item.seq } : { id: item.id };
+    const result = appendAnnotationReply(path, ref, item.text, author);
+    return {
+      index: index + 1,
+      ref: item.seq ? `#${item.seq}` : (item.id || ""),
+      ok: result.ok,
+      error: result.error || null,
+      serial: result.updated?.serial || null,
+      annotationId: result.updated?.id || null,
+    };
+  });
+  const success = results.filter((item) => item.ok).length;
+  const failed = results.length - success;
+  if (json) {
+    console.log(JSON.stringify({
+      success: failed === 0,
+      path: resolve(path),
+      author,
+      total: results.length,
+      successCount: success,
+      failedCount: failed,
+      results,
+    }, null, 2));
+    return;
+  }
+  console.log(`批量回复完成：成功 ${success}，失败 ${failed}`);
+  for (const row of results.filter((item) => !item.ok)) {
+    console.log(`- 第${row.index}条 ${row.ref}: ${row.error}`);
+  }
+}
+
 function printCommentDocs(json: boolean, limit: number, offset: number): void {
   const docs = listAnnotatedDocuments(limit, offset)
     .slice()
@@ -605,6 +687,8 @@ MD Viewer CLI - 统一命令行工具
   mdv comments get --file <FILE>       查看文档评论
   mdv comments reply --file <FILE> [--seq <N> | --id <ID>] --author <NAME> --text <TEXT>
                                        回复一条评论
+  mdv comments reply-batch --file <FILE> --author <NAME> --input <JSON|-> 
+                                       批量回复评论
   mdv comments stats                   评论统计
   mdv --help                           显示帮助
 
@@ -619,6 +703,7 @@ MD Viewer CLI - 统一命令行工具
   --id <ID>                            评论唯一 ID（用于 reply）
   --author <NAME>                      回复作者（必填，如 codex/claude/huanghao）
   --text <TEXT>                        回复内容（用于 reply）
+  --input <PATH|->                     批量回复输入（JSON 文件路径或 stdin）
 
 示例:
   mdv README.md                        打开文件
@@ -635,6 +720,7 @@ MD Viewer CLI - 统一命令行工具
   mdv comments list --json             列出评论文档（JSON）
   mdv comments get --file README.md    查看评论
   mdv comments reply --file README.md --seq 2 --author codex --text "我会补充这部分"
+  mdv comments reply-batch --file README.md --author codex --input replies.json
   mdv comments stats                   评论统计
 
 配置文件:
@@ -658,6 +744,7 @@ interface CliOptions {
   id?: string;
   text?: string;
   author?: string;
+  input?: string;
   daemon: boolean;
 }
 
@@ -706,6 +793,8 @@ function parseArgs(args: string[]): {
       options.text = args[++i];
     } else if (arg === "--author") {
       options.author = args[++i];
+    } else if (arg === "--input") {
+      options.input = args[++i];
     } else if (!arg.startsWith("-")) {
       if (command.length === 0 && !topLevelCommands.has(arg)) {
         // 兼容 `mdv <FILE>`：首个非选项参数且非保留命令时，按文件路径处理。
@@ -847,11 +936,36 @@ async function main() {
         author,
         options.json
       );
+    } else if (subcmd === "reply-batch") {
+      const target = options.file || rest[0];
+      if (!target) {
+        console.error("❌ 缺少文档路径");
+        console.error("   用法: mdv comments reply-batch --file <FILE> --author <NAME> --input <JSON|->");
+        process.exit(1);
+      }
+      const author = String(options.author || "").trim();
+      if (!author) {
+        console.error("❌ 缺少回复作者");
+        console.error("   用法: mdv comments reply-batch --file <FILE> --author <NAME> --input <JSON|->");
+        process.exit(1);
+      }
+      const input = String(options.input || "").trim();
+      if (!input) {
+        console.error("❌ 缺少批量输入");
+        console.error("   用法: mdv comments reply-batch --file <FILE> --author <NAME> --input <JSON|->");
+        process.exit(1);
+      }
+      try {
+        await replyCommentBatch(target, author, input, options.json);
+      } catch (error: any) {
+        console.error(`❌ ${error?.message || "批量回复失败"}`);
+        process.exit(1);
+      }
     } else if (subcmd === "stats") {
       showCommentsStats();
     } else {
       console.error(`❌ 未知的 comments 子命令: ${subcmd}`);
-      console.error(`   可用: list, get, reply, stats`);
+      console.error(`   可用: list, get, reply, reply-batch, stats`);
       process.exit(1);
     }
   } else {

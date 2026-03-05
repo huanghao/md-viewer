@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import {
+  appendAnnotationReply,
   replaceAnnotations,
   listAnnotatedDocuments,
   getAnnotationsByDocument,
@@ -61,6 +62,23 @@ describe('annotation-storage', () => {
     expect(result.annotations[0].status).toBe('unanchored');
     expect(typeof result.annotations[0].quote).toBe('string');
     expect(typeof result.annotations[0].note).toBe('string');
+    expect(Array.isArray(result.annotations[0].thread)).toBe(true);
+  });
+
+  it('migrates legacy note into thread and supports appending reply', () => {
+    const before = getAnnotationsByDocument('/tmp/b.md', 10, 0);
+    expect(before.annotations.length).toBe(1);
+    expect(before.annotations[0].thread?.[0]?.type).toBe('comment');
+    expect(before.annotations[0].thread?.[0]?.note).toBe('note-b1');
+
+    const updated = appendAnnotationReply('/tmp/b.md', { serial: before.annotations[0].serial }, 'reply-b1', 'codex');
+    expect(updated.ok).toBe(true);
+
+    const after = getAnnotationsByDocument('/tmp/b.md', 10, 0);
+    expect(after.annotations.length).toBe(1);
+    expect(after.annotations[0].thread?.length).toBe(2);
+    expect(after.annotations[0].thread?.[1]?.type).toBe('reply');
+    expect(after.annotations[0].thread?.[1]?.author).toBe('codex');
+    expect(after.annotations[0].thread?.[1]?.note).toBe('reply-b1');
   });
 });
-

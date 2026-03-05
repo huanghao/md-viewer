@@ -33,6 +33,7 @@ import {
   handleGetAnnotations,
   handleSaveAnnotations,
   handleMigrateAnnotations,
+  handleClearAllAnnotations,
 } from "./handlers.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
 
@@ -117,6 +118,7 @@ app.post("/api/scan-workspace", handleScanWorkspace);
 app.get("/api/annotations", handleGetAnnotations);
 app.post("/api/annotations", handleSaveAnnotations);
 app.post("/api/annotations/migrate", handleMigrateAnnotations);
+app.post("/api/annotations/clear", handleClearAllAnnotations);
 
 // ==================== 启动服务 ====================
 

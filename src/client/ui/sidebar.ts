@@ -7,6 +7,7 @@ import { getFileListStatus } from '../utils/file-status';
 import { getFileTypeIcon } from '../utils/file-type';
 import { getTabBatchTargets, type TabBatchAction } from '../utils/tab-batch';
 import { renderWorkspaceSidebar, bindWorkspaceEvents } from './sidebar-workspace';
+import { syncAnnotationSidebarLayout } from '../annotation';
 
 let lastEscAt = 0;
 let lastEscValue = '';
@@ -570,5 +571,6 @@ export function renderTabs(): void {
     if (tabsScrollEl && tabsScrollLeft > 0) {
       tabsScrollEl.scrollLeft = tabsScrollLeft;
     }
+    syncAnnotationSidebarLayout();
   });
 }

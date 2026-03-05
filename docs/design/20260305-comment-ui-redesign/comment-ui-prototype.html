@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Comment UI Prototype</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --panel: #ffffff;
+      --line: #dfe3eb;
+      --text: #1f2430;
+      --subtle: #5d6472;
+      --brand: #166ff7;
+      --warn: #d44f4f;
+      --ok: #00a870;
+      --highlight: #fff3b3;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: radial-gradient(1200px 600px at -20% -20%, #d9e8ff 0%, var(--bg) 45%);
+      height: 100vh;
+      overflow: hidden;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      height: 100vh;
+      gap: 12px;
+      padding: 12px;
+    }
+    .doc {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--panel);
+      padding: 20px 24px;
+      overflow: auto;
+      position: relative;
+    }
+    .doc h1 { margin-top: 0; }
+    .quote {
+      background: transparent;
+      border-radius: 6px;
+      padding: 0 2px;
+      transition: background-color .15s;
+      cursor: pointer;
+    }
+    .quote.active { background: var(--highlight); }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--panel);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .panel-head {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      display: grid;
+      gap: 8px;
+      background: linear-gradient(180deg, #fff, #fafbff);
+    }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    button {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 8px;
+      padding: 6px 10px;
+      cursor: pointer;
+      color: var(--text);
+      font-size: 12px;
+    }
+    button.active {
+      border-color: var(--brand);
+      color: var(--brand);
+      background: #edf4ff;
+    }
+    .list {
+      flex: 1;
+      overflow: auto;
+      padding: 10px;
+      display: grid;
+      gap: 10px;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-left: 4px solid transparent;
+      border-radius: 10px;
+      padding: 10px;
+      background: #fff;
+      cursor: pointer;
+    }
+    .card.active { border-color: #aac8ff; background: #f6f9ff; }
+    .card.exact { border-left-color: var(--ok); }
+    .card.reanchored { border-left-color: #e7a320; }
+    .card.orphan { border-left-color: var(--warn); }
+    .meta { font-size: 12px; color: var(--subtle); margin-bottom: 6px; }
+    .body { font-size: 13px; line-height: 1.5; }
+    .actions { margin-top: 8px; display: flex; gap: 6px; }
+    .chip {
+      display: inline-block;
+      font-size: 11px;
+      color: #4e5563;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      margin-right: 6px;
+    }
+    .chip.warn { color: var(--warn); border-color: #efc2c2; background: #fff5f5; }
+
+    .composer {
+      border-top: 1px solid var(--line);
+      padding: 10px;
+      display: grid;
+      gap: 8px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 72px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px;
+      font: inherit;
+    }
+    .note { font-size: 12px; color: var(--subtle); }
+
+    @media (max-width: 960px) {
+      .layout { grid-template-columns: 1fr; }
+      .panel { height: 42vh; }
+      .doc { height: 56vh; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <main class="doc" id="doc">
+      <h1>评论系统重设计原型</h1>
+      <p>这个原型模拟右侧评论面板与正文锚点的联动。点击高亮文本或右侧评论卡可以互相定位。</p>
+      <p>
+        我们希望在文档变更后，评论仍然能尽量定位到
+        <span class="quote" data-anchor="a1">原始讨论片段</span>。
+        如果定位算法只能找到近似位置，则标记为 reanchored。
+      </p>
+      <p>
+        当匹配失败时，评论会进入
+        <span class="quote" data-anchor="a3">orphan（待确认）状态</span>，
+        用户需要手动确认绑定到哪一段。
+      </p>
+      <p>
+        历史区中展示已解决评论，支持
+        <span class="quote" data-anchor="a2">重新打开（reopen）</span>。
+      </p>
+    </main>
+
+    <aside class="panel">
+      <div class="panel-head">
+        <div class="row" id="filterRow">
+          <button data-filter="all" class="active">全部</button>
+          <button data-filter="open">未解决</button>
+          <button data-filter="resolved">已解决</button>
+          <button data-filter="history">历史</button>
+        </div>
+        <div class="row" id="densityRow">
+          <button data-density="default" class="active">默认列表</button>
+          <button data-density="simple">极简列表</button>
+        </div>
+      </div>
+
+      <div class="list" id="list"></div>
+
+      <div class="composer">
+        <textarea placeholder="在这里输入评论（非模态输入）"></textarea>
+        <div class="row">
+          <button>提交</button>
+          <span class="note">若图片上传中，提交按钮应禁用（本原型仅展示文案）。</span>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const state = {
+      filter: 'all',
+      density: 'default',
+      activeId: null,
+      items: [
+        { id: 'c1', anchor: 'a1', title: '定位策略', body: '建议先 exact，再上下文匹配，最后模糊匹配。', status: 'open', track: 'exact', history: false },
+        { id: 'c2', anchor: 'a2', title: '历史评论', body: '该评论已解决，可在历史区 reopen。', status: 'resolved', track: 'reanchored', history: true },
+        { id: 'c3', anchor: 'a3', title: '锚点失效', body: '文档改动过大，当前仅能标记 orphan 待确认。', status: 'open', track: 'orphan', history: false }
+      ]
+    };
+
+    const list = document.getElementById('list');
+    const quotes = [...document.querySelectorAll('.quote')];
+
+    function visible(item) {
+      if (state.filter === 'all') return !item.history;
+      if (state.filter === 'open') return item.status === 'open' && !item.history;
+      if (state.filter === 'resolved') return item.status === 'resolved' && !item.history;
+      if (state.filter === 'history') return item.history;
+      return true;
+    }
+
+    function setActive(itemId) {
+      state.activeId = itemId;
+      const item = state.items.find(i => i.id === itemId);
+      quotes.forEach(q => q.classList.toggle('active', item && q.dataset.anchor === item.anchor));
+      render();
+    }
+
+    function toggleResolve(itemId) {
+      const item = state.items.find(i => i.id === itemId);
+      if (!item) return;
+      if (item.status === 'open') {
+        item.status = 'resolved';
+        item.history = true;
+      } else {
+        item.status = 'open';
+        item.history = false;
+      }
+      render();
+    }
+
+    function render() {
+      const rows = state.items.filter(visible);
+      list.innerHTML = rows.map(item => {
+        const chips = [
+          `<span class="chip">${item.status === 'open' ? '未解决' : '已解决'}</span>`,
+          item.track === 'orphan'
+            ? `<span class="chip warn">orphan: 需确认</span>`
+            : `<span class="chip">${item.track}</span>`
+        ].join('');
+
+        const body = state.density === 'simple'
+          ? `<div class="body">${item.body.slice(0, 24)}...</div>`
+          : `<div class="body">${item.body}</div>`;
+
+        const actionLabel = item.status === 'open' ? '标记已解决' : '重新打开';
+
+        return `
+          <article class="card ${item.track} ${state.activeId === item.id ? 'active' : ''}" data-id="${item.id}">
+            <div class="meta">#${item.id} · ${item.title}</div>
+            <div>${chips}</div>
+            ${body}
+            <div class="actions">
+              <button data-action="toggle" data-id="${item.id}">${actionLabel}</button>
+            </div>
+          </article>
+        `;
+      }).join('');
+    }
+
+    document.getElementById('filterRow').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-filter]');
+      if (!btn) return;
+      state.filter = btn.dataset.filter;
+      [...document.querySelectorAll('#filterRow button')].forEach(b => b.classList.toggle('active', b === btn));
+      render();
+    });
+
+    document.getElementById('densityRow').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-density]');
+      if (!btn) return;
+      state.density = btn.dataset.density;
+      [...document.querySelectorAll('#densityRow button')].forEach(b => b.classList.toggle('active', b === btn));
+      render();
+    });
+
+    list.addEventListener('click', (e) => {
+      const toggleBtn = e.target.closest('button[data-action="toggle"]');
+      if (toggleBtn) {
+        e.stopPropagation();
+        toggleResolve(toggleBtn.dataset.id);
+        return;
+      }
+      const card = e.target.closest('.card');
+      if (card) setActive(card.dataset.id);
+    });
+
+    quotes.forEach(q => {
+      q.addEventListener('click', () => {
+        const item = state.items.find(i => i.anchor === q.dataset.anchor && visible(i));
+        if (item) setActive(item.id);
+      });
+    });
+
+    render();
+  </script>
+</body>
+</html>

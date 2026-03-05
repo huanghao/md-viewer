@@ -935,7 +935,7 @@ function scanDirectory(dirPath: string): any {
   return tree;
 }
 
-// API: 获取批注（按文件）
+// API: 获取评论（按文件）
 export async function handleGetAnnotations(c: Context) {
   try {
     const filePath = c.req.query("path") || "";
@@ -943,11 +943,11 @@ export async function handleGetAnnotations(c: Context) {
     const annotations = listAnnotations(filePath);
     return c.json({ annotations });
   } catch (error: any) {
-    return c.json({ error: error?.message || "获取批注失败" }, 500);
+    return c.json({ error: error?.message || "获取评论失败" }, 500);
   }
 }
 
-// API: 保存批注（整量替换）
+// API: 保存评论（整量替换）
 export async function handleSaveAnnotations(c: Context) {
   try {
     const body = await c.req.json();
@@ -958,11 +958,11 @@ export async function handleSaveAnnotations(c: Context) {
     const result = replaceAnnotations(path, annotations);
     return c.json({ success: true, saved: result.saved });
   } catch (error: any) {
-    return c.json({ error: error?.message || "保存批注失败" }, 500);
+    return c.json({ error: error?.message || "保存评论失败" }, 500);
   }
 }
 
-// API: 从 localStorage 一次性迁移批注到 SQLite
+// API: 从 localStorage 一次性迁移评论到 SQLite
 export async function handleMigrateAnnotations(c: Context) {
   try {
     const body = await c.req.json();
@@ -970,7 +970,7 @@ export async function handleMigrateAnnotations(c: Context) {
     const result = importLegacyAnnotations(byPath);
     return c.json({ success: true, ...result });
   } catch (error: any) {
-    return c.json({ error: error?.message || "迁移批注失败" }, 500);
+    return c.json({ error: error?.message || "迁移评论失败" }, 500);
   }
 }
 

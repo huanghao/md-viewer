@@ -18,6 +18,41 @@ export interface KmDocResult {
   command?: string; // 执行的命令
 }
 
+function normalizeWhitespace(input: string): string {
+  return input.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function dedupeSections(sections: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const section of sections) {
+    const normalized = normalizeWhitespace(section);
+    if (!normalized) continue;
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    result.push(normalized);
+  }
+  return result;
+}
+
+function isHtmlResponseError(text: string): boolean {
+  const normalized = (text || "").toLowerCase();
+  if (!normalized) return false;
+  return (
+    normalized.includes("parse json response") &&
+    normalized.includes("invalid character '<'") &&
+    (normalized.includes("response preview: <!doctype html") ||
+      normalized.includes("response preview: <html"))
+  );
+}
+
+function buildAuthExpiredHint(): string {
+  return [
+    "检测到学城接口返回了 HTML 页面而不是 JSON，通常是登录态失效或认证跳转导致。",
+    "请先在终端重新登录 km-cli 后重试（例如：`km-cli auth login`）。",
+  ].join("\n");
+}
+
 /**
  * 创建学城文档
  */
@@ -32,11 +67,13 @@ export async function createKmDoc(options: {
     stderr: string | undefined,
     message?: string
   ): string => {
-    const parts = [
+    const rawSections = [
       stdout && stdout.trim() ? `STDOUT:\n${stdout}` : "",
       stderr && stderr.trim() ? `STDERR:\n${stderr}` : "",
       message ? `ERROR:\n${message}` : "",
-    ].filter(Boolean);
+    ].filter(Boolean) as string[];
+
+    const parts = dedupeSections(rawSections);
 
     if (parts.length > 0) return parts.join("\n\n");
     return "km-cli 未返回可读输出（stdout/stderr 为空）。请检查 km-cli 登录状态与网络。";
@@ -109,11 +146,12 @@ export async function createKmDoc(options: {
   } catch (error: any) {
     // 命令执行失败（通常是 exit code 非 0）
     const output = outputFallback(error.stdout, error.stderr, error.message);
+    const authExpired = isHtmlResponseError(output);
 
     return {
       success: false,
-      error: "km-cli 执行失败",
-      output,
+      error: authExpired ? "学城登录状态失效，请重新登录 km-cli" : "km-cli 执行失败",
+      output: authExpired ? `${buildAuthExpiredHint()}\n\n${output}` : output,
       command: cmd,
     };
   }
@@ -129,6 +167,17 @@ export async function getKmDocMeta(contentId: string): Promise<any> {
     const { stdout } = await execAsync(cmd);
     return JSON.parse(stdout);
   } catch (error: any) {
+    const output = [
+      error?.stdout ? `STDOUT:\n${error.stdout}` : "",
+      error?.stderr ? `STDERR:\n${error.stderr}` : "",
+      error?.message ? `ERROR:\n${error.message}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    if (isHtmlResponseError(output)) {
+      throw new Error(`获取文档元数据失败: 学城登录状态失效，请重新登录 km-cli。\n${buildAuthExpiredHint()}`);
+    }
     throw new Error(`获取文档元数据失败: ${error.message}`);
   }
 }

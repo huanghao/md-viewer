@@ -42,28 +42,7 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        shell: bash
-        run: |
-          # Try bun install first, fall back to npm if it fails
-          echo "Installing dependencies with bun..."
-          if ! bun install --verbose 2>&1 | tee /tmp/bun-install.log; then
-            echo "⚠️  Bun install failed, trying npm..."
-            npm install --verbose
-          fi
-
-          # Verify critical packages
-          if [ ! -d "node_modules/esbuild" ] || [ ! -d "node_modules/typescript" ]; then
-            echo "❌ Critical packages missing, trying npm..."
-            rm -rf node_modules
-            npm install --verbose
-          fi
-
-          # Final verification
-          if [ ! -d "node_modules/esbuild" ]; then
-            echo "❌ Failed to install esbuild"
-            exit 1
-          fi
-          echo "✅ Dependencies installed successfully"
+        run: npm ci
 
       - name: Build
         run: |

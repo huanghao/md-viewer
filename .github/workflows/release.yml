@@ -98,18 +98,28 @@ jobs:
           done
           cat SHA256SUMS.txt
 
-      - name: List files for debugging
+      - name: Collect release files
         run: |
-          echo "Files in packages/:"
-          ls -la packages/
+          mkdir -p release-files
+          # Find all unique tarballs (one per platform)
+          for platform in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
+            tarball=$(find packages -name "mdv-${platform}.tar.gz" -type f | head -1)
+            if [ -f "$tarball" ]; then
+              cp "$tarball" "release-files/mdv-${platform}.tar.gz"
+              echo "✓ Found: mdv-${platform}.tar.gz"
+            else
+              echo "✗ Missing: mdv-${platform}.tar.gz"
+            fi
+          done
+          cp packages/SHA256SUMS.txt release-files/
           echo ""
-          echo "Tarballs:"
-          find packages -name "*.tar.gz" -type f
+          echo "Release files:"
+          ls -lh release-files/
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: packages/*
+          files: release-files/*
           draft: false
           prerelease: false
           generate_release_notes: true

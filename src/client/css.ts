@@ -2690,7 +2690,7 @@ export const styles = `
       border: 1px solid #e5e7eb;
       border-radius: 6px;
       background: #fafbfc;
-      padding: 6px;
+      padding: 4px 6px;
       cursor: text;
     }
     .annotation-reply-entry:focus-within {
@@ -2698,32 +2698,19 @@ export const styles = `
       box-shadow: 0 0 0 2px rgba(9, 105, 218, 0.12);
       background: #fff;
     }
-    .annotation-reply-placeholder {
-      font-size: 12px;
-      color: #6b7280;
-      line-height: 1.4;
-    }
-    .annotation-reply-editor.hidden {
-      display: none;
-    }
-    .annotation-reply-editor {
-      margin-top: 0;
-    }
-    .annotation-reply-entry.is-open .annotation-reply-placeholder,
-    .annotation-reply-entry:focus-within .annotation-reply-placeholder {
-      display: none;
-    }
-    .annotation-reply-editor textarea {
+    .annotation-reply-entry textarea {
       width: 100%;
-      min-height: 28px;
-      padding: 4px 0;
+      min-height: 34px;
+      padding: 4px 2px;
       border: none;
+      border-radius: 0;
       font-size: 12px;
       font-family: inherit;
       line-height: 1.5;
       resize: none;
       background: transparent;
       outline: none;
+      box-shadow: none;
     }
     .annotation-meta {
       margin-bottom: 4px;
@@ -2903,13 +2890,15 @@ export const styles = `
     }
     .annotation-composer textarea {
       width: 100%;
-      min-height: 72px;
+      min-height: 34px;
       padding: 8px;
       border: 1px solid #d0d7de;
       border-radius: 6px;
       font-size: 13px;
-      resize: vertical;
+      line-height: 1.5;
+      resize: none;
       font-family: inherit;
+      overflow-y: hidden;
     }
     .annotation-composer textarea:focus {
       outline: none;

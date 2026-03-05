@@ -1446,7 +1446,14 @@ export const styles = `
       border-top: 1px solid #e1e4e8;
       display: flex;
       justify-content: flex-end;
+      align-items: center;
       gap: 8px;
+    }
+    .sync-dialog-shortcut-hint {
+      margin-right: auto;
+      font-size: 12px;
+      color: #6b7280;
+      user-select: none;
     }
     .sync-dialog-status {
       margin-top: 10px;
@@ -2843,6 +2850,12 @@ export const styles = `
       outline: none;
       border-color: #0969da;
       box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
+    }
+    .annotation-composer-hint {
+      margin-top: 6px;
+      font-size: 12px;
+      color: #6b7280;
+      user-select: none;
     }
     .annotation-popover-note {
       font-size: 13px;

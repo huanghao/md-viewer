@@ -1,6 +1,7 @@
 import { styles } from "./css.ts";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import { join } from "path";
+import { EMBEDDED_CLIENT_JS } from "./embedded-client.ts";
 
 // 判断是否为开发模式
 const isDev = process.env.NODE_ENV !== 'production';
@@ -8,22 +9,24 @@ const isDev = process.env.NODE_ENV !== 'production';
 // 版本号：用于强制刷新浏览器缓存
 const VERSION = Date.now().toString();
 
-// 生产模式：启动时读取一次并缓存
+// 客户端脚本缓存
 let cachedClientScript: string | null = null;
 
 function loadClientScript(): string {
-  try {
-    return readFileSync(join(process.cwd(), "dist/client.js"), "utf-8");
-  } catch (e) {
-    console.error("❌ 无法读取客户端脚本，请先运行: bun run build:client");
-    process.exit(1);
+  // 开发模式：尝试从文件系统读取
+  if (isDev) {
+    const clientPath = join(process.cwd(), "dist/client.js");
+    if (existsSync(clientPath)) {
+      return readFileSync(clientPath, "utf-8");
+    }
   }
+
+  // 生产模式或文件不存在：使用嵌入的脚本
+  return EMBEDDED_CLIENT_JS;
 }
 
-// 生产模式下预加载
-if (!isDev) {
-  cachedClientScript = loadClientScript();
-}
+// 预加载客户端脚本
+cachedClientScript = loadClientScript();
 
 // 获取客户端脚本
 function getClientScript(): string {
@@ -31,7 +34,7 @@ function getClientScript(): string {
     // 开发模式：每次动态读取，支持热更新
     return loadClientScript();
   } else {
-    // 生产模式：使用缓存，提升性能
+    // 生产模式：使用缓存
     return cachedClientScript!;
   }
 }
@@ -128,16 +131,38 @@ export function generateClientHTML(): string {
       </div>
     </main>
 
-    <!-- 批注侧边栏 -->
+    <!-- 评论侧边栏 -->
     <aside class="annotation-sidebar" id="annotationSidebar">
       <div class="annotation-sidebar-header">
-        <h3>批注列表</h3>
-        <span class="annotation-tip">选中文本即可添加批注</span>
+        <div class="annotation-header-row">
+          <h3 id="annotationTitle">评论(<span id="annotationCount">0</span>)</h3>
+          <div class="annotation-header-actions">
+            <button class="annotation-icon-btn" id="annotationDensityToggle" title="切换默认/极简" aria-label="切换默认/极简">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h10v1H3zm0 4h10v1H3zm0 4h10v1H3z"/></svg>
+            </button>
+            <button class="annotation-icon-btn" id="annotationFilterToggle" title="筛选" aria-label="筛选">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12L9.5 8v4.5l-3-1.5V8z"/></svg>
+            </button>
+            <button class="annotation-icon-btn" id="annotationSidebarClose" title="收起评论" aria-label="收起评论">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.2 4.2L8 8l3.8-3.8 1 1L9 9l3.8 3.8-1 1L8 10l-3.8 3.8-1-1L7 9 3.2 5.2z"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="annotation-filter-menu hidden" id="annotationFilterMenu">
+          <button class="annotation-filter-item is-active" data-filter="all">全部</button>
+          <button class="annotation-filter-item" data-filter="open">未解决</button>
+          <button class="annotation-filter-item" data-filter="resolved">已解决</button>
+          <button class="annotation-filter-item" data-filter="orphan">定位失败</button>
+        </div>
       </div>
       <div class="annotation-list" id="annotationList">
-        <div class="annotation-empty">无批注（选中文本即可添加）</div>
+        <div class="annotation-empty">无评论（选中文本即可添加）</div>
       </div>
     </aside>
+    <div class="annotation-sidebar-resizer" id="annotationSidebarResizer" title="拖拽调整评论栏宽度"></div>
+    <button class="annotation-floating-open-btn" id="annotationFloatingOpenBtn" title="打开评论侧边栏" aria-label="打开评论侧边栏">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h12v9H8l-3 3v-3H2z"/></svg>
+    </button>
   </div>
 
   <!-- 同步对话框 -->
@@ -153,30 +178,57 @@ export function generateClientHTML(): string {
     </div>
   </div>
 
-  <!-- 批注创建浮窗 -->
+  <!-- 评论创建浮窗 -->
   <div id="annotationComposer" class="annotation-composer hidden">
-    <div class="annotation-composer-header">
-      <div class="annotation-composer-title">添加批注</div>
+    <div id="annotationComposerHeader" class="annotation-composer-header">
+      <div class="annotation-row-top">
+        <div class="annotation-row-title">新评论</div>
+        <div class="annotation-row-actions">
+          <button id="composerCancelBtn" class="annotation-icon-action" title="取消" aria-label="取消">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.2 4.2L8 8l3.8-3.8 1 1L9 9l3.8 3.8-1 1L8 10l-3.8 3.8-1-1L7 9 3.2 5.2z"/></svg>
+          </button>
+          <button id="composerSaveBtn" class="annotation-icon-action resolve" title="保存" aria-label="保存">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.4 11.2L3.5 8.3l1.1-1.1 1.8 1.8 5-5 1.1 1.1z"/></svg>
+          </button>
+        </div>
+      </div>
     </div>
-    <div id="composerQuote" class="annotation-composer-quote"></div>
-    <textarea id="composerNote" rows="3" placeholder="输入批注内容..."></textarea>
-    <div class="annotation-composer-actions">
-      <button id="composerCancelBtn" class="annotation-btn">取消</button>
-      <button id="composerSaveBtn" class="annotation-btn annotation-btn-primary">保存</button>
-    </div>
+    <textarea id="composerNote" rows="3" placeholder="输入评论内容..."></textarea>
   </div>
 
-  <!-- 批注查看浮窗 -->
+  <!-- 划词后快速评论入口 -->
+  <button id="annotationQuickAdd" class="annotation-quick-add hidden" title="添加评论" aria-label="添加评论">
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <rect x="2.6" y="2.6" width="10.8" height="10.8" rx="2.4" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <path d="M8 5.4v5.2M5.4 8h5.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+    </svg>
+  </button>
+
+  <!-- 评论查看浮窗 -->
   <div id="annotationPopover" class="annotation-popover hidden">
     <div class="annotation-popover-header">
-      <div class="annotation-popover-title">批注</div>
-      <button id="popoverCloseBtn" class="annotation-btn annotation-btn-icon">×</button>
+      <div class="annotation-row-top">
+        <div id="popoverTitle" class="annotation-row-title">#0</div>
+        <div class="annotation-row-actions">
+          <button id="popoverPrevBtn" class="annotation-icon-action" title="上一条" aria-label="上一条">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 4l4 4H4z"/></svg>
+          </button>
+          <button id="popoverNextBtn" class="annotation-icon-action" title="下一条" aria-label="下一条">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 12l-4-4h8z"/></svg>
+          </button>
+          <button id="popoverResolveBtn" class="annotation-icon-action resolve" title="标记已解决" aria-label="标记已解决">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.4 11.2L3.5 8.3l1.1-1.1 1.8 1.8 5-5 1.1 1.1z"/></svg>
+          </button>
+          <button id="popoverDeleteBtn" class="annotation-icon-action danger" title="删除评论" aria-label="删除评论">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2h4l1 1h3v1H2V3h3l1-1zm-1 4h1v7H5V6zm3 0h1v7H8V6zm3 0h1v7h-1V6z"/></svg>
+          </button>
+          <button id="popoverCloseBtn" class="annotation-icon-action" title="关闭" aria-label="关闭">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.2 4.2L8 8l3.8-3.8 1 1L9 9l3.8 3.8-1 1L8 10l-3.8 3.8-1-1L7 9 3.2 5.2z"/></svg>
+          </button>
+        </div>
+      </div>
     </div>
-    <div id="popoverQuote" class="annotation-popover-quote"></div>
     <div id="popoverNote" class="annotation-popover-note"></div>
-    <div class="annotation-popover-actions">
-      <button id="popoverDeleteBtn" class="annotation-btn annotation-btn-danger">删除批注</button>
-    </div>
   </div>
 
   <script>${clientScript}<\/script>

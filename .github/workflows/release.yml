@@ -103,6 +103,7 @@ jobs:
         with:
           files: |
             packages/mdv-*/*.tar.gz
+            packages/*.tar.gz
             packages/SHA256SUMS.txt
           draft: false
           prerelease: false

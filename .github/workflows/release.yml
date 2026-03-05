@@ -86,15 +86,14 @@ jobs:
             if [ -d "$dir" ]; then
               cd "$dir"
               for file in *.tar.gz; do
-                sha256sum "$file" | tee -a ../SHA256SUMS.txt
+                if [ -f "$file" ]; then
+                  sha256sum "$file" | tee -a ../SHA256SUMS.txt
+                fi
               done
               cd ..
-            fi
-          done
-          # Also handle files directly in packages/
-          for file in *.tar.gz 2>/dev/null; do
-            if [ -f "$file" ]; then
-              sha256sum "$file" | tee -a SHA256SUMS.txt
+            elif [ -f "$dir" ]; then
+              # Handle .tar.gz files directly in packages/
+              sha256sum "$dir" | tee -a SHA256SUMS.txt
             fi
           done
           cat SHA256SUMS.txt

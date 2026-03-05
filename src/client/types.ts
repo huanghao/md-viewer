@@ -143,12 +143,3 @@ export interface SyncStatusData {
 export interface SyncPreferences {
   openAfterSync?: boolean;
 }
-
-export interface SyncMeta {
-  docId?: string;
-  url?: string;
-  title?: string;
-  syncedAt?: number;
-  baseTitle?: string;
-  version?: number;
-}

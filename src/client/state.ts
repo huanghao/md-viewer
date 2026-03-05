@@ -7,7 +7,6 @@ import {
   markWorkspacePathMissing,
   restoreWorkspaceAuxiliaryState,
 } from './workspace-state';
-import { restoreSyncState, setSyncMeta } from './sync-state';
 
 // 全局状态
 export const state: AppState = {
@@ -109,7 +108,6 @@ function cleanupOldFiles(): void {
 export async function restoreState(loadFile: (path: string, silent: boolean) => Promise<FileData | null>): Promise<void> {
   try {
     restoreWorkspaceAuxiliaryState();
-    restoreSyncState();
 
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) return;
@@ -135,14 +133,6 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
           isRemote: fileData.isRemote || false,
           isMissing: false,  // 恢复时文件存在，清除 isMissing
         });
-        // 兼容旧版：从 session 存储中迁移同步字段到 sync-state
-        if (fileInfo.syncedDocId || fileInfo.syncedUrl || fileInfo.syncedAt) {
-          setSyncMeta(path, {
-            docId: fileInfo.syncedDocId,
-            url: fileInfo.syncedUrl,
-            syncedAt: fileInfo.syncedAt
-          });
-        }
         validFiles.push([path, fileInfo]);
       }
     }

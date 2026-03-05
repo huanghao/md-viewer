@@ -35,6 +35,18 @@ Result limit for comment list/get (default: 20).
 .BR \-\-offset " " \fIN\fR
 Result offset for pagination (default: 0).
 .TP
+.BR \-\-seq " " \fIN\fR
+Comment serial (recommended for \fBcomments reply\fR).
+.TP
+.BR \-\-id " " \fIID\fR
+Comment raw unique ID (for \fBcomments reply\fR).
+.TP
+.BR \-\-text " " \fITEXT\fR
+Reply content (for \fBcomments reply\fR).
+.TP
+.BR \-\-author " " \fINAME\fR
+Reply author (required for \fBcomments reply\fR), e.g. \fBcodex\fR/\fBclaude\fR.
+.TP
 .B \-\-help
 Show help.
 .SH COMMANDS
@@ -62,6 +74,13 @@ Get comments for one document.
 .IP
 Options: \fB--file\fR, \fB--limit\fR, \fB--offset\fR, \fB--json\fR
 .RE
+.TP
+.B mdv comments reply --file \fIFILE\fR [--seq \fIN\fR | --id \fIID\fR] --author \fINAME\fR --text \fITEXT\fR
+Reply to one comment thread by serial (\fB2\fR) or raw ID.
+.RS
+.IP
+Options: \fB--file\fR, \fB--seq\fR/\fB--id\fR, \fB--author\fR, \fB--text\fR, \fB--json\fR
+.RE
 .SS mdv-admin
 .TP
 .B mdv-admin stats
@@ -85,6 +104,9 @@ List commented docs:
 .TP
 Get one file comments in JSON:
 .B mdv comments get --file README.md --json
+.TP
+Reply one comment:
+.B mdv comments reply --file README.md --seq 2 --author codex --text "ack, will update"
 .TP
 Show sync stats:
 .B mdv-admin stats

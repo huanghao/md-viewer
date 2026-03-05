@@ -19,6 +19,14 @@ export interface Annotation {
   quoteSuffix?: string;
   status?: 'anchored' | 'unanchored' | 'resolved';
   confidence?: number;
+  thread?: AnnotationThreadItem[];
+}
+
+export interface AnnotationThreadItem {
+  id: string;
+  type: 'comment' | 'reply';
+  note: string;
+  createdAt: number;
 }
 
 type AnnotationFilter = 'all' | 'open' | 'resolved' | 'orphan';
@@ -38,6 +46,15 @@ interface AnnotationState {
   density: AnnotationDensity;
 }
 
+function getInitialDensity(): AnnotationDensity {
+  try {
+    if (typeof localStorage === 'undefined') return 'default';
+    return localStorage.getItem('md-viewer:annotation-density') === 'simple' ? 'simple' : 'default';
+  } catch {
+    return 'default';
+  }
+}
+
 // ==================== 状态管理 ====================
 const state: AnnotationState = {
   annotations: [],
@@ -45,8 +62,8 @@ const state: AnnotationState = {
   pinnedAnnotationId: null,
   activeAnnotationId: null,
   currentFilePath: null,
-  filter: 'all',
-  density: localStorage.getItem('md-viewer:annotation-density') === 'simple' ? 'simple' : 'default',
+  filter: 'open',
+  density: getInitialDensity(),
 };
 const ANNOTATION_PANEL_OPEN_BY_FILE_KEY = 'md-viewer:annotation-panel-open-by-file';
 
@@ -60,6 +77,55 @@ export function nextAnnotationSerial(annotations: Annotation[]): number {
     return Math.max(max, ann.serial);
   }, 0);
   return maxSerial + 1;
+}
+
+function normalizeThread(annotation: Annotation): AnnotationThreadItem[] {
+  const fallbackCreatedAt = Number.isFinite(annotation.createdAt) ? annotation.createdAt : Date.now();
+  const incoming = Array.isArray(annotation.thread) ? annotation.thread : [];
+  const normalized = incoming
+    .map((item, index) => {
+      if (!item || typeof item !== 'object') return null;
+      const note = String((item as any).note || '').trim();
+      if (!note) return null;
+      const typeRaw = String((item as any).type || (index === 0 ? 'comment' : 'reply'));
+      const type: AnnotationThreadItem['type'] = typeRaw === 'reply' ? 'reply' : 'comment';
+      const createdAtRaw = Number((item as any).createdAt);
+      const createdAt = Number.isFinite(createdAtRaw) ? Math.floor(createdAtRaw) : fallbackCreatedAt + index;
+      const id = String((item as any).id || '').trim() || `${type}-${createdAt}-${Math.random().toString(16).slice(2, 8)}`;
+      return { id, type, note, createdAt } as AnnotationThreadItem;
+    })
+    .filter((item): item is AnnotationThreadItem => !!item)
+    .sort((a, b) => a.createdAt - b.createdAt);
+  if (normalized.length === 0) {
+    const note = String(annotation.note || '').trim();
+    if (!note) return [];
+    return [{
+      id: `c-${annotation.id || fallbackCreatedAt}`,
+      type: 'comment',
+      note,
+      createdAt: fallbackCreatedAt,
+    }];
+  }
+  normalized[0].type = 'comment';
+  for (let i = 1; i < normalized.length; i += 1) normalized[i].type = 'reply';
+  return normalized;
+}
+
+function ensureAnnotationThread(annotation: Annotation): boolean {
+  const nextThread = normalizeThread(annotation);
+  const prev = JSON.stringify(annotation.thread || []);
+  const next = JSON.stringify(nextThread);
+  annotation.thread = nextThread;
+  annotation.note = nextThread[0]?.note || annotation.note || '';
+  return prev !== next;
+}
+
+function ensureAnnotationThreads(annotations: Annotation[]): boolean {
+  let changed = false;
+  for (const ann of annotations) {
+    if (ensureAnnotationThread(ann)) changed = true;
+  }
+  return changed;
 }
 
 export function ensureAnnotationSerials(annotations: Annotation[]): boolean {
@@ -89,7 +155,9 @@ export function loadAnnotations(filePath: string): Annotation[] {
     const raw = localStorage.getItem(getStorageKey(filePath));
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    const anns = Array.isArray(parsed) ? parsed : [];
+    ensureAnnotationThreads(anns);
+    return anns;
   } catch (_err) {
     return [];
   }
@@ -106,7 +174,9 @@ export function setAnnotations(filePath: string | null): void {
   state.currentFilePath = filePath;
   if (filePath) {
     state.annotations = loadAnnotations(filePath);
-    if (ensureAnnotationSerials(state.annotations)) {
+    const threadChanged = ensureAnnotationThreads(state.annotations);
+    const serialChanged = ensureAnnotationSerials(state.annotations);
+    if (threadChanged || serialChanged) {
       saveAnnotations(filePath, state.annotations);
     }
     void hydrateAnnotationsFromRemote(filePath);
@@ -134,9 +204,10 @@ async function hydrateAnnotationsFromRemote(filePath: string): Promise<void> {
     if (!Array.isArray(remote)) return;
     if (state.currentFilePath !== filePath) return;
     state.annotations = remote;
+    const threadChanged = ensureAnnotationThreads(state.annotations);
     const serialChanged = ensureAnnotationSerials(state.annotations);
     localStorage.setItem(getStorageKey(filePath), JSON.stringify(state.annotations));
-    if (serialChanged) {
+    if (threadChanged || serialChanged) {
       saveAnnotations(filePath, state.annotations);
     }
     renderAnnotationList(filePath);
@@ -537,12 +608,82 @@ function applyTempSelectionMark(): void {
   } catch {}
 }
 
+function getCommentThread(annotation: Annotation): AnnotationThreadItem[] {
+  ensureAnnotationThread(annotation);
+  return annotation.thread || [];
+}
+
+function getReplyCount(annotation: Annotation): number {
+  return getCommentThread(annotation).filter((item) => item.type === 'reply').length;
+}
+
+function renderThreadListHTML(annotation: Annotation, simple = false): string {
+  const thread = getCommentThread(annotation);
+  const comment = thread[0];
+  const replies = thread.slice(1);
+  if (simple) {
+    return `
+      <div class="annotation-note simple">${escapeHtml(comment?.note || annotation.note || '（无评论内容）')}</div>
+      ${replies.length > 0 ? `<div class="annotation-reply-count">回复 ${replies.length}</div>` : ''}
+    `;
+  }
+  const body = thread
+    .map((item) => `<div class="annotation-thread-line ${item.type === 'reply' ? 'is-reply' : ''}">${escapeHtml(item.note)}</div>`)
+    .join('');
+  return body || '<div class="annotation-thread-line">（无评论内容）</div>';
+}
+
+function appendReply(annotationId: string, filePath: string, text: string): void {
+  const ann = state.annotations.find((item) => item.id === annotationId);
+  if (!ann) return;
+  const note = text.trim();
+  if (!note) return;
+  const thread = getCommentThread(ann);
+  const now = Date.now();
+  thread.push({
+    id: `r-${now}-${Math.random().toString(16).slice(2, 8)}`,
+    type: 'reply',
+    note,
+    createdAt: now,
+  });
+  ann.thread = thread;
+  ann.note = thread[0]?.note || ann.note;
+  saveAnnotations(filePath, state.annotations);
+}
+
+function autoResizeReplyInput(input: HTMLTextAreaElement): void {
+  input.style.height = 'auto';
+  const maxHeight = 140;
+  const next = Math.min(maxHeight, Math.max(input.scrollHeight, 28));
+  input.style.height = `${next}px`;
+  input.style.overflowY = input.scrollHeight > maxHeight ? 'auto' : 'hidden';
+}
+
+function openReplyEditor(container: ParentNode, id: string, editorAttr: string, inputAttr: string): void {
+  const editor = container.querySelector(`[${editorAttr}="${id}"]`) as HTMLElement | null;
+  const input = container.querySelector(`[${inputAttr}="${id}"]`) as HTMLTextAreaElement | null;
+  if (!editor || !input) return;
+  editor.closest('.annotation-reply-entry')?.classList.add('is-open');
+  editor.classList.remove('hidden');
+  autoResizeReplyInput(input);
+  input.focus();
+}
+
 function showPopover(ann: Annotation, x: number, y: number): void {
   const el = getElements();
   if (!el.popover || !el.popoverTitle || !el.popoverNote) return;
   const snippet = ann.quote.substring(0, 22);
   el.popoverTitle.textContent = `#${ann.serial || 0} | ${snippet}${ann.quote.length > 22 ? '...' : ''}`;
-  el.popoverNote.textContent = ann.note || '（无文字说明）';
+  const threadHTML = renderThreadListHTML(ann, false);
+  el.popoverNote.innerHTML = `
+    <div class="annotation-thread">${threadHTML}</div>
+    <div class="annotation-reply-entry" data-popover-reply-entry="${ann.id}" role="button" tabindex="0">
+      <div class="annotation-reply-placeholder">回复…（Cmd/Ctrl+Enter 保存）</div>
+      <div class="annotation-reply-editor hidden" data-popover-reply-editor="${ann.id}">
+        <textarea rows="1" data-popover-reply-input="${ann.id}" placeholder="输入回复内容..."></textarea>
+      </div>
+    </div>
+  `;
   if (el.popoverResolveBtn) {
     el.popoverResolveBtn.title = isResolved(ann) ? '重新打开' : '标记已解决';
     el.popoverResolveBtn.setAttribute('aria-label', isResolved(ann) ? '重新打开' : '标记已解决');
@@ -579,10 +720,18 @@ export function savePendingAnnotation(filePath: string): void {
   if (!state.pendingAnnotation || !el.composerNote) return;
 
   const note = el.composerNote.value.trim();
+  if (!note) return;
+  const now = Date.now();
   const ann: Annotation = {
     ...state.pendingAnnotation,
     serial: nextAnnotationSerial(state.annotations),
     note,
+    thread: [{
+      id: `c-${now}-${Math.random().toString(16).slice(2, 8)}`,
+      type: 'comment',
+      note,
+      createdAt: now,
+    }],
   };
 
   state.annotations.push(ann);
@@ -623,6 +772,7 @@ function jumpToAnnotation(id: string): void {
 
 function setActiveAnnotation(id: string | null, filePath: string | null): void {
   state.activeAnnotationId = id;
+  applyAnnotations();
   if (id) {
     jumpToAnnotation(id);
     state.pinnedAnnotationId = id;
@@ -678,6 +828,15 @@ function toggleResolved(id: string, filePath: string): void {
 }
 
 // ==================== 渲染 ====================
+function decorateMark(wrapper: HTMLElement, ann: Annotation): void {
+  wrapper.classList.add('annotation-mark');
+  wrapper.dataset.annotationId = ann.id;
+  wrapper.classList.add(`status-${getAnchorTrack(ann)}`);
+  if (isResolved(ann)) {
+    wrapper.classList.add('is-resolved');
+  }
+}
+
 function applySingleAnnotation(ann: Annotation): void {
   const el = getElements();
   if (!el.reader) return;
@@ -695,8 +854,7 @@ function applySingleAnnotation(ann: Annotation): void {
     range.setEnd(endPos.node, endPos.offset);
 
     const wrapper = document.createElement('span');
-    wrapper.className = 'annotation-mark';
-    wrapper.dataset.annotationId = ann.id;
+    decorateMark(wrapper, ann);
 
     try {
       range.surroundContents(wrapper);
@@ -740,8 +898,7 @@ function applySingleAnnotation(ann: Annotation): void {
       nodeRange.setEnd(node, end);
 
       const wrapper = document.createElement('span');
-      wrapper.className = 'annotation-mark';
-      wrapper.dataset.annotationId = ann.id;
+      decorateMark(wrapper, ann);
 
       nodeRange.surroundContents(wrapper);
     }
@@ -828,14 +985,33 @@ export function applyAnnotations(): void {
     }
   }
 
-  const sorted = [...state.annotations]
-    .filter((a) => !isResolved(a))
-    .filter((a) => (a.status || 'anchored') !== 'unanchored')
+  const sorted = [...getVisibleAnnotations()]
     .sort((a, b) => b.start - a.start);
   for (const ann of sorted) {
     applySingleAnnotation(ann);
   }
   attachAnnotationEvents();
+}
+
+function resolvePositionedAnnotationOverlaps(listEl: HTMLElement, contentScrollHeight: number): void {
+  const canvas = listEl.querySelector('.annotation-canvas') as HTMLElement | null;
+  if (!canvas) return;
+  const items = Array.from(canvas.querySelectorAll('.annotation-item.positioned')) as HTMLElement[];
+  if (items.length === 0) return;
+
+  const gap = 6;
+  let previousBottom = 0;
+  for (const item of items) {
+    const rawAnchorTop = Number(item.getAttribute('data-anchor-top') || '0');
+    const anchorTop = Number.isFinite(rawAnchorTop) ? Math.max(0, rawAnchorTop) : 0;
+    const resolvedTop = Math.max(anchorTop, previousBottom > 0 ? previousBottom + gap : anchorTop);
+    item.style.top = `${Math.round(resolvedTop)}px`;
+    previousBottom = resolvedTop + item.offsetHeight;
+  }
+
+  const minHeight = Math.max(0, contentScrollHeight);
+  const neededHeight = Math.ceil(previousBottom + 24);
+  canvas.style.height = `${Math.max(minHeight, neededHeight)}px`;
 }
 
 export function renderAnnotationList(filePath: string | null): void {
@@ -856,7 +1032,7 @@ export function renderAnnotationList(filePath: string | null): void {
   }
 
   const renderItem = (ann: Annotation, index: number, positioned = false, top = 0) => `
-    <div class="annotation-item ${state.activeAnnotationId === ann.id ? 'is-active' : ''} status-${getAnchorTrack(ann)}${positioned ? ' positioned' : ''}" data-annotation-id="${ann.id}"${positioned ? ` style="top:${Math.max(0, Math.round(top))}px"` : ''}>
+    <div class="annotation-item ${state.activeAnnotationId === ann.id ? 'is-active' : ''} status-${getAnchorTrack(ann)}${positioned ? ' positioned' : ''}" data-annotation-id="${ann.id}"${positioned ? ` data-anchor-top="${Math.max(0, Math.round(top))}" style="top:${Math.max(0, Math.round(top))}px"` : ''}>
       <div class="annotation-row-top">
         <div class="annotation-row-title">#${ann.serial || index + 1} | ${escapeHtml(ann.quote.substring(0, 28))}${ann.quote.length > 28 ? '...' : ''}</div>
         <div class="annotation-row-actions">
@@ -866,8 +1042,15 @@ export function renderAnnotationList(filePath: string | null): void {
           <button class="annotation-icon-action danger" data-action="delete" data-id="${ann.id}" title="删除">${iconSvg('trash')}</button>
         </div>
       </div>
-      <div class="annotation-note ${state.density === 'simple' ? 'simple' : ''}">${ann.note || '（无文字说明）'}</div>
-      ${getAnchorTrack(ann) === 'orphan' ? '<div class="annotation-note" style="color:#cf222e;">定位失败：原文已变化，请手动确认。</div>' : ''}
+      <div class="annotation-thread">${renderThreadListHTML(ann, state.density === 'simple')}</div>
+      ${state.density === 'simple' ? '' : `
+        <div class="annotation-reply-entry" data-reply-entry="${ann.id}" role="button" tabindex="0">
+          <div class="annotation-reply-placeholder">回复…（Cmd/Ctrl+Enter 保存）</div>
+          <div class="annotation-reply-editor hidden" data-reply-editor="${ann.id}">
+            <textarea rows="1" data-reply-input="${ann.id}" placeholder="输入回复内容..."></textarea>
+          </div>
+        </div>
+      `}
     </div>
   `;
 
@@ -883,6 +1066,7 @@ export function renderAnnotationList(filePath: string | null): void {
     const canvasHeight = Math.max(content?.scrollHeight || 0, maxTop + 180);
     el.annotationList.classList.add('default-mode');
     el.annotationList.innerHTML = `<div class="annotation-canvas" style="height:${canvasHeight}px">${positionedHtml}</div>`;
+    resolvePositionedAnnotationOverlaps(el.annotationList, content?.scrollHeight || 0);
     syncAnnotationScrollWithContent();
   } else {
     el.annotationList.classList.remove('default-mode');
@@ -906,6 +1090,40 @@ export function renderAnnotationList(filePath: string | null): void {
       } else if (action === 'delete') {
         removeAnnotation(id, filePath);
       }
+    });
+  });
+
+  el.annotationList.querySelectorAll('[data-reply-entry]').forEach((entry) => {
+    entry.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const id = (entry as HTMLElement).getAttribute('data-reply-entry');
+      if (!id) return;
+      openReplyEditor(el.annotationList as HTMLElement, id, 'data-reply-editor', 'data-reply-input');
+    });
+    entry.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      event.stopPropagation();
+      const id = (entry as HTMLElement).getAttribute('data-reply-entry');
+      if (!id) return;
+      openReplyEditor(el.annotationList as HTMLElement, id, 'data-reply-editor', 'data-reply-input');
+    });
+  });
+
+  el.annotationList.querySelectorAll('[data-reply-input]').forEach((inputEl) => {
+    const input = inputEl as HTMLTextAreaElement;
+    autoResizeReplyInput(input);
+    input.addEventListener('input', () => autoResizeReplyInput(input));
+    input.addEventListener('click', (event) => event.stopPropagation());
+    inputEl.addEventListener('keydown', (event) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key !== 'Enter') return;
+      event.preventDefault();
+      const input = event.currentTarget as HTMLTextAreaElement;
+      const id = input.getAttribute('data-reply-input');
+      if (!id || !filePath) return;
+      appendReply(id, filePath, input.value);
+      input.value = '';
+      renderAnnotationList(filePath);
     });
   });
 
@@ -1011,6 +1229,55 @@ export function initAnnotationElements(): void {
     const id = state.pinnedAnnotationId;
     if (id && filePath) jumpToRelative(id, 1, filePath);
   });
+  document.getElementById('annotationPopover')?.addEventListener('click', (event) => {
+    const target = event.target as HTMLElement;
+    const contentEl = document.getElementById('content');
+    const filePath = contentEl?.getAttribute('data-current-file');
+    if (!filePath) return;
+    const entry = target.closest('[data-popover-reply-entry]') as HTMLElement | null;
+    if (entry) {
+      event.stopPropagation();
+      const id = entry.getAttribute('data-popover-reply-entry');
+      if (!id) return;
+      openReplyEditor(document, id, 'data-popover-reply-editor', 'data-popover-reply-input');
+      return;
+    }
+    const input = target.closest('[data-popover-reply-input]') as HTMLTextAreaElement | null;
+    if (input) event.stopPropagation();
+  });
+  document.getElementById('annotationPopover')?.addEventListener('keydown', (event) => {
+    const target = event.target as HTMLElement;
+    const entry = target.closest('[data-popover-reply-entry]') as HTMLElement | null;
+    if (!entry) return;
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    event.stopPropagation();
+    const id = entry.getAttribute('data-popover-reply-entry');
+    if (!id) return;
+    openReplyEditor(document, id, 'data-popover-reply-editor', 'data-popover-reply-input');
+  });
+  document.getElementById('annotationPopover')?.addEventListener('keydown', (event) => {
+    const target = event.target as HTMLElement;
+    if (!(target instanceof HTMLTextAreaElement)) return;
+    if (!(event.metaKey || event.ctrlKey) || event.key !== 'Enter') return;
+    const id = target.getAttribute('data-popover-reply-input');
+    const filePath = document.getElementById('content')?.getAttribute('data-current-file');
+    if (!id || !filePath) return;
+    event.preventDefault();
+    appendReply(id, filePath, target.value);
+    target.value = '';
+    const ann = state.annotations.find((item) => item.id === id);
+    const mark = document.querySelector(`[data-annotation-id="${id}"]`) as HTMLElement | null;
+    const rect = mark?.getBoundingClientRect();
+    if (ann) showPopover(ann, rect ? rect.right + 8 : 120, rect ? rect.top + 8 : 120);
+    renderAnnotationList(filePath);
+  });
+  document.getElementById('annotationPopover')?.addEventListener('input', (event) => {
+    const target = event.target as HTMLElement;
+    if (!(target instanceof HTMLTextAreaElement)) return;
+    if (!target.hasAttribute('data-popover-reply-input')) return;
+    autoResizeReplyInput(target);
+  });
 
   getElements().filterMenu?.querySelectorAll('.annotation-filter-item[data-filter]').forEach((node) => {
     node.addEventListener('click', () => {
@@ -1019,6 +1286,7 @@ export function initAnnotationElements(): void {
       state.filter = next;
       getElements().filterMenu?.classList.add('hidden');
       const currentFile = document.getElementById('content')?.getAttribute('data-current-file');
+      applyAnnotations();
       renderAnnotationList(currentFile || null);
     });
   });

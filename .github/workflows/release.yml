@@ -83,11 +83,19 @@ jobs:
         run: |
           cd packages
           for dir in mdv-*; do
-            cd "$dir"
-            for file in *.tar.gz; do
-              sha256sum "$file" | tee -a ../SHA256SUMS.txt
-            done
-            cd ..
+            if [ -d "$dir" ]; then
+              cd "$dir"
+              for file in *.tar.gz; do
+                sha256sum "$file" | tee -a ../SHA256SUMS.txt
+              done
+              cd ..
+            fi
+          done
+          # Also handle files directly in packages/
+          for file in *.tar.gz 2>/dev/null; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" | tee -a SHA256SUMS.txt
+            fi
           done
           cat SHA256SUMS.txt
 

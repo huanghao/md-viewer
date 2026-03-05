@@ -20,7 +20,7 @@
 
 ```bash
 # 添加 tap
-brew tap huanghao/md-viewer
+brew tap huanghao/tap
 
 # 安装
 brew install md-viewer
@@ -29,7 +29,7 @@ brew install md-viewer
 或直接安装：
 
 ```bash
-brew install huanghao/md-viewer/md-viewer
+brew install huanghao/tap/md-viewer
 ```
 
 ### 从源码安装

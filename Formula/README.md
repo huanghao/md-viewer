@@ -6,7 +6,7 @@ This directory contains the Homebrew Formula for MD Viewer.
 
 ```bash
 # Add tap
-brew tap huanghao/md-viewer
+brew tap huanghao/tap
 
 # Install
 brew install md-viewer
@@ -15,8 +15,15 @@ brew install md-viewer
 Or install directly:
 
 ```bash
-brew install huanghao/md-viewer/md-viewer
+brew install huanghao/tap/md-viewer
 ```
+
+## Note
+
+The Formula has been moved to the dedicated tap repository:
+https://github.com/huanghao/homebrew-tap
+
+This directory is kept for reference and local testing only.
 
 ## Usage
 

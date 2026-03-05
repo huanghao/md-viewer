@@ -98,13 +98,18 @@ jobs:
           done
           cat SHA256SUMS.txt
 
+      - name: List files for debugging
+        run: |
+          echo "Files in packages/:"
+          ls -la packages/
+          echo ""
+          echo "Tarballs:"
+          find packages -name "*.tar.gz" -type f
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            packages/mdv-*/*.tar.gz
-            packages/*.tar.gz
-            packages/SHA256SUMS.txt
+          files: packages/*
           draft: false
           prerelease: false
           generate_release_notes: true

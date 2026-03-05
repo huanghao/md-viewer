@@ -3,6 +3,7 @@
 set -euo pipefail
 
 VERSION="${1:-dev}"
+PLATFORM="${2:-}"
 BUILD_DIR="dist"
 PACKAGE_DIR="packages"
 
@@ -18,20 +19,21 @@ if [[ ! -f "${BUILD_DIR}/mdv" ]]; then
 fi
 
 # 清理并创建打包目录
-rm -rf "$PACKAGE_DIR"
 mkdir -p "$PACKAGE_DIR"
 
-# 检测平台
-CURRENT_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-CURRENT_ARCH=$(uname -m)
+# 检测或使用指定的平台
+if [[ -z "$PLATFORM" ]]; then
+  CURRENT_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+  CURRENT_ARCH=$(uname -m)
 
-if [[ "$CURRENT_ARCH" == "arm64" ]]; then
-  CURRENT_ARCH="arm64"
-elif [[ "$CURRENT_ARCH" == "x86_64" ]]; then
-  CURRENT_ARCH="x64"
+  if [[ "$CURRENT_ARCH" == "arm64" ]]; then
+    CURRENT_ARCH="arm64"
+  elif [[ "$CURRENT_ARCH" == "x86_64" ]]; then
+    CURRENT_ARCH="x64"
+  fi
+
+  PLATFORM="${CURRENT_OS}-${CURRENT_ARCH}"
 fi
-
-PLATFORM="${CURRENT_OS}-${CURRENT_ARCH}"
 TARBALL="mdv-${PLATFORM}.tar.gz"
 
 echo "当前平台: ${PLATFORM}"

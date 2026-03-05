@@ -93,6 +93,22 @@ function getServerStatus(): ServerStatus {
   }
 }
 
+async function isServerHttpReachable(host: string, port: number): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 800);
+  try {
+    const res = await fetch(`http://${host}:${port}/`, {
+      method: "GET",
+      signal: controller.signal,
+    });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function startServer(daemon: boolean = false): void {
   if (!daemon) {
     // 前台模式：直接启动 server（不返回）
@@ -225,16 +241,22 @@ function showLogs(tail?: number): void {
   }
 }
 
-function ensureServerRunning(): void {
+async function ensureServerRunning(): Promise<void> {
+  // 兼容没有 PID 文件但端口实际可用（例如用户手动启动 server）的场景
+  if (await isServerHttpReachable(config.server.host, config.server.port)) {
+    return;
+  }
+
   const status = getServerStatus();
   if (!status.running) {
     console.log("⚠️  Server 未运行，正在启动...");
-    startServer();
+    // 打开文件时自动后台拉起，避免阻塞当前 CLI 进程。
+    startServer(true);
     // 等待启动完成
     const maxWait = 5000;
     const startTime = Date.now();
     while (Date.now() - startTime < maxWait) {
-      if (getServerStatus().running) {
+      if (getServerStatus().running || await isServerHttpReachable(config.server.host, config.server.port)) {
         return;
       }
       // 简单的忙等待
@@ -258,10 +280,12 @@ function isUrl(path: string): boolean {
 }
 
 async function openFile(filePath: string, focus: boolean = true): Promise<void> {
-  ensureServerRunning();
+  await ensureServerRunning();
 
   const status = getServerStatus();
-  const url = `http://${status.host}:${status.port}/api/open-file`;
+  const host = status.host || config.server.host;
+  const port = status.port || config.server.port;
+  const url = `http://${host}:${port}/api/open-file`;
 
   // 判断是 URL 还是本地文件
   const isRemoteUrl = isUrl(filePath);
@@ -303,7 +327,7 @@ async function openFile(filePath: string, focus: boolean = true): Promise<void> 
     console.log(`✅ ${action}: ${result.filename}`);
   } catch (e: any) {
     if (e.cause?.code === "ECONNREFUSED") {
-      console.error(`❌ 无法连接到 Server (${status.host}:${status.port})`);
+      console.error(`❌ 无法连接到 Server (${host}:${port})`);
       console.error(`   请确保 Server 已启动: mdv server start`);
     } else {
       console.error(`❌ 错误: ${e.message}`);
@@ -593,6 +617,7 @@ function parseArgs(args: string[]): {
 
   const command: string[] = [];
   let filePath: string | undefined;
+  const topLevelCommands = new Set(["server", "logs", "config", "stats", "cleanup", "comments"]);
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -615,8 +640,9 @@ function parseArgs(args: string[]): {
     } else if (arg === "--file") {
       options.file = args[++i];
     } else if (!arg.startsWith("-")) {
-      if (command.length === 0 && existsSync(arg)) {
-        // 第一个非选项参数如果是文件，作为文件路径
+      if (command.length === 0 && !topLevelCommands.has(arg)) {
+        // 兼容 `mdv <FILE>`：首个非选项参数且非保留命令时，按文件路径处理。
+        // 文件是否存在由 openFile() 统一校验并给出明确错误。
         filePath = arg;
       } else {
         command.push(arg);

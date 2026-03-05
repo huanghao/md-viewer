@@ -48,7 +48,7 @@ mdv cleanup                   # 清理过期数据
 ### Homebrew
 
 ```bash
-brew tap huanghao/md-viewer
+brew tap huanghao/tap
 brew install md-viewer
 ```
 

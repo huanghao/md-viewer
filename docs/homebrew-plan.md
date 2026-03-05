@@ -224,13 +224,23 @@ spawn(process.execPath, ["--internal-server-mode"], {
 git tag -a v0.1.0 -m "Release v0.1.0"
 git push origin v0.1.0
 
-# 3. 等待 CI 完成后，更新 Formula
+# 3. 等待 CI 完成后，更新 Formula SHA256
 ./scripts/update-formula-sha.sh 0.1.0
+
+# 4. 推送到 homebrew-tap 仓库
+cp Formula/md-viewer.rb /path/to/homebrew-tap/Formula/
+cd /path/to/homebrew-tap
 git add Formula/md-viewer.rb
-git commit -m "chore: update formula for v0.1.0"
+git commit -m "chore: update md-viewer to v0.1.0"
 git push
 
-# 4. 测试安装
-brew tap huanghao/md-viewer
+# 5. 测试安装
+brew tap huanghao/tap
 brew install md-viewer
 ```
+
+## Tap 仓库
+
+Formula 已迁移到独立的 tap 仓库：
+- 仓库: https://github.com/huanghao/homebrew-tap
+- 安装: `brew tap huanghao/tap && brew install md-viewer`

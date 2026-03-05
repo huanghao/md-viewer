@@ -50,7 +50,20 @@ git commit -m "chore: update formula for v${VERSION}"
 git push
 ```
 
-### 5. 测试安装
+### 5. 推送 Formula 到 homebrew-tap
+
+```bash
+# 复制 Formula
+cp Formula/md-viewer.rb /path/to/homebrew-tap/Formula/
+
+# 提交到 tap 仓库
+cd /path/to/homebrew-tap
+git add Formula/md-viewer.rb
+git commit -m "chore: update md-viewer to v${VERSION}"
+git push
+```
+
+### 6. 测试安装
 
 ```bash
 # 更新 tap

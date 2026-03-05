@@ -955,21 +955,24 @@ export const styles = `
       right: 6px;
       top: calc(100% + 6px);
       width: 320px;
-      max-height: 380px;
+      max-height: min(520px, calc(100vh - 72px));
       padding: 10px;
       border: 1px solid #d0d7de;
       border-radius: 8px;
       background: #fff;
       box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
       z-index: 2100;
+      overflow: hidden;
     }
     .tab-manager-panel.show {
-      display: block;
+      display: flex;
+      flex-direction: column;
     }
     .tab-manager-row {
       display: flex;
       gap: 6px;
       margin-bottom: 8px;
+      flex-shrink: 0;
     }
     .tab-manager-actions-row {
       flex-wrap: wrap;
@@ -1024,7 +1027,8 @@ export const styles = `
       border: 1px solid #e5e7eb;
       border-radius: 6px;
       overflow: auto;
-      max-height: 280px;
+      flex: 1;
+      min-height: 120px;
     }
     .tab-manager-empty {
       padding: 12px;
@@ -2660,6 +2664,67 @@ export const styles = `
     .annotation-note.simple {
       -webkit-line-clamp: 1;
     }
+    .annotation-thread {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .annotation-thread-line {
+      font-size: 13px;
+      color: #24292e;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .annotation-thread-line.is-reply {
+      color: #4b5563;
+      padding-left: 10px;
+      border-left: 2px solid #e5e7eb;
+    }
+    .annotation-reply-count {
+      font-size: 12px;
+      color: #6b7280;
+    }
+    .annotation-reply-entry {
+      margin-top: 6px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      background: #fafbfc;
+      padding: 6px;
+      cursor: text;
+    }
+    .annotation-reply-entry:focus-within {
+      border-color: #0969da;
+      box-shadow: 0 0 0 2px rgba(9, 105, 218, 0.12);
+      background: #fff;
+    }
+    .annotation-reply-placeholder {
+      font-size: 12px;
+      color: #6b7280;
+      line-height: 1.4;
+    }
+    .annotation-reply-editor.hidden {
+      display: none;
+    }
+    .annotation-reply-editor {
+      margin-top: 0;
+    }
+    .annotation-reply-entry.is-open .annotation-reply-placeholder,
+    .annotation-reply-entry:focus-within .annotation-reply-placeholder {
+      display: none;
+    }
+    .annotation-reply-editor textarea {
+      width: 100%;
+      min-height: 28px;
+      padding: 4px 0;
+      border: none;
+      font-size: 12px;
+      font-family: inherit;
+      line-height: 1.5;
+      resize: none;
+      background: transparent;
+      outline: none;
+    }
     .annotation-meta {
       margin-bottom: 4px;
       display: flex;
@@ -2851,22 +2916,12 @@ export const styles = `
       border-color: #0969da;
       box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
     }
-    .annotation-composer-hint {
-      margin-top: 6px;
-      font-size: 12px;
-      color: #6b7280;
-      user-select: none;
-    }
     .annotation-popover-note {
       font-size: 13px;
       color: #24292e;
       line-height: 1.45;
-      white-space: pre-wrap;
+      white-space: normal;
       word-break: break-word;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
     }
     .annotation-quick-add {
       position: fixed;

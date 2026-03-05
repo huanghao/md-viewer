@@ -8,7 +8,7 @@ import { resolve, join } from "path";
 import { existsSync, readFileSync, writeFileSync, unlinkSync, statSync, openSync } from "fs";
 import { spawn } from "child_process";
 import { loadConfig, getConfigDir, getConfigPath, initConfig } from "./config.ts";
-import { getAnnotationsByDocument, listAnnotatedDocuments } from "./annotation-storage.ts";
+import { appendAnnotationReply, getAnnotationsByDocument, listAnnotatedDocuments } from "./annotation-storage.ts";
 import { getSyncRecordsStats, cleanupAllExpiredRecords } from "./sync-storage.ts";
 
 // ==================== 配置 ====================
@@ -468,29 +468,76 @@ function formatCompactTime(ts: number): string {
 
 function printComments(path: string, json: boolean, limit: number, offset: number): void {
   const result = getAnnotationsByDocument(path, limit, offset);
+  const unresolved = result.annotations.filter((ann: any) => ann.status !== "resolved");
   if (json) {
-    console.log(JSON.stringify(result, null, 2));
+    console.log(JSON.stringify({
+      ...result,
+      annotations: unresolved,
+      totalReturned: unresolved.length,
+      defaultFilter: "unresolved",
+    }, null, 2));
     return;
   }
-  if (result.annotations.length === 0) {
-    console.log("无评论");
+  if (unresolved.length === 0) {
+    console.log("无未解决评论");
     return;
   }
-
-  for (const [index, ann] of result.annotations.entries()) {
-    console.log(`#${offset + index + 1}`);
+  for (const [index, ann] of unresolved.entries()) {
+    const stableSerial = Number(ann?.serial);
+    const displayID = Number.isFinite(stableSerial) && stableSerial > 0
+      ? Math.floor(stableSerial)
+      : (offset + index + 1);
+    console.log(`#${displayID}`);
     const quoted = (ann.quote || "")
       .split("\n")
       .map((line) => `> ${line}`)
       .join("\n");
     console.log(quoted || "> ");
-    console.log(ann.note || "（无评论内容）");
+    const thread = Array.isArray((ann as any).thread) ? (ann as any).thread : [];
+    const root = thread.find((item: any) => item?.type === "comment") || thread[0];
+    const rootAuthor = String(root?.author || "me");
+    console.log(`${rootAuthor}: ${root?.note || ann.note || "（无评论内容）"}`);
+    const replies = thread.filter((item: any) => item?.type === "reply");
+    for (const reply of replies) {
+      const author = String(reply?.author || "me");
+      console.log(`- ${author}: ${String(reply?.note || "").trim()}`);
+    }
     console.log("");
   }
 }
 
+function replyComment(path: string, ref: { id?: string; serial?: number }, text: string, author: string, json: boolean): void {
+  if (!ref.id && typeof ref.serial !== "number") {
+    console.error("❌ 无效的评论引用，请使用 --seq 或 --id");
+    process.exit(1);
+  }
+  const result = appendAnnotationReply(path, ref, text, author);
+  if (!result.ok) {
+    console.error(`❌ ${result.error || "回复失败"}`);
+    process.exit(1);
+  }
+  if (json) {
+    const replyCount = (result.updated?.thread || []).filter((item) => item.type === "reply").length;
+    console.log(JSON.stringify({
+      success: true,
+      path: resolve(path),
+      annotationId: result.updated?.id,
+      serial: result.updated?.serial,
+      author,
+      replyCount,
+    }, null, 2));
+    return;
+  }
+  const serial = Number(result.updated?.serial || 0);
+  console.log(`已回复 #${serial > 0 ? serial : (ref.id || "unknown")}`);
+  console.log(`作者: ${author}`);
+  console.log(text.trim());
+}
+
 function printCommentDocs(json: boolean, limit: number, offset: number): void {
-  const docs = listAnnotatedDocuments(limit, offset);
+  const docs = listAnnotatedDocuments(limit, offset)
+    .slice()
+    .sort((a, b) => (b.latestUpdatedAt - a.latestUpdatedAt) || (b.latestCreatedAt - a.latestCreatedAt) || a.path.localeCompare(b.path));
   if (json) {
     console.log(JSON.stringify({ totalReturned: docs.length, docs }, null, 2));
     return;
@@ -556,6 +603,8 @@ MD Viewer CLI - 统一命令行工具
   mdv cleanup                          清理过期数据
   mdv comments list                    列出有评论的文档
   mdv comments get --file <FILE>       查看文档评论
+  mdv comments reply --file <FILE> [--seq <N> | --id <ID>] --author <NAME> --text <TEXT>
+                                       回复一条评论
   mdv comments stats                   评论统计
   mdv --help                           显示帮助
 
@@ -566,6 +615,10 @@ MD Viewer CLI - 统一命令行工具
   --limit <N>                          结果数量限制（默认 20）
   --offset <N>                         结果偏移（默认 0）
   --tail <N>                           显示日志最后 N 行
+  --seq <N>                            评论序号（用于 reply，推荐）
+  --id <ID>                            评论唯一 ID（用于 reply）
+  --author <NAME>                      回复作者（必填，如 codex/claude/huanghao）
+  --text <TEXT>                        回复内容（用于 reply）
 
 示例:
   mdv README.md                        打开文件
@@ -581,6 +634,7 @@ MD Viewer CLI - 统一命令行工具
   mdv cleanup                          清理过期数据
   mdv comments list --json             列出评论文档（JSON）
   mdv comments get --file README.md    查看评论
+  mdv comments reply --file README.md --seq 2 --author codex --text "我会补充这部分"
   mdv comments stats                   评论统计
 
 配置文件:
@@ -600,6 +654,10 @@ interface CliOptions {
   offset: number;
   tail?: number;
   file?: string;
+  seq?: number;
+  id?: string;
+  text?: string;
+  author?: string;
   daemon: boolean;
 }
 
@@ -640,6 +698,14 @@ function parseArgs(args: string[]): {
       options.tail = parseInt(args[++i], 10);
     } else if (arg === "--file") {
       options.file = args[++i];
+    } else if (arg === "--seq") {
+      options.seq = parseInt(args[++i], 10);
+    } else if (arg === "--id") {
+      options.id = args[++i];
+    } else if (arg === "--text") {
+      options.text = args[++i];
+    } else if (arg === "--author") {
+      options.author = args[++i];
     } else if (!arg.startsWith("-")) {
       if (command.length === 0 && !topLevelCommands.has(arg)) {
         // 兼容 `mdv <FILE>`：首个非选项参数且非保留命令时，按文件路径处理。
@@ -743,11 +809,49 @@ async function main() {
         process.exit(1);
       }
       printComments(target, options.json, options.limit, options.offset);
+    } else if (subcmd === "reply") {
+      const target = options.file || rest[0];
+      if (!target) {
+        console.error("❌ 缺少文档路径");
+        console.error("   用法: mdv comments reply --file <FILE> [--seq <N> | --id <ID>] --author <NAME> --text <TEXT>");
+        process.exit(1);
+      }
+      const seq = Number(options.seq);
+      const id = String(options.id || "").trim();
+      if ((Number.isFinite(seq) && seq > 0) && id) {
+        console.error("❌ --seq 与 --id 不能同时使用");
+        console.error("   用法: mdv comments reply --file <FILE> [--seq <N> | --id <ID>] --author <NAME> --text <TEXT>");
+        process.exit(1);
+      }
+      if ((!Number.isFinite(seq) || seq <= 0) && !id) {
+        console.error("❌ 缺少评论引用，请使用 --seq 或 --id");
+        console.error("   用法: mdv comments reply --file <FILE> [--seq <N> | --id <ID>] --author <NAME> --text <TEXT>");
+        process.exit(1);
+      }
+      const author = String(options.author || "").trim();
+      if (!author) {
+        console.error("❌ 缺少回复作者");
+        console.error("   用法: mdv comments reply --file <FILE> [--seq <N> | --id <ID>] --author <NAME> --text <TEXT>");
+        process.exit(1);
+      }
+      const text = String(options.text || "").trim();
+      if (!text) {
+        console.error("❌ 缺少回复内容");
+        console.error("   用法: mdv comments reply --file <FILE> [--seq <N> | --id <ID>] --author <NAME> --text <TEXT>");
+        process.exit(1);
+      }
+      replyComment(
+        target,
+        Number.isFinite(seq) && seq > 0 ? { serial: Math.floor(seq) } : { id },
+        text,
+        author,
+        options.json
+      );
     } else if (subcmd === "stats") {
       showCommentsStats();
     } else {
       console.error(`❌ 未知的 comments 子命令: ${subcmd}`);
-      console.error(`   可用: list, get, stats`);
+      console.error(`   可用: list, get, reply, stats`);
       process.exit(1);
     }
   } else {

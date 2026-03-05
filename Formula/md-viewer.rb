@@ -6,20 +6,20 @@ class MdViewer < Formula
   on_macos do
     if Hardware::CPU.arm?
       url "https://github.com/huanghao/md-viewer/releases/download/v0.1.0/mdv-darwin-arm64.tar.gz"
-      sha256 "PLACEHOLDER_SHA256_ARM64"
+      sha256 "d5b0dbd9f7eafd5bf9fee67f7f0de5f422b84d694b3e1f4c77a40ffe30c59780"
     else
       url "https://github.com/huanghao/md-viewer/releases/download/v0.1.0/mdv-darwin-x64.tar.gz"
-      sha256 "PLACEHOLDER_SHA256_X64"
+      sha256 "11c7f806262217782b2aea7300a99d4c48a73040f753c1e927466c883c71625d"
     end
   end
 
   on_linux do
     if Hardware::CPU.arm?
       url "https://github.com/huanghao/md-viewer/releases/download/v0.1.0/mdv-linux-arm64.tar.gz"
-      sha256 "PLACEHOLDER_SHA256_LINUX_ARM64"
+      sha256 "800aa63edaa1bbcd2e579c31ba6a9cd3496be97f8775cda48745908af81593e9"
     else
       url "https://github.com/huanghao/md-viewer/releases/download/v0.1.0/mdv-linux-x64.tar.gz"
-      sha256 "PLACEHOLDER_SHA256_LINUX_X64"
+      sha256 "453695b164a161d1c67c72417aaa70946f2867d6377391b2a879d1da0cf54dc7"
     end
   end
 

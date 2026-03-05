@@ -528,6 +528,7 @@ function openComposerFromPending(x?: number, y?: number): void {
   if (!state.pendingAnnotation || !el.composer || !el.composerNote) return;
   applyTempSelectionMark();
   el.composerNote.value = '';
+  autoResizeComposerInput(el.composerNote);
   const left = typeof x === 'number' ? x : (el.quickAdd ? Number.parseFloat(el.quickAdd.style.left || '0') : 0);
   const top = typeof y === 'number' ? y : (el.quickAdd ? Number.parseFloat(el.quickAdd.style.top || '0') : 0);
   placeFloating(el.composer, left, top + 34);
@@ -653,20 +654,18 @@ function appendReply(annotationId: string, filePath: string, text: string): void
 
 function autoResizeReplyInput(input: HTMLTextAreaElement): void {
   input.style.height = 'auto';
-  const maxHeight = 140;
-  const next = Math.min(maxHeight, Math.max(input.scrollHeight, 28));
+  const maxHeight = 160;
+  const next = Math.min(maxHeight, Math.max(input.scrollHeight, 34));
   input.style.height = `${next}px`;
   input.style.overflowY = input.scrollHeight > maxHeight ? 'auto' : 'hidden';
 }
 
-function openReplyEditor(container: ParentNode, id: string, editorAttr: string, inputAttr: string): void {
-  const editor = container.querySelector(`[${editorAttr}="${id}"]`) as HTMLElement | null;
-  const input = container.querySelector(`[${inputAttr}="${id}"]`) as HTMLTextAreaElement | null;
-  if (!editor || !input) return;
-  editor.closest('.annotation-reply-entry')?.classList.add('is-open');
-  editor.classList.remove('hidden');
-  autoResizeReplyInput(input);
-  input.focus();
+function autoResizeComposerInput(input: HTMLTextAreaElement): void {
+  input.style.height = 'auto';
+  const maxHeight = 200;
+  const next = Math.min(maxHeight, Math.max(input.scrollHeight, 34));
+  input.style.height = `${next}px`;
+  input.style.overflowY = input.scrollHeight > maxHeight ? 'auto' : 'hidden';
 }
 
 function showPopover(ann: Annotation, x: number, y: number): void {
@@ -678,10 +677,7 @@ function showPopover(ann: Annotation, x: number, y: number): void {
   el.popoverNote.innerHTML = `
     <div class="annotation-thread">${threadHTML}</div>
     <div class="annotation-reply-entry" data-popover-reply-entry="${ann.id}" role="button" tabindex="0">
-      <div class="annotation-reply-placeholder">回复…（Cmd/Ctrl+Enter 保存）</div>
-      <div class="annotation-reply-editor hidden" data-popover-reply-editor="${ann.id}">
-        <textarea rows="1" data-popover-reply-input="${ann.id}" placeholder="输入回复内容..."></textarea>
-      </div>
+      <textarea rows="1" data-popover-reply-input="${ann.id}" placeholder="输入回复内容..."></textarea>
     </div>
   `;
   if (el.popoverResolveBtn) {
@@ -1045,10 +1041,7 @@ export function renderAnnotationList(filePath: string | null): void {
       <div class="annotation-thread">${renderThreadListHTML(ann, state.density === 'simple')}</div>
       ${state.density === 'simple' ? '' : `
         <div class="annotation-reply-entry" data-reply-entry="${ann.id}" role="button" tabindex="0">
-          <div class="annotation-reply-placeholder">回复…（Cmd/Ctrl+Enter 保存）</div>
-          <div class="annotation-reply-editor hidden" data-reply-editor="${ann.id}">
-            <textarea rows="1" data-reply-input="${ann.id}" placeholder="输入回复内容..."></textarea>
-          </div>
+          <textarea rows="1" data-reply-input="${ann.id}" placeholder="输入回复内容..."></textarea>
         </div>
       `}
     </div>
@@ -1098,15 +1091,23 @@ export function renderAnnotationList(filePath: string | null): void {
       event.stopPropagation();
       const id = (entry as HTMLElement).getAttribute('data-reply-entry');
       if (!id) return;
-      openReplyEditor(el.annotationList as HTMLElement, id, 'data-reply-editor', 'data-reply-input');
+      const input = el.annotationList?.querySelector(`[data-reply-input="${id}"]`) as HTMLTextAreaElement | null;
+      if (!input) return;
+      autoResizeReplyInput(input);
+      input.focus();
     });
     entry.addEventListener('keydown', (event) => {
+      const target = event.target as HTMLElement;
+      if (target instanceof HTMLTextAreaElement) return;
       if (event.key !== 'Enter' && event.key !== ' ') return;
       event.preventDefault();
       event.stopPropagation();
       const id = (entry as HTMLElement).getAttribute('data-reply-entry');
       if (!id) return;
-      openReplyEditor(el.annotationList as HTMLElement, id, 'data-reply-editor', 'data-reply-input');
+      const input = el.annotationList?.querySelector(`[data-reply-input="${id}"]`) as HTMLTextAreaElement | null;
+      if (!input) return;
+      autoResizeReplyInput(input);
+      input.focus();
     });
   });
 
@@ -1194,6 +1195,10 @@ export function initAnnotationElements(): void {
     const filePath = contentEl?.getAttribute('data-current-file');
     if (filePath) savePendingAnnotation(filePath);
   });
+  getElements().composerNote?.addEventListener('input', (event) => {
+    const input = event.currentTarget as HTMLTextAreaElement;
+    autoResizeComposerInput(input);
+  });
   getElements().quickAdd?.addEventListener('click', (event) => {
     event.stopPropagation();
     openComposerFromPending();
@@ -1239,7 +1244,10 @@ export function initAnnotationElements(): void {
       event.stopPropagation();
       const id = entry.getAttribute('data-popover-reply-entry');
       if (!id) return;
-      openReplyEditor(document, id, 'data-popover-reply-editor', 'data-popover-reply-input');
+      const input = document.querySelector(`[data-popover-reply-input="${id}"]`) as HTMLTextAreaElement | null;
+      if (!input) return;
+      autoResizeReplyInput(input);
+      input.focus();
       return;
     }
     const input = target.closest('[data-popover-reply-input]') as HTMLTextAreaElement | null;
@@ -1247,6 +1255,7 @@ export function initAnnotationElements(): void {
   });
   document.getElementById('annotationPopover')?.addEventListener('keydown', (event) => {
     const target = event.target as HTMLElement;
+    if (target instanceof HTMLTextAreaElement) return;
     const entry = target.closest('[data-popover-reply-entry]') as HTMLElement | null;
     if (!entry) return;
     if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -1254,7 +1263,10 @@ export function initAnnotationElements(): void {
     event.stopPropagation();
     const id = entry.getAttribute('data-popover-reply-entry');
     if (!id) return;
-    openReplyEditor(document, id, 'data-popover-reply-editor', 'data-popover-reply-input');
+    const input = document.querySelector(`[data-popover-reply-input="${id}"]`) as HTMLTextAreaElement | null;
+    if (!input) return;
+    autoResizeReplyInput(input);
+    input.focus();
   });
   document.getElementById('annotationPopover')?.addEventListener('keydown', (event) => {
     const target = event.target as HTMLElement;

@@ -14,12 +14,11 @@ import { getSyncStatus, getRecentParents, getSyncParentMeta, executeSync, getSyn
 import { escapeHtml, escapeAttr, escapeJsSingleQuoted } from './utils/escape';
 import { formatRelativeTime, formatFileTime } from './utils/format';
 import { generateDistinctNames } from './utils/file-names';
-import { getSyncMeta, setSyncMeta, clearSyncMeta } from './sync-state';
 
 // 导入 UI 组件
 import { renderSidebar } from './ui/sidebar';
 import { showToast, showSuccess, showError, showWarning, showInfo } from './ui/toast';
-import { showSettingsDialog } from './ui/settings';
+import { showSettingsDialog, closeSettingsDialog } from './ui/settings';
 
 // 导入批注功能
 import {
@@ -28,6 +27,8 @@ import {
   renderAnnotationList,
   handleSelectionForAnnotation,
   setAnnotations,
+  syncAnnotationSidebarLayout,
+  dismissAnnotationPopupByEscape,
 } from './annotation';
 
 const SIDEBAR_WIDTH_STORAGE_KEY = 'md-viewer:sidebar-width';
@@ -39,14 +40,28 @@ const PARENT_URL_SKIP_SEGMENTS = new Set(['doc', 'docs', 'page', 'pages', 'conte
 let workspacePollRunning = false;
 let mermaidInitialized = false;
 let syncDialogInteractionBound = false;
+let lastAnnotationFilePath: string | null = null;
+
+function syncAnnotationsForCurrentFile(force = false): void {
+  const nextPath = state.currentFile && !isHtmlPath(state.currentFile) ? state.currentFile : null;
+  if (force || nextPath !== lastAnnotationFilePath) {
+    setAnnotations(nextPath);
+    lastAnnotationFilePath = nextPath;
+  }
+  renderAnnotationList(nextPath);
+}
 
 // ==================== 消息处理 ====================
 async function onFileLoaded(data: FileData, focus: boolean = false) {
   const previousFile = state.currentFile;
   const shouldFocus = focus && !isHtmlPath(data.path);
   addOrUpdateFile(data, shouldFocus);
+  if (shouldFocus && previousFile !== data.path) {
+    lastAnnotationFilePath = null;
+  }
   renderSidebar();
   renderContent();
+  syncAnnotationsForCurrentFile(shouldFocus && previousFile !== data.path);
   if (shouldFocus && previousFile !== data.path) {
     scrollContentToTop();
   }
@@ -175,6 +190,7 @@ async function syncFileFromDisk(
 
   if (state.currentFile === path || state.currentFile === data.path) {
     renderContent();
+    syncAnnotationsForCurrentFile(false);
     if (options.highlight) {
       flashContentUpdated();
     }
@@ -191,6 +207,7 @@ async function syncFileFromDisk(
 export function renderAll() {
   renderSidebar();
   renderContent();
+  syncAnnotationsForCurrentFile(false);
 }
 
 function isMarkdownContent(file: { name: string; path: string }): boolean {
@@ -796,17 +813,17 @@ function switchFile(path: string) {
   removeSyncInfoPopover();
   if (isHtmlPath(path)) {
     openFileInBrowser(path);
+    lastAnnotationFilePath = null;
+    syncAnnotationsForCurrentFile(true);
     return;
   }
   const previousFile = state.currentFile;
   switchToFile(path);
   renderSidebar();
-
-  // 加载新文件的批注
-  setAnnotations(path);
-  renderAnnotationList(path);
+  lastAnnotationFilePath = null;
 
   renderContent();
+  syncAnnotationsForCurrentFile(true);
   if (previousFile !== path) {
     scrollContentToTop();
   }
@@ -867,6 +884,36 @@ function setupDragAndDrop() {
 // ==================== 键盘快捷键 ====================
 function setupKeyboardShortcuts() {
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (dismissAnnotationPopupByEscape()) {
+        e.preventDefault();
+        return;
+      }
+      if (syncInfoPopoverEl) {
+        e.preventDefault();
+        removeSyncInfoPopover();
+        return;
+      }
+      const syncOverlay = document.getElementById('syncDialogOverlay');
+      if (syncOverlay?.classList.contains('show')) {
+        e.preventDefault();
+        closeSyncDialog();
+        return;
+      }
+      const settingsOverlay = document.getElementById('settingsDialogOverlay');
+      if (settingsOverlay?.classList.contains('show')) {
+        e.preventDefault();
+        closeSettingsDialog();
+        return;
+      }
+      const addWorkspaceOverlay = document.getElementById('addWorkspaceDialogOverlay');
+      if (addWorkspaceOverlay?.classList.contains('show')) {
+        e.preventDefault();
+        addWorkspaceOverlay.classList.remove('show');
+        return;
+      }
+    }
+
     // Cmd-K (Mac) 或 Ctrl-K (Windows/Linux) 聚焦搜索框
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
@@ -1193,33 +1240,15 @@ async function updateSyncButton() {
   button.removeAttribute('aria-disabled');
   button.title = '同步到学城';
 
-  const cached = getSyncMeta(currentPath);
-  if (cached?.docId) {
-    button.className = 'toolbar-text-button synced';
-    buttonText.textContent = `[↑ 继续同步(v${(cached.version || 1) + 1})]`;
-  } else {
-    button.className = 'toolbar-text-button';
-    buttonText.textContent = '[☁↑ 首次同步]';
-  }
+  button.className = 'toolbar-text-button';
+  buttonText.textContent = '[☁↑ 首次同步]';
 
   try {
     const data = await getSyncStatus(currentPath);
 
     if (data.docId) {
-      setSyncMeta(currentPath, {
-        docId: data.docId,
-        url: data.url,
-        title: data.title,
-        syncedAt: data.lastSyncTime,
-        baseTitle: data.baseTitle,
-        version: data.version,
-      });
       button.className = 'toolbar-text-button synced';
       buttonText.textContent = `[↑ 继续同步(v${(data.version || 1) + 1})]`;
-    } else {
-      clearSyncMeta(currentPath);
-      button.className = 'toolbar-text-button';
-      buttonText.textContent = '[☁↑ 首次同步]';
     }
   } catch (e) {
     console.error('获取同步状态失败:', e);
@@ -1244,19 +1273,7 @@ async function handleSyncButtonClick() {
   const button = document.getElementById('syncButton');
   if (button && button.classList.contains('syncing')) return;
 
-  const data = await getSyncStatus(state.currentFile);
-  if (data.docId) {
-    setSyncMeta(state.currentFile, {
-      docId: data.docId,
-      url: data.url,
-      title: data.title,
-      syncedAt: data.lastSyncTime,
-      baseTitle: data.baseTitle,
-      version: data.version,
-    });
-  } else {
-    clearSyncMeta(state.currentFile);
-  }
+  await getSyncStatus(state.currentFile);
 
   removeSyncInfoPopover();
   ensureSyncDialogInteraction();
@@ -1301,12 +1318,6 @@ function ensureSyncDialogInteraction(): void {
     if (e.target === overlay) {
       closeSyncDialog();
     }
-  });
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
-    if (!overlay.classList.contains('show')) return;
-    closeSyncDialog();
   });
 
   overlay.addEventListener('click', (e) => {
@@ -1599,14 +1610,6 @@ async function confirmSync() {
 
     if (result.success) {
       const now = Date.now();
-      setSyncMeta(state.currentFile, {
-        docId: result.docId,
-        url: result.url,
-        title: result.title,
-        syncedAt: now,
-        baseTitle: result.baseTitle,
-        version: result.version,
-      });
       if (openAfter && result.url) {
         window.open(result.url, '_blank');
         closeSyncDialog();
@@ -2023,6 +2026,10 @@ function startWorkspacePolling() {
 
   // 初始化批注功能
   initAnnotationElements();
+  syncAnnotationSidebarLayout();
+  window.addEventListener('resize', () => {
+    syncAnnotationSidebarLayout();
+  });
 
   await restoreState(loadFile);
   await hydrateExpandedWorkspaces();
@@ -2031,13 +2038,8 @@ function startWorkspacePolling() {
   // 根据配置渲染侧边栏
   renderSidebar();
 
-  // 加载当前文件的批注
-  if (state.currentFile) {
-    setAnnotations(state.currentFile);
-    renderAnnotationList(state.currentFile);
-  }
-
   renderContent();
+  syncAnnotationsForCurrentFile(true);
 
   setupDragAndDrop();
   setupSidebarResize();

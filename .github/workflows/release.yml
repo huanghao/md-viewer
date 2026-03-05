@@ -30,6 +30,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
@@ -38,27 +44,26 @@ jobs:
       - name: Install dependencies
         shell: bash
         run: |
-          set +e
-          for i in 1 2 3 4 5; do
-            echo "Attempt $i of 5..."
-            bun install
-            # Verify critical packages are installed
-            if [ -d "node_modules/esbuild" ] && [ -d "node_modules/typescript" ]; then
-              echo "✓ Dependencies installed successfully"
-              set -e
-              break
-            else
-              echo "✗ Dependencies incomplete, retrying..."
-              rm -rf node_modules
-              sleep 10
-            fi
-          done
-          set -e
-          # Final check
+          # Try bun install first, fall back to npm if it fails
+          echo "Installing dependencies with bun..."
+          if ! bun install --verbose 2>&1 | tee /tmp/bun-install.log; then
+            echo "⚠️  Bun install failed, trying npm..."
+            npm install --verbose
+          fi
+
+          # Verify critical packages
+          if [ ! -d "node_modules/esbuild" ] || [ ! -d "node_modules/typescript" ]; then
+            echo "❌ Critical packages missing, trying npm..."
+            rm -rf node_modules
+            npm install --verbose
+          fi
+
+          # Final verification
           if [ ! -d "node_modules/esbuild" ]; then
-            echo "Failed to install dependencies after 5 attempts"
+            echo "❌ Failed to install esbuild"
             exit 1
           fi
+          echo "✅ Dependencies installed successfully"
 
       - name: Build
         run: |

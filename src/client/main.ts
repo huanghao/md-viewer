@@ -2071,7 +2071,8 @@ function startWorkspacePolling() {
   // 添加批注文本选中监听
   document.addEventListener('mouseup', () => {
     setTimeout(() => {
-      handleSelectionForAnnotation(state.currentFile);
+      const filePath = document.getElementById('content')?.getAttribute('data-current-file') || null;
+      handleSelectionForAnnotation(filePath);
     }, 0);
   });
 

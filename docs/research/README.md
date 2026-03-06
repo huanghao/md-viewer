@@ -8,3 +8,4 @@
 - [20260227-md-domain-research-report](./20260227-md-domain-research-report.md)
 - [20260302-state-sync-risk-analysis](./20260302-state-sync-risk-analysis.md)
 - [20260302-venus-api-research](./20260302-venus-api-research.md)
+- [20260307-annotation-reanchor-current-behavior](./20260307-annotation-reanchor-current-behavior.md)

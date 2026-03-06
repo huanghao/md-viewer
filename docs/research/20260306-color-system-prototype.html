@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MD Viewer 配色原型（2026-03-06）</title>
+  <style>
+    :root {
+      --text-primary: #1f2328;
+      --text-secondary: #57606a;
+      --text-muted: #6e7781;
+
+      --bg-canvas: #ffffff;
+      --bg-subtle: #f6f8fa;
+      --bg-elevated: #ffffff;
+
+      --border-default: #d0d7de;
+      --border-muted: #e1e4e8;
+
+      --brand-600: #0969da;
+      --brand-700: #0550ae;
+      --focus-ring: rgba(9, 105, 218, 0.24);
+
+      --success-600: #1a7f37;
+      --success-bg: #dafbe1;
+      --danger-600: #d1242f;
+      --danger-bg: #ffebe9;
+      --warning-700: #9a6700;
+      --warning-bg: #fff8c5;
+      --info-600: #0969da;
+      --info-bg: #ddf4ff;
+
+      --annot-mark-bg: #f8fafc;
+      --annot-mark-line: #b6c2cf;
+      --annot-mark-hover-bg: #eef5ff;
+      --annot-mark-hover-line: #96afd1;
+      --annot-mark-active-bg: #ffe8a3;
+      --annot-mark-active-line: #c69026;
+      --annot-item-active-bg: #f3f8ff;
+      --annot-item-active-border: #9ec2f8;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #f7fafc 0%, #f3f6fb 100%);
+      color: var(--text-primary);
+    }
+    .page { max-width: 1100px; margin: 0 auto; padding: 28px 22px 40px; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    .sub { color: var(--text-secondary); margin: 0 0 20px; }
+    h2 { margin: 24px 0 10px; font-size: 18px; }
+    .grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+    .swatch {
+      border: 1px solid var(--border-default);
+      border-radius: 10px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .swatch-top { height: 56px; border-bottom: 1px solid var(--border-muted); }
+    .swatch-body { padding: 8px 10px; font-size: 12px; color: var(--text-secondary); }
+    .card {
+      border: 1px solid var(--border-default);
+      border-radius: 12px;
+      background: var(--bg-elevated);
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--text-muted); }
+    .btn {
+      border: 1px solid var(--brand-600);
+      border-radius: 8px;
+      padding: 6px 12px;
+      color: #fff;
+      background: var(--brand-600);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: default;
+    }
+    .btn:hover { background: var(--brand-700); }
+
+    .annot-demo {
+      border: 1px solid var(--border-default);
+      border-radius: 10px;
+      background: #fff;
+      padding: 12px;
+      line-height: 1.7;
+    }
+    .mark-default {
+      background: var(--annot-mark-bg);
+      border-bottom: 2px solid var(--annot-mark-line);
+    }
+    .mark-hover {
+      background: var(--annot-mark-hover-bg);
+      border-bottom: 2px solid var(--annot-mark-hover-line);
+    }
+    .mark-active {
+      background: var(--annot-mark-active-bg);
+      border-bottom: 2px solid var(--annot-mark-active-line);
+    }
+    .ann-list .item {
+      border: 1px solid var(--border-muted);
+      border-left: 4px solid #b99a55;
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+      background: #fff;
+    }
+    .ann-list .item.active {
+      background: var(--annot-item-active-bg);
+      border-color: var(--annot-item-active-border);
+    }
+    .status-row { display: grid; gap: 8px; grid-template-columns: 1fr; }
+    .status {
+      border-radius: 8px;
+      border: 1px solid;
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+    .running { background: #f5f8ff; border-color: #d6e4ff; color: #1d4ed8; }
+    .ok { background: #edfdf3; border-color: #c7f0d4; color: #116329; }
+    .err { background: #fff4f2; border-color: #ffd6d1; color: #b42318; }
+
+    .toast-row { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+    .toast {
+      border-radius: 10px;
+      border: 1px solid var(--border-default);
+      background: #fff;
+      padding: 10px;
+      font-size: 13px;
+      border-left-width: 4px;
+    }
+    .t-success { border-left-color: var(--success-600); }
+    .t-danger { border-left-color: var(--danger-600); }
+    .t-warning { border-left-color: var(--warning-700); }
+    .t-info { border-left-color: var(--info-600); }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>MD Viewer 配色原型</h1>
+    <p class="sub">用途：快速预览调研报告中的建议色板与核心组件状态（非最终 UI）。</p>
+
+    <h2>核心色板</h2>
+    <div class="grid">
+      <div class="swatch"><div class="swatch-top" style="background:#1f2328"></div><div class="swatch-body">text-primary<br><span class="mono">#1f2328</span></div></div>
+      <div class="swatch"><div class="swatch-top" style="background:#57606a"></div><div class="swatch-body">text-secondary<br><span class="mono">#57606a</span></div></div>
+      <div class="swatch"><div class="swatch-top" style="background:#f6f8fa"></div><div class="swatch-body">bg-subtle<br><span class="mono">#f6f8fa</span></div></div>
+      <div class="swatch"><div class="swatch-top" style="background:#d0d7de"></div><div class="swatch-body">border-default<br><span class="mono">#d0d7de</span></div></div>
+      <div class="swatch"><div class="swatch-top" style="background:#0969da"></div><div class="swatch-body">brand-600<br><span class="mono">#0969da</span></div></div>
+      <div class="swatch"><div class="swatch-top" style="background:#0550ae"></div><div class="swatch-body">brand-700<br><span class="mono">#0550ae</span></div></div>
+      <div class="swatch"><div class="swatch-top" style="background:#dafbe1"></div><div class="swatch-body">success-bg<br><span class="mono">#dafbe1</span></div></div>
+      <div class="swatch"><div class="swatch-top" style="background:#ffebe9"></div><div class="swatch-body">danger-bg<br><span class="mono">#ffebe9</span></div></div>
+      <div class="swatch"><div class="swatch-top" style="background:#fff8c5"></div><div class="swatch-body">warning-bg<br><span class="mono">#fff8c5</span></div></div>
+      <div class="swatch"><div class="swatch-top" style="background:#ddf4ff"></div><div class="swatch-body">info-bg<br><span class="mono">#ddf4ff</span></div></div>
+    </div>
+
+    <h2>评论划线状态（正文）</h2>
+    <div class="annot-demo">
+      默认：<span class="mark-default">这是一段带默认评论划线的文本</span>。<br />
+      hover：<span class="mark-hover">这是 hover 态预览</span>。<br />
+      当前：<span class="mark-active">这是当前激活评论的高对比划线</span>。
+    </div>
+
+    <h2>评论列表状态（侧栏）</h2>
+    <div class="ann-list">
+      <div class="item">
+        <div><strong>#12</strong> 接口参数设计说明</div>
+        <div class="mono">默认项：低干扰，便于批量浏览</div>
+      </div>
+      <div class="item active">
+        <div><strong>#13</strong> 这里是当前选中评论</div>
+        <div class="mono">active：背景和边框对比加强</div>
+      </div>
+    </div>
+
+    <h2>同步对话框状态块</h2>
+    <div class="status-row">
+      <div class="status running">正在调用 km-cli，请稍候...</div>
+      <div class="status ok">同步成功：文档已生成，可继续下一次同步。</div>
+      <div class="status err">同步失败：保留当前输入，可直接修改后重试。</div>
+    </div>
+
+    <h2>Toast 反馈</h2>
+    <div class="toast-row">
+      <div class="toast t-success">保存成功：配置已更新</div>
+      <div class="toast t-danger">操作失败：请求超时</div>
+      <div class="toast t-warning">注意：父文档 ID 未校验</div>
+      <div class="toast t-info">提示：支持 Cmd/Ctrl + Enter 快速提交</div>
+    </div>
+
+    <h2>主按钮与焦点语义</h2>
+    <div class="card">
+      <button class="btn">同步</button>
+      <span class="mono" style="margin-left:10px;">Primary Action: brand-600/700</span>
+    </div>
+  </div>
+</body>
+</html>

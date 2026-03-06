@@ -39,6 +39,7 @@ const ANNOTATION_WIDTH_MAX = 540;
 interface AnnotationState {
   annotations: Annotation[];
   pendingAnnotation: Annotation | null;
+  pendingAnnotationFilePath: string | null;
   pinnedAnnotationId: string | null;
   activeAnnotationId: string | null;
   currentFilePath: string | null;
@@ -59,6 +60,7 @@ function getInitialDensity(): AnnotationDensity {
 const state: AnnotationState = {
   annotations: [],
   pendingAnnotation: null,
+  pendingAnnotationFilePath: null,
   pinnedAnnotationId: null,
   activeAnnotationId: null,
   currentFilePath: null,
@@ -186,6 +188,7 @@ export function setAnnotations(filePath: string | null): void {
   state.pinnedAnnotationId = null;
   state.activeAnnotationId = null;
   state.pendingAnnotation = null;
+  state.pendingAnnotationFilePath = null;
   hideComposer();
   hideQuickAdd(true);
   hidePopover(true);
@@ -385,7 +388,7 @@ function updateControlState(): void {
 function updateAnnotationCount(): void {
   const el = getElements();
   if (!el.annotationCount) return;
-  el.annotationCount.textContent = String(state.annotations.length);
+  el.annotationCount.textContent = String(getVisibleAnnotations().length);
 }
 
 function setSidebarCollapsed(collapsed: boolean): void {
@@ -508,6 +511,7 @@ function showQuickAdd(x: number, y: number, pendingData: Omit<Annotation, 'note'
   const el = getElements();
   if (!el.quickAdd) return;
   state.pendingAnnotation = { ...pendingData, note: '', createdAt: Date.now() };
+  state.pendingAnnotationFilePath = el.content?.getAttribute('data-current-file') || state.currentFilePath;
   const width = 30;
   const height = 30;
   const left = clamp(x, 8, window.innerWidth - width - 8);
@@ -524,6 +528,7 @@ function hideQuickAdd(clearPending = false): void {
   if (clearPending) {
     clearTempSelectionMark();
     state.pendingAnnotation = null;
+    state.pendingAnnotationFilePath = null;
   }
 }
 
@@ -718,6 +723,8 @@ function hidePopover(force = false): void {
 export function savePendingAnnotation(filePath: string): void {
   const el = getElements();
   if (!state.pendingAnnotation || !el.composerNote) return;
+  const pendingFilePath = state.pendingAnnotationFilePath;
+  if (!pendingFilePath || pendingFilePath !== filePath || pendingFilePath !== state.currentFilePath) return;
 
   const note = el.composerNote.value.trim();
   if (!note) return;
@@ -1144,7 +1151,8 @@ export function renderAnnotationList(filePath: string | null): void {
 // ==================== 事件处理 ====================
 export function handleSelectionForAnnotation(filePath: string | null): void {
   const el = getElements();
-  if (!filePath || !el.reader) return;
+  const renderedFilePath = el.content?.getAttribute('data-current-file');
+  if (!filePath || !renderedFilePath || filePath !== renderedFilePath || !el.reader) return;
 
   const selection = window.getSelection();
   if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;

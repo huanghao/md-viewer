@@ -1525,10 +1525,10 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
     }
     return \`
     <div class="workspace-item">
-      <div class="workspace-header \${isCurrent ? "active" : ""}">
-        <span class="workspace-toggle" onclick="event.stopPropagation();handleWorkspaceToggle('\${escapeAttr(workspace.id)}')">\${toggle}</span>
+      <div class="workspace-header \${isCurrent ? "active" : ""}" onclick="handleWorkspaceToggle('\${escapeAttr(workspace.id)}')">
+        <span class="workspace-toggle">\${toggle}</span>
         <span class="workspace-icon">\\u{1F4C1}</span>
-        <span class="workspace-name" onclick="event.stopPropagation();handleWorkspaceSelect('\${escapeAttr(workspace.id)}')">\${escapeHtml(workspace.name)}</span>
+        <span class="workspace-name">\${escapeHtml(workspace.name)}</span>
         \${pendingRemoveWorkspaceId === workspace.id ? \`
           <div class="workspace-remove-actions" onclick="event.stopPropagation()">
             \${canMoveUp ? \`
@@ -1751,6 +1751,12 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
     window.handleWorkspaceToggle = async (workspaceId) => {
       const workspace = state.config.workspaces.find((ws) => ws.id === workspaceId);
       if (!workspace) return;
+      state.currentWorkspace = workspaceId;
+      if (state.searchQuery.trim()) {
+        const { renderSidebar: renderSidebar3 } = await Promise.resolve().then(() => (init_sidebar(), sidebar_exports));
+        renderSidebar3();
+        return;
+      }
       toggleWorkspaceExpanded(workspaceId);
       if (workspace.isExpanded && !state.fileTree.has(workspaceId)) {
         loadingWorkspaceIds.add(workspaceId);
@@ -1766,11 +1772,6 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
           failedWorkspaceIds.delete(workspaceId);
         }
       }
-      const { renderSidebar: renderSidebar2 } = await Promise.resolve().then(() => (init_sidebar(), sidebar_exports));
-      renderSidebar2();
-    };
-    window.handleWorkspaceSelect = async (workspaceId) => {
-      switchWorkspace(workspaceId);
       const { renderSidebar: renderSidebar2 } = await Promise.resolve().then(() => (init_sidebar(), sidebar_exports));
       renderSidebar2();
     };
@@ -1886,25 +1887,64 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
   });
 
   // src/client/api/annotations.ts
+  async function readJsonOrThrow(response) {
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(data?.error || \`HTTP \${response.status}\`);
+    }
+    return data;
+  }
   async function fetchAnnotations(path) {
     const response = await fetch(\`/api/annotations?path=\${encodeURIComponent(path)}\`);
-    const data = await response.json();
+    const data = await readJsonOrThrow(response);
     return Array.isArray(data?.annotations) ? data.annotations : [];
   }
-  async function saveAnnotationsRemote(path, annotations) {
-    await fetch("/api/annotations", {
+  async function upsertAnnotationRemote(path, annotation) {
+    const response = await fetch("/api/annotations/item", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path, annotations })
+      body: JSON.stringify({ path, annotation })
     });
+    const data = await readJsonOrThrow(response);
+    if (data?.success !== true || !data?.annotation) {
+      throw new Error(data?.error || "\\u4FDD\\u5B58\\u8BC4\\u8BBA\\u5931\\u8D25");
+    }
+    return data.annotation;
   }
-  async function migrateAnnotationsRemote(byPath) {
-    const response = await fetch("/api/annotations/migrate", {
+  async function replyAnnotationRemote(path, ref, text, author) {
+    const response = await fetch("/api/annotations/reply", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ byPath })
+      body: JSON.stringify({ path, ...ref, text, author })
     });
-    return response.json();
+    const data = await readJsonOrThrow(response);
+    if (data?.success !== true || !data?.annotation) {
+      throw new Error(data?.error || "\\u56DE\\u590D\\u8BC4\\u8BBA\\u5931\\u8D25");
+    }
+    return data.annotation;
+  }
+  async function deleteAnnotationRemote(path, ref) {
+    const response = await fetch("/api/annotations/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path, ...ref })
+    });
+    const data = await readJsonOrThrow(response);
+    if (data?.success !== true) {
+      throw new Error(data?.error || "\\u5220\\u9664\\u8BC4\\u8BBA\\u5931\\u8D25");
+    }
+  }
+  async function updateAnnotationStatusRemote(path, ref, status) {
+    const response = await fetch("/api/annotations/status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path, ...ref, status })
+    });
+    const data = await readJsonOrThrow(response);
+    if (data?.success !== true || !data?.annotation) {
+      throw new Error(data?.error || "\\u66F4\\u65B0\\u8BC4\\u8BBA\\u72B6\\u6001\\u5931\\u8D25");
+    }
+    return data.annotation;
   }
   var init_annotations = __esm({
     "src/client/api/annotations.ts"() {
@@ -1981,9 +2021,6 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
       return "default";
     }
   }
-  function getStorageKey(filePath) {
-    return \`md-viewer:annotations:\${filePath}\`;
-  }
   function nextAnnotationSerial(annotations) {
     const maxSerial = annotations.reduce((max, ann) => {
       if (typeof ann.serial !== "number" || !Number.isFinite(ann.serial)) return max;
@@ -2055,32 +2092,33 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
     }
     return changed;
   }
-  function loadAnnotations(filePath) {
-    try {
-      const raw = localStorage.getItem(getStorageKey(filePath));
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      const anns = Array.isArray(parsed) ? parsed : [];
-      ensureAnnotationThreads(anns);
-      return anns;
-    } catch (_err) {
-      return [];
+  function replaceAnnotationInState(next) {
+    const index = state2.annotations.findIndex((item) => item.id === next.id);
+    if (index >= 0) {
+      state2.annotations[index] = next;
+      return;
     }
+    state2.annotations.push(next);
   }
-  function saveAnnotations(filePath, annotations) {
-    localStorage.setItem(getStorageKey(filePath), JSON.stringify(annotations));
-    void saveAnnotationsRemote(filePath, annotations).catch(() => {
+  function persistAnnotation(filePath, annotation, errorPrefix = "\\u8BC4\\u8BBA\\u4FDD\\u5B58\\u5931\\u8D25") {
+    void upsertAnnotationRemote(filePath, annotation).then((saved) => {
+      if (state2.currentFilePath !== filePath) return;
+      replaceAnnotationInState(saved);
+      renderAnnotationList(filePath);
+      applyAnnotations();
+    }).catch((error) => {
+      showError(\`\${errorPrefix}: \${error?.message || "\\u672A\\u77E5\\u9519\\u8BEF"}\`, 2600);
     });
+  }
+  function persistAnnotations(filePath, annotations, errorPrefix = "\\u8BC4\\u8BBA\\u4FDD\\u5B58\\u5931\\u8D25") {
+    for (const annotation of annotations) {
+      persistAnnotation(filePath, annotation, errorPrefix);
+    }
   }
   function setAnnotations(filePath) {
     state2.currentFilePath = filePath;
     if (filePath) {
-      state2.annotations = loadAnnotations(filePath);
-      const threadChanged = ensureAnnotationThreads(state2.annotations);
-      const serialChanged = ensureAnnotationSerials(state2.annotations);
-      if (threadChanged || serialChanged) {
-        saveAnnotations(filePath, state2.annotations);
-      }
+      state2.annotations = [];
       void hydrateAnnotationsFromRemote(filePath);
     } else {
       state2.annotations = [];
@@ -2108,28 +2146,15 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
       state2.annotations = remote;
       const threadChanged = ensureAnnotationThreads(state2.annotations);
       const serialChanged = ensureAnnotationSerials(state2.annotations);
-      localStorage.setItem(getStorageKey(filePath), JSON.stringify(state2.annotations));
       if (threadChanged || serialChanged) {
-        saveAnnotations(filePath, state2.annotations);
+        persistAnnotations(filePath, state2.annotations);
       }
       renderAnnotationList(filePath);
       applyAnnotations();
-    } catch {
+    } catch (error) {
+      if (state2.currentFilePath !== filePath) return;
+      showError(\`\\u8BC4\\u8BBA\\u52A0\\u8F7D\\u5931\\u8D25: \${error?.message || "\\u672A\\u77E5\\u9519\\u8BEF"}\`, 2600);
     }
-  }
-  function getAllAnnotationsFromLocalStorage() {
-    const result = {};
-    const prefix = "md-viewer:annotations:";
-    for (let i = 0; i < localStorage.length; i += 1) {
-      const key = localStorage.key(i);
-      if (!key || !key.startsWith(prefix)) continue;
-      const filePath = key.slice(prefix.length);
-      const annotations = loadAnnotations(filePath);
-      if (annotations.length > 0) {
-        result[filePath] = annotations;
-      }
-    }
-    return result;
   }
   function getElements() {
     return {
@@ -2225,6 +2250,13 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
   }
   function getAnnotationCurrentFilePath() {
     return state2.currentFilePath;
+  }
+  function getActiveAnnotationFilePath() {
+    const currentFilePath = state2.currentFilePath;
+    const renderedFilePath = document.getElementById("content")?.getAttribute("data-current-file") || null;
+    if (!currentFilePath) return null;
+    if (!renderedFilePath) return currentFilePath;
+    return renderedFilePath === currentFilePath ? currentFilePath : null;
   }
   function iconSvg(type) {
     if (type === "up") return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 4l4 4H4z"/></svg>';
@@ -2500,7 +2532,14 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
     });
     ann.thread = thread;
     ann.note = thread[0]?.note || ann.note;
-    saveAnnotations(filePath, state2.annotations);
+    void replyAnnotationRemote(filePath, { id: annotationId }, note, "me").then((saved) => {
+      if (state2.currentFilePath !== filePath) return;
+      replaceAnnotationInState(saved);
+      renderAnnotationList(filePath);
+      applyAnnotations();
+    }).catch((error) => {
+      showError(\`\\u56DE\\u590D\\u8BC4\\u8BBA\\u5931\\u8D25: \${error?.message || "\\u672A\\u77E5\\u9519\\u8BEF"}\`, 2600);
+    });
   }
   function autoResizeReplyInput(input) {
     input.style.height = "auto";
@@ -2575,14 +2614,14 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
       }]
     };
     state2.annotations.push(ann);
-    saveAnnotations(filePath, state2.annotations);
+    persistAnnotation(filePath, ann, "\\u521B\\u5EFA\\u8BC4\\u8BBA\\u5931\\u8D25");
     hideComposer();
     applyAnnotations();
     renderAnnotationList(filePath);
   }
   function removeAnnotation(id, filePath) {
+    const previous = state2.annotations.slice();
     state2.annotations = state2.annotations.filter((a) => a.id !== id);
-    saveAnnotations(filePath, state2.annotations);
     if (state2.pinnedAnnotationId === id) {
       state2.pinnedAnnotationId = null;
       hidePopover(true);
@@ -2592,6 +2631,12 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
     }
     applyAnnotations();
     renderAnnotationList(filePath);
+    void deleteAnnotationRemote(filePath, { id }).catch((error) => {
+      state2.annotations = previous;
+      showError(\`\\u5220\\u9664\\u8BC4\\u8BBA\\u5931\\u8D25: \${error?.message || "\\u672A\\u77E5\\u9519\\u8BEF"}\`, 2600);
+      applyAnnotations();
+      renderAnnotationList(filePath);
+    });
   }
   function jumpToAnnotation(id) {
     const el = getElements();
@@ -2649,15 +2694,22 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
   function toggleResolved(id, filePath) {
     const ann = state2.annotations.find((item) => item.id === id);
     if (!ann) return;
+    const previousStatus = ann.status;
     if (ann.status === "resolved") {
       ann.status = (ann.confidence || 0) <= 0 ? "unanchored" : "anchored";
     } else {
       ann.status = "resolved";
     }
-    saveAnnotations(filePath, state2.annotations);
+    const nextStatus = ann.status || "anchored";
     hidePopover(true);
     applyAnnotations();
     renderAnnotationList(filePath);
+    void updateAnnotationStatusRemote(filePath, { id }, nextStatus).catch((error) => {
+      ann.status = previousStatus;
+      showError(\`\\u66F4\\u65B0\\u8BC4\\u8BBA\\u72B6\\u6001\\u5931\\u8D25: \${error?.message || "\\u672A\\u77E5\\u9519\\u8BEF"}\`, 2600);
+      applyAnnotations();
+      renderAnnotationList(filePath);
+    });
   }
   function decorateMark(wrapper, ann) {
     wrapper.classList.add("annotation-mark");
@@ -2737,7 +2789,7 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
         state2.pinnedAnnotationId = id;
         const rect = markEl.getBoundingClientRect();
         showPopover(ann, rect.right + 8, rect.top + 8);
-        const filePath = document.getElementById("content")?.getAttribute("data-current-file");
+        const filePath = getActiveAnnotationFilePath();
         renderAnnotationList(filePath || null);
       });
     });
@@ -2760,31 +2812,40 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
     if (el.reader) {
       const text = getReaderText(el.reader);
       let changed = false;
+      const changedAnnotations = [];
       for (const ann of state2.annotations) {
         const resolved = resolveAnnotationAnchor(text, ann);
+        let annChanged = false;
         const nextStatus = resolved.status;
         if (ann.start !== resolved.start) {
           ann.start = resolved.start;
           changed = true;
+          annChanged = true;
         }
         if (ann.length !== resolved.length) {
           ann.length = resolved.length;
           changed = true;
+          annChanged = true;
         }
         const mergedStatus = mergeAnnotationStatus(ann.status, nextStatus);
         if ((ann.status || "anchored") !== mergedStatus) {
           ann.status = mergedStatus;
           changed = true;
+          annChanged = true;
         }
         if (ann.confidence !== resolved.confidence) {
           ann.confidence = resolved.confidence;
           changed = true;
+          annChanged = true;
+        }
+        if (annChanged) {
+          changedAnnotations.push({ ...ann, thread: ann.thread ? [...ann.thread] : ann.thread });
         }
       }
       if (changed) {
-        const currentFile = el.content?.getAttribute("data-current-file");
+        const currentFile = getActiveAnnotationFilePath();
         if (currentFile) {
-          saveAnnotations(currentFile, state2.annotations);
+          persistAnnotations(currentFile, changedAnnotations, "\\u540C\\u6B65\\u8BC4\\u8BBA\\u951A\\u70B9\\u5931\\u8D25");
         }
       }
     }
@@ -2960,12 +3021,10 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
     });
   }
   function initAnnotationElements() {
-    void migrateLegacyAnnotationsOnce();
     initAnnotationSidebarWidth();
     setSidebarCollapsed(true);
     document.getElementById("composerSaveBtn")?.addEventListener("click", () => {
-      const contentEl = document.getElementById("content");
-      const filePath = contentEl?.getAttribute("data-current-file");
+      const filePath = getActiveAnnotationFilePath();
       if (filePath) savePendingAnnotation(filePath);
     });
     document.getElementById("composerCancelBtn")?.addEventListener("click", hideComposer);
@@ -2973,8 +3032,7 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
       if (event.key !== "Enter") return;
       if (!(event.metaKey || event.ctrlKey)) return;
       event.preventDefault();
-      const contentEl = document.getElementById("content");
-      const filePath = contentEl?.getAttribute("data-current-file");
+      const filePath = getActiveAnnotationFilePath();
       if (filePath) savePendingAnnotation(filePath);
     });
     getElements().composerNote?.addEventListener("input", (event) => {
@@ -2990,33 +3048,28 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
       hidePopover(true);
     });
     document.getElementById("popoverDeleteBtn")?.addEventListener("click", () => {
-      const contentEl = document.getElementById("content");
-      const filePath = contentEl?.getAttribute("data-current-file");
+      const filePath = getActiveAnnotationFilePath();
       const id = state2.pinnedAnnotationId;
       if (id && filePath) removeAnnotation(id, filePath);
     });
     document.getElementById("popoverResolveBtn")?.addEventListener("click", () => {
-      const contentEl = document.getElementById("content");
-      const filePath = contentEl?.getAttribute("data-current-file");
+      const filePath = getActiveAnnotationFilePath();
       const id = state2.pinnedAnnotationId;
       if (id && filePath) toggleResolved(id, filePath);
     });
     document.getElementById("popoverPrevBtn")?.addEventListener("click", () => {
-      const contentEl = document.getElementById("content");
-      const filePath = contentEl?.getAttribute("data-current-file");
+      const filePath = getActiveAnnotationFilePath();
       const id = state2.pinnedAnnotationId;
       if (id && filePath) jumpToRelative(id, -1, filePath);
     });
     document.getElementById("popoverNextBtn")?.addEventListener("click", () => {
-      const contentEl = document.getElementById("content");
-      const filePath = contentEl?.getAttribute("data-current-file");
+      const filePath = getActiveAnnotationFilePath();
       const id = state2.pinnedAnnotationId;
       if (id && filePath) jumpToRelative(id, 1, filePath);
     });
     document.getElementById("annotationPopover")?.addEventListener("click", (event) => {
       const target = event.target;
-      const contentEl = document.getElementById("content");
-      const filePath = contentEl?.getAttribute("data-current-file");
+      const filePath = getActiveAnnotationFilePath();
       if (!filePath) return;
       const entry = target.closest("[data-popover-reply-entry]");
       if (entry) {
@@ -3052,7 +3105,7 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
       if (!(target instanceof HTMLTextAreaElement)) return;
       if (!(event.metaKey || event.ctrlKey) || event.key !== "Enter") return;
       const id = target.getAttribute("data-popover-reply-input");
-      const filePath = document.getElementById("content")?.getAttribute("data-current-file");
+      const filePath = getActiveAnnotationFilePath();
       if (!id || !filePath) return;
       event.preventDefault();
       appendReply(id, filePath, target.value);
@@ -3075,7 +3128,7 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
         if (!next) return;
         state2.filter = next;
         getElements().filterMenu?.classList.add("hidden");
-        const currentFile = document.getElementById("content")?.getAttribute("data-current-file");
+        const currentFile = getActiveAnnotationFilePath();
         applyAnnotations();
         renderAnnotationList(currentFile || null);
       });
@@ -3089,7 +3142,7 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
     getElements().densityToggle?.addEventListener("click", () => {
       state2.density = state2.density === "default" ? "simple" : "default";
       localStorage.setItem("md-viewer:annotation-density", state2.density);
-      const currentFile = document.getElementById("content")?.getAttribute("data-current-file");
+      const currentFile = getActiveAnnotationFilePath();
       renderAnnotationList(currentFile || null);
     });
     getElements().closeToggle?.addEventListener("click", () => {
@@ -3170,26 +3223,13 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
       window.addEventListener("mouseup", onUp);
     });
   }
-  async function migrateLegacyAnnotationsOnce() {
-    const migrationKey = "md-viewer:annotation-migrated-v1";
-    if (localStorage.getItem(migrationKey) === "true") return;
-    const byPath = getAllAnnotationsFromLocalStorage();
-    if (Object.keys(byPath).length === 0) {
-      localStorage.setItem(migrationKey, "true");
-      return;
-    }
-    try {
-      await migrateAnnotationsRemote(byPath);
-      localStorage.setItem(migrationKey, "true");
-    } catch {
-    }
-  }
   var ANNOTATION_WIDTH_KEY, ANNOTATION_WIDTH_DEFAULT, ANNOTATION_WIDTH_MIN, ANNOTATION_WIDTH_MAX, state2, ANNOTATION_PANEL_OPEN_BY_FILE_KEY;
   var init_annotation = __esm({
     "src/client/annotation.ts"() {
       "use strict";
       init_escape();
       init_annotations();
+      init_toast();
       init_annotation_anchor();
       ANNOTATION_WIDTH_KEY = "md-viewer:annotation-sidebar-width";
       ANNOTATION_WIDTH_DEFAULT = 320;
@@ -3745,7 +3785,7 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
         <div>\\u5F53\\u524D\\u6587\\u4EF6</div><div>\${escapeHtml3(snapshot.currentFile || "\\u65E0")}</div>
         <div>\\u5DF2\\u6253\\u5F00\\u6587\\u4EF6\\u6570</div><div>\${snapshot.openFilesCount}</div>
         <div>\\u5DE5\\u4F5C\\u533A\\u6570</div><div>\${snapshot.workspaceCount}</div>
-        <div>\\u8BC4\\u8BBA\\u7F13\\u5B58\\u6587\\u4EF6\\u6570</div><div>\${snapshot.annotationFileCount}</div>
+        <div>\\u8BC4\\u8BBA\\u76F8\\u5173\\u672C\\u5730\\u952E\\u6570</div><div>\${snapshot.commentStateKeyCount}</div>
         <div>md-viewer \\u672C\\u5730\\u952E\\u6570</div><div>\${snapshot.mdvKeyCount}</div>
         <div>localStorage \\u603B\\u952E\\u6570</div><div>\${snapshot.localStorageKeyCount}</div>
       </div>
@@ -3755,9 +3795,9 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
     </div>
     <div class="settings-section">
       <div class="settings-section-title">\\u6570\\u636E\\u6E05\\u7406</div>
-      <div class="settings-section-desc">\\u6E05\\u7406\\u540E\\u4F1A\\u81EA\\u52A8\\u5237\\u65B0\\u9875\\u9762\\u3002</div>
+      <div class="settings-section-desc">\\u8BC4\\u8BBA\\u72B6\\u6001\\u6E05\\u7406\\u4F1A\\u540C\\u65F6\\u5220\\u9664\\u670D\\u52A1\\u7AEF SQLite \\u8BC4\\u8BBA\\u6570\\u636E\\u548C\\u5BA2\\u6237\\u7AEF\\u8BC4\\u8BBA\\u76F8\\u5173\\u72B6\\u6001\\uFF0C\\u968F\\u540E\\u81EA\\u52A8\\u5237\\u65B0\\u9875\\u9762\\u3002</div>
       <div class="settings-actions-row">
-        <button class="sync-dialog-button" id="clearAllCommentsBtn">\\u6E05\\u7A7A\\u6240\\u6709\\u8BC4\\u8BBA</button>
+        <button class="sync-dialog-button" id="clearAllCommentsBtn">\\u6E05\\u7A7A\\u8BC4\\u8BBA\\u72B6\\u6001</button>
         <button class="sync-dialog-button" id="clearClientStateBtn">\\u6E05\\u7406\\u5BA2\\u6237\\u7AEF\\u72B6\\u6001</button>
       </div>
     </div>
@@ -3790,12 +3830,12 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
     }
     allKeys.sort();
     const mdvKeys = allKeys.filter((key) => key.startsWith("md-viewer:"));
-    const annotationFileCount = mdvKeys.filter((key) => key.startsWith("md-viewer:annotations:")).length;
+    const commentStateKeyCount = mdvKeys.filter((key) => key === "md-viewer:annotation-panel-open-by-file" || key === "md-viewer:annotation-density" || key === "md-viewer:annotation-sidebar-width" || key.startsWith("md-viewer:annotations:")).length;
     return {
       currentFile: state.currentFile,
       openFilesCount: state.sessionFiles.size,
       workspaceCount: state.config.workspaces.length,
-      annotationFileCount,
+      commentStateKeyCount,
       mdvKeyCount: mdvKeys.length,
       localStorageKeyCount: allKeys.length,
       mdvKeys
@@ -3827,15 +3867,16 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
         if (!key) continue;
         if (key.startsWith("md-viewer:annotations:")) keysToDelete.push(key);
         if (key === "md-viewer:annotation-panel-open-by-file") keysToDelete.push(key);
-        if (key === "md-viewer:annotation-migrated-v1") keysToDelete.push(key);
+        if (key === "md-viewer:annotation-density") keysToDelete.push(key);
+        if (key === "md-viewer:annotation-sidebar-width") keysToDelete.push(key);
       }
       for (const key of keysToDelete) {
         localStorage.removeItem(key);
       }
-      showSuccess(\`\\u5DF2\\u6E05\\u7A7A\\u8BC4\\u8BBA\\uFF08\${data?.deleted || 0} \\u6761\\uFF09\`, 1800);
+      showSuccess(\`\\u5DF2\\u6E05\\u7A7A\\u8BC4\\u8BBA\\u72B6\\u6001\\uFF08\\u670D\\u52A1\\u7AEF \${data?.deleted || 0} \\u6761\\uFF0C\\u672C\\u5730 \${keysToDelete.length} \\u9879\\uFF09\`, 1800);
       window.setTimeout(() => window.location.reload(), 250);
     } catch (error) {
-      showError(\`\\u6E05\\u7A7A\\u8BC4\\u8BBA\\u5931\\u8D25: \${error?.message || "\\u672A\\u77E5\\u9519\\u8BEF"}\`, 2600);
+      showError(\`\\u6E05\\u7A7A\\u8BC4\\u8BBA\\u72B6\\u6001\\u5931\\u8D25: \${error?.message || "\\u672A\\u77E5\\u9519\\u8BEF"}\`, 2600);
     }
   }
   function escapeHtml3(input) {
@@ -4192,6 +4233,7 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
     const container = document.getElementById("content");
     if (!container) return;
     if (!state.currentFile) {
+      container.removeAttribute("data-current-file");
       container.innerHTML = \`
       <div class="empty-state">
         <h2>\\u6B22\\u8FCE\\u4F7F\\u7528 MD Viewer</h2>
@@ -4203,6 +4245,7 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
     const file = state.sessionFiles.get(state.currentFile);
     if (!file) return;
     if (isHtmlPath(file.path)) {
+      container.removeAttribute("data-current-file");
       container.innerHTML = \`
       <div class="empty-state">
         <h2>HTML \\u6587\\u4EF6\\u4EC5\\u652F\\u6301\\u5916\\u90E8\\u6253\\u5F00</h2>
@@ -4493,6 +4536,7 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
     removeFile(path);
     renderSidebar();
     renderContent();
+    syncAnnotationsForCurrentFile(true);
   }
   async function searchFilesHandler(rawQuery) {
     const input = document.getElementById("searchInput");

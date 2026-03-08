@@ -13,7 +13,6 @@ import {
   toggleWorkspaceExpanded,
   toggleNodeExpanded,
   scanWorkspace,
-  switchWorkspace
 } from '../workspace';
 
 const ADD_WORKSPACE_DIALOG_ID = 'addWorkspaceDialogOverlay';
@@ -303,10 +302,10 @@ function renderWorkspaceItem(workspace: Workspace, index: number, total: number,
 
   return `
     <div class="workspace-item">
-      <div class="workspace-header ${isCurrent ? 'active' : ''}">
-        <span class="workspace-toggle" onclick="event.stopPropagation();handleWorkspaceToggle('${escapeAttr(workspace.id)}')">${toggle}</span>
+      <div class="workspace-header ${isCurrent ? 'active' : ''}" onclick="handleWorkspaceToggle('${escapeAttr(workspace.id)}')">
+        <span class="workspace-toggle">${toggle}</span>
         <span class="workspace-icon">📁</span>
-        <span class="workspace-name" onclick="event.stopPropagation();handleWorkspaceSelect('${escapeAttr(workspace.id)}')">${escapeHtml(workspace.name)}</span>
+        <span class="workspace-name">${escapeHtml(workspace.name)}</span>
         ${pendingRemoveWorkspaceId === workspace.id ? `
           <div class="workspace-remove-actions" onclick="event.stopPropagation()">
             ${canMoveUp ? `
@@ -563,6 +562,12 @@ export function bindWorkspaceEvents(): void {
     const workspace = state.config.workspaces.find(ws => ws.id === workspaceId);
     if (!workspace) return;
 
+    state.currentWorkspace = workspaceId;
+    if (state.searchQuery.trim()) {
+      const { renderSidebar } = await import('./sidebar');
+      renderSidebar();
+      return;
+    }
     toggleWorkspaceExpanded(workspaceId);
 
     // 如果展开且没有加载文件树，则加载
@@ -582,13 +587,6 @@ export function bindWorkspaceEvents(): void {
       }
     }
 
-    const { renderSidebar } = await import('./sidebar');
-    renderSidebar();
-  };
-
-  // 工作区选择（不改变展开状态）
-  (window as any).handleWorkspaceSelect = async (workspaceId: string) => {
-    switchWorkspace(workspaceId);
     const { renderSidebar } = await import('./sidebar');
     renderSidebar();
   };

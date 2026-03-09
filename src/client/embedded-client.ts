@@ -253,9 +253,6 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
       listDiffPaths.delete(path);
     }
   }
-  function getKnownWorkspacePathsSnapshot(workspaceId) {
-    return Array.from(getKnownWorkspacePaths(workspaceId) || []);
-  }
   var listDiffPaths;
   var init_workspace_state_diff = __esm({
     "src/client/workspace-state-diff.ts"() {
@@ -1367,21 +1364,74 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
     annotateDirectoryFileCount(root);
     return root;
   }
-  function buildSearchTree(workspace, originalTree, query) {
-    if (!query) return originalTree;
-    const lowerQuery = query.toLowerCase();
-    const candidates = /* @__PURE__ */ new Set();
-    const treePaths = /* @__PURE__ */ new Set();
-    collectTreeFilePaths(originalTree, treePaths);
-    treePaths.forEach((path) => candidates.add(path));
-    getKnownWorkspacePathsSnapshot(workspace.id).forEach((path) => candidates.add(path));
-    getSessionFiles().filter((file) => file.path.startsWith(\`\${workspace.path.replace(/\\/+\$/, "")}/\`)).forEach((file) => candidates.add(file.path));
-    const matched = Array.from(candidates).filter((path) => {
-      const basename = path.split("/").pop() || "";
-      return path.toLowerCase().includes(lowerQuery) || basename.toLowerCase().includes(lowerQuery);
-    });
+  function buildSearchTree(workspace, query) {
+    if (!query) return state.fileTree.get(workspace.id);
+    const workspaceRoot = workspace.path.replace(/\\/+\$/, "");
+    const workspacePrefix = \`\${workspaceRoot}/\`;
+    const matched = Array.from(workspaceSearchPaths).filter((path) => path === workspaceRoot || path.startsWith(workspacePrefix));
     if (matched.length === 0) return void 0;
     return buildTreeFromPaths(workspace, matched);
+  }
+  function getWorkspaceSearchRoots() {
+    return state.config.workspaces.map((workspace) => workspace.path.trim()).filter(Boolean);
+  }
+  function resetWorkspaceSearchState() {
+    workspaceSearchQuery = "";
+    workspaceSearchRootsKey = "";
+    workspaceSearchLoading = false;
+    workspaceSearchLoaded = false;
+    workspaceSearchPaths = /* @__PURE__ */ new Set();
+  }
+  async function runWorkspaceSearch(query, roots, rootsKey, seq) {
+    try {
+      const data = await searchFiles(query, { roots, limit: 200 });
+      if (seq !== workspaceSearchSeq) return;
+      workspaceSearchQuery = query;
+      workspaceSearchRootsKey = rootsKey;
+      workspaceSearchPaths = new Set((data.files || []).map((file) => file.path).filter(Boolean));
+      workspaceSearchLoading = false;
+      workspaceSearchLoaded = true;
+    } catch (error) {
+      if (seq !== workspaceSearchSeq) return;
+      console.error("\\u5DE5\\u4F5C\\u533A\\u641C\\u7D22\\u5931\\u8D25:", error);
+      workspaceSearchQuery = query;
+      workspaceSearchRootsKey = rootsKey;
+      workspaceSearchPaths = /* @__PURE__ */ new Set();
+      workspaceSearchLoading = false;
+      workspaceSearchLoaded = true;
+    }
+    const { renderSidebar: renderSidebar2 } = await Promise.resolve().then(() => (init_sidebar(), sidebar_exports));
+    renderSidebar2();
+  }
+  function ensureWorkspaceSearchResults(query) {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      resetWorkspaceSearchState();
+      return;
+    }
+    const roots = getWorkspaceSearchRoots();
+    const rootsKey = roots.join("\\n");
+    if (roots.length === 0) {
+      workspaceSearchQuery = trimmed;
+      workspaceSearchRootsKey = rootsKey;
+      workspaceSearchPaths = /* @__PURE__ */ new Set();
+      workspaceSearchLoading = false;
+      workspaceSearchLoaded = true;
+      return;
+    }
+    if (workspaceSearchLoaded && !workspaceSearchLoading && workspaceSearchQuery === trimmed && workspaceSearchRootsKey === rootsKey) {
+      return;
+    }
+    if (workspaceSearchLoading && workspaceSearchQuery === trimmed && workspaceSearchRootsKey === rootsKey) {
+      return;
+    }
+    workspaceSearchSeq += 1;
+    workspaceSearchQuery = trimmed;
+    workspaceSearchRootsKey = rootsKey;
+    workspaceSearchLoading = true;
+    workspaceSearchLoaded = false;
+    workspaceSearchPaths = /* @__PURE__ */ new Set();
+    void runWorkspaceSearch(trimmed, roots, rootsKey, workspaceSearchSeq);
   }
   function updateWorkspacePathPreview() {
     const input = document.getElementById(ADD_WORKSPACE_INPUT_ID);
@@ -1483,6 +1533,7 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
   }
   function renderWorkspaceSidebar() {
     const query = state.searchQuery.trim().toLowerCase();
+    ensureWorkspaceSearchResults(query);
     return \`
     \${renderWorkspaceSection(query)}
   \`;
@@ -1510,8 +1561,7 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
   }
   function renderWorkspaceItem(workspace, index, total, query) {
     const isCurrent = state.currentWorkspace === workspace.id;
-    const originalTree = state.fileTree.get(workspace.id);
-    const tree = query ? buildSearchTree(workspace, originalTree, query) : originalTree;
+    const tree = query ? buildSearchTree(workspace, query) : state.fileTree.get(workspace.id);
     const shouldExpand = query ? true : workspace.isExpanded;
     const toggle = shouldExpand ? "\\u25BC" : "\\u25B6";
     const canMoveUp = index > 0;
@@ -1583,6 +1633,13 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
   \`;
   }
   function renderFileTree(workspaceId, tree, query) {
+    if (query && workspaceSearchLoading && workspaceSearchQuery === query) {
+      return \`
+      <div class="file-tree loading">
+        <div class="tree-loading">\\u641C\\u7D22\\u4E2D...</div>
+      </div>
+    \`;
+    }
     if (loadingWorkspaceIds.has(workspaceId)) {
       return \`
       <div class="file-tree loading">
@@ -1600,7 +1657,7 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
     if (!tree) {
       return \`
       <div class="file-tree empty">
-        <div class="tree-empty">\\u76EE\\u5F55\\u6682\\u4E0D\\u53EF\\u7528</div>
+        <div class="tree-empty">\${query ? "\\u672A\\u627E\\u5230\\u5339\\u914D\\u6587\\u4EF6" : "\\u76EE\\u5F55\\u6682\\u4E0D\\u53EF\\u7528"}</div>
       </div>
     \`;
     }
@@ -1863,12 +1920,13 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
       renderSidebar2();
     };
   }
-  var ADD_WORKSPACE_DIALOG_ID, ADD_WORKSPACE_INPUT_ID, ADD_WORKSPACE_PREVIEW_ID, pendingRemoveWorkspaceId, removeOutsideClickBound, loadingWorkspaceIds, failedWorkspaceIds;
+  var ADD_WORKSPACE_DIALOG_ID, ADD_WORKSPACE_INPUT_ID, ADD_WORKSPACE_PREVIEW_ID, pendingRemoveWorkspaceId, removeOutsideClickBound, loadingWorkspaceIds, failedWorkspaceIds, workspaceSearchQuery, workspaceSearchRootsKey, workspaceSearchLoading, workspaceSearchLoaded, workspaceSearchPaths, workspaceSearchSeq;
   var init_sidebar_workspace = __esm({
     "src/client/ui/sidebar-workspace.ts"() {
       "use strict";
       init_state();
       init_workspace_state();
+      init_files();
       init_escape();
       init_file_status();
       init_file_type();
@@ -1883,6 +1941,12 @@ export const EMBEDDED_CLIENT_JS = `"use strict";
       removeOutsideClickBound = false;
       loadingWorkspaceIds = /* @__PURE__ */ new Set();
       failedWorkspaceIds = /* @__PURE__ */ new Set();
+      workspaceSearchQuery = "";
+      workspaceSearchRootsKey = "";
+      workspaceSearchLoading = false;
+      workspaceSearchLoaded = false;
+      workspaceSearchPaths = /* @__PURE__ */ new Set();
+      workspaceSearchSeq = 0;
     }
   });
 

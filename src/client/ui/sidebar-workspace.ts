@@ -1,6 +1,7 @@
 import type { Workspace, FileTreeNode, FileInfo } from '../types';
 import { state, getSessionFile, getSessionFiles, hasSessionFile } from '../state';
-import { hasListDiff, isWorkspacePathMissing, getWorkspaceMissingPaths, getKnownWorkspacePathsSnapshot } from '../workspace-state';
+import { hasListDiff, isWorkspacePathMissing, getWorkspaceMissingPaths } from '../workspace-state';
+import { searchFiles } from '../api/files';
 import { escapeHtml, escapeAttr } from '../utils/escape';
 import { getFileListStatus } from '../utils/file-status';
 import { getFileTypeIcon } from '../utils/file-type';
@@ -22,6 +23,12 @@ let pendingRemoveWorkspaceId: string | null = null;
 let removeOutsideClickBound = false;
 const loadingWorkspaceIds = new Set<string>();
 const failedWorkspaceIds = new Set<string>();
+let workspaceSearchQuery = '';
+let workspaceSearchRootsKey = '';
+let workspaceSearchLoading = false;
+let workspaceSearchLoaded = false;
+let workspaceSearchPaths = new Set<string>();
+let workspaceSearchSeq = 0;
 
 function getWorkspaceNameFromPath(path: string): string {
   const parts = path.split('/').filter(Boolean);
@@ -111,26 +118,96 @@ function buildTreeFromPaths(workspace: Workspace, filePaths: string[]): FileTree
   return root;
 }
 
-function buildSearchTree(workspace: Workspace, originalTree: FileTreeNode | undefined, query: string): FileTreeNode | undefined {
-  if (!query) return originalTree;
-  const lowerQuery = query.toLowerCase();
-  const candidates = new Set<string>();
-
-  const treePaths = new Set<string>();
-  collectTreeFilePaths(originalTree, treePaths);
-  treePaths.forEach((path) => candidates.add(path));
-  getKnownWorkspacePathsSnapshot(workspace.id).forEach((path) => candidates.add(path));
-  getSessionFiles()
-    .filter((file) => file.path.startsWith(`${workspace.path.replace(/\/+$/, '')}/`))
-    .forEach((file) => candidates.add(file.path));
-
-  const matched = Array.from(candidates).filter((path) => {
-    const basename = path.split('/').pop() || '';
-    return path.toLowerCase().includes(lowerQuery) || basename.toLowerCase().includes(lowerQuery);
-  });
-
+function buildSearchTree(workspace: Workspace, query: string): FileTreeNode | undefined {
+  if (!query) return state.fileTree.get(workspace.id);
+  const workspaceRoot = workspace.path.replace(/\/+$/, '');
+  const workspacePrefix = `${workspaceRoot}/`;
+  const matched = Array.from(workspaceSearchPaths).filter((path) => (
+    path === workspaceRoot || path.startsWith(workspacePrefix)
+  ));
   if (matched.length === 0) return undefined;
   return buildTreeFromPaths(workspace, matched);
+}
+
+function getWorkspaceSearchRoots(): string[] {
+  return state.config.workspaces
+    .map((workspace) => workspace.path.trim())
+    .filter(Boolean);
+}
+
+function resetWorkspaceSearchState(): void {
+  workspaceSearchQuery = '';
+  workspaceSearchRootsKey = '';
+  workspaceSearchLoading = false;
+  workspaceSearchLoaded = false;
+  workspaceSearchPaths = new Set<string>();
+}
+
+async function runWorkspaceSearch(query: string, roots: string[], rootsKey: string, seq: number): Promise<void> {
+  try {
+    const data = await searchFiles(query, { roots, limit: 200 });
+    if (seq !== workspaceSearchSeq) return;
+    workspaceSearchQuery = query;
+    workspaceSearchRootsKey = rootsKey;
+    workspaceSearchPaths = new Set((data.files || []).map((file) => file.path).filter(Boolean));
+    workspaceSearchLoading = false;
+    workspaceSearchLoaded = true;
+  } catch (error) {
+    if (seq !== workspaceSearchSeq) return;
+    console.error('工作区搜索失败:', error);
+    workspaceSearchQuery = query;
+    workspaceSearchRootsKey = rootsKey;
+    workspaceSearchPaths = new Set<string>();
+    workspaceSearchLoading = false;
+    workspaceSearchLoaded = true;
+  }
+
+  const { renderSidebar } = await import('./sidebar');
+  renderSidebar();
+}
+
+function ensureWorkspaceSearchResults(query: string): void {
+  const trimmed = query.trim();
+  if (!trimmed) {
+    resetWorkspaceSearchState();
+    return;
+  }
+
+  const roots = getWorkspaceSearchRoots();
+  const rootsKey = roots.join('\n');
+  if (roots.length === 0) {
+    workspaceSearchQuery = trimmed;
+    workspaceSearchRootsKey = rootsKey;
+    workspaceSearchPaths = new Set<string>();
+    workspaceSearchLoading = false;
+    workspaceSearchLoaded = true;
+    return;
+  }
+
+  if (
+    workspaceSearchLoaded &&
+    !workspaceSearchLoading &&
+    workspaceSearchQuery === trimmed &&
+    workspaceSearchRootsKey === rootsKey
+  ) {
+    return;
+  }
+
+  if (
+    workspaceSearchLoading &&
+    workspaceSearchQuery === trimmed &&
+    workspaceSearchRootsKey === rootsKey
+  ) {
+    return;
+  }
+
+  workspaceSearchSeq += 1;
+  workspaceSearchQuery = trimmed;
+  workspaceSearchRootsKey = rootsKey;
+  workspaceSearchLoading = true;
+  workspaceSearchLoaded = false;
+  workspaceSearchPaths = new Set<string>();
+  void runWorkspaceSearch(trimmed, roots, rootsKey, workspaceSearchSeq);
 }
 
 function updateWorkspacePathPreview(): void {
@@ -248,6 +325,7 @@ async function confirmAddWorkspaceDialog(): Promise<void> {
 // 渲染工作区模式侧边栏
 export function renderWorkspaceSidebar(): string {
   const query = state.searchQuery.trim().toLowerCase();
+  ensureWorkspaceSearchResults(query);
   return `
     ${renderWorkspaceSection(query)}
   `;
@@ -285,8 +363,7 @@ function renderEmptyWorkspace(): string {
 // 渲染单个工作区
 function renderWorkspaceItem(workspace: Workspace, index: number, total: number, query: string): string {
   const isCurrent = state.currentWorkspace === workspace.id;
-  const originalTree = state.fileTree.get(workspace.id);
-  const tree = query ? buildSearchTree(workspace, originalTree, query) : originalTree;
+  const tree = query ? buildSearchTree(workspace, query) : state.fileTree.get(workspace.id);
   const shouldExpand = query ? true : workspace.isExpanded;
   const toggle = shouldExpand ? '▼' : '▶';
   const canMoveUp = index > 0;
@@ -362,6 +439,14 @@ function renderWorkspaceItem(workspace: Workspace, index: number, total: number,
 
 // 渲染文件树
 function renderFileTree(workspaceId: string, tree: FileTreeNode | undefined, query: string): string {
+  if (query && workspaceSearchLoading && workspaceSearchQuery === query) {
+    return `
+      <div class="file-tree loading">
+        <div class="tree-loading">搜索中...</div>
+      </div>
+    `;
+  }
+
   if (loadingWorkspaceIds.has(workspaceId)) {
     return `
       <div class="file-tree loading">
@@ -381,7 +466,7 @@ function renderFileTree(workspaceId: string, tree: FileTreeNode | undefined, que
   if (!tree) {
     return `
       <div class="file-tree empty">
-        <div class="tree-empty">目录暂不可用</div>
+        <div class="tree-empty">${query ? '未找到匹配文件' : '目录暂不可用'}</div>
       </div>
     `;
   }

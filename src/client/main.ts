@@ -461,6 +461,7 @@ function renderContent() {
   if (!container) return;
 
   if (!state.currentFile) {
+    container.removeAttribute('data-current-file');
     container.innerHTML = `
       <div class="empty-state">
         <h2>欢迎使用 MD Viewer</h2>
@@ -474,6 +475,7 @@ function renderContent() {
   if (!file) return;
 
   if (isHtmlPath(file.path)) {
+    container.removeAttribute('data-current-file');
     container.innerHTML = `
       <div class="empty-state">
         <h2>HTML 文件仅支持外部打开</h2>
@@ -839,6 +841,7 @@ function removeFileHandler(path: string) {
   removeFileFromState(path);
   renderSidebar();
   renderContent();
+  syncAnnotationsForCurrentFile(true);
 }
 
 // 搜索文件

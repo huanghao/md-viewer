@@ -31,7 +31,10 @@ import {
   handleInferWorkspace,
   handleScanWorkspace,
   handleGetAnnotations,
-  handleSaveAnnotations,
+  handleUpsertAnnotation,
+  handleReplyAnnotation,
+  handleDeleteAnnotation,
+  handleUpdateAnnotationStatus,
   handleMigrateAnnotations,
   handleClearAllAnnotations,
 } from "./handlers.ts";
@@ -116,7 +119,10 @@ app.post("/api/scan-workspace", handleScanWorkspace);
 
 // API: 评论相关（SQLite 持久化）
 app.get("/api/annotations", handleGetAnnotations);
-app.post("/api/annotations", handleSaveAnnotations);
+app.post("/api/annotations/item", handleUpsertAnnotation);
+app.post("/api/annotations/reply", handleReplyAnnotation);
+app.post("/api/annotations/delete", handleDeleteAnnotation);
+app.post("/api/annotations/status", handleUpdateAnnotationStatus);
 app.post("/api/annotations/migrate", handleMigrateAnnotations);
 app.post("/api/annotations/clear", handleClearAllAnnotations);
 

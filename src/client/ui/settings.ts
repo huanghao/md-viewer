@@ -68,7 +68,7 @@ function renderSettingsDialog(): void {
         <div>当前文件</div><div>${escapeHtml(snapshot.currentFile || '无')}</div>
         <div>已打开文件数</div><div>${snapshot.openFilesCount}</div>
         <div>工作区数</div><div>${snapshot.workspaceCount}</div>
-        <div>评论缓存文件数</div><div>${snapshot.annotationFileCount}</div>
+        <div>评论相关本地键数</div><div>${snapshot.commentStateKeyCount}</div>
         <div>md-viewer 本地键数</div><div>${snapshot.mdvKeyCount}</div>
         <div>localStorage 总键数</div><div>${snapshot.localStorageKeyCount}</div>
       </div>
@@ -78,9 +78,9 @@ function renderSettingsDialog(): void {
     </div>
     <div class="settings-section">
       <div class="settings-section-title">数据清理</div>
-      <div class="settings-section-desc">清理后会自动刷新页面。</div>
+      <div class="settings-section-desc">评论状态清理会同时删除服务端 SQLite 评论数据和客户端评论相关状态，随后自动刷新页面。</div>
       <div class="settings-actions-row">
-        <button class="sync-dialog-button" id="clearAllCommentsBtn">清空所有评论</button>
+        <button class="sync-dialog-button" id="clearAllCommentsBtn">清空评论状态</button>
         <button class="sync-dialog-button" id="clearClientStateBtn">清理客户端状态</button>
       </div>
     </div>
@@ -115,7 +115,7 @@ interface ClientStateSnapshot {
   currentFile: string | null;
   openFilesCount: number;
   workspaceCount: number;
-  annotationFileCount: number;
+  commentStateKeyCount: number;
   mdvKeyCount: number;
   localStorageKeyCount: number;
   mdvKeys: string[];
@@ -129,12 +129,17 @@ function getClientStateSnapshot(): ClientStateSnapshot {
   }
   allKeys.sort();
   const mdvKeys = allKeys.filter((key) => key.startsWith('md-viewer:'));
-  const annotationFileCount = mdvKeys.filter((key) => key.startsWith('md-viewer:annotations:')).length;
+  const commentStateKeyCount = mdvKeys.filter((key) => (
+    key === 'md-viewer:annotation-panel-open-by-file' ||
+    key === 'md-viewer:annotation-density' ||
+    key === 'md-viewer:annotation-sidebar-width' ||
+    key.startsWith('md-viewer:annotations:')
+  )).length;
   return {
     currentFile: state.currentFile,
     openFilesCount: state.sessionFiles.size,
     workspaceCount: state.config.workspaces.length,
-    annotationFileCount,
+    commentStateKeyCount,
     mdvKeyCount: mdvKeys.length,
     localStorageKeyCount: allKeys.length,
     mdvKeys,
@@ -168,15 +173,16 @@ async function clearAllComments(): Promise<void> {
       if (!key) continue;
       if (key.startsWith('md-viewer:annotations:')) keysToDelete.push(key);
       if (key === 'md-viewer:annotation-panel-open-by-file') keysToDelete.push(key);
-      if (key === 'md-viewer:annotation-migrated-v1') keysToDelete.push(key);
+      if (key === 'md-viewer:annotation-density') keysToDelete.push(key);
+      if (key === 'md-viewer:annotation-sidebar-width') keysToDelete.push(key);
     }
     for (const key of keysToDelete) {
       localStorage.removeItem(key);
     }
-    showSuccess(`已清空评论（${data?.deleted || 0} 条）`, 1800);
+    showSuccess(`已清空评论状态（服务端 ${data?.deleted || 0} 条，本地 ${keysToDelete.length} 项）`, 1800);
     window.setTimeout(() => window.location.reload(), 250);
   } catch (error: any) {
-    showError(`清空评论失败: ${error?.message || '未知错误'}`, 2600);
+    showError(`清空评论状态失败: ${error?.message || '未知错误'}`, 2600);
   }
 }
 

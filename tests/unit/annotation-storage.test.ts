@@ -7,6 +7,9 @@ import {
   replaceAnnotations,
   listAnnotatedDocuments,
   getAnnotationsByDocument,
+  upsertAnnotation,
+  updateAnnotationStatus,
+  deleteAnnotation,
 } from '../../src/annotation-storage';
 
 let tempConfigHome = '';
@@ -80,5 +83,37 @@ describe('annotation-storage', () => {
     expect(after.annotations[0].thread?.[1]?.type).toBe('reply');
     expect(after.annotations[0].thread?.[1]?.author).toBe('codex');
     expect(after.annotations[0].thread?.[1]?.note).toBe('reply-b1');
+  });
+
+  it('supports incremental upsert for one annotation', () => {
+    const result = upsertAnnotation('/tmp/a.md', {
+      id: 'a3',
+      start: 20,
+      length: 4,
+      quote: 'dddd',
+      note: 'note-a3',
+      createdAt: 4000,
+      status: 'anchored',
+    });
+    expect(result.ok).toBe(true);
+    expect(result.annotation?.serial).toBe(3);
+
+    const after = getAnnotationsByDocument('/tmp/a.md', 10, 0);
+    expect(after.total).toBe(3);
+    expect(after.annotations.some((item) => item.id === 'a3')).toBe(true);
+  });
+
+  it('supports incremental status update and delete', () => {
+    const statusUpdated = updateAnnotationStatus('/tmp/a.md', { id: 'a1' }, 'resolved');
+    expect(statusUpdated.ok).toBe(true);
+    expect(statusUpdated.updated?.status).toBe('resolved');
+
+    const deleted = deleteAnnotation('/tmp/a.md', { id: 'a2' });
+    expect(deleted.ok).toBe(true);
+
+    const after = getAnnotationsByDocument('/tmp/a.md', 10, 0);
+    expect(after.total).toBe(2);
+    expect(after.annotations.some((item) => item.id === 'a2')).toBe(false);
+    expect(after.annotations.find((item) => item.id === 'a1')?.status).toBe('resolved');
   });
 });

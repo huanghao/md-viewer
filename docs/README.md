@@ -19,6 +19,7 @@
 ## 2. 专题与设计文档
 
 - [design/](./design/)
+- [20260308-comment-system-single-source-of-truth](./design/20260308-comment-system-single-source-of-truth.md)
 - [state-model-session-vs-workspace](./state-model-session-vs-workspace.md)
 
 ## 3. 测试与调研（进行中）

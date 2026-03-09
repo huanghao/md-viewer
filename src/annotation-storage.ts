@@ -102,6 +102,24 @@ function parseThreadFromRow(rawThreadJson: unknown, note: string, createdAt: num
   return buildThreadFromLegacyNote(note, createdAt, annotationId);
 }
 
+function mapRowToAnnotation(row: any): StoredAnnotation {
+  const thread = parseThreadFromRow(row.thread_json, row.note, row.created_at, row.id);
+  return {
+    id: row.id,
+    serial: Number.isFinite(Number(row.serial)) && Number(row.serial) > 0 ? Number(row.serial) : undefined,
+    start: row.start,
+    length: row.length,
+    quote: row.quote,
+    note: thread[0]?.note || row.note,
+    thread,
+    createdAt: row.created_at,
+    quotePrefix: row.quote_prefix || undefined,
+    quoteSuffix: row.quote_suffix || undefined,
+    status: row.status || "anchored",
+    confidence: typeof row.confidence === "number" ? row.confidence : undefined,
+  };
+}
+
 function getDb(): Database {
   if (db) return db;
 
@@ -189,6 +207,87 @@ function normalizeAnnotation(input: any): StoredAnnotation | null {
   };
 }
 
+function getAnnotationRowById(id: string): any | null {
+  return getDb()
+    .query(
+      `SELECT id, serial, doc_path, start, length, quote, note, thread_json, created_at, updated_at, quote_prefix, quote_suffix, status, confidence
+       FROM annotations WHERE id = ?`
+    )
+    .get(id) as any | null;
+}
+
+function getAnnotationRowByRef(path: string, annotationRef: { id?: string; serial?: number }): any | null {
+  if (annotationRef.id) {
+    return getDb()
+      .query(
+        `SELECT id, serial, doc_path, start, length, quote, note, thread_json, created_at, updated_at, quote_prefix, quote_suffix, status, confidence
+         FROM annotations WHERE doc_path = ? AND id = ?`
+      )
+      .get(path, annotationRef.id) as any | null;
+  }
+  if (
+    typeof annotationRef.serial === "number" &&
+    Number.isFinite(annotationRef.serial) &&
+    annotationRef.serial > 0
+  ) {
+    return getDb()
+      .query(
+        `SELECT id, serial, doc_path, start, length, quote, note, thread_json, created_at, updated_at, quote_prefix, quote_suffix, status, confidence
+         FROM annotations WHERE doc_path = ? AND serial = ?`
+      )
+      .get(path, Math.floor(annotationRef.serial)) as any | null;
+  }
+  return null;
+}
+
+function getNextSerialForDoc(path: string): number {
+  const row = getDb()
+    .query(`SELECT COALESCE(MAX(serial), 0) as max_serial FROM annotations WHERE doc_path = ?`)
+    .get(path) as { max_serial: number } | null;
+  return Number(row?.max_serial || 0) + 1;
+}
+
+function writeAnnotationRow(path: string, ann: StoredAnnotation, updatedAt = Date.now()): StoredAnnotation {
+  const database = getDb();
+  const existingById = getAnnotationRowById(ann.id);
+  const normalizedThread = normalizeThreadItems(Array.isArray(ann.thread) ? ann.thread : []);
+  const existingSerial = existingById && String(existingById.doc_path) === path
+    ? Number(existingById.serial || 0)
+    : 0;
+  const serial = ann.serial && ann.serial > 0
+    ? Math.floor(ann.serial)
+    : existingSerial > 0
+      ? existingSerial
+      : getNextSerialForDoc(path);
+  const createdAt = existingById
+    ? Number(existingById.created_at || ann.createdAt || Date.now())
+    : Number(ann.createdAt || Date.now());
+
+  database.prepare(`
+    INSERT OR REPLACE INTO annotations
+      (id, serial, doc_path, start, length, quote, note, thread_json, created_at, updated_at, quote_prefix, quote_suffix, status, confidence)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    ann.id,
+    serial,
+    path,
+    ann.start,
+    ann.length,
+    ann.quote,
+    normalizedThread[0]?.note || ann.note,
+    JSON.stringify(normalizedThread),
+    createdAt,
+    updatedAt,
+    ann.quotePrefix || null,
+    ann.quoteSuffix || null,
+    ann.status || "anchored",
+    ann.confidence ?? null
+  );
+
+  const row = getAnnotationRowById(ann.id);
+  return row ? mapRowToAnnotation(row) : { ...ann, serial, createdAt };
+}
+
 export function listAnnotations(docPath: string): StoredAnnotation[] {
   const path = normalizeDocPath(docPath);
   if (!path) return [];
@@ -200,23 +299,7 @@ export function listAnnotations(docPath: string): StoredAnnotation[] {
     )
     .all(path) as any[];
 
-  return rows.map((row) => {
-    const thread = parseThreadFromRow(row.thread_json, row.note, row.created_at, row.id);
-    return {
-      id: row.id,
-      serial: Number.isFinite(Number(row.serial)) && Number(row.serial) > 0 ? Number(row.serial) : undefined,
-      start: row.start,
-      length: row.length,
-      quote: row.quote,
-      note: thread[0]?.note || row.note,
-      thread,
-      createdAt: row.created_at,
-      quotePrefix: row.quote_prefix || undefined,
-      quoteSuffix: row.quote_suffix || undefined,
-      status: row.status || "anchored",
-      confidence: typeof row.confidence === "number" ? row.confidence : undefined,
-    };
-  });
+  return rows.map((row) => mapRowToAnnotation(row));
 }
 
 export function replaceAnnotations(docPath: string, annotations: any[]): { saved: number } {
@@ -260,36 +343,27 @@ export function replaceAnnotations(docPath: string, annotations: any[]): { saved
 
   const now = Date.now();
   const removeStmt = database.prepare("DELETE FROM annotations WHERE doc_path = ?");
-  const insertStmt = database.prepare(`
-    INSERT OR REPLACE INTO annotations
-      (id, serial, doc_path, start, length, quote, note, thread_json, created_at, updated_at, quote_prefix, quote_suffix, status, confidence)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
 
   const tx = database.transaction((items: StoredAnnotation[]) => {
     removeStmt.run(path);
     for (const ann of items) {
-      const thread = normalizeThreadItems(Array.isArray(ann.thread) ? ann.thread : []);
-      insertStmt.run(
-        ann.id,
-        ann.serial ?? null,
-        path,
-        ann.start,
-        ann.length,
-        ann.quote,
-        thread[0]?.note || ann.note,
-        JSON.stringify(thread),
-        ann.createdAt,
-        now,
-        ann.quotePrefix || null,
-        ann.quoteSuffix || null,
-        ann.status || "anchored",
-        ann.confidence ?? null
-      );
+      writeAnnotationRow(path, ann, now);
     }
   });
   tx(normalized);
   return { saved: normalized.length };
+}
+
+export function upsertAnnotation(
+  docPath: string,
+  annotation: any
+): { ok: boolean; annotation?: StoredAnnotation; error?: string } {
+  const path = normalizeDocPath(docPath);
+  if (!path) return { ok: false, error: "缺少文档路径" };
+  const normalized = normalizeAnnotation(annotation);
+  if (!normalized) return { ok: false, error: "评论数据无效" };
+  const saved = writeAnnotationRow(path, normalized);
+  return { ok: true, annotation: saved };
 }
 
 export function importLegacyAnnotations(
@@ -375,23 +449,7 @@ export function getAnnotationsByDocument(
     )
     .all(path, safeLimit, safeOffset) as any[];
 
-  const annotations = rows.map((row) => {
-    const thread = parseThreadFromRow(row.thread_json, row.note, row.created_at, row.id);
-    return {
-      id: row.id,
-      serial: Number.isFinite(Number(row.serial)) && Number(row.serial) > 0 ? Number(row.serial) : undefined,
-      start: row.start,
-      length: row.length,
-      quote: row.quote,
-      note: thread[0]?.note || row.note,
-      thread,
-      createdAt: row.created_at,
-      quotePrefix: row.quote_prefix || undefined,
-      quoteSuffix: row.quote_suffix || undefined,
-      status: row.status || "anchored",
-      confidence: typeof row.confidence === "number" ? row.confidence : undefined,
-    };
-  }) as StoredAnnotation[];
+  const annotations = rows.map((row) => mapRowToAnnotation(row)) as StoredAnnotation[];
 
   return { path, total, annotations };
 }
@@ -409,20 +467,9 @@ export function appendAnnotationReply(
   const authorText = String(author || "").trim();
   if (!authorText) return { ok: false, error: "回复作者不能为空" };
 
-  const all = listAnnotations(path);
-  const target = all.find((ann) => {
-    if (annotationRef.id && ann.id === annotationRef.id) return true;
-    if (
-      typeof annotationRef.serial === "number" &&
-      Number.isFinite(annotationRef.serial) &&
-      annotationRef.serial > 0 &&
-      ann.serial === Math.floor(annotationRef.serial)
-    ) {
-      return true;
-    }
-    return false;
-  });
-  if (!target) return { ok: false, error: "未找到评论" };
+  const targetRow = getAnnotationRowByRef(path, annotationRef);
+  if (!targetRow) return { ok: false, error: "未找到评论" };
+  const target = mapRowToAnnotation(targetRow);
 
   const now = Date.now();
   const nextThread = normalizeThreadItems([
@@ -438,8 +485,37 @@ export function appendAnnotationReply(
   target.thread = nextThread;
   target.note = nextThread[0]?.note || target.note;
 
-  replaceAnnotations(path, all);
-  return { ok: true, updated: target };
+  const updated = writeAnnotationRow(path, target);
+  return { ok: true, updated };
+}
+
+export function deleteAnnotation(
+  docPath: string,
+  annotationRef: { id?: string; serial?: number }
+): { ok: boolean; deleted?: boolean; error?: string } {
+  const path = normalizeDocPath(docPath);
+  if (!path) return { ok: false, error: "缺少文档路径" };
+  const targetRow = getAnnotationRowByRef(path, annotationRef);
+  if (!targetRow) return { ok: false, error: "未找到评论" };
+  getDb().query(`DELETE FROM annotations WHERE id = ?`).run(String(targetRow.id));
+  return { ok: true, deleted: true };
+}
+
+export function updateAnnotationStatus(
+  docPath: string,
+  annotationRef: { id?: string; serial?: number },
+  status: "anchored" | "unanchored" | "resolved"
+): { ok: boolean; updated?: StoredAnnotation; error?: string } {
+  const path = normalizeDocPath(docPath);
+  if (!path) return { ok: false, error: "缺少文档路径" };
+  const nextStatus = status === "resolved" || status === "unanchored" ? status : "anchored";
+  const targetRow = getAnnotationRowByRef(path, annotationRef);
+  if (!targetRow) return { ok: false, error: "未找到评论" };
+  getDb()
+    .query(`UPDATE annotations SET status = ?, updated_at = ? WHERE id = ?`)
+    .run(nextStatus, Date.now(), String(targetRow.id));
+  const updatedRow = getAnnotationRowById(String(targetRow.id));
+  return { ok: true, updated: updatedRow ? mapRowToAnnotation(updatedRow) : undefined };
 }
 
 export function clearAllAnnotations(): { deleted: number; documents: number } {

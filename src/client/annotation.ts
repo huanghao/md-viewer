@@ -3,7 +3,14 @@
  */
 
 import { escapeHtml } from './utils/escape';
-import { fetchAnnotations, saveAnnotationsRemote, migrateAnnotationsRemote } from './api/annotations';
+import {
+  fetchAnnotations,
+  upsertAnnotationRemote,
+  replyAnnotationRemote,
+  deleteAnnotationRemote,
+  updateAnnotationStatusRemote,
+} from './api/annotations';
+import { showError } from './ui/toast';
 import { resolveAnnotationAnchor } from './utils/annotation-anchor';
 
 // ==================== 类型定义 ====================
@@ -68,10 +75,6 @@ const state: AnnotationState = {
   density: getInitialDensity(),
 };
 const ANNOTATION_PANEL_OPEN_BY_FILE_KEY = 'md-viewer:annotation-panel-open-by-file';
-
-function getStorageKey(filePath: string): string {
-  return `md-viewer:annotations:${filePath}`;
-}
 
 export function nextAnnotationSerial(annotations: Annotation[]): number {
   const maxSerial = annotations.reduce((max, ann) => {
@@ -152,35 +155,38 @@ export function ensureAnnotationSerials(annotations: Annotation[]): boolean {
   return changed;
 }
 
-export function loadAnnotations(filePath: string): Annotation[] {
-  try {
-    const raw = localStorage.getItem(getStorageKey(filePath));
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    const anns = Array.isArray(parsed) ? parsed : [];
-    ensureAnnotationThreads(anns);
-    return anns;
-  } catch (_err) {
-    return [];
+function replaceAnnotationInState(next: Annotation): void {
+  const index = state.annotations.findIndex((item) => item.id === next.id);
+  if (index >= 0) {
+    state.annotations[index] = next;
+    return;
   }
+  state.annotations.push(next);
 }
 
-export function saveAnnotations(filePath: string, annotations: Annotation[]): void {
-  localStorage.setItem(getStorageKey(filePath), JSON.stringify(annotations));
-  void saveAnnotationsRemote(filePath, annotations).catch(() => {
-    // 服务端不可用时，保持 localStorage 兜底
-  });
+function persistAnnotation(filePath: string, annotation: Annotation, errorPrefix = '评论保存失败'): void {
+  void upsertAnnotationRemote(filePath, annotation)
+    .then((saved) => {
+      if (state.currentFilePath !== filePath) return;
+      replaceAnnotationInState(saved);
+      renderAnnotationList(filePath);
+      applyAnnotations();
+    })
+    .catch((error) => {
+      showError(`${errorPrefix}: ${error?.message || '未知错误'}`, 2600);
+    });
+}
+
+function persistAnnotations(filePath: string, annotations: Annotation[], errorPrefix = '评论保存失败'): void {
+  for (const annotation of annotations) {
+    persistAnnotation(filePath, annotation, errorPrefix);
+  }
 }
 
 export function setAnnotations(filePath: string | null): void {
   state.currentFilePath = filePath;
   if (filePath) {
-    state.annotations = loadAnnotations(filePath);
-    const threadChanged = ensureAnnotationThreads(state.annotations);
-    const serialChanged = ensureAnnotationSerials(state.annotations);
-    if (threadChanged || serialChanged) {
-      saveAnnotations(filePath, state.annotations);
-    }
+    state.annotations = [];
     void hydrateAnnotationsFromRemote(filePath);
   } else {
     state.annotations = [];
@@ -209,34 +215,19 @@ async function hydrateAnnotationsFromRemote(filePath: string): Promise<void> {
     state.annotations = remote;
     const threadChanged = ensureAnnotationThreads(state.annotations);
     const serialChanged = ensureAnnotationSerials(state.annotations);
-    localStorage.setItem(getStorageKey(filePath), JSON.stringify(state.annotations));
     if (threadChanged || serialChanged) {
-      saveAnnotations(filePath, state.annotations);
+      persistAnnotations(filePath, state.annotations);
     }
     renderAnnotationList(filePath);
     applyAnnotations();
-  } catch {
-    // ignore
+  } catch (error: any) {
+    if (state.currentFilePath !== filePath) return;
+    showError(`评论加载失败: ${error?.message || '未知错误'}`, 2600);
   }
 }
 
 export function getAnnotations(): Annotation[] {
   return state.annotations;
-}
-
-export function getAllAnnotationsFromLocalStorage(): Record<string, Annotation[]> {
-  const result: Record<string, Annotation[]> = {};
-  const prefix = 'md-viewer:annotations:';
-  for (let i = 0; i < localStorage.length; i += 1) {
-    const key = localStorage.key(i);
-    if (!key || !key.startsWith(prefix)) continue;
-    const filePath = key.slice(prefix.length);
-    const annotations = loadAnnotations(filePath);
-    if (annotations.length > 0) {
-      result[filePath] = annotations;
-    }
-  }
-  return result;
 }
 
 // ==================== DOM 元素引用 ====================
@@ -345,6 +336,14 @@ function matchesFilter(ann: Annotation, filter: AnnotationFilter): boolean {
 
 export function getAnnotationCurrentFilePath(): string | null {
   return state.currentFilePath;
+}
+
+function getActiveAnnotationFilePath(): string | null {
+  const currentFilePath = state.currentFilePath;
+  const renderedFilePath = document.getElementById('content')?.getAttribute('data-current-file') || null;
+  if (!currentFilePath) return null;
+  if (!renderedFilePath) return currentFilePath;
+  return renderedFilePath === currentFilePath ? currentFilePath : null;
 }
 
 function iconSvg(type: 'up' | 'down' | 'check' | 'trash' | 'comment' | 'list' | 'filter' | 'close'): string {
@@ -658,7 +657,16 @@ function appendReply(annotationId: string, filePath: string, text: string): void
   });
   ann.thread = thread;
   ann.note = thread[0]?.note || ann.note;
-  saveAnnotations(filePath, state.annotations);
+  void replyAnnotationRemote(filePath, { id: annotationId }, note, 'me')
+    .then((saved) => {
+      if (state.currentFilePath !== filePath) return;
+      replaceAnnotationInState(saved);
+      renderAnnotationList(filePath);
+      applyAnnotations();
+    })
+    .catch((error) => {
+      showError(`回复评论失败: ${error?.message || '未知错误'}`, 2600);
+    });
 }
 
 function autoResizeReplyInput(input: HTMLTextAreaElement): void {
@@ -742,15 +750,15 @@ export function savePendingAnnotation(filePath: string): void {
   };
 
   state.annotations.push(ann);
-  saveAnnotations(filePath, state.annotations);
+  persistAnnotation(filePath, ann, '创建评论失败');
   hideComposer();
   applyAnnotations();
   renderAnnotationList(filePath);
 }
 
 export function removeAnnotation(id: string, filePath: string): void {
+  const previous = state.annotations.slice();
   state.annotations = state.annotations.filter((a) => a.id !== id);
-  saveAnnotations(filePath, state.annotations);
   if (state.pinnedAnnotationId === id) {
     state.pinnedAnnotationId = null;
     hidePopover(true);
@@ -760,6 +768,12 @@ export function removeAnnotation(id: string, filePath: string): void {
   }
   applyAnnotations();
   renderAnnotationList(filePath);
+  void deleteAnnotationRemote(filePath, { id }).catch((error) => {
+    state.annotations = previous;
+    showError(`删除评论失败: ${error?.message || '未知错误'}`, 2600);
+    applyAnnotations();
+    renderAnnotationList(filePath);
+  });
 }
 
 function jumpToAnnotation(id: string): void {
@@ -823,15 +837,22 @@ function syncAnnotationScrollWithContent(): void {
 function toggleResolved(id: string, filePath: string): void {
   const ann = state.annotations.find((item) => item.id === id);
   if (!ann) return;
+  const previousStatus = ann.status;
   if (ann.status === 'resolved') {
     ann.status = (ann.confidence || 0) <= 0 ? 'unanchored' : 'anchored';
   } else {
     ann.status = 'resolved';
   }
-  saveAnnotations(filePath, state.annotations);
+  const nextStatus = ann.status || 'anchored';
   hidePopover(true);
   applyAnnotations();
   renderAnnotationList(filePath);
+  void updateAnnotationStatusRemote(filePath, { id }, nextStatus).catch((error) => {
+    ann.status = previousStatus;
+    showError(`更新评论状态失败: ${error?.message || '未知错误'}`, 2600);
+    applyAnnotations();
+    renderAnnotationList(filePath);
+  });
 }
 
 // ==================== 渲染 ====================
@@ -936,7 +957,7 @@ function attachAnnotationEvents(): void {
       state.pinnedAnnotationId = id;
       const rect = markEl.getBoundingClientRect();
       showPopover(ann, rect.right + 8, rect.top + 8);
-      const filePath = document.getElementById('content')?.getAttribute('data-current-file');
+      const filePath = getActiveAnnotationFilePath();
       renderAnnotationList(filePath || null);
     });
   });
@@ -962,32 +983,41 @@ export function applyAnnotations(): void {
   if (el.reader) {
     const text = getReaderText(el.reader);
     let changed = false;
+    const changedAnnotations: Annotation[] = [];
     for (const ann of state.annotations) {
       const resolved = resolveAnnotationAnchor(text, ann);
+      let annChanged = false;
       const nextStatus = resolved.status;
       if (ann.start !== resolved.start) {
         ann.start = resolved.start;
         changed = true;
+        annChanged = true;
       }
       if (ann.length !== resolved.length) {
         ann.length = resolved.length;
         changed = true;
+        annChanged = true;
       }
       const mergedStatus = mergeAnnotationStatus(ann.status, nextStatus);
       if ((ann.status || 'anchored') !== mergedStatus) {
         ann.status = mergedStatus;
         changed = true;
+        annChanged = true;
       }
       if (ann.confidence !== resolved.confidence) {
         ann.confidence = resolved.confidence;
         changed = true;
+        annChanged = true;
+      }
+      if (annChanged) {
+        changedAnnotations.push({ ...ann, thread: ann.thread ? [...ann.thread] : ann.thread });
       }
     }
 
     if (changed) {
-      const currentFile = el.content?.getAttribute('data-current-file');
+      const currentFile = getActiveAnnotationFilePath();
       if (currentFile) {
-        saveAnnotations(currentFile, state.annotations);
+        persistAnnotations(currentFile, changedAnnotations, '同步评论锚点失败');
       }
     }
   }
@@ -1187,14 +1217,12 @@ export function handleSelectionForAnnotation(filePath: string | null): void {
 
 // ==================== 初始化 ====================
 export function initAnnotationElements(): void {
-  void migrateLegacyAnnotationsOnce();
   initAnnotationSidebarWidth();
   setSidebarCollapsed(true);
 
   // 绑定全局事件
   document.getElementById('composerSaveBtn')?.addEventListener('click', () => {
-    const contentEl = document.getElementById('content');
-    const filePath = contentEl?.getAttribute('data-current-file');
+    const filePath = getActiveAnnotationFilePath();
     if (filePath) savePendingAnnotation(filePath);
   });
 
@@ -1203,8 +1231,7 @@ export function initAnnotationElements(): void {
     if (event.key !== 'Enter') return;
     if (!(event.metaKey || event.ctrlKey)) return;
     event.preventDefault();
-    const contentEl = document.getElementById('content');
-    const filePath = contentEl?.getAttribute('data-current-file');
+    const filePath = getActiveAnnotationFilePath();
     if (filePath) savePendingAnnotation(filePath);
   });
   getElements().composerNote?.addEventListener('input', (event) => {
@@ -1222,34 +1249,29 @@ export function initAnnotationElements(): void {
   });
 
   document.getElementById('popoverDeleteBtn')?.addEventListener('click', () => {
-    const contentEl = document.getElementById('content');
-    const filePath = contentEl?.getAttribute('data-current-file');
+    const filePath = getActiveAnnotationFilePath();
     const id = state.pinnedAnnotationId;
     if (id && filePath) removeAnnotation(id, filePath);
   });
 
   document.getElementById('popoverResolveBtn')?.addEventListener('click', () => {
-    const contentEl = document.getElementById('content');
-    const filePath = contentEl?.getAttribute('data-current-file');
+    const filePath = getActiveAnnotationFilePath();
     const id = state.pinnedAnnotationId;
     if (id && filePath) toggleResolved(id, filePath);
   });
   document.getElementById('popoverPrevBtn')?.addEventListener('click', () => {
-    const contentEl = document.getElementById('content');
-    const filePath = contentEl?.getAttribute('data-current-file');
+    const filePath = getActiveAnnotationFilePath();
     const id = state.pinnedAnnotationId;
     if (id && filePath) jumpToRelative(id, -1, filePath);
   });
   document.getElementById('popoverNextBtn')?.addEventListener('click', () => {
-    const contentEl = document.getElementById('content');
-    const filePath = contentEl?.getAttribute('data-current-file');
+    const filePath = getActiveAnnotationFilePath();
     const id = state.pinnedAnnotationId;
     if (id && filePath) jumpToRelative(id, 1, filePath);
   });
   document.getElementById('annotationPopover')?.addEventListener('click', (event) => {
     const target = event.target as HTMLElement;
-    const contentEl = document.getElementById('content');
-    const filePath = contentEl?.getAttribute('data-current-file');
+    const filePath = getActiveAnnotationFilePath();
     if (!filePath) return;
     const entry = target.closest('[data-popover-reply-entry]') as HTMLElement | null;
     if (entry) {
@@ -1285,7 +1307,7 @@ export function initAnnotationElements(): void {
     if (!(target instanceof HTMLTextAreaElement)) return;
     if (!(event.metaKey || event.ctrlKey) || event.key !== 'Enter') return;
     const id = target.getAttribute('data-popover-reply-input');
-    const filePath = document.getElementById('content')?.getAttribute('data-current-file');
+    const filePath = getActiveAnnotationFilePath();
     if (!id || !filePath) return;
     event.preventDefault();
     appendReply(id, filePath, target.value);
@@ -1309,7 +1331,7 @@ export function initAnnotationElements(): void {
       if (!next) return;
       state.filter = next;
       getElements().filterMenu?.classList.add('hidden');
-      const currentFile = document.getElementById('content')?.getAttribute('data-current-file');
+      const currentFile = getActiveAnnotationFilePath();
       applyAnnotations();
       renderAnnotationList(currentFile || null);
     });
@@ -1325,7 +1347,7 @@ export function initAnnotationElements(): void {
   getElements().densityToggle?.addEventListener('click', () => {
     state.density = state.density === 'default' ? 'simple' : 'default';
     localStorage.setItem('md-viewer:annotation-density', state.density);
-    const currentFile = document.getElementById('content')?.getAttribute('data-current-file');
+    const currentFile = getActiveAnnotationFilePath();
     renderAnnotationList(currentFile || null);
   });
 
@@ -1433,22 +1455,4 @@ export function initAnnotationElements(): void {
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
   });
-}
-
-async function migrateLegacyAnnotationsOnce(): Promise<void> {
-  const migrationKey = 'md-viewer:annotation-migrated-v1';
-  if (localStorage.getItem(migrationKey) === 'true') return;
-
-  const byPath = getAllAnnotationsFromLocalStorage();
-  if (Object.keys(byPath).length === 0) {
-    localStorage.setItem(migrationKey, 'true');
-    return;
-  }
-
-  try {
-    await migrateAnnotationsRemote(byPath);
-    localStorage.setItem(migrationKey, 'true');
-  } catch {
-    // 保持可重试，不设置迁移完成标记
-  }
 }

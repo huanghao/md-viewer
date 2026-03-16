@@ -37,6 +37,8 @@ import {
   handleUpdateAnnotationStatus,
   handleMigrateAnnotations,
   handleClearAllAnnotations,
+  handleGetSessionState,
+  handleUpdateSessionState,
 } from "./handlers.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
 
@@ -125,6 +127,10 @@ app.post("/api/annotations/delete", handleDeleteAnnotation);
 app.post("/api/annotations/status", handleUpdateAnnotationStatus);
 app.post("/api/annotations/migrate", handleMigrateAnnotations);
 app.post("/api/annotations/clear", handleClearAllAnnotations);
+
+// API: 会话状态（标签页）
+app.get("/api/session-state", handleGetSessionState);
+app.post("/api/session-state", handleUpdateSessionState);
 
 // ==================== 启动服务 ====================
 

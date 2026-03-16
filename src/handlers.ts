@@ -1062,6 +1062,32 @@ export async function handleClearAllAnnotations(c: Context) {
   }
 }
 
+// API: 获取会话状态（标签页、当前文档）
+// 注意：这个状态由前端通过 POST 上报，因为标签页状态在浏览器 localStorage 中
+let sessionState: {
+  currentFile: string | null;
+  openFiles: Array<{ path: string; name: string }>;
+  lastUpdate: number;
+} = {
+  currentFile: null,
+  openFiles: [],
+  lastUpdate: Date.now(),
+};
+
+export function handleGetSessionState(c: Context) {
+  return c.json(sessionState);
+}
+
+export async function handleUpdateSessionState(c: Context) {
+  const body = await c.req.json();
+  sessionState = {
+    currentFile: body.currentFile || null,
+    openFiles: body.openFiles || [],
+    lastUpdate: Date.now(),
+  };
+  return c.json({ success: true });
+}
+
 // 辅助函数
 function fileExists(path: string): boolean {
   return existsSync(path);

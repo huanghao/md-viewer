@@ -671,34 +671,89 @@ function cleanupExpired(): void {
 
 // ==================== 帮助信息 ====================
 
+// ==================== 标签页管理 ====================
+
+async function showTabs(json: boolean = false): Promise<void> {
+  // 尝试多个可能的端口
+  const ports = [53000, DEFAULT_PORT, 3000, 3001];
+  let data: any = null;
+
+  for (const port of ports) {
+    try {
+      const res = await fetch(`http://${DEFAULT_HOST}:${port}/api/session-state`, {
+        signal: AbortSignal.timeout(500),
+      });
+      if (res.ok) {
+        data = await res.json();
+        break;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  if (!data) {
+    console.error("❌ 无法连接到 MD Viewer App");
+    console.error("   请确保 App 正在运行");
+    process.exit(1);
+  }
+
+  try {
+    if (json) {
+      console.log(JSON.stringify(data, null, 2));
+      return;
+    }
+
+    console.log("# 标签页状态\n");
+
+    if (data.currentFile) {
+      console.log(`当前文档: ${data.currentFile}`);
+    } else {
+      console.log("当前文档: （无）");
+    }
+
+    console.log(`\n打开的标签页 (${data.openFiles.length}):\n`);
+    if (data.openFiles.length === 0) {
+      console.log("  （无）");
+    } else {
+      for (const file of data.openFiles) {
+        const marker = file.path === data.currentFile ? "▸" : " ";
+        console.log(`  ${marker} ${file.name}`);
+        console.log(`    ${file.path}`);
+      }
+    }
+
+    const updateTime = new Date(data.lastUpdate).toLocaleString();
+    console.log(`\n更新时间: ${updateTime}`);
+  } catch (error: any) {
+    console.error("❌ 显示标签页失败");
+    console.error(`   ${error.message}`);
+    process.exit(1);
+  }
+}
+
 function showHelp() {
   console.log(`
-MD Viewer CLI - 统一命令行工具
+MD Viewer CLI - 命令行工具
 
 用法:
-  mdv <FILE>                           打开文件（自动启动 Server）
-  mdv server start [--daemon]          启动 Server（默认前台，--daemon 后台）
-  mdv server stop|restart|status       管理 Server
-  mdv logs [--tail N]                  查看服务日志
+  mdv <FILE>                           打开文件
+  mdv tabs [--json]                    查看标签页和当前文档
   mdv config [get|set] [KEY] [VALUE]   配置管理
-  mdv stats                            运维统计（服务器+同步+日志）
-  mdv cleanup                          清理过期数据
   mdv comments list                    列出有评论的文档
   mdv comments get --file <FILE>       查看文档评论
   mdv comments reply --file <FILE> [--seq <N> | --id <ID>] --author <NAME> --text <TEXT>
                                        回复一条评论
-  mdv comments reply-batch --file <FILE> --author <NAME> --input <JSON|-> 
+  mdv comments reply-batch --file <FILE> --author <NAME> --input <JSON|->
                                        批量回复评论
   mdv comments stats                   评论统计
   mdv --help                           显示帮助
 
 选项:
   --no-focus                           添加文件但不切换焦点
-  --daemon, -d                         后台运行 Server
   --json                               JSON 输出（用于脚本）
   --limit <N>                          结果数量限制（默认 20）
   --offset <N>                         结果偏移（默认 0）
-  --tail <N>                           显示日志最后 N 行
   --seq <N>                            评论序号（用于 reply，推荐）
   --id <ID>                            评论唯一 ID（用于 reply）
   --author <NAME>                      回复作者（必填，如 codex/claude/huanghao）
@@ -708,15 +763,11 @@ MD Viewer CLI - 统一命令行工具
 示例:
   mdv README.md                        打开文件
   mdv --no-focus notes.md              添加但不切换
-  mdv server start                     启动服务（前台，Ctrl+C 停止）
-  mdv server start --daemon            启动服务（后台）
-  mdv server status                    查看服务状态
-  mdv logs --tail 50                   查看最后 50 行日志
+  mdv tabs                             查看当前打开的标签页
+  mdv tabs --json                      JSON 格式输出标签页
   mdv config                           查看完整配置
   mdv config get server.port           获取端口配置
   mdv config set server.port 3001      设置端口
-  mdv stats                            查看运维统计
-  mdv cleanup                          清理过期数据
   mdv comments list --json             列出评论文档（JSON）
   mdv comments get --file README.md    查看评论
   mdv comments reply --file README.md --seq 2 --author codex --text "我会补充这部分"
@@ -725,9 +776,6 @@ MD Viewer CLI - 统一命令行工具
 
 配置文件:
   ${getConfigPath()}
-
-日志文件:
-  ${getLogFilePath()}
 `);
 }
 
@@ -763,7 +811,7 @@ function parseArgs(args: string[]): {
 
   const command: string[] = [];
   let filePath: string | undefined;
-  const topLevelCommands = new Set(["server", "logs", "config", "stats", "cleanup", "comments"]);
+  const topLevelCommands = new Set(["tabs", "config", "comments"]);
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -840,27 +888,8 @@ async function main() {
   // 处理命令
   const [cmd, subcmd, ...rest] = command;
 
-  if (cmd === "server") {
-    switch (subcmd) {
-      case "start":
-        await startServer(options.daemon);
-        break;
-      case "stop":
-        stopServer();
-        break;
-      case "restart":
-        await restartServer(options.daemon);
-        break;
-      case "status":
-        showServerStatus();
-        break;
-      default:
-        console.error(`❌ 未知的 server 子命令: ${subcmd}`);
-        console.error(`   可用: start, stop, restart, status`);
-        process.exit(1);
-    }
-  } else if (cmd === "logs") {
-    showLogs(options.tail);
+  if (cmd === "tabs") {
+    await showTabs(options.json);
   } else if (cmd === "config") {
     if (!subcmd) {
       showConfig();
@@ -883,10 +912,6 @@ async function main() {
       console.error(`   可用: get, set`);
       process.exit(1);
     }
-  } else if (cmd === "stats") {
-    await showStats();
-  } else if (cmd === "cleanup") {
-    cleanupExpired();
   } else if (cmd === "comments") {
     if (subcmd === "list") {
       printCommentDocs(options.json, options.limit, options.offset);

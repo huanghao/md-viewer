@@ -2,7 +2,7 @@
 import type { FileData, SyncHistoryItem } from './types';
 
 // 导入状态管理
-import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFileFromState, switchToFile, setSearchQuery, markFileMissing, getSessionFile } from './state';
+import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFileFromState, switchToFile, setSearchQuery, markFileMissing, getSessionFile, setOnStateChangedCallback } from './state';
 import { clearListDiff, markWorkspacePathMissing } from './workspace-state';
 import { addWorkspace, hydrateExpandedWorkspaces, scanWorkspace, revealFileInWorkspace } from './workspace';
 
@@ -2083,20 +2083,39 @@ function startWorkspacePolling() {
   await refreshCurrentFile();
   connectSSE();
 
-  // 定期上报状态到服务器（用于 mdv tabs 命令）
-  startSessionStateSync();
+  // 初始化会话状态同步（事件驱动）
+  initSessionStateSync();
 })();
 
 // ==================== 会话状态同步 ====================
 
-function startSessionStateSync() {
-  // 立即上报一次
+let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+function initSessionStateSync() {
+  // 注册状态变化回调
+  setOnStateChangedCallback(notifySessionStateChanged);
+
+  // 页面加载时立即同步一次
   syncSessionState();
 
-  // 每 5 秒上报一次
-  setInterval(() => {
+  // 监听 visibility change（页面切换回来时同步）
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      syncSessionState();
+    }
+  });
+}
+
+function notifySessionStateChanged() {
+  // 防抖：300ms 内多次调用只执行一次
+  if (syncDebounceTimer) {
+    clearTimeout(syncDebounceTimer);
+  }
+
+  syncDebounceTimer = setTimeout(() => {
     syncSessionState();
-  }, 5000);
+    syncDebounceTimer = null;
+  }, 300);
 }
 
 async function syncSessionState() {

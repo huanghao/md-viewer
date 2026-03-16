@@ -456,7 +456,8 @@ export async function handleOpenFile(c: Context) {
 
     // 推送给所有连接的客户端
     broadcastFileOpened(fileInfo, focus);
-    
+    trackFileOpened(fileInfo.path, fileInfo.filename, focus);
+
     log(`📄 CLI 打开远程文件: ${filename}${focus ? " (并切换)" : ""}`);
     
     return c.json({ success: true, filename: fileInfo.filename });
@@ -483,7 +484,8 @@ export async function handleOpenFile(c: Context) {
 
   // 推送给所有连接的客户端
   broadcastFileOpened(fileInfo, focus);
-  
+  trackFileOpened(fileInfo.path, fileInfo.filename, focus);
+
   log(`📄 CLI 打开文件: ${fileInfo.filename}${focus ? " (并切换)" : ""}`);
   
   return c.json({ success: true, filename: fileInfo.filename });
@@ -1063,29 +1065,52 @@ export async function handleClearAllAnnotations(c: Context) {
 }
 
 // API: 获取会话状态（标签页、当前文档）
-// 注意：这个状态由前端通过 POST 上报，因为标签页状态在浏览器 localStorage 中
-let sessionState: {
-  currentFile: string | null;
-  openFiles: Array<{ path: string; name: string }>;
-  lastUpdate: number;
-} = {
-  currentFile: null,
-  openFiles: [],
-  lastUpdate: Date.now(),
-};
+// 服务器端跟踪通过 openFile API 打开的文件
+const openedFiles = new Map<string, { path: string; name: string; openedAt: number }>();
+let currentFilePath: string | null = null;
 
 export function handleGetSessionState(c: Context) {
-  return c.json(sessionState);
+  const openFiles = Array.from(openedFiles.values())
+    .sort((a, b) => b.openedAt - a.openedAt) // 按打开时间倒序
+    .map(({ path, name }) => ({ path, name }));
+
+  return c.json({
+    currentFile: currentFilePath,
+    openFiles,
+    lastUpdate: Date.now(),
+  });
 }
 
 export async function handleUpdateSessionState(c: Context) {
   const body = await c.req.json();
-  sessionState = {
-    currentFile: body.currentFile || null,
-    openFiles: body.openFiles || [],
-    lastUpdate: Date.now(),
-  };
+  currentFilePath = body.currentFile || null;
+
+  // 可选：前端也可以上报完整的文件列表
+  if (body.openFiles && Array.isArray(body.openFiles)) {
+    openedFiles.clear();
+    for (const file of body.openFiles) {
+      openedFiles.set(file.path, {
+        path: file.path,
+        name: file.name,
+        openedAt: Date.now(),
+      });
+    }
+  }
+
   return c.json({ success: true });
+}
+
+// 内部函数：记录文件打开
+export function trackFileOpened(path: string, name: string, focus: boolean) {
+  openedFiles.set(path, {
+    path,
+    name,
+    openedAt: Date.now(),
+  });
+
+  if (focus) {
+    currentFilePath = path;
+  }
 }
 
 // 辅助函数

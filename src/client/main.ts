@@ -2,7 +2,7 @@
 import type { FileData, SyncHistoryItem } from './types';
 
 // 导入状态管理
-import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFileFromState, switchToFile, setSearchQuery, markFileMissing, getSessionFile, setOnStateChangedCallback } from './state';
+import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFileFromState, switchToFile, setSearchQuery, markFileMissing, getSessionFile } from './state';
 import { clearListDiff, markWorkspacePathMissing } from './workspace-state';
 import { addWorkspace, hydrateExpandedWorkspaces, scanWorkspace, revealFileInWorkspace } from './workspace';
 
@@ -1931,6 +1931,34 @@ function connectSSE() {
     await onFileLoaded(data, data.focus !== false);
   });
 
+  // 服务端请求状态（用于 mdv tabs）
+  eventSource.addEventListener('state-request', async (e: any) => {
+    const data = JSON.parse(e.data);
+    const requestId = data.requestId;
+
+    if (!requestId) return;
+
+    // 立即响应服务端请求
+    const openFiles = Array.from(state.sessionFiles.values()).map((file) => ({
+      path: file.path,
+      name: file.name,
+    }));
+
+    try {
+      await fetch('/api/session-state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId,
+          currentFile: state.currentFile,
+          openFiles,
+        }),
+      });
+    } catch (error) {
+      console.error('响应状态请求失败:', error);
+    }
+  });
+
   eventSource.onerror = () => {
     console.error('SSE 连接断开，尝试重连...');
     eventSource.close();
@@ -2083,58 +2111,4 @@ function startWorkspacePolling() {
   await refreshCurrentFile();
   connectSSE();
 
-  // 初始化会话状态同步（事件驱动）
-  initSessionStateSync();
 })();
-
-// ==================== 会话状态同步 ====================
-
-let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-
-function initSessionStateSync() {
-  // 注册状态变化回调
-  setOnStateChangedCallback(notifySessionStateChanged);
-
-  // 页面加载时立即同步一次
-  syncSessionState();
-
-  // 监听 visibility change（页面切换回来时同步）
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) {
-      syncSessionState();
-    }
-  });
-}
-
-function notifySessionStateChanged() {
-  // 防抖：300ms 内多次调用只执行一次
-  if (syncDebounceTimer) {
-    clearTimeout(syncDebounceTimer);
-  }
-
-  syncDebounceTimer = setTimeout(() => {
-    syncSessionState();
-    syncDebounceTimer = null;
-  }, 300);
-}
-
-async function syncSessionState() {
-  try {
-    const openFiles = Array.from(state.sessionFiles.values()).map((file) => ({
-      path: file.path,
-      name: file.name,
-    }));
-
-    await fetch('/api/session-state', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        currentFile: state.currentFile,
-        openFiles,
-      }),
-    });
-  } catch (error) {
-    // 静默失败，不影响用户体验
-    console.debug('状态同步失败:', error);
-  }
-}

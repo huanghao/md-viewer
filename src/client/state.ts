@@ -8,19 +8,6 @@ import {
   restoreWorkspaceAuxiliaryState,
 } from './workspace-state';
 
-// 状态变化回调
-let onStateChangedCallback: (() => void) | null = null;
-
-export function setOnStateChangedCallback(callback: () => void) {
-  onStateChangedCallback = callback;
-}
-
-function notifyStateChanged() {
-  if (onStateChangedCallback) {
-    onStateChangedCallback();
-  }
-}
-
 // 全局状态
 export const state: AppState = {
   sessionFiles: new Map(),
@@ -206,7 +193,6 @@ export function addOrUpdateFile(fileData: FileData, switchTo: boolean = false): 
   }
 
   saveState();
-  notifyStateChanged();
 }
 
 export function removeFile(path: string): void {
@@ -219,7 +205,6 @@ export function removeFile(path: string): void {
     state.currentFile = remainingFiles.length > 0 ? remainingFiles[0].path : null;
   }
   saveState();
-  notifyStateChanged();
 }
 
 export function switchToFile(path: string): void {
@@ -227,7 +212,6 @@ export function switchToFile(path: string): void {
   clearListDiff(path);
   clearWorkspacePathMissing(path);
   saveState();
-  notifyStateChanged();
 }
 
 export function markFileMissing(path: string, switchTo: boolean = false): void {

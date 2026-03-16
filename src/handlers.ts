@@ -12,7 +12,7 @@ import {
   log,
   isSupportedTextFile,
 } from "./utils.ts";
-import { broadcastFileOpened, addClient, removeClient } from "./sse.ts";
+import { broadcastFileOpened, addClient, removeClient, broadcastEvent } from "./sse.ts";
 import { createKmDoc, getKmDocMeta } from "./km-cli.ts";
 import {
   getRecentParents,
@@ -456,7 +456,6 @@ export async function handleOpenFile(c: Context) {
 
     // 推送给所有连接的客户端
     broadcastFileOpened(fileInfo, focus);
-    trackFileOpened(fileInfo.path, fileInfo.filename, focus);
 
     log(`📄 CLI 打开远程文件: ${filename}${focus ? " (并切换)" : ""}`);
     
@@ -484,7 +483,6 @@ export async function handleOpenFile(c: Context) {
 
   // 推送给所有连接的客户端
   broadcastFileOpened(fileInfo, focus);
-  trackFileOpened(fileInfo.path, fileInfo.filename, focus);
 
   log(`📄 CLI 打开文件: ${fileInfo.filename}${focus ? " (并切换)" : ""}`);
   
@@ -1065,54 +1063,82 @@ export async function handleClearAllAnnotations(c: Context) {
 }
 
 // API: 获取会话状态（标签页、当前文档）
-// 服务器端跟踪通过 openFile API 打开的文件
-const openedFiles = new Map<string, { path: string; name: string; openedAt: number }>();
-let currentFilePath: string | null = null;
+// 设计：服务端不存储状态，而是通过 SSE 向客户端请求
 
-export function handleGetSessionState(c: Context) {
-  const openFiles = Array.from(openedFiles.values())
-    .sort((a, b) => b.openedAt - a.openedAt) // 按打开时间倒序
-    .map(({ path, name }) => ({ path, name }));
+interface SessionStateRequest {
+  requestId: string;
+  resolve: (data: any) => void;
+  reject: (error: Error) => void;
+  timeout: ReturnType<typeof setTimeout>;
+}
 
-  return c.json({
-    currentFile: currentFilePath,
-    openFiles,
-    lastUpdate: Date.now(),
+const pendingStateRequests = new Map<string, SessionStateRequest>();
+
+export async function handleGetSessionState(c: Context) {
+  const requestId = `state-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  // 创建一个 Promise 等待客户端响应
+  const statePromise = new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      pendingStateRequests.delete(requestId);
+      reject(new Error('客户端响应超时'));
+    }, 3000); // 3 秒超时
+
+    pendingStateRequests.set(requestId, { requestId, resolve, reject, timeout });
   });
+
+  // 通过 SSE 向所有客户端广播请求
+  broadcastStateRequest(requestId);
+
+  try {
+    const data = await statePromise;
+    return c.json(data);
+  } catch (error: any) {
+    return c.json({
+      error: error.message,
+      currentFile: null,
+      openFiles: [],
+      lastUpdate: Date.now(),
+    }, 500);
+  }
 }
 
 export async function handleUpdateSessionState(c: Context) {
   const body = await c.req.json();
-  currentFilePath = body.currentFile || null;
+  const requestId = body.requestId;
 
-  // 前端上报完整的文件列表（来自 localStorage）
-  if (body.openFiles && Array.isArray(body.openFiles)) {
-    openedFiles.clear();
-    for (const file of body.openFiles) {
-      if (file.path && file.name) {
-        openedFiles.set(file.path, {
-          path: file.path,
-          name: file.name,
-          openedAt: Date.now(),
-        });
-      }
-    }
+  if (!requestId) {
+    return c.json({ error: '缺少 requestId' }, 400);
   }
+
+  const request = pendingStateRequests.get(requestId);
+  if (!request) {
+    return c.json({ error: '请求已过期或不存在' }, 404);
+  }
+
+  // 清理
+  clearTimeout(request.timeout);
+  pendingStateRequests.delete(requestId);
+
+  // 响应等待的请求
+  request.resolve({
+    currentFile: body.currentFile || null,
+    openFiles: body.openFiles || [],
+    lastUpdate: Date.now(),
+  });
 
   return c.json({ success: true });
 }
 
-// 内部函数：记录文件打开
-export function trackFileOpened(path: string, name: string, focus: boolean) {
-  openedFiles.set(path, {
-    path,
-    name,
-    openedAt: Date.now(),
-  });
+// 广播状态请求（通过 SSE）
+function broadcastStateRequest(requestId: string) {
+  const event = {
+    type: 'state-request',
+    requestId,
+    timestamp: Date.now(),
+  };
 
-  if (focus) {
-    currentFilePath = path;
-  }
+  broadcastEvent(event);
 }
 
 // 辅助函数

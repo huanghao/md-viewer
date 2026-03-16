@@ -2082,4 +2082,40 @@ function startWorkspacePolling() {
   // 页面刷新时，自动刷新当前正在展示的文件
   await refreshCurrentFile();
   connectSSE();
+
+  // 定期上报状态到服务器（用于 mdv tabs 命令）
+  startSessionStateSync();
 })();
+
+// ==================== 会话状态同步 ====================
+
+function startSessionStateSync() {
+  // 立即上报一次
+  syncSessionState();
+
+  // 每 5 秒上报一次
+  setInterval(() => {
+    syncSessionState();
+  }, 5000);
+}
+
+async function syncSessionState() {
+  try {
+    const openFiles = Array.from(state.sessionFiles.values()).map((file) => ({
+      path: file.path,
+      name: file.name,
+    }));
+
+    await fetch('/api/session-state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        currentFile: state.currentFile,
+        openFiles,
+      }),
+    });
+  } catch (error) {
+    // 静默失败，不影响用户体验
+    console.debug('状态同步失败:', error);
+  }
+}

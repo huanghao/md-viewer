@@ -1085,15 +1085,17 @@ export async function handleUpdateSessionState(c: Context) {
   const body = await c.req.json();
   currentFilePath = body.currentFile || null;
 
-  // 可选：前端也可以上报完整的文件列表
+  // 前端上报完整的文件列表（来自 localStorage）
   if (body.openFiles && Array.isArray(body.openFiles)) {
     openedFiles.clear();
     for (const file of body.openFiles) {
-      openedFiles.set(file.path, {
-        path: file.path,
-        name: file.name,
-        openedAt: Date.now(),
-      });
+      if (file.path && file.name) {
+        openedFiles.set(file.path, {
+          path: file.path,
+          name: file.name,
+          openedAt: Date.now(),
+        });
+      }
     }
   }
 

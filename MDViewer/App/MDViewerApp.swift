@@ -13,11 +13,12 @@ struct MDViewerApp: App {
     @StateObject private var serverManager = ServerManager.shared
 
     var body: some Scene {
-        // 主窗口（状态栏在 AppDelegate 中创建）
+        // 主窗口
         WindowGroup("MD Viewer") {
             MainWindow()
                 .environmentObject(serverManager)
-                .frame(minWidth: 900, minHeight: 600)
+                .frame(minWidth: 1000, idealWidth: 1400, maxWidth: CGFloat.infinity,
+                       minHeight: 700, idealHeight: 900, maxHeight: CGFloat.infinity)
         }
         .commands {
             CommandGroup(replacing: .newItem) {

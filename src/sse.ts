@@ -59,3 +59,18 @@ export function broadcastFileDeleted(path: string) {
     }
   }
 }
+
+// 通用事件广播
+export function broadcastEvent(event: { type: string; [key: string]: any }) {
+  const message = `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(message);
+
+  for (const client of sseClients) {
+    try {
+      client.controller.enqueue(bytes);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}

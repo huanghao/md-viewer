@@ -1,0 +1,2 @@
+# This directory will contain mdv-server binary
+# Run ./scripts/build-server-for-xcode.sh to generate it

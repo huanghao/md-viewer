@@ -178,3 +178,12 @@ Temporary Items
 
 ########## Global/macOS END ##########
 
+# MDViewer Resources (generated)
+MDViewer/Resources/mdv-server
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# App Bundle (generated)
+dist/

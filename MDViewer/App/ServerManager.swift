@@ -65,9 +65,24 @@ class ServerManager: ObservableObject {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: serverPath)
             process.arguments = ["--internal-server-mode"]
+            // 继承当前进程的 PATH，并补充常见工具路径
+            // macOS App 默认 PATH 很短，需要手动补充 Go/Homebrew 等路径
+            let currentPath = ProcessInfo.processInfo.environment["PATH"] ?? ""
+            let extraPaths = [
+                "/usr/local/bin",
+                "/opt/homebrew/bin",
+                NSHomeDirectory() + "/go/bin",
+                NSHomeDirectory() + "/.local/bin",
+            ].filter { FileManager.default.fileExists(atPath: $0) }
+            let fullPath = (extraPaths + [currentPath])
+                .filter { !$0.isEmpty }
+                .joined(separator: ":")
+
             process.environment = [
                 "PORT": "\(port)",
-                "HOST": "127.0.0.1"
+                "HOST": "127.0.0.1",
+                "PATH": fullPath,
+                "HOME": NSHomeDirectory(),
             ]
 
             // 5. 重定向日志

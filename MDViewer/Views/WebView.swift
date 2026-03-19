@@ -21,6 +21,7 @@ struct WebView: NSViewRepresentable {
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
+        webView.uiDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
 
         // 立即加载（只在创建时执行一次）
@@ -57,12 +58,50 @@ struct WebView: NSViewRepresentable {
         Coordinator(self)
     }
 
-    class Coordinator: NSObject, WKNavigationDelegate {
+    class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         var parent: WebView
         var lastRefreshTrigger: Int = 0
 
         init(_ parent: WebView) {
             self.parent = parent
+        }
+
+        // 拦截导航：外部链接用系统浏览器打开
+        @MainActor func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationAction: WKNavigationAction,
+            decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void
+        ) {
+            guard let url = navigationAction.request.url else {
+                decisionHandler(.allow)
+                return
+            }
+
+            let isLocal = url.host == "127.0.0.1" || url.host == "localhost"
+
+            // 外部链接：用系统默认浏览器打开
+            if !isLocal && (url.scheme == "http" || url.scheme == "https") {
+                NSWorkspace.shared.open(url)
+                decisionHandler(.cancel)
+                print("🌍 外部链接用系统浏览器打开: \(url)")
+                return
+            }
+
+            decisionHandler(.allow)
+        }
+
+        // 处理 window.open() / target="_blank"：同样用系统浏览器打开
+        func webView(
+            _ webView: WKWebView,
+            createWebViewWith configuration: WKWebViewConfiguration,
+            for navigationAction: WKNavigationAction,
+            windowFeatures: WKWindowFeatures
+        ) -> WKWebView? {
+            if let url = navigationAction.request.url {
+                NSWorkspace.shared.open(url)
+                print("🌍 window.open 用系统浏览器打开: \(url)")
+            }
+            return nil
         }
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {

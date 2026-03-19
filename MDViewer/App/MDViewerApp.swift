@@ -27,6 +27,12 @@ struct MDViewerApp: App {
                 }
                 .keyboardShortcut("o", modifiers: .command)
             }
+            CommandGroup(after: .toolbar) {
+                Button("刷新") {
+                    NotificationCenter.default.post(name: .reloadWebView, object: nil)
+                }
+                .keyboardShortcut("r", modifiers: .command)
+            }
         }
 
         // 设置窗口

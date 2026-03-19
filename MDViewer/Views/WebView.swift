@@ -11,6 +11,7 @@ import WebKit
 struct WebView: NSViewRepresentable {
     let url: URL
     @Binding var isLoading: Bool
+    @Binding var refreshTrigger: Int
 
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
@@ -30,6 +31,14 @@ struct WebView: NSViewRepresentable {
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
+        // 刷新触发
+        if context.coordinator.lastRefreshTrigger != refreshTrigger {
+            context.coordinator.lastRefreshTrigger = refreshTrigger
+            print("🔄 WebView reload triggered")
+            webView.reload()
+            return
+        }
+
         // 只在 URL 真正改变时才重新加载
         // 规范化 URL（去除末尾斜杠）进行比较
         let currentURLString = webView.url?.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/")) ?? ""
@@ -50,6 +59,7 @@ struct WebView: NSViewRepresentable {
 
     class Coordinator: NSObject, WKNavigationDelegate {
         var parent: WebView
+        var lastRefreshTrigger: Int = 0
 
         init(_ parent: WebView) {
             self.parent = parent

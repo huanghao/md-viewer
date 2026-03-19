@@ -11,6 +11,7 @@ struct MainWindow: View {
     @EnvironmentObject var serverManager: ServerManager
     @State private var isLoading = false
     @State private var webViewURL: URL?
+    @State private var refreshTrigger = 0
 
     var body: some View {
         ZStack {
@@ -18,7 +19,8 @@ struct MainWindow: View {
                 // WebView 已创建，URL 不会改变（除非端口变化）
                 WebView(
                     url: url,
-                    isLoading: $isLoading
+                    isLoading: $isLoading,
+                    refreshTrigger: $refreshTrigger
                 )
 
                 if isLoading {
@@ -100,5 +102,21 @@ struct MainWindow: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .reloadWebView)) { _ in
+            refreshTrigger += 1
+        }
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button(action: { refreshTrigger += 1 }) {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .help("刷新 (⌘R)")
+                .disabled(webViewURL == nil)
+            }
+        }
     }
+}
+
+extension Notification.Name {
+    static let reloadWebView = Notification.Name("reloadWebView")
 }

@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-19
+
+### Added
+
+- **单实例保护**: 防止重复启动服务器
+- **Tabs 命令**: `mdv tabs` 查看当前打开的标签页
+- **线程回复**: 批注支持多级回复和批量回复
+- **工作区树状态持久化**: 记住文件树展开状态
+
+### Changed
+
+- **前端状态管理**: 状态只保存在客户端，服务端按需请求
+- **事件驱动同步**: 改用事件驱动的状态同步机制
+- **窗口默认尺寸**: 增大窗口默认尺寸，移除状态栏
+- **批注来源**: 批注改为服务端来源，支持增量加载
+
+### Fixed
+
+- 服务器端跟踪打开的文件
+- 工作区搜索与树缓存解耦
+- 批注与渲染文件正确绑定
+- 回复输入框始终可见
+
 ## [0.1.0] - 2026-03-05
 
 ### Added
@@ -42,5 +65,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial development versions (not released via Homebrew).
 
-[Unreleased]: https://github.com/huanghao/md-viewer/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/huanghao/md-viewer/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/huanghao/md-viewer/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/huanghao/md-viewer/releases/tag/v0.1.0

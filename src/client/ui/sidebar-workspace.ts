@@ -15,6 +15,7 @@ import {
   toggleNodeExpanded,
   scanWorkspace,
 } from '../workspace';
+import { clearListDiff, clearWorkspaceModified, hasWorkspaceModified } from '../workspace-state';
 
 const ADD_WORKSPACE_DIALOG_ID = 'addWorkspaceDialogOverlay';
 const ADD_WORKSPACE_INPUT_ID = 'addWorkspacePathInput';
@@ -498,6 +499,7 @@ function renderTreeNode(workspaceId: string, node: FileTreeNode, depth: number):
     const typeIcon = getFileTypeIcon(node.path);
 
     // 获取文件状态（优先级：D > M > 蓝点）
+    const wsModified = hasWorkspaceModified(node.path);
     let statusBadge = '&nbsp;';
     if (openedFile) {
       const status = getFileListStatus(openedFile, listDiff);
@@ -508,6 +510,8 @@ function renderTreeNode(workspaceId: string, node: FileTreeNode, depth: number):
       }
     } else if (isMissing) {
       statusBadge = '<span class="status-badge status-deleted" style="color: #cf222e">D</span>';
+    } else if (wsModified) {
+      statusBadge = '<span class="status-badge status-modified" style="color: #ff9500">M</span>';
     } else if (listDiff) {
       statusBadge = '<span class="new-dot"></span>';
     }
@@ -729,6 +733,10 @@ export function bindWorkspaceEvents(): void {
       await (window as any).openExternalFile?.(filePath);
       return;
     }
+
+    // 清除工作区修改标记（点击即视为已查看）
+    clearWorkspaceModified(filePath);
+    clearListDiff(filePath);
 
     // 导入 switchToFile 和渲染函数
     const { switchToFile } = await import('../state');

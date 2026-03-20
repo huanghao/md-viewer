@@ -7,7 +7,8 @@ import {
 import { clearWorkspacePathMissing, markWorkspacePathMissing } from './workspace-state-missing';
 import { restoreWorkspaceExpandedStateFromStorage } from './workspace-tree-expansion-persistence';
 
-const listDiffPaths = new Set<string>();
+const listDiffPaths = new Set<string>();   // 新增（蓝点）
+const modifiedPaths = new Set<string>();   // 未打开文件被修改（M 标记）
 
 export function hasListDiff(path: string): boolean {
   return listDiffPaths.has(path);
@@ -22,9 +23,22 @@ export function clearListDiff(path: string): void {
   listDiffPaths.delete(path);
 }
 
+export function hasWorkspaceModified(path: string): boolean {
+  return modifiedPaths.has(path);
+}
+
+export function markWorkspaceModified(path: string): void {
+  modifiedPaths.add(path);
+}
+
+export function clearWorkspaceModified(path: string): void {
+  modifiedPaths.delete(path);
+}
+
 export function restoreWorkspaceAuxiliaryState(): void {
-  // 蓝点为会话内提示，刷新后清空
+  // 蓝点和 M 标记为会话内提示，刷新后清空
   listDiffPaths.clear();
+  modifiedPaths.clear();
   restoreWorkspaceKnownFilesFromStorage();
   restoreWorkspaceExpandedStateFromStorage();
 }
@@ -65,6 +79,7 @@ export function removeWorkspaceTracking(workspaceId: string): void {
 
   for (const path of knownSet) {
     listDiffPaths.delete(path);
+    modifiedPaths.delete(path);
   }
 }
 

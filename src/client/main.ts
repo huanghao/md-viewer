@@ -3,7 +3,7 @@ import type { FileData, SyncHistoryItem } from './types';
 
 // 导入状态管理
 import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFileFromState, switchToFile, setSearchQuery, markFileMissing, getSessionFile } from './state';
-import { clearListDiff, markWorkspacePathMissing } from './workspace-state';
+import { clearListDiff, markWorkspaceModified, clearWorkspaceModified, markWorkspacePathMissing } from './workspace-state';
 import { addWorkspace, hydrateExpandedWorkspaces, scanWorkspace, revealFileInWorkspace } from './workspace';
 
 // 导入 API
@@ -1894,11 +1894,15 @@ function connectSSE() {
     const file = getSessionFile(data.path);
 
     if (file) {
-      // 统一策略：仅更新状态，不自动替换正文（当前/非当前一致）
+      // 已打开的文件：更新 lastModified，M 标记由 getFileListStatus 计算
       file.lastModified = data.lastModified;
-      renderSidebar();
-      await updateToolbarButtons();
+    } else {
+      // 未打开的工作区文件：标记 M，与已打开文件保持一致
+      markWorkspaceModified(data.path);
     }
+
+    renderSidebar();
+    await updateToolbarButtons();
   });
 
   // 文件删除

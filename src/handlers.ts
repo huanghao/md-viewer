@@ -668,7 +668,7 @@ export async function handleSyncExecute(c: Context) {
       return c.json({
         success: false,
         error: result.error || "同步失败",
-        output: result.output || result.error || "km-cli 未返回可读输出",
+        output: result.output || result.error || "oa-skills 未返回可读输出",
         command: result.command,
         version: nextVersion,
         baseTitle,

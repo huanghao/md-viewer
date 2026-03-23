@@ -1,12 +1,56 @@
 /**
- * km-cli 命令封装
+ * oa-skills citadel 命令封装
  * 提供与学城交互的接口
  */
 
 import { exec } from "child_process";
 import { promisify } from "util";
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
+import { homedir } from "os";
 
 const execAsync = promisify(exec);
+
+function getMisId(): string {
+  const catpawConfig = join(homedir(), ".catpaw", "sso_config.json");
+  if (existsSync(catpawConfig)) {
+    try {
+      const cfg = JSON.parse(readFileSync(catpawConfig, "utf-8"));
+      if (cfg.misId) return cfg.misId;
+    } catch {
+      // ignore
+    }
+  }
+  return "";
+}
+
+function buildMisFlag(): string {
+  const mis = getMisId();
+  return mis ? `--mis ${mis}` : "";
+}
+
+/**
+ * oa-skills 把日志和 JSON 都输出到 stdout，提取最后一个完整 JSON 对象/数组
+ */
+function extractJson(stdout: string): any {
+  // 找最后一个以 { 或 [ 开头的行，往后截取
+  const lines = stdout.split("\n");
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const trimmed = lines[i].trim();
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      const candidate = lines.slice(i).join("\n");
+      try {
+        return JSON.parse(candidate);
+      } catch {
+        continue;
+      }
+    }
+  }
+  // 再试一次：直接找第一个完整 JSON 块
+  const match = stdout.match(/(\{[\s\S]*\}|\[[\s\S]*\])\s*$/);
+  if (match) return JSON.parse(match[1]);
+  throw new Error("无法从输出中提取 JSON");
+}
 
 export interface KmDocResult {
   success: boolean;
@@ -15,42 +59,7 @@ export interface KmDocResult {
   title?: string;
   error?: string;
   output?: string;
-  command?: string; // 执行的命令
-}
-
-function normalizeWhitespace(input: string): string {
-  return input.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
-}
-
-function dedupeSections(sections: string[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const section of sections) {
-    const normalized = normalizeWhitespace(section);
-    if (!normalized) continue;
-    if (seen.has(normalized)) continue;
-    seen.add(normalized);
-    result.push(normalized);
-  }
-  return result;
-}
-
-function isHtmlResponseError(text: string): boolean {
-  const normalized = (text || "").toLowerCase();
-  if (!normalized) return false;
-  return (
-    normalized.includes("parse json response") &&
-    normalized.includes("invalid character '<'") &&
-    (normalized.includes("response preview: <!doctype html") ||
-      normalized.includes("response preview: <html"))
-  );
-}
-
-function buildAuthExpiredHint(): string {
-  return [
-    "检测到学城接口返回了 HTML 页面而不是 JSON，通常是登录态失效或认证跳转导致。",
-    "请先在终端重新登录 km-cli 后重试（例如：`km-cli auth login`）。",
-  ].join("\n");
+  command?: string;
 }
 
 /**
@@ -61,54 +70,25 @@ export async function createKmDoc(options: {
   title: string;
   markdownFile: string;
 }): Promise<KmDocResult> {
-  const cmd = `km-cli doc create --parent-id "${options.parentId}" --title "${options.title}" --markdown-file "${options.markdownFile}" --json`;
-  const outputFallback = (
-    stdout: string | undefined,
-    stderr: string | undefined,
-    message?: string
-  ): string => {
-    const rawSections = [
-      stdout && stdout.trim() ? `STDOUT:\n${stdout}` : "",
-      stderr && stderr.trim() ? `STDERR:\n${stderr}` : "",
-      message ? `ERROR:\n${message}` : "",
-    ].filter(Boolean) as string[];
-
-    const parts = dedupeSections(rawSections);
-
-    if (parts.length > 0) return parts.join("\n\n");
-    return "km-cli 未返回可读输出（stdout/stderr 为空）。请检查 km-cli 登录状态与网络。";
-  };
+  const mis = buildMisFlag();
+  const cmd = `oa-skills citadel createDocument --parentId "${options.parentId}" --title "${options.title}" --file "${options.markdownFile}" --raw${mis ? ` ${mis}` : ""}`;
 
   try {
-    const { stdout, stderr } = await execAsync(cmd);
+    const { stdout } = await execAsync(cmd);
 
-    // 检查是否有错误输出
-    if (stderr && stderr.trim()) {
-      return {
-        success: false,
-        error: "km-cli 执行失败",
-        output: outputFallback(stdout, stderr),
-        command: cmd,
-      };
-    }
-
-    // 检查输出是否包含 "Error:" 或 "Usage:"
-    if (stdout.includes("Error:") || stdout.includes("Usage:")) {
-      return {
-        success: false,
-        error: "km-cli 执行失败",
-        output: stdout,
-        command: cmd,
-      };
-    }
-
-    // 尝试解析 JSON 输出
     try {
-      const result = JSON.parse(stdout);
+      const result = extractJson(stdout);
+      const docId = result.contentId || result.id || result.docId;
+      const url = result.url || result.link || (docId ? `https://km.sankuai.com/collabpage/${docId}` : undefined);
 
-      // km-cli 返回的字段可能是 id 或 contentId
-      const docId = result.id || result.contentId || result.docId;
-      const url = result.url || result.link || `https://km.woa.com/pages/${docId}`;
+      if (!docId) {
+        return {
+          success: false,
+          error: "oa-skills 未返回文档 ID",
+          output: stdout,
+          command: cmd,
+        };
+      }
 
       return {
         success: true,
@@ -116,11 +96,10 @@ export async function createKmDoc(options: {
         url,
         title: result.title || options.title,
         command: cmd,
-        output: stdout, // 成功时也保存输出
+        output: stdout,
       };
-    } catch (parseError) {
-      // JSON 解析失败，但命令可能成功了
-      // 尝试从输出中提取信息
+    } catch {
+      // JSON 解析失败，尝试从输出中提取 URL/ID
       const urlMatch = stdout.match(/https?:\/\/[^\s]+/);
       const idMatch = stdout.match(/\b\d{6,}\b/);
 
@@ -135,49 +114,40 @@ export async function createKmDoc(options: {
         };
       }
 
-      // 完全无法解析，返回原始输出
       return {
         success: false,
-        error: "无法解析 km-cli 输出",
-        output: outputFallback(stdout, stderr, "无法解析 km-cli 输出"),
+        error: "无法解析 oa-skills 输出",
+        output: stdout || "oa-skills 未返回可读输出",
         command: cmd,
       };
     }
   } catch (error: any) {
-    // 命令执行失败（通常是 exit code 非 0）
-    const output = outputFallback(error.stdout, error.stderr, error.message);
-    const authExpired = isHtmlResponseError(output);
+    const output = [
+      error?.stdout?.trim() ? `STDOUT:\n${error.stdout}` : "",
+      error?.stderr?.trim() ? `STDERR:\n${error.stderr}` : "",
+      error?.message ? `ERROR:\n${error.message}` : "",
+    ].filter(Boolean).join("\n\n");
 
     return {
       success: false,
-      error: authExpired ? "学城登录状态失效，请重新登录 km-cli" : "km-cli 执行失败",
-      output: authExpired ? `${buildAuthExpiredHint()}\n\n${output}` : output,
+      error: "oa-skills 执行失败",
+      output: output || "oa-skills 未返回可读输出",
       command: cmd,
     };
   }
 }
 
 /**
- * 获取文档元数据
+ * 获取文档元数据（返回包含 title、contentId 的对象）
  */
 export async function getKmDocMeta(contentId: string): Promise<any> {
-  const cmd = `km-cli doc get-meta --content-id "${contentId}" --json`;
+  const mis = buildMisFlag();
+  const cmd = `oa-skills citadel getMarkdown --contentId "${contentId}" --raw${mis ? ` ${mis}` : ""}`;
 
   try {
     const { stdout } = await execAsync(cmd);
-    return JSON.parse(stdout);
+    return extractJson(stdout);
   } catch (error: any) {
-    const output = [
-      error?.stdout ? `STDOUT:\n${error.stdout}` : "",
-      error?.stderr ? `STDERR:\n${error.stderr}` : "",
-      error?.message ? `ERROR:\n${error.message}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n\n");
-
-    if (isHtmlResponseError(output)) {
-      throw new Error(`获取文档元数据失败: 学城登录状态失效，请重新登录 km-cli。\n${buildAuthExpiredHint()}`);
-    }
     throw new Error(`获取文档元数据失败: ${error.message}`);
   }
 }
@@ -195,11 +165,11 @@ export async function validateParentId(parentId: string): Promise<boolean> {
 }
 
 /**
- * 检查 km-cli 是否已安装
+ * 检查 oa-skills 是否已安装
  */
 export async function checkKmCliInstalled(): Promise<boolean> {
   try {
-    await execAsync("which km-cli");
+    await execAsync("which oa-skills");
     return true;
   } catch {
     return false;

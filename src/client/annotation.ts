@@ -346,7 +346,7 @@ function getActiveAnnotationFilePath(): string | null {
   return renderedFilePath === currentFilePath ? currentFilePath : null;
 }
 
-function iconSvg(type: 'up' | 'down' | 'check' | 'trash' | 'comment' | 'list' | 'filter' | 'close'): string {
+function iconSvg(type: 'up' | 'down' | 'check' | 'trash' | 'comment' | 'list' | 'filter' | 'close' | 'edit'): string {
   if (type === 'up') return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 4l4 4H4z"/></svg>';
   if (type === 'down') return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 12l-4-4h8z"/></svg>';
   if (type === 'check') return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.4 11.2L3.5 8.3l1.1-1.1 1.8 1.8 5-5 1.1 1.1z"/></svg>';
@@ -354,6 +354,7 @@ function iconSvg(type: 'up' | 'down' | 'check' | 'trash' | 'comment' | 'list' | 
   if (type === 'comment') return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h12v9H8l-3 3v-3H2z"/></svg>';
   if (type === 'list') return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h10v1H3zm0 4h10v1H3zm0 4h10v1H3z"/></svg>';
   if (type === 'filter') return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12L9.5 8v4.5l-3-1.5V8z"/></svg>';
+  if (type === 'edit') return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.5 2.5a1.5 1.5 0 012.1 2.1L5 13.2l-3 .8.8-3 8.7-8.5z"/></svg>';
   return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.2 4.2L8 8l3.8-3.8 1 1L9 9l3.8 3.8-1 1L8 10l-3.8 3.8-1-1L7 9 3.2 5.2z"/></svg>';
 }
 
@@ -637,7 +638,11 @@ function renderThreadListHTML(annotation: Annotation, simple = false): string {
     `;
   }
   const body = thread
-    .map((item) => `<div class="annotation-thread-line ${item.type === 'reply' ? 'is-reply' : ''}">${escapeHtml(item.note)}</div>`)
+    .map((item) => `
+      <div class="annotation-thread-line ${item.type === 'reply' ? 'is-reply' : ''}" data-thread-item-id="${item.id}" data-annotation-id="${annotation.id}">
+        <span class="annotation-thread-text">${escapeHtml(item.note)}</span>
+        <button class="annotation-thread-edit-btn" data-edit-thread-item="${item.id}" data-annotation-id="${annotation.id}" title="编辑">${iconSvg('edit')}</button>
+      </div>`)
     .join('');
   return body || '<div class="annotation-thread-line">（无评论内容）</div>';
 }
@@ -667,6 +672,61 @@ function appendReply(annotationId: string, filePath: string, text: string): void
     .catch((error) => {
       showError(`回复评论失败: ${error?.message || '未知错误'}`, 2600);
     });
+}
+
+function editThreadItem(annotationId: string, itemId: string, filePath: string): void {
+  const lineEl = document.querySelector(
+    `.annotation-thread-line[data-thread-item-id="${itemId}"][data-annotation-id="${annotationId}"]`
+  ) as HTMLElement | null;
+  if (!lineEl) return;
+
+  const ann = state.annotations.find((a) => a.id === annotationId);
+  if (!ann) return;
+  const thread = getCommentThread(ann);
+  const item = thread.find((t) => t.id === itemId);
+  if (!item) return;
+
+  // 替换成编辑态
+  const originalHTML = lineEl.innerHTML;
+  lineEl.classList.add('is-editing');
+  lineEl.innerHTML = `<textarea class="annotation-thread-edit-input">${escapeHtml(item.note)}</textarea>`;
+  const textarea = lineEl.querySelector('textarea') as HTMLTextAreaElement;
+  textarea.style.height = `${Math.max(textarea.scrollHeight, 34)}px`;
+  textarea.focus();
+  textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+
+  const cancel = () => {
+    lineEl.classList.remove('is-editing');
+    lineEl.innerHTML = originalHTML;
+    // 重新绑定编辑按钮
+    lineEl.querySelector('[data-edit-thread-item]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      editThreadItem(annotationId, itemId, filePath);
+    });
+  };
+
+  const save = () => {
+    const newText = textarea.value.trim();
+    if (!newText || newText === item.note) { cancel(); return; }
+    item.note = newText;
+    if (thread[0]?.id === itemId) ann.note = newText; // 同步主 note
+    ann.thread = thread;
+    persistAnnotation(filePath, ann, '编辑评论失败');
+    renderAnnotationList(filePath);
+  };
+
+  textarea.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+    else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save(); }
+  });
+  textarea.addEventListener('input', () => {
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(200, Math.max(textarea.scrollHeight, 34))}px`;
+  });
+  textarea.addEventListener('blur', () => {
+    // 短暂延迟，避免与 save 冲突
+    setTimeout(() => { if (lineEl.classList.contains('is-editing')) cancel(); }, 150);
+  });
 }
 
 function autoResizeReplyInput(input: HTMLTextAreaElement): void {
@@ -1127,6 +1187,16 @@ export function renderAnnotationList(filePath: string | null): void {
     });
   });
 
+  el.annotationList.querySelectorAll('[data-edit-thread-item]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const itemId = (btn as HTMLElement).getAttribute('data-edit-thread-item');
+      const annotationId = (btn as HTMLElement).getAttribute('data-annotation-id');
+      if (!itemId || !annotationId || !filePath) return;
+      editThreadItem(annotationId, itemId, filePath);
+    });
+  });
+
   el.annotationList.querySelectorAll('[data-reply-entry]').forEach((entry) => {
     entry.addEventListener('click', (event) => {
       event.stopPropagation();
@@ -1158,7 +1228,8 @@ export function renderAnnotationList(filePath: string | null): void {
     input.addEventListener('input', () => autoResizeReplyInput(input));
     input.addEventListener('click', (event) => event.stopPropagation());
     inputEl.addEventListener('keydown', (event) => {
-      if (!(event.metaKey || event.ctrlKey) || event.key !== 'Enter') return;
+      if (event.key !== 'Enter') return;
+      if (event.shiftKey) return; // Shift+Enter 换行
       event.preventDefault();
       const input = event.currentTarget as HTMLTextAreaElement;
       const id = input.getAttribute('data-reply-input');
@@ -1229,7 +1300,7 @@ export function initAnnotationElements(): void {
   document.getElementById('composerCancelBtn')?.addEventListener('click', hideComposer);
   getElements().composerNote?.addEventListener('keydown', (event) => {
     if (event.key !== 'Enter') return;
-    if (!(event.metaKey || event.ctrlKey)) return;
+    if (event.shiftKey) return; // Shift+Enter 换行
     event.preventDefault();
     const filePath = getActiveAnnotationFilePath();
     if (filePath) savePendingAnnotation(filePath);
@@ -1273,6 +1344,14 @@ export function initAnnotationElements(): void {
     const target = event.target as HTMLElement;
     const filePath = getActiveAnnotationFilePath();
     if (!filePath) return;
+    const editBtn = target.closest('[data-edit-thread-item]') as HTMLElement | null;
+    if (editBtn) {
+      event.stopPropagation();
+      const itemId = editBtn.getAttribute('data-edit-thread-item');
+      const annotationId = editBtn.getAttribute('data-annotation-id');
+      if (itemId && annotationId) editThreadItem(annotationId, itemId, filePath);
+      return;
+    }
     const entry = target.closest('[data-popover-reply-entry]') as HTMLElement | null;
     if (entry) {
       event.stopPropagation();
@@ -1305,7 +1384,8 @@ export function initAnnotationElements(): void {
   document.getElementById('annotationPopover')?.addEventListener('keydown', (event) => {
     const target = event.target as HTMLElement;
     if (!(target instanceof HTMLTextAreaElement)) return;
-    if (!(event.metaKey || event.ctrlKey) || event.key !== 'Enter') return;
+    if (event.key !== 'Enter') return;
+    if (event.shiftKey) return; // Shift+Enter 换行
     const id = target.getAttribute('data-popover-reply-input');
     const filePath = getActiveAnnotationFilePath();
     if (!id || !filePath) return;

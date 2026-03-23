@@ -1122,6 +1122,15 @@ export const styles = `
       padding: 24px;
       padding-right: calc(var(--annotation-sidebar-width) + 24px);
     }
+    .html-preview-frame {
+      display: block;
+      width: calc(100% + 48px);
+      margin: -24px;
+      height: calc(100% + 48px);
+      min-height: calc(100vh - 48px);
+      border: none;
+      background: #fff;
+    }
     body.annotation-sidebar-collapsed .content {
       padding-right: 24px;
     }
@@ -2715,6 +2724,58 @@ export const styles = `
       line-height: 1.4;
       white-space: pre-wrap;
       word-break: break-word;
+      position: relative;
+      display: flex;
+      align-items: flex-start;
+      gap: 4px;
+    }
+    .annotation-thread-line .annotation-thread-text {
+      flex: 1;
+      min-width: 0;
+    }
+    .annotation-thread-edit-btn {
+      flex-shrink: 0;
+      display: none;
+      width: 18px;
+      height: 18px;
+      padding: 0;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      color: #6b7280;
+      border-radius: 3px;
+      line-height: 1;
+    }
+    .annotation-thread-edit-btn svg {
+      width: 11px;
+      height: 11px;
+      fill: currentColor;
+    }
+    .annotation-thread-edit-btn:hover {
+      color: #0969da;
+      background: #f0f6ff;
+    }
+    .annotation-thread-line:hover .annotation-thread-edit-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .annotation-thread-line.is-editing {
+      display: block;
+    }
+    .annotation-thread-edit-input {
+      width: 100%;
+      min-height: 34px;
+      padding: 4px 6px;
+      border: 1px solid #0969da;
+      border-radius: 4px;
+      font-size: 13px;
+      font-family: inherit;
+      line-height: 1.4;
+      resize: none;
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(9, 105, 218, 0.12);
+      box-sizing: border-box;
     }
     .annotation-thread-line.is-reply {
       color: #4b5563;

@@ -14,7 +14,6 @@ import { getSyncRecordsStats, cleanupAllExpiredRecords } from "./sync-storage.ts
 // ==================== 配置 ====================
 
 const config = loadConfig();
-const DEFAULT_PORT = config.server.port;
 const DEFAULT_HOST = config.server.host;
 
 function getPidFilePath(): string {
@@ -241,31 +240,25 @@ function showLogs(tail?: number): void {
   }
 }
 
+function getAppServerPort(): number {
+  // 优先读 app 写入的实际端口文件
+  const portFile = join(getConfigDir(), "server.port");
+  if (existsSync(portFile)) {
+    const val = parseInt(readFileSync(portFile, "utf-8").trim(), 10);
+    if (!isNaN(val)) return val;
+  }
+  return config.server.port;
+}
+
 async function ensureServerRunning(): Promise<void> {
-  // 兼容没有 PID 文件但端口实际可用（例如用户手动启动 server）的场景
-  if (await isServerHttpReachable(config.server.host, config.server.port)) {
+  const port = getAppServerPort();
+  if (await isServerHttpReachable(config.server.host, port)) {
     return;
   }
 
-  const status = getServerStatus();
-  if (!status.running) {
-    console.log("⚠️  Server 未运行，正在启动...");
-    // 打开文件时自动后台拉起，避免阻塞当前 CLI 进程。
-    startServer(true);
-    // 等待启动完成
-    const maxWait = 5000;
-    const startTime = Date.now();
-    while (Date.now() - startTime < maxWait) {
-      if (getServerStatus().running || await isServerHttpReachable(config.server.host, config.server.port)) {
-        return;
-      }
-      // 简单的忙等待
-      const now = Date.now();
-      while (Date.now() - now < 100) {}
-    }
-    console.error("❌ Server 启动超时");
-    process.exit(1);
-  }
+  console.error(`❌ 无法连接到 MDViewer (${config.server.host}:${port})`);
+  console.error(`   请确保 MDViewer.app 已启动`);
+  process.exit(1);
 }
 
 // ==================== 文件操作 ====================
@@ -282,9 +275,8 @@ function isUrl(path: string): boolean {
 async function openFile(filePath: string, focus: boolean = true): Promise<void> {
   await ensureServerRunning();
 
-  const status = getServerStatus();
-  const host = status.host || config.server.host;
-  const port = status.port || config.server.port;
+  const host = config.server.host;
+  const port = getAppServerPort();
   const url = `http://${host}:${port}/api/open-file`;
 
   // 判断是 URL 还是本地文件
@@ -302,10 +294,10 @@ async function openFile(filePath: string, focus: boolean = true): Promise<void> 
     }
     targetPath = absolutePath;
 
-    // 只允许 md/markdown/txt
+    // 只允许 md/markdown/txt/html/htm
     const ext = targetPath.match(/\.([^.]+)$/)?.[1]?.toLowerCase();
-    if (ext && !["md", "markdown", "txt"].includes(ext)) {
-      console.error(`❌ 不支持的文件类型: .${ext}（CLI 仅支持 md/markdown/txt）`);
+    if (ext && !["md", "markdown", "txt", "html", "htm"].includes(ext)) {
+      console.error(`❌ 不支持的文件类型: .${ext}（CLI 仅支持 md/markdown/txt/html/htm）`);
       process.exit(1);
     }
   }
@@ -327,8 +319,8 @@ async function openFile(filePath: string, focus: boolean = true): Promise<void> 
     console.log(`✅ ${action}: ${result.filename}`);
   } catch (e: any) {
     if (e.cause?.code === "ECONNREFUSED") {
-      console.error(`❌ 无法连接到 Server (${host}:${port})`);
-      console.error(`   请确保 Server 已启动: mdv server start`);
+      console.error(`❌ 无法连接到 MDViewer (${host}:${port})`);
+      console.error(`   请确保 MDViewer.app 已启动`);
     } else {
       console.error(`❌ 错误: ${e.message}`);
     }
@@ -408,14 +400,13 @@ async function showStats(): Promise<void> {
   console.log("");
 
   // 1. 服务器状态
-  const status = getServerStatus();
+  const port = getAppServerPort();
+  const host = config.server.host;
+  const reachable = await isServerHttpReachable(host, port);
   console.log("服务器状态:");
-  if (status.running) {
-    console.log(`  运行中 (PID: ${status.pid})`);
-    console.log(`  地址: http://${status.host}:${status.port}/`);
-    if (status.memoryUsage) {
-      console.log(`  内存: ${(status.memoryUsage / 1024 / 1024).toFixed(1)} MB`);
-    }
+  if (reachable) {
+    console.log(`  运行中`);
+    console.log(`  地址: http://${host}:${port}/`);
   } else {
     console.log(`  未运行`);
   }
@@ -434,9 +425,9 @@ async function showStats(): Promise<void> {
   console.log("");
 
   // 3. 打开的文件数量（需要从 server 获取）
-  if (status.running) {
+  if (reachable) {
     try {
-      const response = await fetch(`http://${status.host}:${status.port}/api/files`);
+      const response = await fetch(`http://${host}:${port}/api/files`);
       if (response.ok) {
         const files = await response.json();
         console.log("打开的文件:");
@@ -674,27 +665,23 @@ function cleanupExpired(): void {
 // ==================== 标签页管理 ====================
 
 async function showTabs(json: boolean = false): Promise<void> {
-  // 尝试多个可能的端口
-  const ports = [53000, DEFAULT_PORT, 3000, 3001];
+  const port = getAppServerPort();
   let data: any = null;
 
-  for (const port of ports) {
-    try {
-      const res = await fetch(`http://${DEFAULT_HOST}:${port}/api/session-state`, {
-        signal: AbortSignal.timeout(500),
-      });
-      if (res.ok) {
-        data = await res.json();
-        break;
-      }
-    } catch {
-      continue;
+  try {
+    const res = await fetch(`http://${DEFAULT_HOST}:${port}/api/session-state`, {
+      signal: AbortSignal.timeout(500),
+    });
+    if (res.ok) {
+      data = await res.json();
     }
+  } catch {
+    // ignore
   }
 
   if (!data) {
-    console.error("❌ 无法连接到 MD Viewer App");
-    console.error("   请确保 App 正在运行");
+    console.error("❌ 无法连接到 MDViewer App");
+    console.error("   请确保 MDViewer.app 已启动");
     process.exit(1);
   }
 
@@ -762,6 +749,7 @@ MD Viewer CLI - 命令行工具
 
 示例:
   mdv README.md                        打开文件
+  mdv report.html                      打开 HTML 文件
   mdv --no-focus notes.md              添加但不切换
   mdv tabs                             查看当前打开的标签页
   mdv tabs --json                      JSON 格式输出标签页

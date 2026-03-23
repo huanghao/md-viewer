@@ -42,7 +42,7 @@ let workspacePollRunning = false;
 let mermaidInitialized = false;
 let syncDialogInteractionBound = false;
 function syncAnnotationsForCurrentFile(force = false): void {
-  const nextPath = state.currentFile && !isHtmlPath(state.currentFile) ? state.currentFile : null;
+  const nextPath = state.currentFile && !isHtmlPath(state.currentFile) ? state.currentFile : null; // HTML 文件不支持批注
   const currentAnnotationFilePath = getAnnotationCurrentFilePath();
   if (force || nextPath !== currentAnnotationFilePath) {
     setAnnotations(nextPath);
@@ -55,7 +55,7 @@ function syncAnnotationsForCurrentFile(force = false): void {
 // ==================== 消息处理 ====================
 async function onFileLoaded(data: FileData, focus: boolean = false) {
   const previousFile = state.currentFile;
-  const shouldFocus = focus && !isHtmlPath(data.path);
+  const shouldFocus = focus;
   addOrUpdateFile(data, shouldFocus);
   if (shouldFocus && state.config.sidebarMode === 'workspace') {
     await revealFileInWorkspace(data.path);
@@ -475,13 +475,8 @@ function renderContent() {
   if (!file) return;
 
   if (isHtmlPath(file.path)) {
-    container.removeAttribute('data-current-file');
-    container.innerHTML = `
-      <div class="empty-state">
-        <h2>HTML 文件仅支持外部打开</h2>
-        <p>请在列表中点击该文件，在浏览器新页面查看</p>
-      </div>
-    `;
+    container.setAttribute('data-current-file', file.path);
+    container.innerHTML = `<iframe class="html-preview-frame" srcdoc="${file.content.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"></iframe>`;
     const meta = document.getElementById('fileMeta');
     if (meta) {
       meta.textContent = formatRelativeTime(file.lastModified);
@@ -747,13 +742,8 @@ async function addFileByPath(path: string, focus: boolean = true) {
 
   const data = await loadFile(path);
   if (data) {
-    const shouldFocus = focus && !isHtmlPath(data.path || path);
-    await onFileLoaded(data, shouldFocus);
+    await onFileLoaded(data, focus);
     await openFile(path, focus);
-
-    if (focus && isHtmlPath(data.path || path)) {
-      openFileInBrowser(data.path || path);
-    }
 
     // 清空统一输入框
     setSearchQuery('');
@@ -816,11 +806,6 @@ async function handleSmartAddInput(path: string): Promise<void> {
 // 切换文件
 function switchFile(path: string) {
   removeSyncInfoPopover();
-  if (isHtmlPath(path)) {
-    openFileInBrowser(path);
-    syncAnnotationsForCurrentFile(true);
-    return;
-  }
   const previousFile = state.currentFile;
   switchToFile(path);
   renderSidebar();
@@ -1424,7 +1409,7 @@ async function showSyncDialog() {
           <span class="sync-dialog-codepanel-title">将执行的命令</span>
         ${renderSyncCopyButton('window.copySyncCommand(event)', '复制命令')}
         </div>
-        <div class="sync-dialog-output" id="syncCommandPreview">km-cli doc create --parent-id "..." --title "${escapeHtml(nextTitle)}" --markdown-file "${escapeHtml(state.currentFile || '')}" --json</div>
+        <div class="sync-dialog-output" id="syncCommandPreview">oa-skills citadel createDocument --parentId "..." --title "${escapeHtml(nextTitle)}" --file "${escapeHtml(state.currentFile || '')}" --raw</div>
       </div>
     </div>
 
@@ -1435,7 +1420,7 @@ async function showSyncDialog() {
 
     <div class="sync-dialog-status">
       <div class="sync-dialog-status-block running" id="syncStatusRunning" style="display:none;">
-        正在调用 km-cli，请稍候...
+        正在调用 oa-skills，请稍候...
       </div>
       <div class="sync-dialog-status-block error" id="syncStatusError" style="display:none;">
         <div class="sync-dialog-status-message" id="syncStatusErrorMessage"></div>
@@ -1486,7 +1471,7 @@ async function showSyncDialog() {
             <span class="sync-dialog-codepanel-title">将执行的命令</span>
           ${renderSyncCopyButton('window.copySyncCommand(event)', '复制命令')}
           </div>
-          <div class="sync-dialog-output" id="syncCommandPreview">km-cli doc create --parent-id "..." --title "${escapeHtml(nextTitle)}" --markdown-file "${escapeHtml(state.currentFile || '')}" --json</div>
+          <div class="sync-dialog-output" id="syncCommandPreview">oa-skills citadel createDocument --parentId "..." --title "${escapeHtml(nextTitle)}" --file "${escapeHtml(state.currentFile || '')}" --raw</div>
         </div>
       `;
       checkbox.parentNode!.insertBefore(fallback, checkbox);
@@ -1556,7 +1541,7 @@ function updateCommandPreview() {
   let parentId = parentInput?.value.trim() || selectedRadio?.value || '...';
   parentId = normalizeParentIdInput(parentId) || '...';
 
-  preview.textContent = `km-cli doc create --parent-id "${parentId}" --title "${versionedTitle}" --markdown-file "${state.currentFile}" --json`;
+  preview.textContent = `oa-skills citadel createDocument --parentId "${parentId}" --title "${versionedTitle}" --file "${state.currentFile}" --raw`;
 }
 
 // 选择最近位置

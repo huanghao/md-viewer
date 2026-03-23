@@ -728,12 +728,6 @@ export function bindWorkspaceEvents(): void {
 
   // 文件点击
   (window as any).handleFileClick = async (filePath: string) => {
-    const lower = filePath.toLowerCase();
-    if (lower.endsWith('.html') || lower.endsWith('.htm')) {
-      await (window as any).openExternalFile?.(filePath);
-      return;
-    }
-
     // 清除工作区修改标记（点击即视为已查看）
     clearWorkspaceModified(filePath);
     clearListDiff(filePath);

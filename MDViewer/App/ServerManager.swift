@@ -106,6 +106,7 @@ class ServerManager: ObservableObject {
             let ready = await waitForServer(port: port)
             if ready {
                 self.isRunning = true
+                writePortFile(port: port)
                 startHealthCheck()
                 print("✅ Server 启动成功: http://127.0.0.1:\(port)")
             } else {
@@ -138,6 +139,7 @@ class ServerManager: ObservableObject {
         serverProcess = nil
         isRunning = false
         port = nil
+        removePortFile()
     }
 
     func restart() async {
@@ -254,6 +256,22 @@ class ServerManager: ObservableObject {
 
         print("❌ 找不到 mdv-server 二进制文件")
         return nil
+    }
+
+    private func getPortFilePath() -> String {
+        let configDir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".config/md-viewer")
+        return configDir.appendingPathComponent("server.port").path
+    }
+
+    private func writePortFile(port: Int) {
+        let path = getPortFilePath()
+        try? "\(port)".write(toFile: path, atomically: true, encoding: .utf8)
+    }
+
+    private func removePortFile() {
+        let path = getPortFilePath()
+        try? FileManager.default.removeItem(atPath: path)
     }
 
     private func getLogPath() -> String {

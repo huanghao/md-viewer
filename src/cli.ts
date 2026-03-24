@@ -459,13 +459,16 @@ function formatCompactTime(ts: number): string {
 
 function printComments(path: string, json: boolean, limit: number, offset: number): void {
   const result = getAnnotationsByDocument(path, limit, offset);
-  const unresolved = result.annotations.filter((ann: any) => ann.status !== "resolved");
+  // 默认只返回有意义的评论：未解决且已定位（排除 unanchored）
+  const unresolved = result.annotations.filter(
+    (ann: any) => ann.status !== "resolved" && ann.status !== "unanchored"
+  );
   if (json) {
     console.log(JSON.stringify({
       ...result,
       annotations: unresolved,
       totalReturned: unresolved.length,
-      defaultFilter: "unresolved",
+      defaultFilter: "unresolved+anchored",
     }, null, 2));
     return;
   }

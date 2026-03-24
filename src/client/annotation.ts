@@ -510,6 +510,10 @@ export function mergeAnnotationStatus(
 function showQuickAdd(x: number, y: number, pendingData: Omit<Annotation, 'note' | 'createdAt'>): void {
   const el = getElements();
   if (!el.quickAdd) return;
+  // 新划词时关闭旧的 composer（明确的焦点转移）
+  if (el.composer && !el.composer.classList.contains('hidden')) {
+    hideComposer();
+  }
   state.pendingAnnotation = { ...pendingData, note: '', createdAt: Date.now() };
   state.pendingAnnotationFilePath = el.content?.getAttribute('data-current-file') || state.currentFilePath;
   const width = 30;
@@ -546,11 +550,36 @@ function openComposerFromPending(x?: number, y?: number): void {
   el.composerNote.focus();
 }
 
+// 折叠 composer：隐藏浮窗但保留 pendingAnnotation、划线和输入内容
+function collapseComposer(): void {
+  const el = getElements();
+  if (!el.composer) return;
+  el.composer.classList.add('hidden');
+}
+
+// 展开 composer：重新显示浮窗（划线和内容仍在）
+function expandComposer(): void {
+  const el = getElements();
+  if (!el.composer || !state.pendingAnnotation) return;
+  // 重新定位到划线位置
+  const reader = document.getElementById('reader');
+  const mark = reader?.querySelector('.annotation-mark-temp');
+  if (mark) {
+    const rect = mark.getBoundingClientRect();
+    placeFloating(el.composer, rect.right + 6, rect.top - 8);
+  }
+  el.composer.classList.remove('hidden');
+  el.composerNote?.focus();
+}
+
+// 清除 composer：真正取消，清除 pendingAnnotation 和划线
 function hideComposer(): void {
   const el = getElements();
   if (!el.composer) return;
   clearTempSelectionMark();
   state.pendingAnnotation = null;
+  state.pendingAnnotationFilePath = null;
+  if (el.composerNote) el.composerNote.value = '';
   el.composer.classList.add('hidden');
 }
 
@@ -792,7 +821,7 @@ export function savePendingAnnotation(filePath: string): void {
   const el = getElements();
   if (!state.pendingAnnotation || !el.composerNote) return;
   const pendingFilePath = state.pendingAnnotationFilePath;
-  if (!pendingFilePath || pendingFilePath !== filePath || pendingFilePath !== state.currentFilePath) return;
+  if (!pendingFilePath || pendingFilePath !== filePath) return;
 
   const note = el.composerNote.value.trim();
   if (!note) return;
@@ -1460,7 +1489,7 @@ export function initAnnotationElements(): void {
   });
 
   document.getElementById('content')?.addEventListener('scroll', () => {
-    hideQuickAdd(true);
+    hideQuickAdd(false); // 滚动只隐藏按钮，不清除 pending 划线
     syncAnnotationScrollWithContent();
     syncPinnedPopoverPosition();
   });
@@ -1477,12 +1506,20 @@ export function initAnnotationElements(): void {
     const target = event.target as Node;
     const els = getElements();
 
+    // 点击 temp mark → 展开 composer
+    if ((target as HTMLElement).closest('.annotation-mark-temp')) {
+      expandComposer();
+      return;
+    }
+
+    // 点击 composer 外部 → 折叠（保留内容和划线）
     if (
       els.composer &&
+      !els.composer.classList.contains('hidden') &&
       !els.composer.contains(target) &&
       !(els.quickAdd && els.quickAdd.contains(target))
     ) {
-      hideComposer();
+      collapseComposer();
     }
 
     if (

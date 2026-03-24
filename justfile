@@ -6,7 +6,7 @@ dev:
 
 # 构建前端资源
 build-client:
-    bun run build.ts
+    bun run build.ts && bun run scripts/embed-client.ts
 
 # 构建本地二进制（当前平台）
 build:

@@ -919,10 +919,13 @@ function scanDirectory(dirPath: string): any {
           tree.fileCount += subTree.fileCount;
         }
       } else if (isSupportedTextFile(entry.name.toLowerCase())) {
+        let lastModified = 0;
+        try { lastModified = statSync(fullPath).mtimeMs; } catch { /* ignore */ }
         tree.children.push({
           name: entry.name,
           path: fullPath,
-          type: 'file'
+          type: 'file',
+          lastModified,
         });
         tree.fileCount++;
       }

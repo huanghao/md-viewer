@@ -33,10 +33,6 @@ update-formula version:
 sync-tap version:
     bash scripts/sync-formula-to-tap.sh {{version}}
 
-# 安装 iTerm2 dispatcher
-install-iterm2:
-    bash scripts/install-iterm2-dispatcher.sh
-
 # 运行 e2e 测试
 test:
     bun run test:e2e

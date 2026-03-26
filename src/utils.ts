@@ -56,16 +56,35 @@ export function getLastModified(path: string): number | undefined {
   }
 }
 
+interface FileListCache {
+  files: string[];
+  expiresAt: number;
+}
+
+const fileListCache = new Map<string, FileListCache>();
+const FILE_LIST_CACHE_TTL = 30_000; // 30 秒
+
 export function getFileList(dir: string): string[] {
+  const now = Date.now();
+  const cached = fileListCache.get(dir);
+  if (cached && cached.expiresAt > now) {
+    return cached.files;
+  }
   try {
     const files = readdirSync(dir, { recursive: true }) as string[];
-    return files
+    const result = files
       .filter((f) => isSupportedTextFile(f.toLowerCase()))
       .map((f) => resolve(dir, f))
       .sort();
+    fileListCache.set(dir, { files: result, expiresAt: now + FILE_LIST_CACHE_TTL });
+    return result;
   } catch {
     return [];
   }
+}
+
+export function invalidateFileListCache(dir: string): void {
+  fileListCache.delete(dir);
 }
 
 interface SearchCandidate {

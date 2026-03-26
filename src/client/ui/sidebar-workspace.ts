@@ -174,6 +174,12 @@ function ensureWorkspaceSearchResults(query: string): void {
     return;
   }
 
+  // 绝对路径或波浪线路径：用户在做路径补全，不需要工作区深度搜索
+  if (trimmed.startsWith('/') || trimmed.startsWith('~/') || trimmed.startsWith('~\\')) {
+    resetWorkspaceSearchState();
+    return;
+  }
+
   const roots = getWorkspaceSearchRoots();
   const rootsKey = roots.join('\n');
   if (roots.length === 0) {

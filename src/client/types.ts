@@ -26,6 +26,7 @@ export interface FileTreeNode {
   children?: FileTreeNode[];
   isExpanded?: boolean;
   fileCount?: number;  // 目录下的 md/html 文件数
+  lastModified?: number; // 文件最后修改时间（仅 file 节点）
 }
 
 // 应用配置类型

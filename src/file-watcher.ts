@@ -3,7 +3,8 @@ import type { FSWatcher } from "chokidar";
 import { stat } from "fs/promises";
 import { resolve } from "path";
 import { broadcastFileChanged, broadcastFileDeleted } from "./sse.ts";
-import { isSupportedTextFile } from "./utils.ts";
+import { isSupportedTextFile, invalidateFileListCache } from "./utils.ts";
+import { dirname } from "path";
 
 let watcher: FSWatcher | null = null;
 const watchedPaths = new Set<string>();
@@ -32,11 +33,25 @@ function ensureWatcher() {
     }
   });
 
+  // 文件新增
+  watcher.on('add', (path: string) => {
+    if (!isSupportedTextFile(path.toLowerCase())) return;
+    invalidateFileListCache(dirname(path));
+    // 同时失效所有祖先目录的缓存
+    for (const root of watchedWorkspaceRoots) {
+      if (path.startsWith(root)) invalidateFileListCache(root);
+    }
+  });
+
   // 文件删除
   watcher.on('unlink', (path: string) => {
     if (!isSupportedTextFile(path.toLowerCase())) return;
     broadcastFileDeleted(path);
     watchedPaths.delete(path);
+    invalidateFileListCache(dirname(path));
+    for (const root of watchedWorkspaceRoots) {
+      if (path.startsWith(root)) invalidateFileListCache(root);
+    }
   });
 }
 

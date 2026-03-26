@@ -724,10 +724,13 @@ function editThreadItem(annotationId: string, itemId: string, filePath: string):
   textarea.focus();
   textarea.setSelectionRange(textarea.value.length, textarea.value.length);
 
+  let committed = false; // 防止 blur 在 save/cancel 后再次触发
+
   const cancel = () => {
+    if (committed) return;
+    committed = true;
     lineEl.classList.remove('is-editing');
     lineEl.innerHTML = originalHTML;
-    // 重新绑定编辑按钮
     lineEl.querySelector('[data-edit-thread-item]')?.addEventListener('click', (e) => {
       e.stopPropagation();
       editThreadItem(annotationId, itemId, filePath);
@@ -735,13 +738,31 @@ function editThreadItem(annotationId: string, itemId: string, filePath: string):
   };
 
   const save = () => {
+    if (committed) return;
+    committed = true;
     const newText = textarea.value.trim();
-    if (!newText || newText === item.note) { cancel(); return; }
+    if (!newText || newText === item.note) {
+      // 内容未变，恢复原样
+      lineEl.classList.remove('is-editing');
+      lineEl.innerHTML = originalHTML;
+      lineEl.querySelector('[data-edit-thread-item]')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        editThreadItem(annotationId, itemId, filePath);
+      });
+      return;
+    }
     item.note = newText;
-    if (thread[0]?.id === itemId) ann.note = newText; // 同步主 note
+    if (thread[0]?.id === itemId) ann.note = newText;
     ann.thread = thread;
     persistAnnotation(filePath, ann, '编辑评论失败');
+    // 立即更新 DOM：列表和 popover
     renderAnnotationList(filePath);
+    // 如果 popover 正在显示这条评论，同步更新 popover 内容
+    if (state.pinnedAnnotationId === annotationId) {
+      const mark = document.querySelector(`[data-annotation-id="${annotationId}"]`) as HTMLElement | null;
+      const rect = mark?.getBoundingClientRect();
+      showPopover(ann, rect ? rect.right + 8 : 120, rect ? rect.top + 8 : 120);
+    }
   };
 
   textarea.addEventListener('keydown', (e) => {
@@ -753,8 +774,7 @@ function editThreadItem(annotationId: string, itemId: string, filePath: string):
     textarea.style.height = `${Math.min(200, Math.max(textarea.scrollHeight, 34))}px`;
   });
   textarea.addEventListener('blur', () => {
-    // 短暂延迟，避免与 save 冲突
-    setTimeout(() => { if (lineEl.classList.contains('is-editing')) cancel(); }, 150);
+    setTimeout(() => { if (!committed) cancel(); }, 150);
   });
 }
 

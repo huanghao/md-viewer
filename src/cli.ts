@@ -9,7 +9,6 @@ import { existsSync, readFileSync, writeFileSync, unlinkSync, statSync, openSync
 import { spawn } from "child_process";
 import { loadConfig, getConfigDir, getConfigPath, initConfig } from "./config.ts";
 import { appendAnnotationReply, getAnnotationsByDocument, listAnnotatedDocuments } from "./annotation-storage.ts";
-import { getSyncRecordsStats, cleanupAllExpiredRecords } from "./sync-storage.ts";
 
 // ==================== 配置 ====================
 
@@ -412,19 +411,7 @@ async function showStats(): Promise<void> {
   }
   console.log("");
 
-  // 2. 同步记录统计
-  const syncStats = getSyncRecordsStats();
-  console.log("同步记录:");
-  console.log(`  总文件数: ${syncStats.totalFiles}`);
-  console.log(`  过期文件数: ${syncStats.expiredFiles} (超过 6 个月)`);
-  console.log(`  最近位置数: ${syncStats.recentParents}`);
-  if (syncStats.newestSync) {
-    const days = Math.floor((Date.now() - syncStats.newestSync) / (1000 * 60 * 60 * 24));
-    console.log(`  最新同步: ${days === 0 ? "今天" : `${days} 天前`}`);
-  }
-  console.log("");
-
-  // 3. 打开的文件数量（需要从 server 获取）
+  // 2. 打开的文件数量（需要从 server 获取）
   if (reachable) {
     try {
       const response = await fetch(`http://${host}:${port}/api/files`);

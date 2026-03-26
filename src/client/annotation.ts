@@ -346,7 +346,95 @@ function getActiveAnnotationFilePath(): string | null {
   return renderedFilePath === currentFilePath ? currentFilePath : null;
 }
 
-function iconSvg(type: 'up' | 'down' | 'check' | 'trash' | 'comment' | 'list' | 'filter' | 'close' | 'edit'): string {
+/**
+ * Emacs/Readline 风格快捷键处理（适用于所有评论 textarea）
+ * 返回 true 表示已处理，调用方应 preventDefault()
+ */
+function handleEmacsKeys(e: KeyboardEvent, textarea: HTMLTextAreaElement): boolean {
+  if (!e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return false;
+  const key = e.key.toLowerCase();
+  const { value, selectionStart: start, selectionEnd: end } = textarea;
+  if (start === null || end === null) return false;
+
+  const setPos = (pos: number) => {
+    textarea.selectionStart = pos;
+    textarea.selectionEnd = pos;
+  };
+
+  const lineStart = (pos: number) => {
+    const idx = value.lastIndexOf('\n', pos - 1);
+    return idx === -1 ? 0 : idx + 1;
+  };
+  const lineEnd = (pos: number) => {
+    const idx = value.indexOf('\n', pos);
+    return idx === -1 ? value.length : idx;
+  };
+
+  switch (key) {
+    case 'a': setPos(lineStart(start)); return true;
+    case 'e': setPos(lineEnd(start)); return true;
+    case 'b': setPos(Math.max(0, start - 1)); return true;
+    case 'f': setPos(Math.min(value.length, start + 1)); return true;
+    case 'n': {
+      const le = lineEnd(start);
+      setPos(le === value.length ? le : Math.min(value.length, le + 1 + (start - lineStart(start))));
+      return true;
+    }
+    case 'p': {
+      const ls = lineStart(start);
+      if (ls === 0) { setPos(0); return true; }
+      const prevLineStart = lineStart(ls - 1);
+      const prevLineLen = (ls - 1) - prevLineStart;
+      setPos(prevLineStart + Math.min(start - ls, prevLineLen));
+      return true;
+    }
+    case 'd': {
+      if (start < value.length) {
+        textarea.value = value.slice(0, start) + value.slice(start + 1);
+        setPos(start);
+        textarea.dispatchEvent(new Event('input'));
+      }
+      return true;
+    }
+    case 'k': {
+      const le = lineEnd(start);
+      // 如果光标已在行尾，删除换行符本身
+      const deleteEnd = start === le && le < value.length ? le + 1 : le;
+      textarea.value = value.slice(0, start) + value.slice(deleteEnd);
+      setPos(start);
+      textarea.dispatchEvent(new Event('input'));
+      return true;
+    }
+    case 'u': {
+      const ls = lineStart(start);
+      textarea.value = value.slice(0, ls) + value.slice(start);
+      setPos(ls);
+      textarea.dispatchEvent(new Event('input'));
+      return true;
+    }
+    case 'w': {
+      // 删除前一个单词（空白分隔）
+      let i = start;
+      while (i > 0 && /\s/.test(value[i - 1])) i--;
+      while (i > 0 && !/\s/.test(value[i - 1])) i--;
+      textarea.value = value.slice(0, i) + value.slice(start);
+      setPos(i);
+      textarea.dispatchEvent(new Event('input'));
+      return true;
+    }
+    case 'h': {
+      if (start > 0) {
+        textarea.value = value.slice(0, start - 1) + value.slice(start);
+        setPos(start - 1);
+        textarea.dispatchEvent(new Event('input'));
+      }
+      return true;
+    }
+    default: return false;
+  }
+}
+
+function iconSvg(type: 'up' | 'down' | 'check' | 'trash' | 'comment' | 'list' | 'filter' | 'close' | 'edit' | 'reopen'): string {
   if (type === 'up') return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 4l4 4H4z"/></svg>';
   if (type === 'down') return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 12l-4-4h8z"/></svg>';
   if (type === 'check') return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.4 11.2L3.5 8.3l1.1-1.1 1.8 1.8 5-5 1.1 1.1z"/></svg>';
@@ -355,6 +443,7 @@ function iconSvg(type: 'up' | 'down' | 'check' | 'trash' | 'comment' | 'list' | 
   if (type === 'list') return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h10v1H3zm0 4h10v1H3zm0 4h10v1H3z"/></svg>';
   if (type === 'filter') return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12L9.5 8v4.5l-3-1.5V8z"/></svg>';
   if (type === 'edit') return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.5 2.5a1.5 1.5 0 012.1 2.1L5 13.2l-3 .8.8-3 8.7-8.5z"/></svg>';
+  if (type === 'reopen') return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2a6 6 0 100 12A6 6 0 008 2zm0 1.5a4.5 4.5 0 110 9 4.5 4.5 0 010-9zM6 5.5l4 2.5-4 2.5V5.5z"/></svg>';
   return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.2 4.2L8 8l3.8-3.8 1 1L9 9l3.8 3.8-1 1L8 10l-3.8 3.8-1-1L7 9 3.2 5.2z"/></svg>';
 }
 
@@ -766,6 +855,7 @@ function editThreadItem(annotationId: string, itemId: string, filePath: string):
   };
 
   textarea.addEventListener('keydown', (e) => {
+    if (handleEmacsKeys(e, textarea)) { e.preventDefault(); return; }
     if (e.key === 'Escape') { e.preventDefault(); cancel(); }
     else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save(); }
   });
@@ -803,12 +893,15 @@ function showPopover(ann: Annotation, x: number, y: number): void {
   el.popoverNote.innerHTML = `
     <div class="annotation-thread">${threadHTML}</div>
     <div class="annotation-reply-entry" data-popover-reply-entry="${ann.id}" role="button" tabindex="0">
-      <textarea rows="1" data-popover-reply-input="${ann.id}" placeholder="输入回复内容..."></textarea>
+      <textarea rows="1" data-popover-reply-input="${ann.id}" placeholder="输入回复内容（Cmd+Enter 提交）"></textarea>
     </div>
   `;
   if (el.popoverResolveBtn) {
-    el.popoverResolveBtn.title = isResolved(ann) ? '重新打开' : '标记已解决';
-    el.popoverResolveBtn.setAttribute('aria-label', isResolved(ann) ? '重新打开' : '标记已解决');
+    const resolved = isResolved(ann);
+    el.popoverResolveBtn.title = resolved ? '重新打开' : '标记已解决';
+    el.popoverResolveBtn.setAttribute('aria-label', resolved ? '重新打开' : '标记已解决');
+    el.popoverResolveBtn.innerHTML = resolved ? iconSvg('reopen') : iconSvg('check');
+    el.popoverResolveBtn.classList.toggle('is-resolved', resolved);
   }
   el.popover.style.left = `${Math.round(x)}px`;
   el.popover.style.top = `${Math.round(y)}px`;
@@ -1145,14 +1238,23 @@ function resolvePositionedAnnotationOverlaps(listEl: HTMLElement, contentScrollH
   const items = Array.from(canvas.querySelectorAll('.annotation-item.positioned')) as HTMLElement[];
   if (items.length === 0) return;
 
+  // 先批量读取所有 offsetHeight（避免 read-write 交替导致 layout thrashing）
+  const heights = items.map((item) => item.offsetHeight);
+
   const gap = 6;
   let previousBottom = 0;
-  for (const item of items) {
-    const rawAnchorTop = Number(item.getAttribute('data-anchor-top') || '0');
+  const tops: number[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const rawAnchorTop = Number(items[i].getAttribute('data-anchor-top') || '0');
     const anchorTop = Number.isFinite(rawAnchorTop) ? Math.max(0, rawAnchorTop) : 0;
     const resolvedTop = Math.max(anchorTop, previousBottom > 0 ? previousBottom + gap : anchorTop);
-    item.style.top = `${Math.round(resolvedTop)}px`;
-    previousBottom = resolvedTop + item.offsetHeight;
+    tops.push(resolvedTop);
+    previousBottom = resolvedTop + heights[i];
+  }
+
+  // 批量写入 style.top
+  for (let i = 0; i < items.length; i++) {
+    items[i].style.top = `${Math.round(tops[i])}px`;
   }
 
   const minHeight = Math.max(0, contentScrollHeight);
@@ -1178,20 +1280,20 @@ export function renderAnnotationList(filePath: string | null): void {
   }
 
   const renderItem = (ann: Annotation, index: number, positioned = false, top = 0) => `
-    <div class="annotation-item ${state.activeAnnotationId === ann.id ? 'is-active' : ''} status-${getAnchorTrack(ann)}${positioned ? ' positioned' : ''}" data-annotation-id="${ann.id}"${positioned ? ` data-anchor-top="${Math.max(0, Math.round(top))}" style="top:${Math.max(0, Math.round(top))}px"` : ''}>
+    <div class="annotation-item ${state.activeAnnotationId === ann.id ? 'is-active' : ''} status-${getAnchorTrack(ann)}${isResolved(ann) ? ' is-resolved' : ''}${positioned ? ' positioned' : ''}" data-annotation-id="${ann.id}"${positioned ? ` data-anchor-top="${Math.max(0, Math.round(top))}" style="top:${Math.max(0, Math.round(top))}px"` : ''}>
       <div class="annotation-row-top">
         <div class="annotation-row-title">#${ann.serial || index + 1} | ${escapeHtml(ann.quote.substring(0, 28))}${ann.quote.length > 28 ? '...' : ''}</div>
         <div class="annotation-row-actions">
           <button class="annotation-icon-action" data-action="prev" data-id="${ann.id}" title="上一条">${iconSvg('up')}</button>
           <button class="annotation-icon-action" data-action="next" data-id="${ann.id}" title="下一条">${iconSvg('down')}</button>
-          <button class="annotation-icon-action resolve" data-action="resolve" data-id="${ann.id}" title="${isResolved(ann) ? '重新打开' : '标记已解决'}">${iconSvg('check')}</button>
+          <button class="annotation-icon-action resolve${isResolved(ann) ? ' is-resolved' : ''}" data-action="resolve" data-id="${ann.id}" title="${isResolved(ann) ? '重新打开' : '标记已解决'}">${isResolved(ann) ? iconSvg('reopen') : iconSvg('check')}</button>
           <button class="annotation-icon-action danger" data-action="delete" data-id="${ann.id}" title="删除">${iconSvg('trash')}</button>
         </div>
       </div>
       <div class="annotation-thread">${renderThreadListHTML(ann, state.density === 'simple')}</div>
       ${state.density === 'simple' ? '' : `
         <div class="annotation-reply-entry" data-reply-entry="${ann.id}" role="button" tabindex="0">
-          <textarea rows="1" data-reply-input="${ann.id}" placeholder="输入回复内容..."></textarea>
+          <textarea rows="1" data-reply-input="${ann.id}" placeholder="输入回复内容（Cmd+Enter 提交）"></textarea>
         </div>
       `}
     </div>
@@ -1271,14 +1373,24 @@ export function renderAnnotationList(filePath: string | null): void {
     });
   });
 
+  // 延迟到下一帧批量处理，避免 render 时多次强制 layout
+  requestAnimationFrame(() => {
+    el.annotationList?.querySelectorAll('[data-reply-input]').forEach((inputEl) => {
+      autoResizeReplyInput(inputEl as HTMLTextAreaElement);
+    });
+  });
+
   el.annotationList.querySelectorAll('[data-reply-input]').forEach((inputEl) => {
     const input = inputEl as HTMLTextAreaElement;
-    autoResizeReplyInput(input);
     input.addEventListener('input', () => autoResizeReplyInput(input));
     input.addEventListener('click', (event) => event.stopPropagation());
     inputEl.addEventListener('keydown', (event) => {
+      if (handleEmacsKeys(event, event.currentTarget as HTMLTextAreaElement)) {
+        event.preventDefault();
+        return;
+      }
       if (event.key !== 'Enter') return;
-      if (event.shiftKey) return; // Shift+Enter 换行
+      if (!(event.metaKey || event.ctrlKey)) return; // Cmd/Ctrl+Enter 提交
       event.preventDefault();
       const input = event.currentTarget as HTMLTextAreaElement;
       const id = input.getAttribute('data-reply-input');
@@ -1348,8 +1460,12 @@ export function initAnnotationElements(): void {
 
   document.getElementById('composerCancelBtn')?.addEventListener('click', hideComposer);
   getElements().composerNote?.addEventListener('keydown', (event) => {
+    if (handleEmacsKeys(event, event.currentTarget as HTMLTextAreaElement)) {
+      event.preventDefault();
+      return;
+    }
     if (event.key !== 'Enter') return;
-    if (event.shiftKey) return; // Shift+Enter 换行
+    if (!(event.metaKey || event.ctrlKey)) return; // Cmd/Ctrl+Enter 提交
     event.preventDefault();
     const filePath = getActiveAnnotationFilePath();
     if (filePath) savePendingAnnotation(filePath);
@@ -1433,8 +1549,12 @@ export function initAnnotationElements(): void {
   document.getElementById('annotationPopover')?.addEventListener('keydown', (event) => {
     const target = event.target as HTMLElement;
     if (!(target instanceof HTMLTextAreaElement)) return;
+    if (handleEmacsKeys(event, target)) {
+      event.preventDefault();
+      return;
+    }
     if (event.key !== 'Enter') return;
-    if (event.shiftKey) return; // Shift+Enter 换行
+    if (!(event.metaKey || event.ctrlKey)) return; // Cmd/Ctrl+Enter 提交
     const id = target.getAttribute('data-popover-reply-input');
     const filePath = getActiveAnnotationFilePath();
     if (!id || !filePath) return;

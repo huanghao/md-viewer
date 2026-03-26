@@ -20,14 +20,6 @@ import {
   handleOpenFile,
   handleOpenLocalFile,
   handleEvents,
-  handleGetRecentParents,
-  handleGetSyncParentMeta,
-  handleSyncExecute,
-  handleGetSyncStatus,
-  handleCleanupSync,
-  handleGetSyncStats,
-  handleGetSyncPreferences,
-  handleSetSyncPreferences,
   handleInferWorkspace,
   handleScanWorkspace,
   handleGetAnnotations,
@@ -98,15 +90,6 @@ app.get("/api/nearby", handleGetNearby);
 app.get("/api/path-suggestions", handlePathSuggestions);
 app.post("/api/detect-path", handleDetectPath);
 
-// API: 同步相关
-app.get("/api/sync/recent-parents", handleGetRecentParents);
-app.get("/api/sync/parent-meta", handleGetSyncParentMeta);
-app.post("/api/sync/execute", handleSyncExecute);
-app.get("/api/sync/status", handleGetSyncStatus);
-app.post("/api/sync/cleanup", handleCleanupSync);
-app.get("/api/sync/stats", handleGetSyncStats);
-app.get("/api/sync/preferences", handleGetSyncPreferences);
-app.post("/api/sync/preferences", handleSetSyncPreferences);
 
 // API: CLI 调用 - 打开文件
 app.post("/api/open-file", handleOpenFile);

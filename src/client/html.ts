@@ -101,9 +101,6 @@ export function generateClientHTML(): string {
         <button class="toolbar-text-button" id="refreshButton" onclick="handleRefreshButtonClick()" style="display: none;" title="文件已更新，点击刷新">
           <span id="refreshButtonText">[↻ 刷新]</span>
         </button>
-        <button class="toolbar-text-button" id="syncButton" onclick="handleSyncButtonClick()" title="同步到学城">
-          <span id="syncButtonText">[☁↑ 同步]</span>
-        </button>
         <button class="font-scale-button" id="fontScaleButton" onclick="toggleFontScaleMenu()" title="调整字体大小">
           <span id="fontScaleText">100%</span>
         </button>
@@ -149,8 +146,8 @@ export function generateClientHTML(): string {
           </div>
         </div>
         <div class="annotation-filter-menu hidden" id="annotationFilterMenu">
-          <button class="annotation-filter-item is-active" data-filter="all">全部</button>
-          <button class="annotation-filter-item" data-filter="open">未解决</button>
+          <button class="annotation-filter-item" data-filter="all">全部</button>
+          <button class="annotation-filter-item is-active" data-filter="open">未解决</button>
           <button class="annotation-filter-item" data-filter="resolved">已解决</button>
           <button class="annotation-filter-item" data-filter="orphan">定位失败</button>
         </div>
@@ -165,18 +162,6 @@ export function generateClientHTML(): string {
     </button>
   </div>
 
-  <!-- 同步对话框 -->
-  <div class="sync-dialog-overlay" id="syncDialogOverlay">
-    <div class="sync-dialog">
-      <div class="sync-dialog-header">
-        <div class="sync-dialog-title" id="syncDialogTitle">同步到学城</div>
-        <button class="sync-dialog-close" onclick="closeSyncDialog()">×</button>
-      </div>
-      <div class="sync-dialog-body" id="syncDialogBody">
-        <!-- 动态内容 -->
-      </div>
-    </div>
-  </div>
 
   <!-- 评论创建浮窗 -->
   <div id="annotationComposer" class="annotation-composer hidden">
@@ -194,7 +179,7 @@ export function generateClientHTML(): string {
       </div>
     </div>
     <div class="annotation-reply-entry annotation-composer-input">
-      <textarea id="composerNote" rows="1" placeholder="输入评论内容..."></textarea>
+      <textarea id="composerNote" rows="1" placeholder="输入评论内容（Cmd+Enter 提交）"></textarea>
     </div>
   </div>
 

@@ -8,6 +8,25 @@
 import SwiftUI
 import WebKit
 
+// 子类化 WKWebView，拦截 Cmd+F 触发原生 Find in Page
+class FindableWebView: WKWebView {
+    override func keyDown(with event: NSEvent) {
+        // Cmd+F → 触发 find panel
+        if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "f" {
+            if let findAction = NSClassFromString("NSTextFinderAction") {
+                _ = findAction
+            }
+            // 直接调用 WKWebView 内部的 find panel selector
+            let sel = NSSelectorFromString("_showFindUI:")
+            if self.responds(to: sel) {
+                self.perform(sel, with: nil)
+                return
+            }
+        }
+        super.keyDown(with: event)
+    }
+}
+
 struct WebView: NSViewRepresentable {
     let url: URL
     @Binding var isLoading: Bool
@@ -19,7 +38,7 @@ struct WebView: NSViewRepresentable {
         // 启用开发者工具
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
 
-        let webView = WKWebView(frame: .zero, configuration: config)
+        let webView = FindableWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true

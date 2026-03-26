@@ -33,6 +33,12 @@ struct MDViewerApp: App {
                 }
                 .keyboardShortcut("r", modifiers: .command)
             }
+            CommandGroup(after: .textEditing) {
+                Button("查找...") {
+                    NSApp.sendAction(Selector(("_searchFieldSearch:")), to: nil, from: nil)
+                }
+                .keyboardShortcut("f", modifiers: .command)
+            }
         }
 
         // 设置窗口

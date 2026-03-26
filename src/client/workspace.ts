@@ -197,13 +197,20 @@ export async function scanWorkspace(workspaceId: string): Promise<FileTreeNode |
 
     // Keep user's directory expand/collapse preference across polling rescans.
     const previousTree = state.fileTree.get(workspaceId);
+    const persistedExpandedState = getWorkspaceExpandedState(workspaceId);
+    const isFirstLoad = !previousTree && (!persistedExpandedState || persistedExpandedState.size === 0);
+
     if (previousTree) {
       mergeDirectoryExpandedState(previousTree, tree);
-    }
-    const persistedExpandedState = getWorkspaceExpandedState(workspaceId);
-    if (persistedExpandedState && persistedExpandedState.size > 0) {
+    } else if (persistedExpandedState && persistedExpandedState.size > 0) {
       applyDirectoryExpandedState(tree, persistedExpandedState);
+    } else {
+      // 首次加载：默认全部折叠，只展开最近两个文件所在的目录
+      collapseAllDirectories(tree);
+      expandRecentFileDirs(tree, 2);
     }
+
+    void isFirstLoad; // suppress unused warning
 
     // 缓存文件树
     state.fileTree.set(workspaceId, tree);
@@ -228,7 +235,61 @@ function collectFilePaths(node: FileTreeNode | undefined): string[] {
   return paths;
 }
 
-// 刷新后恢复已展开工作区的目录树，避免出现“已展开但未加载”的占位状态。
+// 递归折叠所有目录（根目录除外）
+function collapseAllDirectories(node: FileTreeNode): void {
+  if (node.type !== 'directory') return;
+  for (const child of node.children || []) {
+    if (child.type === 'directory') {
+      child.isExpanded = false;
+      collapseAllDirectories(child);
+    }
+  }
+}
+
+// 收集所有文件节点，按 lastModified 降序
+function collectFileNodes(node: FileTreeNode, result: FileTreeNode[] = []): FileTreeNode[] {
+  if (node.type === 'file') {
+    result.push(node);
+  } else {
+    for (const child of node.children || []) {
+      collectFileNodes(child, result);
+    }
+  }
+  return result;
+}
+
+// 展开指定文件路径到根节点的所有祖先目录
+function expandAncestors(root: FileTreeNode, filePath: string): void {
+  function visit(node: FileTreeNode): boolean {
+    if (node.type === 'file') return node.path === filePath;
+    for (const child of node.children || []) {
+      if (visit(child)) {
+        node.isExpanded = true;
+        return true;
+      }
+    }
+    return false;
+  }
+  visit(root);
+}
+
+// 首次加载：展开最近 maxCount 个文件所在的目录链
+function expandRecentFileDirs(root: FileTreeNode, maxCount: number): void {
+  const files = collectFileNodes(root);
+  files.sort((a, b) => (b.lastModified || 0) - (a.lastModified || 0));
+  const recent = files.slice(0, maxCount);
+  // 记录已展开的直接父目录，避免超过 maxCount 个目录被展开
+  const expandedDirs = new Set<string>();
+  for (const file of recent) {
+    const parentPath = file.path.substring(0, file.path.lastIndexOf('/'));
+    if (!expandedDirs.has(parentPath)) {
+      expandedDirs.add(parentPath);
+      expandAncestors(root, file.path);
+    }
+  }
+}
+
+// 刷新后恢复已展开工作区的目录树，避免出现”已展开但未加载”的占位状态。
 export async function hydrateExpandedWorkspaces(): Promise<void> {
   const expanded = state.config.workspaces.filter((ws) => ws.isExpanded);
 

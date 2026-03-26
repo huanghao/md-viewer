@@ -50,17 +50,9 @@ bun build --compile \
   src/cli.ts
 
 echo ""
-
-# 复制 dispatcher 脚本
-echo "4️⃣  复制 mdv-iterm2-dispatcher..."
-cp scripts/mdv-iterm2-dispatcher.sh "${BUILD_DIR}/mdv-iterm2-dispatcher"
-chmod +x "${BUILD_DIR}/mdv-iterm2-dispatcher"
-
-echo ""
 echo "📦 构建完成！"
 echo "-------------"
 ls -lh "$BUILD_DIR/"
 echo ""
 echo "产物:"
 echo "  - mdv: $(du -h ${BUILD_DIR}/mdv | cut -f1)"
-echo "  - mdv-iterm2-dispatcher: $(du -h ${BUILD_DIR}/mdv-iterm2-dispatcher | cut -f1)"

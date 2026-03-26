@@ -46,12 +46,11 @@ trap "rm -rf ${TEMP_DIR}" EXIT
 # 复制文件到临时目录
 echo "1️⃣  复制文件..."
 cp "${BUILD_DIR}/mdv" "${TEMP_DIR}/"
-cp "${BUILD_DIR}/mdv-iterm2-dispatcher" "${TEMP_DIR}/"
 
 # 创建 tarball
 echo "2️⃣  创建 tarball..."
 cd "${TEMP_DIR}"
-tar -czf "${TARBALL}" mdv mdv-iterm2-dispatcher
+tar -czf "${TARBALL}" mdv
 cd - > /dev/null
 
 # 移动到 packages 目录

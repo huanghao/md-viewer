@@ -4,8 +4,7 @@
   "description": "Markdown viewer with live reload",
   "type": "module",
   "bin": {
-    "mdv": "./src/cli.ts",
-    "mdv-iterm2-dispatcher": "./scripts/mdv-iterm2-dispatcher.sh"
+    "mdv": "./src/cli.ts"
   },
   "scripts": {
     "build:client": "bun run build.ts",

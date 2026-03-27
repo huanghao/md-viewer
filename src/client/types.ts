@@ -8,6 +8,7 @@ export interface FileInfo {
   isRemote: boolean;
   displayName?: string;
   isMissing?: boolean;        // 标识文件是否不存在
+  pendingContent?: string;    // 磁盘最新内容（diff 视图使用，内存缓存）
 }
 
 // 工作区类型

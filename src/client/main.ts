@@ -11,6 +11,7 @@ import { loadFile, searchFiles, getNearbyFiles, openFile, detectPathType } from 
 
 // 导入工具函数
 import { escapeHtml, escapeAttr } from './utils/escape';
+import { diffLines } from './utils/diff';
 import { formatRelativeTime, formatFileTime } from './utils/format';
 import { generateDistinctNames } from './utils/file-names';
 
@@ -36,6 +37,7 @@ const SIDEBAR_DEFAULT_WIDTH = 260;
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 680;
 const fileRefreshSeq = new Map<string, number>();
+let diffViewActive = false;
 let workspacePollRunning = false;
 let mermaidInitialized = false;
 function syncAnnotationsForCurrentFile(force = false): void {
@@ -183,12 +185,18 @@ async function syncFileFromDisk(
   if (!targetFile) return false;
 
   targetFile.content = data.content;
+  targetFile.pendingContent = undefined;  // 清理缓存的 pending 内容
   targetFile.lastModified = data.lastModified;
   targetFile.displayedModified = data.lastModified;
   targetFile.isMissing = false;
   saveState();
 
   if (state.currentFile === path || state.currentFile === data.path) {
+    if (diffViewActive) {
+      diffViewActive = false;
+      const diffBtn = document.getElementById('diffButton');
+      if (diffBtn) diffBtn.classList.remove('active');
+    }
     renderContent();
     syncAnnotationsForCurrentFile(false);
     if (options.highlight) {
@@ -760,6 +768,12 @@ async function handleSmartAddInput(path: string): Promise<void> {
 
 // 切换文件
 function switchFile(path: string) {
+  // 切换文件时关闭 diff 视图
+  if (diffViewActive) {
+    diffViewActive = false;
+    const diffBtn = document.getElementById('diffButton');
+    if (diffBtn) diffBtn.classList.remove('active');
+  }
   const previousFile = state.currentFile;
   switchToFile(path);
   renderSidebar();
@@ -882,12 +896,165 @@ function handleURLParams() {
   }
 }
 
+// ==================== Diff 视图 ====================
+
+async function loadPendingContent(path: string): Promise<string | null> {
+  const file = state.sessionFiles.get(path);
+  if (!file) return null;
+  if (file.pendingContent !== undefined) return file.pendingContent;
+  const data = await loadFile(path, true);
+  if (!data) return null;
+  file.pendingContent = data.content;
+  return data.content;
+}
+
+function renderDiffView(oldContent: string, newContent: string): void {
+  const container = document.getElementById('content');
+  if (!container) return;
+
+  const lines = diffLines(oldContent, newContent);
+  const hasChanges = lines.some(l => l.type !== 'equal');
+
+  if (!hasChanges) {
+    container.innerHTML = `
+      <div class="diff-view-container">
+        <div class="diff-header">
+          <div class="diff-header-titles">
+            <div class="diff-header-old">← 当前版本</div>
+            <div class="diff-header-new">磁盘最新版本 →</div>
+          </div>
+          <div class="diff-actions">
+            <button class="diff-close-btn" onclick="window.closeDiffView()">关闭</button>
+          </div>
+        </div>
+        <div class="diff-no-changes">文件内容与磁盘一致，无差异</div>
+      </div>
+    `;
+    return;
+  }
+
+  // 构建 side-by-side diff 行：delete/insert 配对，equal 直接输出
+  const rows: Array<{ left?: (typeof lines)[0]; right?: (typeof lines)[0] }> = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.type === 'equal') {
+      rows.push({ left: line, right: line });
+      i++;
+    } else if (line.type === 'delete') {
+      if (i + 1 < lines.length && lines[i + 1].type === 'insert') {
+        rows.push({ left: line, right: lines[i + 1] });
+        i += 2;
+      } else {
+        rows.push({ left: line });
+        i++;
+      }
+    } else {
+      rows.push({ right: line });
+      i++;
+    }
+  }
+
+  const escH = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const tableRows = rows.map(({ left, right }) => {
+    if (left && right && left.type === 'equal') {
+      return `<tr class="diff-row-equal">
+        <td class="diff-line-no">${left.oldLineNo}</td>
+        <td>${escH(left.content)}</td>
+        <td class="diff-line-no">${right.newLineNo}</td>
+        <td>${escH(right.content)}</td>
+      </tr>`;
+    }
+    const leftNo = left ? `<td class="diff-line-no">${left.oldLineNo ?? ''}</td>` : `<td class="diff-line-no diff-cell-empty"></td>`;
+    const leftCell = left ? `<td class="diff-row-delete-cell">${escH(left.content)}</td>` : `<td class="diff-cell-empty"></td>`;
+    const rightNo = right ? `<td class="diff-line-no">${right.newLineNo ?? ''}</td>` : `<td class="diff-line-no diff-cell-empty"></td>`;
+    const rightCell = right ? `<td class="diff-row-insert-cell">${escH(right.content)}</td>` : `<td class="diff-cell-empty"></td>`;
+    const rowClass = left && right ? 'diff-row-mixed' : left ? 'diff-row-delete' : 'diff-row-insert';
+    return `<tr class="${rowClass}">${leftNo}${leftCell}${rightNo}${rightCell}</tr>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="diff-view-container">
+      <div class="diff-header">
+        <div class="diff-header-titles">
+          <div class="diff-header-old">← 当前版本</div>
+          <div class="diff-header-new">磁盘最新版本 →</div>
+        </div>
+        <div class="diff-actions">
+          <button class="diff-accept-btn" onclick="window.acceptDiffUpdate()">接受更新</button>
+          <button class="diff-close-btn" onclick="window.closeDiffView()">关闭</button>
+        </div>
+      </div>
+      <div class="diff-view-scroll">
+        <div class="diff-view">
+          <table class="diff-table">
+            <colgroup>
+              <col style="width:40px">
+              <col style="width:calc(50% - 40px)">
+              <col style="width:40px">
+              <col style="width:calc(50% - 40px)">
+            </colgroup>
+            <tbody>${tableRows}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function handleDiffButtonClick(): Promise<void> {
+  if (!state.currentFile) return;
+  const file = state.sessionFiles.get(state.currentFile);
+  if (!file) return;
+
+  if (diffViewActive) {
+    closeDiffView();
+    return;
+  }
+
+  const newContent = await loadPendingContent(state.currentFile);
+  if (newContent === null) return;
+
+  diffViewActive = true;
+  const diffBtn = document.getElementById('diffButton');
+  if (diffBtn) diffBtn.classList.add('active');
+
+  renderDiffView(file.content, newContent);
+}
+
+function closeDiffView(): void {
+  diffViewActive = false;
+  const diffBtn = document.getElementById('diffButton');
+  if (diffBtn) diffBtn.classList.remove('active');
+  renderContent();
+}
+
+async function acceptDiffUpdate(): Promise<void> {
+  if (!state.currentFile) return;
+  const file = state.sessionFiles.get(state.currentFile);
+  if (!file || file.pendingContent === undefined) return;
+
+  file.content = file.pendingContent;
+  file.pendingContent = undefined;
+  file.displayedModified = file.lastModified;
+  saveState();
+
+  diffViewActive = false;
+  renderContent();
+  syncAnnotationsForCurrentFile(false);
+  flashContentUpdated();
+  renderSidebar();
+  await updateToolbarButtons();
+}
+
 // ==================== 工具栏按钮 ====================
-// 更新工具栏按钮（刷新按钮）
 async function updateToolbarButtons() {
+  const diffButton = document.getElementById('diffButton');
+  const refreshButton = document.getElementById('refreshButton');
+
   if (!state.currentFile) {
-    // 没有当前文件时隐藏所有按钮
-    const refreshButton = document.getElementById('refreshButton');
+    if (diffButton) diffButton.style.display = 'none';
     if (refreshButton) refreshButton.style.display = 'none';
     return;
   }
@@ -896,17 +1063,14 @@ async function updateToolbarButtons() {
   if (!file) return;
 
   if (file.isMissing) {
-    const refreshButton = document.getElementById('refreshButton');
+    if (diffButton) diffButton.style.display = 'none';
     if (refreshButton) refreshButton.style.display = 'none';
     return;
   }
 
-  // 更新刷新按钮：只有当文件 dirty 时才显示
-  const refreshButton = document.getElementById('refreshButton');
-  if (refreshButton) {
-    const isDirty = file.lastModified > file.displayedModified;
-    refreshButton.style.display = isDirty ? 'flex' : 'none';
-  }
+  const isDirty = file.lastModified > file.displayedModified;
+  if (diffButton) diffButton.style.display = isDirty && !file.isRemote ? 'flex' : 'none';
+  if (refreshButton) refreshButton.style.display = isDirty ? 'flex' : 'none';
 }
 
 // 点击刷新按钮
@@ -1148,6 +1312,9 @@ declare global {
     addFileByPath: (path: string, focus: boolean) => void;
     refreshFile: (path: string) => void;
     handleRefreshButtonClick: () => void;
+    handleDiffButtonClick: () => void;
+    closeDiffView: () => void;
+    acceptDiffUpdate: () => void;
     copySingleText: (text: string, e?: Event) => void;
     copyFileName: (fileName: string) => void;
     showToast?: (message: string, type: string) => void;
@@ -1191,6 +1358,9 @@ window.showNearbyMenu = showNearbyMenu;
 window.addFileByPath = addFileByPath;
 window.refreshFile = refreshFile;
 window.handleRefreshButtonClick = handleRefreshButtonClick;
+window.handleDiffButtonClick = handleDiffButtonClick;
+window.closeDiffView = closeDiffView;
+window.acceptDiffUpdate = acceptDiffUpdate;
 window.copySingleText = copySingleText;
 window.copyFileName = copyFileName;
 window.showToast = showToast;

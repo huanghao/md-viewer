@@ -8,6 +8,16 @@
 import SwiftUI
 import WebKit
 
+extension NSView {
+    func findSubview<T: NSView>(ofType type: T.Type) -> T? {
+        if let match = self as? T { return match }
+        for sub in subviews {
+            if let found = sub.findSubview(ofType: type) { return found }
+        }
+        return nil
+    }
+}
+
 // 子类化 WKWebView，拦截 Cmd+F 触发原生 Find in Page
 class FindableWebView: WKWebView {
     override func keyDown(with event: NSEvent) {

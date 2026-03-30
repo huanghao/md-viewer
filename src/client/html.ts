@@ -1,4 +1,5 @@
 import { styles } from "./css.ts";
+import { githubMarkdownCSS, highlightGithubCSS } from "./vendor-css.ts";
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import { EMBEDDED_CLIENT_JS } from "./embedded-client.ts";
@@ -52,10 +53,10 @@ export function generateClientHTML(): string {
   <title>MD Viewer - Markdown Viewer</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
   <!-- Version: ${VERSION} -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css/github-markdown-light.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js/styles/github.css">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"><\/script>
+  <style>${githubMarkdownCSS}</style>
+  <style>${highlightGithubCSS}</style>
   <style>${styles}</style>
 </head>
 <body>

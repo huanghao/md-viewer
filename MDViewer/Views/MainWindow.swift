@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import WebKit
+import AppKit
 
 struct MainWindow: View {
     @EnvironmentObject var serverManager: ServerManager
@@ -105,6 +107,11 @@ struct MainWindow: View {
         .onReceive(NotificationCenter.default.publisher(for: .reloadWebView)) { _ in
             refreshTrigger += 1
         }
+        .onReceive(NotificationCenter.default.publisher(for: .showFindBar)) { _ in
+            if let webView = NSApp.keyWindow?.contentView?.findSubview(ofType: WKWebView.self) {
+                webView.evaluateJavaScript("window.__showFindBar && window.__showFindBar()", completionHandler: nil)
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button(action: { refreshTrigger += 1 }) {
@@ -119,4 +126,5 @@ struct MainWindow: View {
 
 extension Notification.Name {
     static let reloadWebView = Notification.Name("reloadWebView")
+    static let showFindBar = Notification.Name("showFindBar")
 }

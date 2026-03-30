@@ -35,7 +35,7 @@ struct MDViewerApp: App {
             }
             CommandGroup(after: .textEditing) {
                 Button("查找...") {
-                    NSApp.sendAction(Selector(("_searchFieldSearch:")), to: nil, from: nil)
+                    NotificationCenter.default.post(name: .showFindBar, object: nil)
                 }
                 .keyboardShortcut("f", modifiers: .command)
             }

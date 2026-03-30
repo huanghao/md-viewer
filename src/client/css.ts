@@ -2618,4 +2618,70 @@ export const styles = `
         padding-right: 24px;
       }
     }
+
+    /* ==================== Find Bar ==================== */
+    #findBar {
+      display: none;
+      position: fixed;
+      top: 12px;
+      right: 16px;
+      z-index: 10000;
+      align-items: center;
+      gap: 4px;
+      background: var(--bg-primary, #fff);
+      border: 1px solid #d0d7de;
+      border-radius: 8px;
+      padding: 6px 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.14);
+    }
+    #findBar.visible {
+      display: flex;
+    }
+    #findBarInput {
+      border: 1px solid #d0d7de;
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 13px;
+      width: 200px;
+      outline: none;
+      background: var(--bg-primary, #fff);
+      color: var(--text-primary, #1f2328);
+    }
+    #findBarInput:focus {
+      border-color: #0969da;
+      box-shadow: 0 0 0 2px rgba(9,105,218,0.2);
+    }
+    #findBarCount {
+      font-size: 12px;
+      color: #57606a;
+      min-width: 52px;
+      text-align: center;
+    }
+    #findBarCount.no-result {
+      color: #cf222e;
+    }
+    #findBar button {
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      color: #57606a;
+      line-height: 1;
+    }
+    #findBar button:hover {
+      background: #f6f8fa;
+      color: #1f2328;
+    }
+    mark.find-highlight {
+      background: #fff3b0;
+      color: inherit;
+      border-radius: 2px;
+      padding: 0 1px;
+    }
+    mark.find-highlight-current {
+      background: #ff9500;
+      color: #fff;
+    }
 `;

@@ -27,11 +27,26 @@
 
 **量化（估算，M=1500文本节点）：**
 
-| 批注数 | 优化前 | 优化后 | 提速 |
+| 批注数 | 优化前（估算） | 优化后（估算） | 估算提速 |
 |--------|--------|--------|------|
 | 10     | ~86ms  | ~18ms  | 4.8x |
 | 30     | ~245ms | ~41ms  | 6.0x |
 | 50     | ~404ms | ~64ms  | 6.3x |
+
+**实测基准（`tests/unit/annotation-perf.test.ts`，仅 offset 查找部分，不含 DOM 操作）：**
+
+| 场景 | 优化前（线性查找） | 优化后（二分查找） | 实测提速 |
+|------|----------------|----------------|---------|
+| 小文档 M=500 N=10 | 0.28ms | 0.09ms | **3.1x** |
+| 中文档 M=1500 N=30 | 0.39ms | 0.10ms | **3.9x** |
+| 大文档 M=1500 N=50 | 0.44ms | 0.07ms | **6.1x** |
+| 超大文档 M=3000 N=100 | 0.88ms | 0.09ms | **9.9x** |
+
+> 注：实测数字为纯 JS 计算（无 DOM），实际浏览器中还包含 TreeWalker 遍历和 DOM 操作开销，总体提速比会更显著。
+
+**✅ 已实施**（2026-04-03）：
+- 新增 `src/client/utils/text-node-index.ts`：`TextNodeIndex` + `buildTextNodeIndex` + `positionForOffset`（二分查找）
+- 修改 `src/client/annotation.ts`：`applyAnnotations` 一次建立索引，`applySingleAnnotation` 接受索引参数
 
 **优化方案：**
 将 `positionForGlobalOffset` 的逐节点遍历改为：

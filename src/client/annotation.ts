@@ -2,6 +2,7 @@
  * 圈点评论功能模块
  */
 
+import { collectTextNodes, buildTextNodeIndex, positionForOffset as positionForOffsetFast, type TextNodeIndex } from './utils/text-node-index';
 import { escapeHtml } from './utils/escape';
 import {
   fetchAnnotations,
@@ -282,7 +283,15 @@ function globalOffsetForPosition(root: HTMLElement, targetNode: Node, targetOffs
   return -1;
 }
 
-function positionForGlobalOffset(root: HTMLElement, offset: number): { node: Text; offset: number } | null {
+function positionForGlobalOffset(
+  root: HTMLElement,
+  offset: number,
+  index?: TextNodeIndex
+): { node: Text; offset: number } | null {
+  if (index) {
+    return positionForOffsetFast(index, offset);
+  }
+  // 原始线性逻辑（fallback，保持向后兼容）
   const nodes = getTextNodes(root);
   let count = 0;
   for (const node of nodes) {
@@ -1067,13 +1076,13 @@ function decorateMark(wrapper: HTMLElement, ann: Annotation): void {
   }
 }
 
-function applySingleAnnotation(ann: Annotation): void {
+function applySingleAnnotation(ann: Annotation, index?: TextNodeIndex): void {
   const el = getElements();
   if (!el.reader) return;
   if (typeof ann.start !== 'number' || typeof ann.length !== 'number' || ann.length <= 0) return;
 
-  const startPos = positionForGlobalOffset(el.reader, ann.start);
-  const endPos = positionForGlobalOffset(el.reader, ann.start + ann.length);
+  const startPos = positionForGlobalOffset(el.reader, ann.start, index);
+  const endPos = positionForGlobalOffset(el.reader, ann.start + ann.length, index);
   if (!startPos || !endPos) return;
   if (startPos.node === endPos.node && startPos.offset === endPos.offset) return;
 
@@ -1182,8 +1191,17 @@ export function applyAnnotations(): void {
   const el = getElements();
   clearRenderedMarks();
 
+  // 一次 TreeWalker 建立索引，供所有批注定位复用
+  const index: TextNodeIndex | undefined = el.reader
+    ? buildTextNodeIndex(collectTextNodes(el.reader))
+    : undefined;
+
   if (el.reader) {
-    const text = getReaderText(el.reader);
+    // 从索引直接拼接文本，避免第二次 TreeWalker
+    const text = index
+      ? index.nodes.map((n) => n.nodeValue || '').join('')
+      : getReaderText(el.reader);
+
     let changed = false;
     const changedAnnotations: Annotation[] = [];
     for (const ann of state.annotations) {
@@ -1227,7 +1245,7 @@ export function applyAnnotations(): void {
   const sorted = [...getVisibleAnnotations()]
     .sort((a, b) => b.start - a.start);
   for (const ann of sorted) {
-    applySingleAnnotation(ann);
+    applySingleAnnotation(ann, index);
   }
   attachAnnotationEvents();
 }

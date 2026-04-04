@@ -14,11 +14,13 @@ import { escapeHtml, escapeAttr } from './utils/escape';
 import { diffLines } from './utils/diff';
 import { formatRelativeTime, formatFileTime } from './utils/format';
 import { generateDistinctNames } from './utils/file-names';
+import { getFileTypeIcon, getFileTypeLabel, isJsonFile, isJsonlFile } from './utils/file-type';
 
 // 导入 UI 组件
 import { renderSidebar } from './ui/sidebar';
 import { showToast, showSuccess, showError, showWarning, showInfo } from './ui/toast';
 import { showSettingsDialog, closeSettingsDialog } from './ui/settings';
+import { renderJsonContent } from './ui/json-viewer';
 
 // 导入批注功能
 import {
@@ -449,6 +451,19 @@ function renderContent() {
     return;
   }
 
+  if (isJsonPath(file.path)) {
+    container.setAttribute('data-current-file', file.path);
+    container.innerHTML = '';
+    const searchInput = document.getElementById('searchInput') as HTMLInputElement | null;
+    const query = searchInput?.value?.trim() ?? '';
+    renderJsonContent(container, file.content, file.path, query);
+    const meta = document.getElementById('fileMeta');
+    if (meta) meta.textContent = formatRelativeTime(file.lastModified);
+    renderBreadcrumb();
+    updateToolbarButtons();
+    return;
+  }
+
   // 使用 marked 渲染 Markdown
   const html = (window as any).marked.parse(file.content);
   const deletedNotice = file.isMissing
@@ -587,6 +602,11 @@ function getWorkspaceNameFromPath(path: string): string {
 function isHtmlPath(path: string): boolean {
   const lower = path.toLowerCase();
   return lower.endsWith('.html') || lower.endsWith('.htm');
+}
+
+function isJsonPath(path: string): boolean {
+  const lower = path.toLowerCase();
+  return lower.endsWith('.json') || lower.endsWith('.jsonl');
 }
 
 function isUrlPath(path: string): boolean {

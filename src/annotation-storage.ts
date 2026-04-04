@@ -150,6 +150,7 @@ function getDb(): Database {
       confidence REAL
     );
     CREATE INDEX IF NOT EXISTS idx_annotations_doc_path ON annotations(doc_path);
+    CREATE INDEX IF NOT EXISTS idx_annotations_doc_status ON annotations(doc_path, status);
   `);
 
   const columns = db.query(`PRAGMA table_info(annotations)`).all() as Array<{ name: string }>;
@@ -526,5 +527,23 @@ export function clearAllAnnotations(): { deleted: number; documents: number } {
   const deleted = Number(row?.count || 0);
   const documents = Number(row?.docs || 0);
   database.query(`DELETE FROM annotations`).run();
+  return { deleted, documents };
+}
+
+export function tidyAnnotations(olderThanDays = 7): { deleted: number; documents: number } {
+  const cutoff = Date.now() - olderThanDays * 24 * 60 * 60 * 1000;
+  const database = getDb();
+  const rows = database
+    .query(
+      `SELECT COUNT(1) as count, COUNT(DISTINCT doc_path) as docs
+       FROM annotations
+       WHERE status IN ('resolved', 'unanchored') AND updated_at < ?`
+    )
+    .get(cutoff) as { count: number; docs: number } | null;
+  const deleted = Number(rows?.count || 0);
+  const documents = Number(rows?.docs || 0);
+  database
+    .query(`DELETE FROM annotations WHERE status IN ('resolved', 'unanchored') AND updated_at < ?`)
+    .run(cutoff);
   return { deleted, documents };
 }

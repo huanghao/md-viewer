@@ -8,7 +8,7 @@ import { resolve, join } from "path";
 import { existsSync, readFileSync, writeFileSync, unlinkSync, statSync, openSync } from "fs";
 import { spawn } from "child_process";
 import { loadConfig, getConfigDir, getConfigPath, initConfig } from "./config.ts";
-import { appendAnnotationReply, getAnnotationsByDocument, listAnnotatedDocuments } from "./annotation-storage.ts";
+import { appendAnnotationReply, getAnnotationsByDocument, listAnnotatedDocuments, tidyAnnotations } from "./annotation-storage.ts";
 
 // ==================== 配置 ====================
 
@@ -598,9 +598,11 @@ async function replyCommentBatch(
 }
 
 function printCommentDocs(json: boolean, limit: number, offset: number): void {
-  const docs = listAnnotatedDocuments(limit, offset)
+  const allDocs = listAnnotatedDocuments(limit, offset)
     .slice()
     .sort((a, b) => (b.latestUpdatedAt - a.latestUpdatedAt) || (b.latestCreatedAt - a.latestCreatedAt) || a.path.localeCompare(b.path));
+  // 只展示有 open（anchored）评论的文档，与界面默认 filter 一致
+  const docs = allDocs.filter((d) => d.anchoredCount > 0);
   if (json) {
     console.log(JSON.stringify({ totalReturned: docs.length, docs }, null, 2));
     return;
@@ -609,12 +611,27 @@ function printCommentDocs(json: boolean, limit: number, offset: number): void {
   console.log(`共返回 ${docs.length} 条`);
   console.log("");
   for (const item of docs) {
+    const resolvedCount = item.count - item.anchoredCount - item.unanchoredCount;
     console.log(`- ${item.path}`);
     console.log(`  - 评论数: ${item.count}`);
     console.log(`  - 可定位: ${item.anchoredCount}`);
     console.log(`  - 失锚: ${item.unanchoredCount}`);
+    if (resolvedCount > 0) console.log(`  - 已解决: ${resolvedCount}`);
     console.log(`  - 更新时间: ${formatCompactTime(item.latestUpdatedAt)}`);
     console.log("");
+  }
+}
+
+function runTidy(days: number, json: boolean): void {
+  const { deleted, documents } = tidyAnnotations(days);
+  if (json) {
+    console.log(JSON.stringify({ deleted, documents, olderThanDays: days }));
+    return;
+  }
+  if (deleted === 0) {
+    console.log(`✅ 无需清理（没有 ${days} 天前的已解决/失锚评论）`);
+  } else {
+    console.log(`✅ 已清理 ${deleted} 条评论（来自 ${documents} 个文档，${days} 天前已解决/失锚）`);
   }
 }
 
@@ -717,13 +734,14 @@ MD Viewer CLI - 命令行工具
   mdv <FILE>                           打开文件
   mdv tabs [--json]                    查看标签页和当前文档
   mdv config [get|set] [KEY] [VALUE]   配置管理
-  mdv comments list                    列出有评论的文档
+  mdv comments list                    列出有 open 评论的文档
   mdv comments get --file <FILE>       查看文档评论
   mdv comments reply --file <FILE> [--seq <N> | --id <ID>] --author <NAME> --text <TEXT>
                                        回复一条评论
   mdv comments reply-batch --file <FILE> --author <NAME> --input <JSON|->
                                        批量回复评论
   mdv comments stats                   评论统计
+  mdv comments tidy [--days <N>]       清理 N 天前的已解决/失锚评论（默认 7 天）
   mdv --help                           显示帮助
 
 选项:
@@ -736,6 +754,7 @@ MD Viewer CLI - 命令行工具
   --author <NAME>                      回复作者（必填，如 codex/claude/huanghao）
   --text <TEXT>                        回复内容（用于 reply）
   --input <PATH|->                     批量回复输入（JSON 文件路径或 stdin）
+  --days <N>                           清理天数阈值（用于 tidy，默认 7）
 
 示例:
   mdv README.md                        打开文件
@@ -747,6 +766,8 @@ MD Viewer CLI - 命令行工具
   mdv config get server.port           获取端口配置
   mdv config set server.port 3001      设置端口
   mdv comments list --json             列出评论文档（JSON）
+  mdv comments tidy                    清理 7 天前的已解决/失锚评论
+  mdv comments tidy --days 30          清理 30 天前的已解决/失锚评论
   mdv comments get --file README.md    查看评论
   mdv comments reply --file README.md --seq 2 --author codex --text "我会补充这部分"
   mdv comments reply-batch --file README.md --author codex --input replies.json
@@ -772,6 +793,7 @@ interface CliOptions {
   author?: string;
   input?: string;
   daemon: boolean;
+  days?: number;
 }
 
 function parseArgs(args: string[]): {
@@ -821,6 +843,8 @@ function parseArgs(args: string[]): {
       options.author = args[++i];
     } else if (arg === "--input") {
       options.input = args[++i];
+    } else if (arg === "--days") {
+      options.days = parseInt(args[++i], 10);
     } else if (!arg.startsWith("-")) {
       if (command.length === 0 && !topLevelCommands.has(arg)) {
         // 兼容 `mdv <FILE>`：首个非选项参数且非保留命令时，按文件路径处理。
@@ -966,9 +990,14 @@ async function main() {
       }
     } else if (subcmd === "stats") {
       showCommentsStats();
+    } else if (subcmd === "tidy") {
+      const days = Number.isFinite(Number(options.days)) && Number(options.days) > 0
+        ? Math.floor(Number(options.days))
+        : 7;
+      runTidy(days, options.json);
     } else {
       console.error(`❌ 未知的 comments 子命令: ${subcmd}`);
-      console.error(`   可用: list, get, reply, reply-batch, stats`);
+      console.error(`   可用: list, get, reply, reply-batch, stats, tidy`);
       process.exit(1);
     }
   } else {

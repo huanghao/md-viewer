@@ -8,7 +8,7 @@ import { resolve, join } from "path";
 import { existsSync, readFileSync, writeFileSync, unlinkSync, statSync, openSync } from "fs";
 import { spawn } from "child_process";
 import { loadConfig, getConfigDir, getConfigPath, initConfig } from "./config.ts";
-import { appendAnnotationReply, getAnnotationsByDocument, listAnnotatedDocuments, tidyAnnotations } from "./annotation-storage.ts";
+import { appendAnnotationReply, getAnnotationsByDocument, listAnnotatedDocuments, tidyAnnotations, tidyMissingFiles } from "./annotation-storage.ts";
 
 // ==================== 配置 ====================
 
@@ -621,16 +621,29 @@ function printCommentDocs(json: boolean, limit: number, offset: number): void {
   }
 }
 
-function runTidy(days: number, json: boolean): void {
-  const { deleted, documents } = tidyAnnotations(days);
+function runTidy(days: number, missing: boolean, json: boolean): void {
+  const stale = tidyAnnotations(days);
+  const gone = missing ? tidyMissingFiles() : { deleted: 0, documents: 0 };
+  const totalDeleted = stale.deleted + gone.deleted;
+  const totalDocs = stale.documents + gone.documents;
   if (json) {
-    console.log(JSON.stringify({ deleted, documents, olderThanDays: days }));
+    console.log(JSON.stringify({
+      deleted: totalDeleted,
+      documents: totalDocs,
+      stale: { deleted: stale.deleted, documents: stale.documents, olderThanDays: days },
+      missingFiles: { deleted: gone.deleted, documents: gone.documents },
+    }));
     return;
   }
-  if (deleted === 0) {
-    console.log(`✅ 无需清理（没有 ${days} 天前的已解决/失锚评论）`);
-  } else {
-    console.log(`✅ 已清理 ${deleted} 条评论（来自 ${documents} 个文档，${days} 天前已解决/失锚）`);
+  if (stale.deleted === 0 && gone.deleted === 0) {
+    console.log(`✅ 无需清理`);
+    return;
+  }
+  if (stale.deleted > 0) {
+    console.log(`✅ 已清理 ${stale.deleted} 条过期评论（来自 ${stale.documents} 个文档，${days} 天前已解决/失锚）`);
+  }
+  if (gone.deleted > 0) {
+    console.log(`✅ 已清理 ${gone.deleted} 条孤儿评论（来自 ${gone.documents} 个已删除文件）`);
   }
 }
 
@@ -740,7 +753,7 @@ MD Viewer CLI - 命令行工具
   mdv comments reply-batch --file <FILE> --author <NAME> --input <JSON|->
                                        批量回复评论
   mdv comments stats                   评论统计
-  mdv comments tidy [--days <N>]       清理 N 天前的已解决/失锚评论（默认 7 天）
+  mdv comments tidy [--days <N>] [--missing]  清理过期评论；--missing 同时清理已删除文件的评论
   mdv --help                           显示帮助
 
 选项:
@@ -754,6 +767,7 @@ MD Viewer CLI - 命令行工具
   --text <TEXT>                        回复内容（用于 reply）
   --input <PATH|->                     批量回复输入（JSON 文件路径或 stdin）
   --days <N>                           清理天数阈值（用于 tidy，默认 7）
+  --missing                            同时清理已删除文件的评论（用于 tidy）
 
 示例:
   mdv README.md                        打开文件
@@ -767,6 +781,7 @@ MD Viewer CLI - 命令行工具
   mdv comments list --json             列出评论文档（JSON）
   mdv comments tidy                    清理 7 天前的已解决/失锚评论
   mdv comments tidy --days 30          清理 30 天前的已解决/失锚评论
+  mdv comments tidy --missing          同时清理已删除文件的评论
   mdv comments get --file README.md    查看评论
   mdv comments reply --file README.md --seq 2 --author codex --text "我会补充这部分"
   mdv comments reply-batch --file README.md --author codex --input replies.json
@@ -793,6 +808,7 @@ interface CliOptions {
   input?: string;
   daemon: boolean;
   days?: number;
+  missing?: boolean;
 }
 
 function parseArgs(args: string[]): {
@@ -844,6 +860,8 @@ function parseArgs(args: string[]): {
       options.input = args[++i];
     } else if (arg === "--days") {
       options.days = parseInt(args[++i], 10);
+    } else if (arg === "--missing") {
+      options.missing = true;
     } else if (!arg.startsWith("-")) {
       if (command.length === 0 && !topLevelCommands.has(arg)) {
         // 兼容 `mdv <FILE>`：首个非选项参数且非保留命令时，按文件路径处理。
@@ -993,7 +1011,7 @@ async function main() {
       const days = Number.isFinite(Number(options.days)) && Number(options.days) > 0
         ? Math.floor(Number(options.days))
         : 7;
-      runTidy(days, options.json);
+      runTidy(days, options.missing === true, options.json);
     } else {
       console.error(`❌ 未知的 comments 子命令: ${subcmd}`);
       console.error(`   可用: list, get, reply, reply-batch, stats, tidy`);

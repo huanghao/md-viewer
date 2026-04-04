@@ -533,6 +533,27 @@ export function clearAllAnnotations(): { deleted: number; documents: number } {
   return { deleted, documents };
 }
 
+export function tidyMissingFiles(): { deleted: number; documents: number } {
+  const database = getDb();
+  const paths = database
+    .query(`SELECT DISTINCT doc_path FROM annotations`)
+    .all() as { doc_path: string }[];
+  const missing = paths
+    .map((r) => r.doc_path)
+    .filter((p) => !/^https?:\/\//i.test(p) && !existsSync(p));
+  if (missing.length === 0) return { deleted: 0, documents: 0 };
+  const stmt = database.prepare(`DELETE FROM annotations WHERE doc_path = ?`);
+  let deleted = 0;
+  for (const p of missing) {
+    const countRow = database
+      .query(`SELECT COUNT(1) as count FROM annotations WHERE doc_path = ?`)
+      .get(p) as { count: number } | null;
+    deleted += Number(countRow?.count || 0);
+    stmt.run(p);
+  }
+  return { deleted, documents: missing.length };
+}
+
 export function tidyAnnotations(olderThanDays = 7): { deleted: number; documents: number } {
   const cutoff = Date.now() - olderThanDays * 24 * 60 * 60 * 1000;
   const database = getDb();

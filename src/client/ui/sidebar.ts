@@ -4,7 +4,7 @@ import { saveConfig } from '../config';
 import { escapeAttr, escapeHtml } from '../utils/escape';
 import { generateDistinctNames } from '../utils/file-names';
 import { getFileListStatus } from '../utils/file-status';
-import { getFileTypeIcon } from '../utils/file-type';
+import { getFileTypeIcon, isJsonFile, isJsonlFile } from '../utils/file-type';
 import { getTabBatchTargets, type TabBatchAction } from '../utils/tab-batch';
 import { renderWorkspaceSidebar, bindWorkspaceEvents } from './sidebar-workspace';
 import { syncAnnotationSidebarLayout } from '../annotation';
@@ -148,11 +148,6 @@ function rerenderByMode(): void {
   renderFiles();
 }
 
-function isJsonPath(path: string): boolean {
-  const lower = path.toLowerCase();
-  return lower.endsWith('.json') || lower.endsWith('.jsonl');
-}
-
 function looksLikePathInput(value: string): boolean {
   const v = value.trim();
   if (!v) return false;
@@ -207,7 +202,7 @@ export function renderSearchBox(): void {
       }
       rerenderByMode();
       // If current file is JSON, re-render with new query
-      if (state.currentFile && isJsonPath(state.currentFile)) {
+      if (state.currentFile && (isJsonFile(state.currentFile) || isJsonlFile(state.currentFile))) {
         (window as any).renderContent?.();
       }
     });

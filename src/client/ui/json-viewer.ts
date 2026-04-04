@@ -29,7 +29,7 @@ function buildNode(
   if (!isExpandable) {
     // Leaf node
     const keyHtml = key !== null
-      ? `<span class="json-key">${highlight(JSON.stringify(key), query)}</span><span class="json-colon">:</span>`
+      ? `<span class="json-key">${highlight(escapeHtml(JSON.stringify(key)), query)}</span><span class="json-colon">:</span>`
       : '';
     const valHtml = renderLeaf(value, query);
     return `
@@ -55,7 +55,7 @@ function buildNode(
   const childrenClass = collapsed ? 'json-children collapsed' : 'json-children';
 
   const keyHtml = key !== null
-    ? `<span class="json-key">${highlight(JSON.stringify(key), query)}</span><span class="json-colon">:</span>`
+    ? `<span class="json-key">${highlight(escapeHtml(JSON.stringify(key)), query)}</span><span class="json-colon">:</span>`
     : '';
 
   const previewHtml = collapsed

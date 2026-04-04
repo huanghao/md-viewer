@@ -19,7 +19,8 @@ export function isHtml(path: string): boolean {
 }
 
 export function isJson(path: string): boolean {
-  return path.endsWith(".json") || path.endsWith(".jsonl");
+  const lower = path.toLowerCase();
+  return lower.endsWith(".json") || lower.endsWith(".jsonl");
 }
 
 export function isSupportedTextFile(path: string): boolean {

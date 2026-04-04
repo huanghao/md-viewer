@@ -861,7 +861,10 @@ function setupKeyboardShortcuts() {
     }
 
     // Cmd-K (Mac) 或 Ctrl-K (Windows/Linux) 聚焦搜索框
+    // 如果焦点在 textarea/input 里（如评论框），不拦截，让 Emacs 快捷键生效
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      const tag = (document.activeElement as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === 'textarea' || tag === 'input') return;
       e.preventDefault();
       const input = document.getElementById('searchInput') as HTMLInputElement | null;
       if (input) {

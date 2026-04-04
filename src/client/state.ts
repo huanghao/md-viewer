@@ -196,13 +196,15 @@ export function addOrUpdateFile(fileData: FileData, switchTo: boolean = false): 
 }
 
 export function removeFile(path: string): void {
+  const allFiles = Array.from(state.sessionFiles.keys());
+  const idx = allFiles.indexOf(path);
   state.sessionFiles.delete(path);
   clearListDiff(path);
   clearWorkspacePathMissing(path);
   if (state.currentFile === path) {
-    // 切换到剩余文件中的第一个
+    // 切换到被关闭文件左边（前一个）的文件，若无则取右边第一个
     const remainingFiles = Array.from(state.sessionFiles.values());
-    state.currentFile = remainingFiles.length > 0 ? remainingFiles[0].path : null;
+    state.currentFile = remainingFiles.length > 0 ? remainingFiles[Math.max(0, idx - 1)].path : null;
   }
   saveState();
 }

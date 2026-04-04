@@ -17,11 +17,17 @@
 
 | 文件 | 改动 |
 |------|------|
-| `src/utils.ts` | `isSupportedTextFile()` 加入 `.json` / `.jsonl` |
-| `src/client/utils/file-type.ts` | 加入 `isJsonFile()` / `isJsonlFile()` |
+| `src/utils.ts` | `isSupportedTextFile()` 加入 `.json` / `.jsonl`；工作区文件树扫描（`handlers.ts:595`）自动覆盖 |
+| `src/client/utils/file-type.ts` | 加入 `isJsonFile()` / `isJsonlFile()`；`getFileTypeIcon()` 加 JSON 图标（`{}`标签） |
 | `src/client/ui/json-viewer.ts` | 新文件，JSON tree renderer |
 | `src/client/main.ts` | `renderContent()` 加 JSON 分支；`syncAnnotationsForCurrentFile` 不排除 JSON |
 | `src/client/css.ts` | 追加 JSON viewer 样式 |
+
+### 工作区集成
+
+- `isSupportedTextFile()` 加入 `.json`/`.jsonl` 后，工作区目录扫描（服务端 `handlers.ts` `buildDirectoryTree`）和侧边栏文件过滤自动生效，无需额外改动
+- `getFileTypeIcon()` 加入 JSON 类型，返回 `{ cls: 'json', label: '{}' }`，侧边栏文件列表显示正确图标
+- 侧边栏"附近文件"（`getNearbyFiles`）同样通过 `isSupportedTextFile` 过滤，自动支持 JSON
 
 ## JSON Tree Renderer
 

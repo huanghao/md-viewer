@@ -2684,4 +2684,119 @@ export const styles = `
       background: #ff9500;
       color: #fff;
     }
+
+    /* ==================== JSON Viewer ==================== */
+    .json-viewer {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: calc(13px * var(--font-scale));
+      line-height: 1.6;
+      padding: 16px 20px;
+      color: #24292e;
+      user-select: text;
+    }
+    .json-viewer ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .json-viewer li {
+      padding: 0;
+    }
+    .json-node {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      padding: 1px 0;
+      cursor: default;
+    }
+    .json-node-expandable {
+      cursor: pointer;
+    }
+    .json-node-expandable:hover {
+      background: rgba(0,0,0,0.04);
+      border-radius: 3px;
+    }
+    .json-toggle {
+      display: inline-block;
+      width: 14px;
+      font-size: 10px;
+      color: #6a737d;
+      flex-shrink: 0;
+      user-select: none;
+    }
+    .json-key {
+      color: #005cc5;
+      white-space: nowrap;
+    }
+    .json-colon {
+      color: #24292e;
+      margin-right: 4px;
+    }
+    .json-string { color: #22863a; }
+    .json-number { color: #005cc5; }
+    .json-boolean { color: #e36209; }
+    .json-null { color: #6a737d; }
+    .json-bracket {
+      color: #6a737d;
+      font-weight: 500;
+    }
+    .json-count {
+      color: #6a737d;
+      font-size: 11px;
+      margin-left: 4px;
+    }
+    .json-preview {
+      color: #6a737d;
+      font-size: 12px;
+      margin-left: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 300px;
+    }
+    .json-children {
+      padding-left: 20px;
+    }
+    .json-children.collapsed {
+      display: none;
+    }
+    .json-error {
+      background: #ffeef0;
+      border: 1px solid #fdb8c0;
+      border-radius: 4px;
+      padding: 12px 16px;
+      color: #b31d28;
+      margin-bottom: 12px;
+    }
+    .json-error pre {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #586069;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .json-line-header {
+      font-size: 11px;
+      color: #6a737d;
+      padding: 4px 0 2px;
+      border-top: 1px solid #eaecef;
+      margin-top: 8px;
+      user-select: none;
+    }
+    .json-line-header:first-child {
+      border-top: none;
+      margin-top: 0;
+    }
+    mark.json-match {
+      background: #fff3b0;
+      color: inherit;
+      border-radius: 2px;
+      padding: 0 1px;
+    }
+    .json-no-results {
+      color: #6a737d;
+      font-style: italic;
+      padding: 20px;
+      text-align: center;
+    }
 `;

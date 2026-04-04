@@ -1,6 +1,7 @@
 tests/e2e/runtime/
 .claude/
 mdv
+!skills/mdv/
 md-viewer
 test-results/
 dist/

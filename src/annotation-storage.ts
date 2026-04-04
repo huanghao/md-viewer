@@ -33,6 +33,7 @@ export interface AnnotationDocSummary {
   latestCreatedAt: number;
   anchoredCount: number;
   unanchoredCount: number;
+  resolvedCount: number;
 }
 
 let db: Database | null = null;
@@ -405,8 +406,9 @@ export function listAnnotatedDocuments(limit = 20, offset = 0): AnnotationDocSum
          COUNT(1) as count,
          MAX(updated_at) as latest_updated_at,
          MAX(created_at) as latest_created_at,
+         SUM(CASE WHEN status = 'anchored' THEN 1 ELSE 0 END) as anchored_count,
          SUM(CASE WHEN status = 'unanchored' THEN 1 ELSE 0 END) as unanchored_count,
-         SUM(CASE WHEN status != 'unanchored' THEN 1 ELSE 0 END) as anchored_count
+         SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) as resolved_count
        FROM annotations
        GROUP BY doc_path
        ORDER BY latest_updated_at DESC, latest_created_at DESC, doc_path ASC
@@ -421,6 +423,7 @@ export function listAnnotatedDocuments(limit = 20, offset = 0): AnnotationDocSum
     latestCreatedAt: Number(row.latest_created_at || 0),
     anchoredCount: Number(row.anchored_count || 0),
     unanchoredCount: Number(row.unanchored_count || 0),
+    resolvedCount: Number(row.resolved_count || 0),
   }));
 }
 

@@ -611,12 +611,11 @@ function printCommentDocs(json: boolean, limit: number, offset: number): void {
   console.log(`共返回 ${docs.length} 条`);
   console.log("");
   for (const item of docs) {
-    const resolvedCount = item.count - item.anchoredCount - item.unanchoredCount;
     console.log(`- ${item.path}`);
     console.log(`  - 评论数: ${item.count}`);
     console.log(`  - 可定位: ${item.anchoredCount}`);
     console.log(`  - 失锚: ${item.unanchoredCount}`);
-    if (resolvedCount > 0) console.log(`  - 已解决: ${resolvedCount}`);
+    if (item.resolvedCount > 0) console.log(`  - 已解决: ${item.resolvedCount}`);
     console.log(`  - 更新时间: ${formatCompactTime(item.latestUpdatedAt)}`);
     console.log("");
   }

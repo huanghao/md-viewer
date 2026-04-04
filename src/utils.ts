@@ -18,9 +18,13 @@ export function isHtml(path: string): boolean {
   return path.endsWith(".html") || path.endsWith(".htm");
 }
 
+export function isJson(path: string): boolean {
+  return path.endsWith(".json") || path.endsWith(".jsonl");
+}
+
 export function isSupportedTextFile(path: string): boolean {
   const lower = path.toLowerCase();
-  return isMarkdown(lower) || isHtml(lower);
+  return isMarkdown(lower) || isHtml(lower) || isJson(lower);
 }
 
 export function isUrl(path: string): boolean {

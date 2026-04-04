@@ -148,6 +148,11 @@ function rerenderByMode(): void {
   renderFiles();
 }
 
+function isJsonPath(path: string): boolean {
+  const lower = path.toLowerCase();
+  return lower.endsWith('.json') || lower.endsWith('.jsonl');
+}
+
 function looksLikePathInput(value: string): boolean {
   const v = value.trim();
   if (!v) return false;
@@ -201,6 +206,10 @@ export function renderSearchBox(): void {
         clearBtn.style.display = query ? 'block' : 'none';
       }
       rerenderByMode();
+      // If current file is JSON, re-render with new query
+      if (state.currentFile && isJsonPath(state.currentFile)) {
+        (window as any).renderContent?.();
+      }
     });
 
     input.addEventListener('keydown', (e) => {

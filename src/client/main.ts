@@ -1345,6 +1345,7 @@ declare global {
     toggleFontScaleMenu: () => void;
     setFontScale: (scale: number) => void;
     openExternalFile?: (path: string) => void | Promise<void>;
+    renderContent?: () => void;
   }
 }
 
@@ -1391,6 +1392,7 @@ window.showSettingsDialog = showSettingsDialog;
 window.toggleFontScaleMenu = toggleFontScaleMenu;
 window.setFontScale = setFontScale;
 window.openExternalFile = openFileInBrowser;
+window.renderContent = renderContent;
 
 function startWorkspacePolling() {
   window.setInterval(async () => {

@@ -872,7 +872,11 @@ function editThreadItem(annotationId: string, itemId: string, filePath: string):
     textarea.style.height = 'auto';
     textarea.style.height = `${Math.min(200, Math.max(textarea.scrollHeight, 34))}px`;
   });
-  textarea.addEventListener('blur', () => {
+  textarea.addEventListener('blur', (e) => {
+    // 焦点移到同一 annotation item 内（如 reply input）时不 cancel
+    const related = (e as FocusEvent).relatedTarget as HTMLElement | null;
+    const annotationItem = lineEl.closest('.annotation-item');
+    if (related && annotationItem && annotationItem.contains(related)) return;
     setTimeout(() => { if (!committed) cancel(); }, 150);
   });
 }
@@ -1286,6 +1290,13 @@ export function renderAnnotationList(filePath: string | null): void {
   updateAnnotationCount();
   updateControlState();
 
+  // 保存 reply input 草稿，重建 DOM 后恢复
+  const replyDrafts = new Map<string, string>();
+  el.annotationList.querySelectorAll<HTMLTextAreaElement>('[data-reply-input]').forEach((input) => {
+    const id = input.getAttribute('data-reply-input');
+    if (id && input.value.trim()) replyDrafts.set(id, input.value);
+  });
+
   if (!filePath || state.annotations.length === 0) {
     el.annotationList.innerHTML = '<div class="annotation-empty">无评论（选中文本即可添加）</div>';
     return;
@@ -1390,6 +1401,14 @@ export function renderAnnotationList(filePath: string | null): void {
       input.focus();
     });
   });
+
+  // 恢复 reply input 草稿
+  if (replyDrafts.size > 0) {
+    el.annotationList.querySelectorAll<HTMLTextAreaElement>('[data-reply-input]').forEach((input) => {
+      const id = input.getAttribute('data-reply-input');
+      if (id && replyDrafts.has(id)) input.value = replyDrafts.get(id)!;
+    });
+  }
 
   // 延迟到下一帧批量处理，避免 render 时多次强制 layout
   requestAnimationFrame(() => {

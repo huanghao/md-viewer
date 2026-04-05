@@ -445,25 +445,19 @@ function formatCompactTime(ts: number): string {
 }
 
 function printComments(path: string, json: boolean, limit: number, offset: number): void {
-  const result = getAnnotationsByDocument(path, limit, offset);
-  // 默认只返回有意义的评论：未解决且已定位（排除 unanchored）
-  const unresolved = result.annotations.filter(
-    (ann: any) => ann.status !== "resolved" && ann.status !== "unanchored"
-  );
+  const result = getAnnotationsByDocument(path, limit, offset, "open");
   if (json) {
     console.log(JSON.stringify({
       ...result,
-      annotations: unresolved,
-      totalReturned: unresolved.length,
-      defaultFilter: "unresolved+anchored",
+      totalReturned: result.annotations.length,
     }, null, 2));
     return;
   }
-  if (unresolved.length === 0) {
+  if (result.annotations.length === 0) {
     console.log("无未解决评论");
     return;
   }
-  for (const [index, ann] of unresolved.entries()) {
+  for (const [index, ann] of result.annotations.entries()) {
     const stableSerial = Number(ann?.serial);
     const displayID = Number.isFinite(stableSerial) && stableSerial > 0
       ? Math.floor(stableSerial)
@@ -598,11 +592,8 @@ async function replyCommentBatch(
 }
 
 function printCommentDocs(json: boolean, limit: number, offset: number): void {
-  const allDocs = listAnnotatedDocuments(limit, offset)
-    .slice()
-    .sort((a, b) => (b.latestUpdatedAt - a.latestUpdatedAt) || (b.latestCreatedAt - a.latestCreatedAt) || a.path.localeCompare(b.path));
-  // 只展示有 open（anchored）评论的文档，与界面默认 filter 一致
-  const docs = allDocs.filter((d) => d.anchoredCount > 0);
+  // SQL 已按 latest_updated_at DESC 排序，只过滤有 open 评论的文档
+  const docs = listAnnotatedDocuments(limit, offset).filter((d) => d.anchoredCount > 0);
   if (json) {
     console.log(JSON.stringify({ totalReturned: docs.length, docs }, null, 2));
     return;

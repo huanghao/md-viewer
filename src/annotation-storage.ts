@@ -430,15 +430,20 @@ export function listAnnotatedDocuments(limit = 20, offset = 0): AnnotationDocSum
 export function getAnnotationsByDocument(
   docPath: string,
   limit = 100,
-  offset = 0
+  offset = 0,
+  statusFilter: "open" | "all" = "open"
 ): { path: string; total: number; annotations: StoredAnnotation[] } {
   const path = normalizeDocPath(docPath);
   const safeLimit = Math.max(1, Math.min(1000, Math.floor(limit)));
   const safeOffset = Math.max(0, Math.floor(offset));
   if (!path) return { path, total: 0, annotations: [] };
 
+  const whereStatus = statusFilter === "open"
+    ? "AND status = 'anchored'"
+    : "";
+
   const totalRow = getDb()
-    .query(`SELECT COUNT(1) as count FROM annotations WHERE doc_path = ?`)
+    .query(`SELECT COUNT(1) as count FROM annotations WHERE doc_path = ? ${whereStatus}`)
     .get(path) as { count: number } | null;
   const total = Number(totalRow?.count || 0);
 
@@ -447,8 +452,8 @@ export function getAnnotationsByDocument(
       `SELECT id, start, length, quote, note, thread_json, created_at, quote_prefix, quote_suffix, status, confidence
        , serial
        FROM annotations
-       WHERE doc_path = ?
-       ORDER BY created_at DESC
+       WHERE doc_path = ? ${whereStatus}
+       ORDER BY created_at ASC
        LIMIT ? OFFSET ?`
     )
     .all(path, safeLimit, safeOffset) as any[];

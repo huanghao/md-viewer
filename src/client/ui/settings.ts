@@ -4,6 +4,10 @@ import { renderSidebar } from './sidebar';
 import { showError, showSuccess } from './toast';
 import { MD_THEMES, HL_THEMES } from '../themes/index';
 
+// 打开对话框时保存的原始主题值，用于 Cancel 时恢复
+let _savedMarkdownTheme = '';
+let _savedCodeTheme = '';
+
 // 初始化：绑定全局函数
 if (typeof window !== 'undefined') {
   (window as any).closeSettingsDialog = closeSettingsDialog;
@@ -12,6 +16,10 @@ if (typeof window !== 'undefined') {
 
 // 显示设置对话框
 export function showSettingsDialog(): void {
+  // 保存打开时的原始主题值，Cancel 时恢复
+  _savedMarkdownTheme = state.config.markdownTheme || 'github';
+  _savedCodeTheme = state.config.codeTheme || 'github';
+
   const overlay = document.getElementById('settingsDialogOverlay');
   if (!overlay) {
     createSettingsDialog();
@@ -132,8 +140,14 @@ function renderSettingsDialog(): void {
   });
 }
 
-// 关闭设置对话框
+// 关闭设置对话框（Cancel）：恢复原始主题
 export function closeSettingsDialog(): void {
+  // 恢复打开时的主题（取消预览）
+  if (_savedMarkdownTheme) {
+    state.config.markdownTheme = _savedMarkdownTheme;
+    state.config.codeTheme = _savedCodeTheme;
+    (window as any).applyTheme?.();
+  }
   const overlay = document.getElementById('settingsDialogOverlay');
   if (overlay) {
     overlay.classList.remove('show');
@@ -148,6 +162,9 @@ export function saveSettings(): void {
   if (hlSelect) state.config.codeTheme = hlSelect.value;
   saveConfig(state.config);
   renderSidebar();
+  // 清掉 saved 值，避免 closeSettingsDialog 误恢复
+  _savedMarkdownTheme = '';
+  _savedCodeTheme = '';
   closeSettingsDialog();
 }
 

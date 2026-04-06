@@ -860,4 +860,10 @@ export function bindWorkspaceEvents(): void {
   (window as any).handleFocusWorkspaceToggle = (_id: string) => {
     // no-op: focus view groups auto-expand based on content
   };
+
+  (window as any).setFocusWindowKey = (key: string) => {
+    state.config.focusWindowKey = key as any;
+    import('../config').then(({ saveConfig }) => saveConfig(state.config));
+    import('./sidebar').then(({ renderSidebar }) => renderSidebar());
+  };
 }

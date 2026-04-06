@@ -1,13 +1,13 @@
 import type { SSEClient } from "./types.ts";
 
 const sseClients = new Set<SSEClient>();
+const encoder = new TextEncoder();
 
 export function broadcastFileOpened(
   fileInfo: { path: string; filename: string; content: string; lastModified: number; isRemote: boolean },
   focus: boolean
 ) {
   const message = `event: file-opened\ndata: ${JSON.stringify({ ...fileInfo, focus })}\n\n`;
-  const encoder = new TextEncoder();
   const bytes = encoder.encode(message);
 
   for (const client of sseClients) {
@@ -34,7 +34,6 @@ export function getClients(): Set<SSEClient> {
 
 export function broadcastFileChanged(path: string, lastModified: number) {
   const message = `event: file-changed\ndata: ${JSON.stringify({ path, lastModified })}\n\n`;
-  const encoder = new TextEncoder();
   const bytes = encoder.encode(message);
 
   for (const client of sseClients) {
@@ -48,7 +47,6 @@ export function broadcastFileChanged(path: string, lastModified: number) {
 
 export function broadcastFileDeleted(path: string) {
   const message = `event: file-deleted\ndata: ${JSON.stringify({ path })}\n\n`;
-  const encoder = new TextEncoder();
   const bytes = encoder.encode(message);
 
   for (const client of sseClients) {
@@ -63,7 +61,6 @@ export function broadcastFileDeleted(path: string) {
 // 通用事件广播
 export function broadcastEvent(event: { type: string; [key: string]: any }) {
   const message = `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
-  const encoder = new TextEncoder();
   const bytes = encoder.encode(message);
 
   for (const client of sseClients) {

@@ -166,6 +166,13 @@ export function renderSearchBox(): void {
   let input = container.querySelector('#searchInput') as HTMLInputElement | null;
   let clearBtn = container.querySelector('#searchClear') as HTMLButtonElement | null;
 
+  const tab = state.config.sidebarTab;
+  const placeholder = tab === 'list'
+    ? '搜索已打开的文件'
+    : tab === 'focus'
+    ? '搜索焦点文件'
+    : '搜索或输入路径（Enter补全，Cmd/Ctrl+Enter添加）';
+
   if (!input || !clearBtn) {
     container.innerHTML = `
       <div class="search-wrapper">
@@ -173,7 +180,7 @@ export function renderSearchBox(): void {
         <input
           type="text"
           class="search-input"
-          placeholder="搜索或输入路径（Enter补全，Cmd/Ctrl+Enter添加）"
+          placeholder="${placeholder}"
           id="searchInput"
         />
         <button class="search-clear" id="searchClear">×</button>
@@ -259,6 +266,8 @@ export function renderSearchBox(): void {
     input.value = state.searchQuery;
   }
   clearBtn.style.display = state.searchQuery ? 'block' : 'none';
+  // 同步 placeholder（切换 tab 时更新）
+  input.placeholder = placeholder;
 }
 
 // 渲染当前文件路径（已移除，功能由面包屑导航提供）

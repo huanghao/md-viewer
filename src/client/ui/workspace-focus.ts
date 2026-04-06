@@ -36,6 +36,9 @@ function isIgnored(filePath: string, workspacePath: string, patterns: string[]):
   return patterns.some((p) => globToRegex(p).test(rel));
 }
 
+// Track in-flight workspace scans to prevent duplicate requests during render
+const scanningWorkspaceIds = new Set<string>();
+
 const FOCUS_WINDOW_MS: Record<string, number> = {
   '8h':  8  * 3600 * 1000,
   '2d':  2  * 86400 * 1000,
@@ -182,8 +185,10 @@ export function renderFocusView(): string {
   const groups = workspaces.map((ws) => {
     const tree = state.fileTree.get(ws.id);
     const loading = !tree;
-    if (!tree) {
+    if (!tree && !scanningWorkspaceIds.has(ws.id)) {
+      scanningWorkspaceIds.add(ws.id);
       void scanWorkspace(ws.id).then((scanned) => {
+        scanningWorkspaceIds.delete(ws.id);
         if (scanned) {
           import('./sidebar').then(({ renderSidebar }) => renderSidebar());
         }

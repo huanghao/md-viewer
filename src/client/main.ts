@@ -1403,12 +1403,15 @@ function startWorkspacePolling() {
     if (workspacePollRunning) return;
     if (state.config.sidebarTab === 'list') return;
 
-    const expanded = state.config.workspaces.filter((ws) => ws.isExpanded);
-    if (expanded.length === 0) return;
+    // In focus tab, poll all workspaces (not just expanded ones)
+    const toScan = state.config.sidebarTab === 'focus'
+      ? state.config.workspaces
+      : state.config.workspaces.filter((ws) => ws.isExpanded);
+    if (toScan.length === 0) return;
 
     workspacePollRunning = true;
     try {
-      for (const ws of expanded) {
+      for (const ws of toScan) {
         await scanWorkspace(ws.id);
       }
       renderSidebar();

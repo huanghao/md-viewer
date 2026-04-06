@@ -41,21 +41,14 @@ function scrollCurrentFileIntoView(container: HTMLElement): void {
   });
 }
 
-export function toggleSidebarMode(): void {
-  state.config.sidebarMode = state.config.sidebarMode === 'workspace' ? 'simple' : 'workspace';
-  saveConfig(state.config);
-  renderSidebar();
-}
-
-export function toggleWorkspaceView(): void {
-  state.config.sidebarView = state.config.sidebarView === 'focus' ? 'full' : 'focus';
+export function setSidebarTab(tab: 'focus' | 'full' | 'list'): void {
+  state.config.sidebarTab = tab;
   saveConfig(state.config);
   renderSidebar();
 }
 
 if (typeof window !== 'undefined') {
-  (window as any).toggleSidebarMode = toggleSidebarMode;
-  (window as any).toggleWorkspaceView = toggleWorkspaceView;
+  (window as any).setSidebarTab = setSidebarTab;
   (window as any).toggleTabManager = toggleTabManager;
   (window as any).setTabManagerQuery = setTabManagerQuery;
   (window as any).setTabManagerSort = setTabManagerSort;
@@ -148,7 +141,7 @@ function applyTabBatchAction(action: TabBatchAction): void {
 }
 
 function rerenderByMode(): void {
-  if (state.config.sidebarMode === 'workspace') {
+  if (state.config.sidebarTab === 'focus' || state.config.sidebarTab === 'full') {
     renderSidebar();
     return;
   }
@@ -278,32 +271,23 @@ export function renderCurrentPath(): void {
   container.style.display = 'none';
 }
 
-function renderModeSwitchRow(): void {
+function renderViewTabs(): void {
   const container = document.getElementById('modeSwitchRow');
   if (!container) return;
 
-  const isWorkspace = state.config.sidebarMode === 'workspace';
-  const label = isWorkspace ? '工作区' : '文件';
-  const title = isWorkspace ? '切换到简单模式' : '切换到工作区模式';
-  const viewLabel = state.config.sidebarView === 'focus' ? '焦点' : '全量';
+  const tab = state.config.sidebarTab;
+  const tabs: Array<{ key: 'focus' | 'full' | 'list'; label: string }> = [
+    { key: 'focus', label: '焦点' },
+    { key: 'full', label: '全量' },
+    { key: 'list', label: '列表' },
+  ];
 
   container.innerHTML = `
-    <div class="mode-switch-row">
-      <button
-        class="mode-switch-icon"
-        title="${title}"
-        aria-label="${title}"
-        onclick="window.toggleSidebarMode()"
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M16 3l4 4l-4 4"></path>
-          <path d="M10 7l10 0"></path>
-          <path d="M8 13l-4 4l4 4"></path>
-          <path d="M4 17l9 0"></path>
-        </svg>
-      </button>
-      <span class="mode-switch-label">${label}</span>
-      ${isWorkspace ? `<button class="sidebar-view-toggle" onclick="toggleWorkspaceView()" title="切换焦点/全量视图">${viewLabel}</button>` : ''}
+    <div class="view-tabs">
+      ${tabs.map(t => `
+        <button class="view-tab${tab === t.key ? ' active' : ''}"
+                onclick="setSidebarTab('${t.key}')">${t.label}</button>
+      `).join('')}
     </div>
   `;
 }
@@ -382,43 +366,37 @@ export function renderFiles(): void {
 
 // 渲染整个侧边栏（根据模式选择）
 export function renderSidebar(): void {
-  const mode = state.config.sidebarMode;
+  const tab = state.config.sidebarTab;
   const container = document.querySelector('.sidebar') as HTMLElement | null;
   if (container) {
-    container.classList.toggle('workspace-mode', mode === 'workspace');
+    container.classList.toggle('workspace-mode', tab === 'focus' || tab === 'full');
   }
 
-  // 渲染搜索框
   renderSearchBox();
-  renderModeSwitchRow();
+  renderViewTabs();
 
-  if (mode === 'workspace') {
-    // 工作区模式
-    renderCurrentPath();  // 工作区模式也显示当前路径
-    if (!container) return;
-
-    // 查找或创建文件列表容器
-    let fileListContainer = document.getElementById('fileList');
-    if (!fileListContainer) {
-      fileListContainer = document.createElement('div');
-      fileListContainer.id = 'fileList';
-      fileListContainer.className = 'file-list';
-      container.appendChild(fileListContainer);
-    }
-
-    // 渲染工作区侧边栏
-    fileListContainer.innerHTML = renderWorkspaceSidebar();
-
-    // 绑定事件
-    bindWorkspaceEvents();
-
-    // 滚动当前文件到侧边栏40%位置
-    scrollCurrentFileIntoView(fileListContainer);
-  } else {
-    // 简单模式
+  if (tab === 'list') {
     renderCurrentPath();
     renderFiles();
+    renderTabs();
+    return;
   }
+
+  // focus or full — workspace rendering
+  renderCurrentPath();
+  if (!container) return;
+
+  let fileListContainer = document.getElementById('fileList');
+  if (!fileListContainer) {
+    fileListContainer = document.createElement('div');
+    fileListContainer.id = 'fileList';
+    fileListContainer.className = 'file-list';
+    container.appendChild(fileListContainer);
+  }
+
+  fileListContainer.innerHTML = renderWorkspaceSidebar();
+  bindWorkspaceEvents();
+  scrollCurrentFileIntoView(fileListContainer);
 
   // 渲染标签页（两种模式都有）
   renderTabs();

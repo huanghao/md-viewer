@@ -90,7 +90,7 @@ function cleanupOldFiles(): void {
 
   // 按最后访问时间排序
   const sortedFiles = Array.from(state.sessionFiles.entries())
-    .sort((a, b) => (b[1].lastModified || 0) - (a[1].lastModified || 0));
+    .sort((a, b) => (b[1].lastAccessed || b[1].lastModified || 0) - (a[1].lastAccessed || a[1].lastModified || 0));
 
   // 保留最近的 MAX_FILES 个
   const filesToKeep = sortedFiles.slice(0, MAX_FILES);
@@ -178,6 +178,7 @@ export function addOrUpdateFile(fileData: FileData, switchTo: boolean = false): 
     displayedModified: fileData.lastModified,  // 初始化时两者相同
     isRemote: fileData.isRemote || false,
     isMissing: false,
+    lastAccessed: Date.now(),
   });
 
   if (switchTo) {
@@ -211,6 +212,8 @@ export function removeFile(path: string): void {
 
 export function switchToFile(path: string): void {
   state.currentFile = path;
+  const f = state.sessionFiles.get(path);
+  if (f) f.lastAccessed = Date.now();
   clearListDiff(path);
   clearWorkspacePathMissing(path);
   saveState();

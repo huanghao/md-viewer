@@ -58,7 +58,7 @@ async function onFileLoaded(data: FileData, focus: boolean = false) {
   const previousFile = state.currentFile;
   const shouldFocus = focus;
   addOrUpdateFile(data, shouldFocus);
-  if (shouldFocus && state.config.sidebarMode === 'workspace') {
+  if (shouldFocus && (state.config.sidebarTab === 'focus' || state.config.sidebarTab === 'full')) {
     await revealFileInWorkspace(data.path);
   }
   if (shouldFocus && previousFile !== data.path) {
@@ -1401,7 +1401,7 @@ window.renderContent = renderContent;
 function startWorkspacePolling() {
   window.setInterval(async () => {
     if (workspacePollRunning) return;
-    if (state.config.sidebarMode !== 'workspace') return;
+    if (state.config.sidebarTab === 'list') return;
 
     const expanded = state.config.workspaces.filter((ws) => ws.isExpanded);
     if (expanded.length === 0) return;

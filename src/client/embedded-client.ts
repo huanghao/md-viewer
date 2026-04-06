@@ -13,7 +13,7 @@ export const EMBEDDED_CLIENT_JS = `"use strict";(()=>{var Yi=Object.defineProper
          data-path="\${v(e.path)}"
          onclick="handleFocusFileClick('\${v(e.path)}')">
       <span class="tree-indent" style="width:8px"></span>
-      <span class="focus-file-icon tree-file-icon \${r.cls}">\${k(r.label)}</span>
+      <span class="file-type-icon \${r.cls}">\${k(r.label)}</span>
       <span class="tree-name"><span class="tree-name-full">\${k(a)}</span></span>
       \${d}
       \${l?\`<span class="focus-file-time">\${k(l)}</span>\`:""}

@@ -115,7 +115,7 @@ function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>): string {
          data-path="${escapeAttr(file.path)}"
          onclick="handleFocusFileClick('${escapeAttr(file.path)}')">
       <span class="tree-indent" style="width:8px"></span>
-      <span class="focus-file-icon tree-file-icon ${icon.cls}">${escapeHtml(icon.label)}</span>
+      <span class="file-type-icon ${icon.cls}">${escapeHtml(icon.label)}</span>
       <span class="tree-name"><span class="tree-name-full">${escapeHtml(displayName)}</span></span>
       ${statusDot}
       ${timeStr ? `<span class="focus-file-time">${escapeHtml(timeStr)}</span>` : ''}

@@ -5,6 +5,7 @@ import { getFileListStatus } from '../utils/file-status';
 import { getFileTypeIcon } from '../utils/file-type';
 import { stripWorkspaceTreeDisplayExtension } from '../utils/workspace-file-name';
 import { getPinnedFiles, isPinned } from '../utils/pinned-files';
+import { scanWorkspace } from '../workspace';
 
 // Collect all file nodes from a tree recursively
 function collectFiles(node: FileTreeNode): FileTreeNode[] {
@@ -79,9 +80,16 @@ function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>): string {
   `;
 }
 
-function renderFocusWorkspaceGroup(workspace: Workspace, activeFiles: FileTreeNode[], pinned: Set<string>): string {
+function renderFocusWorkspaceGroup(
+  workspace: Workspace,
+  activeFiles: FileTreeNode[],
+  pinned: Set<string>,
+  loading: boolean
+): string {
   const hasFiles = activeFiles.length > 0;
-  const badge = hasFiles
+  const badge = loading
+    ? `<span class="focus-ws-badge empty">…</span>`
+    : hasFiles
     ? `<span class="focus-ws-badge">${activeFiles.length}</span>`
     : `<span class="focus-ws-badge empty">0</span>`;
 
@@ -112,8 +120,20 @@ export function renderFocusView(): string {
 
   const groups = workspaces.map((ws) => {
     const tree = state.fileTree.get(ws.id);
+    const loading = !tree;
+
+    // If tree is missing, trigger a background scan so the view populates
+    if (!tree) {
+      void scanWorkspace(ws.id).then((scanned) => {
+        if (scanned) {
+          // Re-render sidebar after scan completes
+          import('./sidebar').then(({ renderSidebar }) => renderSidebar());
+        }
+      });
+    }
+
     const activeFiles = getActiveFiles(ws.path, tree, windowMs, pinned);
-    return renderFocusWorkspaceGroup(ws, activeFiles, pinned);
+    return renderFocusWorkspaceGroup(ws, activeFiles, pinned, loading);
   }).join('');
 
   return `<div class="focus-view">${groups}</div>`;

@@ -818,8 +818,31 @@ export function bindWorkspaceEvents(): void {
     renderSidebar();
   };
 
-  (window as any).handleFocusFileClick = (path: string) => {
-    (window as any).switchFile?.(path);
+  (window as any).handleFocusFileClick = async (filePath: string) => {
+    clearWorkspaceModified(filePath);
+    clearListDiff(filePath);
+
+    const { switchToFile } = await import('../state');
+    const { loadFile } = await import('../api/files');
+
+    if (!hasSessionFile(filePath)) {
+      const fileData = await loadFile(filePath, true);
+      if (!fileData) {
+        const { markFileMissing } = await import('../state');
+        markFileMissing(filePath, true);
+        const main = await import('../main');
+        (main as any).renderAll();
+        showError('文件已删除，已标记为 D（无本地缓存）');
+        return;
+      }
+      const { addOrUpdateFile } = await import('../state');
+      addOrUpdateFile(fileData, true);
+    } else {
+      switchToFile(filePath);
+    }
+
+    const main = await import('../main');
+    (main as any).renderAll();
   };
 
   (window as any).handleUnpinFile = async (path: string) => {

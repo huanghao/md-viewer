@@ -47,7 +47,7 @@ export function saveState(): void {
         isRemote: file.isRemote || false,
         isMissing: file.isMissing || false,
         displayedModified: file.displayedModified,
-        lastAccessed: Date.now() // 记录最后访问时间用于 LRU
+        lastAccessed: file.lastAccessed || Date.now()
       }]),
       currentFile: state.currentFile
     };
@@ -67,7 +67,7 @@ export function saveState(): void {
             isRemote: file.isRemote || false,
             isMissing: file.isMissing || false,
             displayedModified: file.displayedModified,
-            lastAccessed: Date.now()
+            lastAccessed: file.lastAccessed || Date.now()
           }]),
           currentFile: state.currentFile
         };
@@ -132,6 +132,7 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
           displayedModified: savedDisplayedModified,
           isRemote: fileData.isRemote || false,
           isMissing: false,  // 恢复时文件存在，清除 isMissing
+          lastAccessed: fileInfo.lastAccessed || fileData.lastModified,
         });
         validFiles.push([path, fileInfo]);
       }

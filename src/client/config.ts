@@ -4,10 +4,9 @@ const CONFIG_KEY = 'md-viewer:config';
 
 // 默认配置
 export const defaultConfig: AppConfig = {
-  sidebarMode: 'simple',  // 默认使用简单模式
-  sidebarView: 'focus',
-  focusWindowHours: 4,
-  workspaces: []
+  sidebarTab: 'focus',
+  focusWindowKey: '8h',
+  workspaces: [],
 };
 
 // 加载配置

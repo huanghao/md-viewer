@@ -33,9 +33,8 @@ export interface FileTreeNode {
 
 // 应用配置类型
 export interface AppConfig {
-  sidebarMode: 'simple' | 'workspace';
-  sidebarView: 'focus' | 'full';  // within workspace mode: focus or full tree
-  focusWindowHours: number;        // mtime window for focus view (default 4)
+  sidebarTab: 'focus' | 'full' | 'list';  // replaces sidebarMode + sidebarView
+  focusWindowKey: '8h' | '2d' | '1w' | '1m';  // replaces focusWindowHours
   workspaces: Workspace[];
 }
 

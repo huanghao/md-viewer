@@ -36,6 +36,8 @@ export interface FileTreeNode {
 export interface AppConfig {
   sidebarTab: 'focus' | 'full' | 'list';  // replaces sidebarMode + sidebarView
   focusWindowKey: '8h' | '2d' | '1w' | '1m';  // replaces focusWindowHours
+  markdownTheme: string;  // 'github' | 'notion' | 'bear'
+  codeTheme: string;      // 'github' | 'github-dark' | 'atom-one-dark'
   workspaces: Workspace[];
 }
 

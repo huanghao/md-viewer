@@ -2963,4 +2963,114 @@ export const styles = `
     }
     .tree-item:hover .tree-pin-btn { display: inline; }
     .tree-item .tree-pin-btn.active { display: inline; opacity: 1; }
+
+    /* ==================== Sync / Settings Dialog ==================== */
+    .sync-dialog-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 9000;
+      align-items: center;
+      justify-content: center;
+    }
+    .sync-dialog-overlay.show {
+      display: flex;
+    }
+    .sync-dialog {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+      width: 480px;
+      max-width: calc(100vw - 48px);
+      max-height: calc(100vh - 80px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .sync-dialog-header {
+      display: flex;
+      align-items: center;
+      padding: 14px 18px;
+      border-bottom: 1px solid #e1e4e8;
+      flex-shrink: 0;
+    }
+    .sync-dialog-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #24292e;
+      flex: 1;
+    }
+    .sync-dialog-close {
+      background: none;
+      border: none;
+      font-size: 18px;
+      color: #57606a;
+      cursor: pointer;
+      padding: 0 4px;
+      line-height: 1;
+    }
+    .sync-dialog-close:hover { color: #24292e; }
+    .sync-dialog-body {
+      padding: 18px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .sync-dialog-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 12px 18px;
+      border-top: 1px solid #e1e4e8;
+      flex-shrink: 0;
+    }
+    .sync-dialog-button {
+      font-size: 13px;
+      padding: 6px 14px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      background: #f6f8fa;
+      color: #24292e;
+      cursor: pointer;
+    }
+    .sync-dialog-button:hover { background: #e1e4e8; }
+    .sync-dialog-button.primary {
+      background: #0969da;
+      border-color: #0969da;
+      color: #fff;
+    }
+    .sync-dialog-button.primary:hover { background: #0757ba; }
+    /* add-workspace dialog specific */
+    .add-workspace-overlay .sync-dialog { width: 520px; }
+    .sync-dialog-field { margin-bottom: 14px; }
+    .sync-dialog-label { display: block; font-size: 12px; font-weight: 500; color: #24292e; margin-bottom: 6px; }
+    .sync-dialog-input {
+      width: 100%;
+      font-size: 13px;
+      padding: 7px 10px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      resize: vertical;
+      font-family: inherit;
+    }
+    .sync-dialog-input:focus { outline: none; border-color: #0969da; box-shadow: 0 0 0 3px rgba(9,105,218,0.15); }
+    .workspace-path-hint { font-size: 11px; color: #57606a; margin-top: 4px; }
+    .workspace-path-preview { font-size: 11px; color: #0969da; margin-top: 4px; font-family: monospace; word-break: break-all; }
+    .add-workspace-footer { justify-content: flex-end; }
+    .sync-dialog-btn {
+      font-size: 13px;
+      padding: 6px 14px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      background: #f6f8fa;
+      color: #24292e;
+      cursor: pointer;
+    }
+    .sync-dialog-btn:hover { background: #e1e4e8; }
+    .sync-dialog-btn-primary {
+      background: #0969da;
+      border-color: #0969da;
+      color: #fff;
+    }
+    .sync-dialog-btn-primary:hover { background: #0757ba; }
 `;

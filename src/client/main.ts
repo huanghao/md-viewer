@@ -530,14 +530,14 @@ function renderBreadcrumb() {
   // 显示面包屑路径和复制按钮
   container.innerHTML = `
     ${breadcrumbItems}
-    <button class="copy-filename-button" onclick="copyFileName('${escapeAttr(fileName)}', event)">
+    <button class="copy-filename-button" onclick="copyFilePath('${escapeAttr(file.path)}', event)" title="复制相对路径 / ⌥+点击复制绝对路径">
       <span class="copy-icon"></span>
       <span class="check-icon">
         <svg viewBox="0 0 16 16" fill="currentColor">
           <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path>
         </svg>
       </span>
-      <span class="copy-tooltip">复制路径</span>
+      <span class="copy-tooltip">复制相对路径</span>
     </button>
   `;
 }
@@ -1111,14 +1111,14 @@ function resolveCopyFeedbackTarget(e?: Event): HTMLElement | null {
   return (e.target as HTMLElement).closest('.copy-filename-button, .sync-dialog-copy-btn, .sync-dialog-btn') as HTMLElement | null;
 }
 
-function applyCopyFeedback(target: HTMLElement | null): void {
+function applyCopyFeedback(target: HTMLElement | null, successMsg?: string): void {
   if (!target) return;
 
   if (target.classList.contains('copy-filename-button')) {
     target.classList.add('success');
     const tooltip = target.querySelector('.copy-tooltip');
     const originalText = tooltip?.textContent;
-    if (tooltip) tooltip.textContent = '已复制';
+    if (tooltip) tooltip.textContent = successMsg || '已复制';
     setTimeout(() => {
       target.classList.remove('success');
       if (tooltip && originalText) tooltip.textContent = originalText;
@@ -1133,9 +1133,9 @@ function applyCopyFeedback(target: HTMLElement | null): void {
   }, 1000);
 }
 
-function copyTextWithFeedback(text: string, e?: Event): void {
+function copyTextWithFeedback(text: string, e?: Event, successMsg?: string): void {
   navigator.clipboard.writeText(text).then(() => {
-    applyCopyFeedback(resolveCopyFeedbackTarget(e));
+    applyCopyFeedback(resolveCopyFeedbackTarget(e), successMsg);
   }).catch(() => {
     showError('复制失败');
   });
@@ -1146,9 +1146,29 @@ function copySingleText(text: string, e?: Event) {
   copyTextWithFeedback(text, e);
 }
 
-// 复制文件名
+// 复制文件路径：默认复制相对工作区根目录的相对路径，Alt+Click 复制绝对路径
+function copyFilePath(filePath: string, event?: Event) {
+  const isAlt = event instanceof MouseEvent && event.altKey;
+  if (isAlt) {
+    copyTextWithFeedback(filePath, event, '已复制绝对路径');
+    return;
+  }
+  // 找当前文件所属工作区，计算相对路径
+  const workspaces = state.config.workspaces;
+  let relPath = filePath;
+  for (const ws of workspaces) {
+    const root = ws.path.replace(/\/+$/, '');
+    if (filePath === root || filePath.startsWith(root + '/')) {
+      relPath = filePath.slice(root.length + 1);
+      break;
+    }
+  }
+  copyTextWithFeedback(relPath, event, '已复制相对路径');
+}
+
+// 兼容旧调用
 function copyFileName(fileName: string, event?: Event) {
-  copyTextWithFeedback(fileName, event);
+  copyFilePath(fileName, event);
 }
 
 
@@ -1343,7 +1363,8 @@ declare global {
     closeDiffView: () => void;
     acceptDiffUpdate: () => void;
     copySingleText: (text: string, e?: Event) => void;
-    copyFileName: (fileName: string) => void;
+    copyFileName: (fileName: string, event?: Event) => void;
+    copyFilePath: (filePath: string, event?: Event) => void;
     showToast?: (message: string, type: string) => void;
     showSettingsDialog: () => void;
     toggleFontScaleMenu: () => void;
@@ -1391,6 +1412,7 @@ window.closeDiffView = closeDiffView;
 window.acceptDiffUpdate = acceptDiffUpdate;
 window.copySingleText = copySingleText;
 window.copyFileName = copyFileName;
+window.copyFilePath = copyFilePath;
 window.showToast = showToast;
 window.showSettingsDialog = showSettingsDialog;
 window.toggleFontScaleMenu = toggleFontScaleMenu;

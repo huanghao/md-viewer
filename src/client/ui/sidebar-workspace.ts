@@ -333,14 +333,12 @@ async function confirmAddWorkspaceDialog(): Promise<void> {
 
 // 渲染工作区模式侧边栏
 export function renderWorkspaceSidebar(): string {
-  if (state.config.sidebarView === 'focus') {
+  if (state.config.sidebarTab === 'focus') {
     return renderFocusView();
   }
   const query = state.searchQuery.trim().toLowerCase();
   ensureWorkspaceSearchResults(query);
-  return `
-    ${renderWorkspaceSection(query)}
-  `;
+  return `${renderWorkspaceSection(query)}`;
 }
 
 // 渲染工作区区域

@@ -22,6 +22,8 @@ import { showToast, showSuccess, showError, showWarning, showInfo } from './ui/t
 import { showSettingsDialog, closeSettingsDialog } from './ui/settings';
 import { renderJsonContent } from './ui/json-viewer';
 
+import { getMdThemeCss, getHlThemeCss } from './themes/index';
+
 // 导入批注功能
 import {
   initAnnotationElements,
@@ -33,6 +35,17 @@ import {
   syncAnnotationSidebarLayout,
   dismissAnnotationPopupByEscape,
 } from './annotation';
+
+function applyTheme(): void {
+  const mdCss = getMdThemeCss(state.config.markdownTheme || 'github');
+  const hlCss = getHlThemeCss(state.config.codeTheme || 'github');
+
+  const mdStyle = document.getElementById('theme-md-css');
+  const hlStyle = document.getElementById('theme-hl-css');
+
+  if (mdStyle) mdStyle.textContent = mdCss;
+  if (hlStyle) hlStyle.textContent = hlCss;
+}
 
 const SIDEBAR_WIDTH_STORAGE_KEY = 'md-viewer:sidebar-width';
 const SIDEBAR_DEFAULT_WIDTH = 260;
@@ -1371,6 +1384,7 @@ declare global {
     setFontScale: (scale: number) => void;
     openExternalFile?: (path: string) => void | Promise<void>;
     renderContent?: () => void;
+    applyTheme?: () => void;
   }
 }
 
@@ -1419,6 +1433,7 @@ window.toggleFontScaleMenu = toggleFontScaleMenu;
 window.setFontScale = setFontScale;
 window.openExternalFile = openFileInBrowser;
 window.renderContent = renderContent;
+(window as any).applyTheme = applyTheme;
 
 function startWorkspacePolling() {
   window.setInterval(async () => {
@@ -1458,6 +1473,7 @@ function startWorkspacePolling() {
   });
 
   await restoreState(loadFile);
+  applyTheme();  // apply saved theme preference
   await hydrateExpandedWorkspaces();
   startWorkspacePolling();
 

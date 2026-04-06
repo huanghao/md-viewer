@@ -91,7 +91,16 @@ function formatRelativeTime(ms: number): string {
   return `${Math.floor(diff / 86400000)}d`;
 }
 
-function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>): string {
+function highlightQuery(text: string, query: string): string {
+  if (!query) return escapeHtml(text);
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return escapeHtml(text);
+  return escapeHtml(text.slice(0, idx))
+    + `<mark class="search-highlight">${escapeHtml(text.slice(idx, idx + query.length))}</mark>`
+    + escapeHtml(text.slice(idx + query.length));
+}
+
+function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>, query: string): string {
   const isCurrent = state.currentFile === file.path;
   const isPinnedFile = pinned.has(file.path);
   const fileInfo = state.sessionFiles.get(file.path);
@@ -116,7 +125,7 @@ function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>): string {
          onclick="handleFocusFileClick('${escapeAttr(file.path)}')">
       <span class="tree-indent" style="width:8px"></span>
       <span class="file-type-icon ${icon.cls}">${escapeHtml(icon.label)}</span>
-      <span class="tree-name"><span class="tree-name-full">${escapeHtml(displayName)}</span></span>
+      <span class="tree-name"><span class="tree-name-full">${highlightQuery(displayName, query)}</span></span>
       ${statusDot}
       ${timeStr ? `<span class="focus-file-time">${escapeHtml(timeStr)}</span>` : ''}
       ${pinIcon}
@@ -148,7 +157,8 @@ function renderFocusWorkspaceGroup(
   workspace: Workspace,
   activeFiles: FileTreeNode[],
   pinned: Set<string>,
-  loading: boolean
+  loading: boolean,
+  query: string
 ): string {
   const hasFiles = activeFiles.length > 0;
   const badge = loading
@@ -158,7 +168,7 @@ function renderFocusWorkspaceGroup(
     : `<span class="focus-ws-badge empty">0</span>`;
 
   const filesHtml = hasFiles
-    ? activeFiles.map((f) => renderFocusFileItem(f, pinned)).join('')
+    ? activeFiles.map((f) => renderFocusFileItem(f, pinned, query)).join('')
     : '';
 
   return `
@@ -181,6 +191,7 @@ export function renderFocusView(): string {
 
   const windowMs = FOCUS_WINDOW_MS[state.config.focusWindowKey || '8h'] ?? FOCUS_WINDOW_MS['8h'];
   const pinned = getPinnedFiles();
+  const query = state.searchQuery.trim().toLowerCase();
 
   const groups = workspaces.map((ws) => {
     const tree = state.fileTree.get(ws.id);
@@ -194,8 +205,15 @@ export function renderFocusView(): string {
         }
       });
     }
-    const activeFiles = getActiveFiles(ws.path, tree, windowMs, pinned);
-    return renderFocusWorkspaceGroup(ws, activeFiles, pinned, loading);
+    let activeFiles = getActiveFiles(ws.path, tree, windowMs, pinned);
+    // Apply search filter: match against file name or path
+    if (query) {
+      activeFiles = activeFiles.filter((f) => {
+        const name = (stripWorkspaceTreeDisplayExtension(f.name) || f.name).toLowerCase();
+        return name.includes(query) || f.path.toLowerCase().includes(query);
+      });
+    }
+    return renderFocusWorkspaceGroup(ws, activeFiles, pinned, loading, query);
   }).join('');
 
   return `<div class="focus-view">${renderFilterBar()}${groups}</div>`;

@@ -2799,4 +2799,151 @@ export const styles = `
       padding: 20px;
       text-align: center;
     }
+    /* ==================== Focus View ==================== */
+    .focus-view {
+      padding: 4px 0;
+    }
+    .focus-ws-group {
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .focus-ws-group:last-child {
+      border-bottom: none;
+    }
+    .focus-ws-header {
+      display: flex;
+      align-items: center;
+      padding: 5px 10px;
+      cursor: pointer;
+      user-select: none;
+      gap: 5px;
+    }
+    .focus-ws-header:hover {
+      background: rgba(0,0,0,0.03);
+    }
+    .focus-ws-arrow {
+      font-size: 9px;
+      color: #aaa;
+      width: 10px;
+      flex-shrink: 0;
+      transition: transform 0.15s;
+    }
+    .focus-ws-arrow.open {
+      transform: rotate(90deg);
+    }
+    .focus-ws-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: #444;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .focus-ws-badge {
+      font-size: 10px;
+      background: #e8f0fe;
+      color: #4a7fd4;
+      border-radius: 8px;
+      padding: 1px 5px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .focus-ws-badge.empty {
+      background: #f3f4f6;
+      color: #bbb;
+    }
+    .focus-ws-files {
+      padding: 2px 0 4px;
+    }
+    .focus-file-item {
+      display: flex;
+      align-items: center;
+      padding: 3px 8px 3px 20px;
+      cursor: pointer;
+      gap: 4px;
+      position: relative;
+    }
+    .focus-file-item:hover {
+      background: rgba(0,0,0,0.04);
+    }
+    .focus-file-item.current {
+      background: #e8f0fe;
+    }
+    .focus-file-item.current .focus-file-name {
+      color: #1a56db;
+      font-weight: 500;
+    }
+    .focus-file-icon {
+      font-size: 10px;
+      flex-shrink: 0;
+      width: 14px;
+      text-align: center;
+    }
+    .focus-file-name {
+      font-size: 12px;
+      color: #333;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+    .focus-file-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .focus-file-dot.modified { background: #f59e0b; }
+    .focus-file-dot.new-file { background: #10b981; }
+    .focus-file-time {
+      font-size: 10px;
+      color: #bbb;
+      flex-shrink: 0;
+    }
+    .focus-pin-btn {
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 10px;
+      padding: 0 2px;
+      opacity: 0.5;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+    .focus-pin-btn:hover, .focus-pin-btn.active { opacity: 1; }
+    .focus-empty {
+      font-size: 12px;
+      color: #aaa;
+      padding: 12px 16px;
+      font-style: italic;
+    }
+    /* Pin button in full tree view — show on hover */
+    .tree-item .tree-pin-btn {
+      display: none;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 10px;
+      padding: 0 2px;
+      opacity: 0.5;
+      line-height: 1;
+      margin-left: auto;
+    }
+    .tree-item:hover .tree-pin-btn { display: inline; }
+    .tree-item .tree-pin-btn.active { display: inline; opacity: 1; }
+    /* Sidebar view toggle button */
+    .sidebar-view-toggle {
+      font-size: 10px;
+      padding: 2px 7px;
+      border: 1px solid #ddd;
+      border-radius: 3px;
+      background: #f5f5f5;
+      color: #555;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .sidebar-view-toggle:hover {
+      background: #e8e8e8;
+    }
 `;

@@ -1,5 +1,6 @@
 import type { Workspace, FileTreeNode, FileInfo } from '../types';
 import { state, getSessionFile, getSessionFiles, hasSessionFile } from '../state';
+import { renderFocusView } from './workspace-focus';
 import { hasListDiff, isWorkspacePathMissing, getWorkspaceMissingPaths } from '../workspace-state';
 import { searchFiles } from '../api/files';
 import { escapeHtml, escapeAttr } from '../utils/escape';
@@ -332,6 +333,9 @@ async function confirmAddWorkspaceDialog(): Promise<void> {
 
 // 渲染工作区模式侧边栏
 export function renderWorkspaceSidebar(): string {
+  if (state.config.sidebarView === 'focus') {
+    return renderFocusView();
+  }
   const query = state.searchQuery.trim().toLowerCase();
   ensureWorkspaceSearchResults(query);
   return `
@@ -812,5 +816,27 @@ export function bindWorkspaceEvents(): void {
     moveWorkspaceByOffset(workspaceId, 1);
     const { renderSidebar } = await import('./sidebar');
     renderSidebar();
+  };
+
+  (window as any).handleFocusFileClick = (path: string) => {
+    (window as any).switchFile?.(path);
+  };
+
+  (window as any).handleUnpinFile = async (path: string) => {
+    const { unpinFile } = await import('../utils/pinned-files');
+    unpinFile(path);
+    const { renderSidebar } = await import('./sidebar');
+    renderSidebar();
+  };
+
+  (window as any).handlePinFile = async (path: string) => {
+    const { pinFile } = await import('../utils/pinned-files');
+    pinFile(path);
+    const { renderSidebar } = await import('./sidebar');
+    renderSidebar();
+  };
+
+  (window as any).handleFocusWorkspaceToggle = (_id: string) => {
+    // no-op: focus view groups auto-expand based on content
   };
 }

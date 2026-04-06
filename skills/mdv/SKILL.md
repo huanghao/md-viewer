@@ -37,6 +37,26 @@ mdv comments tidy --missing
 mdv comments tidy --days 30 --missing
 ```
 
+## 回复批注
+
+单条回复：
+```bash
+mdv comments reply --file /path/to/file.md --author claude --seq 1 --text "已更新"
+```
+
+批量回复（推荐，`--input` 支持内联 JSON 数组）：
+```bash
+mdv comments reply-batch --file /path/to/file.md --author claude --input '[
+  {"seq": 1, "text": "已在文档中更新"},
+  {"seq": 2, "text": "已在文档中说明"},
+  {"seq": 3, "text": "已补充相关内容"}
+]'
+```
+
+- `--input` 接受：内联 JSON 字符串、文件路径、`-`（stdin）
+- JSON 格式：直接传数组 `[...]` 或 `{"replies":[...]}` 均可
+- 用**单引号**包裹 JSON，避免 shell 转义问题
+
 ## 处理批注的判断逻辑
 
 - 获取批注后，**直接处理**，不要只展示给用户等待确认。逐条判断批注类型，立即行动

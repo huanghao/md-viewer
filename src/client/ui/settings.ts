@@ -2,6 +2,7 @@ import { state } from '../state';
 import { saveConfig } from '../config';
 import { renderSidebar } from './sidebar';
 import { showError, showSuccess } from './toast';
+import { MD_THEMES, HL_THEMES } from '../themes/index';
 
 // 初始化：绑定全局函数
 if (typeof window !== 'undefined') {
@@ -62,6 +63,28 @@ function renderSettingsDialog(): void {
   const snapshot = getClientStateSnapshot();
   body.innerHTML = `
     <div class="settings-section">
+      <div class="settings-section-title">主题</div>
+      <div class="settings-section-desc">切换 Markdown 正文样式和代码高亮配色。</div>
+      <div class="settings-kv-grid">
+        <div>正文样式</div>
+        <div>
+          <select id="markdownThemeSelect" style="font-size:12px;padding:2px 6px;border:1px solid #ddd;border-radius:3px">
+            ${MD_THEMES.map(t =>
+              `<option value="${t.key}"${state.config.markdownTheme === t.key ? ' selected' : ''}>${t.label}</option>`
+            ).join('')}
+          </select>
+        </div>
+        <div>代码高亮</div>
+        <div>
+          <select id="codeThemeSelect" style="font-size:12px;padding:2px 6px;border:1px solid #ddd;border-radius:3px">
+            ${HL_THEMES.map(t =>
+              `<option value="${t.key}"${state.config.codeTheme === t.key ? ' selected' : ''}>${t.label}</option>`
+            ).join('')}
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="settings-section">
       <div class="settings-section-title">客户端状态</div>
       <div class="settings-section-desc">用于排查本地缓存是否脏数据，可直接清理。</div>
       <div class="settings-kv-grid">
@@ -94,6 +117,19 @@ function renderSettingsDialog(): void {
   clearAllCommentsBtn?.addEventListener('click', () => {
     void clearAllComments();
   });
+
+  const mdSelect = document.getElementById('markdownThemeSelect') as HTMLSelectElement | null;
+  const hlSelect = document.getElementById('codeThemeSelect') as HTMLSelectElement | null;
+
+  mdSelect?.addEventListener('change', () => {
+    state.config.markdownTheme = mdSelect!.value;
+    (window as any).applyTheme?.();
+  });
+
+  hlSelect?.addEventListener('change', () => {
+    state.config.codeTheme = hlSelect!.value;
+    (window as any).applyTheme?.();
+  });
 }
 
 // 关闭设置对话框
@@ -106,6 +142,10 @@ export function closeSettingsDialog(): void {
 
 // 保存设置
 export function saveSettings(): void {
+  const mdSelect = document.getElementById('markdownThemeSelect') as HTMLSelectElement | null;
+  const hlSelect = document.getElementById('codeThemeSelect') as HTMLSelectElement | null;
+  if (mdSelect) state.config.markdownTheme = mdSelect.value;
+  if (hlSelect) state.config.codeTheme = hlSelect.value;
   saveConfig(state.config);
   renderSidebar();
   closeSettingsDialog();

@@ -62,20 +62,6 @@ function renderSettingsDialog(): void {
   const snapshot = getClientStateSnapshot();
   body.innerHTML = `
     <div class="settings-section">
-      <div class="settings-section-title">焦点视图</div>
-      <div class="settings-section-desc">工作区精简视图，只显示最近有改动的文件。</div>
-      <div class="settings-kv-grid">
-        <div>时间窗口</div>
-        <div>
-          <select id="focusWindowSelect" style="font-size:12px;padding:2px 6px;border:1px solid #ddd;border-radius:3px">
-            <option value="1" ${state.config.focusWindowHours === 1 ? 'selected' : ''}>1 小时</option>
-            <option value="4" ${state.config.focusWindowHours === 4 ? 'selected' : ''}>4 小时（默认）</option>
-            <option value="24" ${state.config.focusWindowHours === 24 ? 'selected' : ''}>24 小时</option>
-          </select>
-        </div>
-      </div>
-    </div>
-    <div class="settings-section">
       <div class="settings-section-title">客户端状态</div>
       <div class="settings-section-desc">用于排查本地缓存是否脏数据，可直接清理。</div>
       <div class="settings-kv-grid">
@@ -120,10 +106,6 @@ export function closeSettingsDialog(): void {
 
 // 保存设置
 export function saveSettings(): void {
-  const focusWindowSelect = document.getElementById('focusWindowSelect') as HTMLSelectElement | null;
-  if (focusWindowSelect) {
-    state.config.focusWindowHours = Number(focusWindowSelect.value) || 4;
-  }
   saveConfig(state.config);
   renderSidebar();
   closeSettingsDialog();

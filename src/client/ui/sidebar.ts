@@ -47,8 +47,15 @@ export function toggleSidebarMode(): void {
   renderSidebar();
 }
 
+export function toggleWorkspaceView(): void {
+  state.config.sidebarView = state.config.sidebarView === 'focus' ? 'full' : 'focus';
+  saveConfig(state.config);
+  renderSidebar();
+}
+
 if (typeof window !== 'undefined') {
   (window as any).toggleSidebarMode = toggleSidebarMode;
+  (window as any).toggleWorkspaceView = toggleWorkspaceView;
   (window as any).toggleTabManager = toggleTabManager;
   (window as any).setTabManagerQuery = setTabManagerQuery;
   (window as any).setTabManagerSort = setTabManagerSort;
@@ -278,6 +285,7 @@ function renderModeSwitchRow(): void {
   const isWorkspace = state.config.sidebarMode === 'workspace';
   const label = isWorkspace ? '工作区' : '文件';
   const title = isWorkspace ? '切换到简单模式' : '切换到工作区模式';
+  const viewLabel = state.config.sidebarView === 'focus' ? '焦点' : '全量';
 
   container.innerHTML = `
     <div class="mode-switch-row">
@@ -295,6 +303,7 @@ function renderModeSwitchRow(): void {
         </svg>
       </button>
       <span class="mode-switch-label">${label}</span>
+      ${isWorkspace ? `<button class="sidebar-view-toggle" onclick="toggleWorkspaceView()" title="切换焦点/全量视图">${viewLabel}</button>` : ''}
     </div>
   `;
 }

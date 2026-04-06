@@ -15,7 +15,7 @@ function ensureWatcher() {
 
   watcher = chokidar.watch([], {
     persistent: true,
-    ignoreInitial: false,
+    ignoreInitial: true,
     awaitWriteFinish: {
       stabilityThreshold: 100,
       pollInterval: 100

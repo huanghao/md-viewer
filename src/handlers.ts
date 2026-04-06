@@ -13,6 +13,8 @@ import {
   isSupportedTextFile,
 } from "./utils.ts";
 import { broadcastFileOpened, addClient, removeClient, broadcastEvent } from "./sse.ts";
+
+const encoder = new TextEncoder();
 import { watchFile, watchWorkspace } from "./file-watcher.ts";
 import {
   listAnnotations,
@@ -423,6 +425,8 @@ export async function handleOpenFile(c: Context) {
     isRemote: false,
   };
 
+  watchFile(resolvedPath);
+
   // 推送给所有连接的客户端
   broadcastFileOpened(fileInfo, focus);
 
@@ -471,22 +475,23 @@ export async function handleOpenLocalFile(c: Context) {
 
 // API: SSE 事件流
 export function handleEvents(c: Context) {
+  let client: { controller: ReadableStreamDefaultController<Uint8Array> } | null = null;
+
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
-      const client = { controller };
+      client = { controller };
       addClient(client);
-      
+
       // 发送初始连接成功消息
-      const encoder = new TextEncoder();
       controller.enqueue(encoder.encode(`event: connected\ndata: ${JSON.stringify({})}\n\n`));
-      
+
       // 清理断开连接的客户端
       c.req.signal.addEventListener("abort", () => {
-        removeClient(client);
+        removeClient(client!);
       });
     },
-    cancel(controller) {
-      // 清理
+    cancel() {
+      if (client) removeClient(client);
     },
   });
 

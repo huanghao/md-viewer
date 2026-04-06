@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>侧边栏重设计原型</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f0f0f0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 32px 24px;
+  gap: 32px;
+  min-height: 100vh;
+}
+
+.label-row {
+  font-size: 11px;
+  color: #888;
+  text-align: center;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sidebar {
+  width: 240px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  flex-shrink: 0;
+}
+
+/* ===== 三 tab 切换栏 ===== */
+.view-tabs {
+  display: flex;
+  border-bottom: 1px solid #e8e8e8;
+  background: #fafafa;
+  padding: 0 8px;
+  gap: 0;
+}
+
+.view-tab {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  color: #888;
+  padding: 7px 0 6px;
+  text-align: center;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  user-select: none;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.view-tab:hover { color: #444; }
+
+.view-tab.active {
+  color: #0969da;
+  border-bottom-color: #0969da;
+}
+
+/* ===== 焦点视图 filter bar ===== */
+.focus-filter-bar {
+  display: flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fefefe;
+  gap: 6px;
+}
+
+.filter-label {
+  font-size: 11px;
+  color: #999;
+  flex-shrink: 0;
+}
+
+.time-pills {
+  display: flex;
+  gap: 3px;
+}
+
+.time-pill {
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  border: 1px solid #e0e0e0;
+  background: #fff;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.time-pill:hover { border-color: #aaa; color: #333; }
+
+.time-pill.active {
+  background: #0969da;
+  border-color: #0969da;
+  color: #fff;
+}
+
+.filter-count {
+  margin-left: auto;
+  font-size: 10px;
+  color: #bbb;
+}
+
+/* ===== 统一文件项样式 ===== */
+.ws-group { border-bottom: 1px solid #f0f0f0; }
+.ws-group:last-child { border-bottom: none; }
+
+.ws-group-header {
+  display: flex;
+  align-items: center;
+  padding: 5px 8px;
+  cursor: pointer;
+  gap: 4px;
+  background: #fafafa;
+}
+.ws-group-header:hover { background: #f3f3f3; }
+
+.ws-arrow {
+  font-size: 9px;
+  color: #aaa;
+  width: 10px;
+  flex-shrink: 0;
+}
+.ws-arrow.open { transform: rotate(90deg); display: inline-block; }
+
+.ws-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #444;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ws-badge {
+  font-size: 10px;
+  background: #e8f0fe;
+  color: #4a7fd4;
+  border-radius: 8px;
+  padding: 1px 5px;
+  font-weight: 600;
+}
+.ws-badge.empty { background: #f3f4f6; color: #bbb; }
+
+/* 统一文件项 — 和全量树保持一致 */
+.file-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px 4px 20px;
+  cursor: pointer;
+  gap: 4px;
+  font-size: 13px;
+  color: #24292e;
+  min-height: 28px;
+  border-radius: 0;
+  position: relative;
+}
+.file-item:hover { background: #f6f8fa; }
+.file-item.current {
+  background: #dbeafe;
+  color: #0969da;
+}
+
+.file-icon {
+  font-size: 11px;
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+  color: #888;
+}
+.file-icon.md { color: #0969da; font-weight: 700; }
+
+.file-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.file-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.file-dot.modified { background: #f59e0b; }
+.file-dot.new-file { background: #10b981; }
+
+.file-time {
+  font-size: 10px;
+  color: #bbb;
+  flex-shrink: 0;
+}
+
+.pin-btn {
+  display: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0 2px;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+.file-item:hover .pin-btn { display: inline; }
+.pin-btn.active { display: inline; opacity: 1; }
+
+/* ===== 列表模式（打开的文件） ===== */
+.open-file-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  cursor: pointer;
+  gap: 4px;
+  font-size: 13px;
+  color: #24292e;
+  min-height: 28px;
+}
+.open-file-item:hover { background: #f6f8fa; }
+.open-file-item.current { background: #dbeafe; color: #0969da; }
+
+.open-file-close {
+  display: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #aaa;
+  font-size: 14px;
+  padding: 0 2px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.open-file-item:hover .open-file-close { display: inline; }
+
+/* ===== 全量树 ===== */
+.tree-dir {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  cursor: pointer;
+  gap: 4px;
+  font-size: 13px;
+  color: #24292e;
+  min-height: 28px;
+}
+.tree-dir:hover { background: #f6f8fa; }
+.tree-dir-arrow { font-size: 9px; color: #aaa; width: 10px; }
+.tree-dir-name { flex: 1; font-weight: 500; }
+
+.tree-files { padding-left: 14px; }
+
+/* ===== 说明面板 ===== */
+.notes {
+  max-width: 340px;
+}
+.note-card {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+.note-card h3 { font-size: 13px; font-weight: 600; color: #222; margin-bottom: 7px; }
+.note-card p, .note-card li { font-size: 12px; color: #555; line-height: 1.6; }
+.note-card ul { padding-left: 16px; }
+.note-card li { margin-bottom: 2px; }
+.divider { height: 1px; background: #f0f0f0; margin: 8px 0; }
+</style>
+</head>
+<body>
+
+<!-- ===== 焦点视图 ===== -->
+<div>
+  <div class="label-row">焦点视图</div>
+  <div class="sidebar">
+    <div class="view-tabs">
+      <div class="view-tab active">焦点</div>
+      <div class="view-tab">全量</div>
+      <div class="view-tab">列表</div>
+    </div>
+    <div class="focus-filter-bar">
+      <span class="filter-label">最近</span>
+      <div class="time-pills">
+        <div class="time-pill">1h</div>
+        <div class="time-pill active">4h</div>
+        <div class="time-pill">24h</div>
+      </div>
+      <span class="filter-count">11 个文件</span>
+    </div>
+
+    <div class="ws-group">
+      <div class="ws-group-header">
+        <span class="ws-arrow open">▶</span>
+        <span class="ws-name">walle-skills</span>
+        <span class="ws-badge">2</span>
+      </div>
+      <div class="file-item current">
+        <span class="file-icon md">M</span>
+        <span class="file-name">2026-04-06-rgs-download.md</span>
+        <span class="file-dot modified"></span>
+        <span class="file-time">23m</span>
+        <button class="pin-btn active">📌</button>
+      </div>
+      <div class="file-item">
+        <span class="file-icon md">M</span>
+        <span class="file-name">rgs-skill-design.md</span>
+        <span class="file-time">1h</span>
+        <button class="pin-btn">📌</button>
+      </div>
+    </div>
+
+    <div class="ws-group">
+      <div class="ws-group-header">
+        <span class="ws-arrow open">▶</span>
+        <span class="ws-name">0405-ml_classifier</span>
+        <span class="ws-badge">3</span>
+      </div>
+      <div class="file-item">
+        <span class="file-icon md">M</span>
+        <span class="file-name">feature-generation-design.md</span>
+        <span class="file-dot modified"></span>
+        <span class="file-time">2h</span>
+        <button class="pin-btn">📌</button>
+      </div>
+      <div class="file-item">
+        <span class="file-icon md">M</span>
+        <span class="file-name">rec-fields.md</span>
+        <span class="file-time">2h</span>
+        <button class="pin-btn">📌</button>
+      </div>
+      <div class="file-item">
+        <span class="file-icon md">M</span>
+        <span class="file-name">01-from-proto.md</span>
+        <span class="file-time">3h</span>
+        <button class="pin-btn">📌</button>
+      </div>
+    </div>
+
+    <div class="ws-group">
+      <div class="ws-group-header">
+        <span class="ws-arrow open">▶</span>
+        <span class="ws-name">md-viewer</span>
+        <span class="ws-badge">1</span>
+      </div>
+      <div class="file-item">
+        <span class="file-icon md">M</span>
+        <span class="file-name">2026-04-04-json-viewer-design.md</span>
+        <span class="file-time">pin</span>
+        <button class="pin-btn active">📌</button>
+      </div>
+    </div>
+
+    <div class="ws-group">
+      <div class="ws-group-header">
+        <span class="ws-arrow">▶</span>
+        <span class="ws-name">walle2</span>
+        <span class="ws-badge empty">0</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 全量视图 ===== -->
+<div>
+  <div class="label-row">全量视图</div>
+  <div class="sidebar">
+    <div class="view-tabs">
+      <div class="view-tab">焦点</div>
+      <div class="view-tab active">全量</div>
+      <div class="view-tab">列表</div>
+    </div>
+
+    <div class="ws-group">
+      <div class="ws-group-header">
+        <span class="ws-arrow open">▶</span>
+        <span class="ws-name">walle-skills</span>
+      </div>
+      <div class="tree-dir" style="padding-left:20px">
+        <span class="tree-dir-arrow">▼</span>
+        <span class="tree-dir-name">docs</span>
+      </div>
+      <div class="tree-files">
+        <div class="file-item current" style="padding-left:34px">
+          <span class="file-icon md">M</span>
+          <span class="file-name">2026-04-06-rgs-download.md</span>
+          <button class="pin-btn">📌</button>
+        </div>
+        <div class="file-item" style="padding-left:34px">
+          <span class="file-icon md">M</span>
+          <span class="file-name">rgs-skill-design.md</span>
+          <button class="pin-btn active">📌</button>
+        </div>
+        <div class="file-item" style="padding-left:34px">
+          <span class="file-icon md">M</span>
+          <span class="file-name">SKILL.md</span>
+          <button class="pin-btn">📌</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ws-group">
+      <div class="ws-group-header">
+        <span class="ws-arrow open">▶</span>
+        <span class="ws-name">0405-ml_classifier</span>
+      </div>
+      <div class="tree-dir" style="padding-left:20px">
+        <span class="tree-dir-arrow">▼</span>
+        <span class="tree-dir-name">docs</span>
+      </div>
+      <div class="tree-files">
+        <div class="file-item" style="padding-left:34px">
+          <span class="file-icon md">M</span>
+          <span class="file-name">feature-generation-design.md</span>
+          <button class="pin-btn">📌</button>
+        </div>
+        <div class="file-item" style="padding-left:34px">
+          <span class="file-icon md">M</span>
+          <span class="file-name">rec-fields.md</span>
+          <button class="pin-btn">📌</button>
+        </div>
+      </div>
+      <div class="tree-dir" style="padding-left:20px">
+        <span class="tree-dir-arrow">▶</span>
+        <span class="tree-dir-name">rec-field-survey</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 列表视图 ===== -->
+<div>
+  <div class="label-row">列表视图（打开的文件）</div>
+  <div class="sidebar">
+    <div class="view-tabs">
+      <div class="view-tab">焦点</div>
+      <div class="view-tab">全量</div>
+      <div class="view-tab active">列表</div>
+    </div>
+
+    <div class="open-file-item current">
+      <span class="file-icon md">M</span>
+      <span class="file-name">2026-04-06-rgs-download.md</span>
+      <span class="file-dot modified"></span>
+      <button class="open-file-close">×</button>
+    </div>
+    <div class="open-file-item">
+      <span class="file-icon md">M</span>
+      <span class="file-name">feature-generation-design.md</span>
+      <button class="open-file-close">×</button>
+    </div>
+    <div class="open-file-item">
+      <span class="file-icon md">M</span>
+      <span class="file-name">rec-fields.md</span>
+      <button class="open-file-close">×</button>
+    </div>
+    <div class="open-file-item">
+      <span class="file-icon md">M</span>
+      <span class="file-name">01-from-proto.md</span>
+      <button class="open-file-close">×</button>
+    </div>
+    <div class="open-file-item">
+      <span class="file-icon md">M</span>
+      <span class="file-name">2026-04-04-json-viewer-design.md</span>
+      <button class="open-file-close">×</button>
+    </div>
+    <div class="open-file-item">
+      <span class="file-icon md">M</span>
+      <span class="file-name">CHANGELOG.md</span>
+      <button class="open-file-close">×</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 说明 ===== -->
+<div class="notes">
+  <div class="label-row">设计说明</div>
+
+  <div class="note-card">
+    <h3>三 Tab 切换</h3>
+    <p>始终显示在侧边栏顶部，替换原来的「工作区/文件」切换按钮 + 「焦点/全量」两级结构。</p>
+    <div class="divider"></div>
+    <ul>
+      <li><strong>焦点</strong> — 最近修改 + pin，按工作区分组</li>
+      <li><strong>全量</strong> — 完整目录树，可 pin 文件</li>
+      <li><strong>列表</strong> — 当前打开的文件（原 simple 模式）</li>
+    </ul>
+  </div>
+
+  <div class="note-card">
+    <h3>焦点视图 filter bar</h3>
+    <p>时间窗口直接显示在焦点视图顶部，1h / 4h / 24h 三个 pill 快速切换，不需要进设置。</p>
+  </div>
+
+  <div class="note-card">
+    <h3>统一样式</h3>
+    <p>焦点视图的文件项与全量树保持一致：font-size 13px、min-height 28px、padding `4px 8px`、hover `#f6f8fa`、current `#dbeafe`。</p>
+  </div>
+
+  <div class="note-card">
+    <h3>Pin 交互</h3>
+    <ul>
+      <li>全量视图：hover 文件显示 📌，点击 pin → 在焦点视图常驻</li>
+      <li>焦点视图：已 pin 的文件始终显示 📌，点击取消 pin</li>
+      <li>pin 的文件不受时间窗口过滤</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>

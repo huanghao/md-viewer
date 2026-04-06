@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>工作区精简视图原型</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f0f0f0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 32px 24px;
+  gap: 40px;
+  min-height: 100vh;
+}
+
+h1 { font-size: 15px; color: #444; margin-bottom: 20px; font-weight: 500; text-align: center; }
+.label-row { font-size: 11px; color: #888; text-align: center; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* ===== 模拟侧边栏 ===== */
+.sidebar {
+  width: 240px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  flex-shrink: 0;
+}
+
+.sidebar-header {
+  background: #fafafa;
+  border-bottom: 1px solid #e8e8e8;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.sidebar-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  flex: 1;
+}
+
+.mode-toggle {
+  display: flex;
+  background: #ebebeb;
+  border-radius: 4px;
+  padding: 2px;
+  gap: 1px;
+}
+
+.mode-btn {
+  font-size: 10px;
+  padding: 2px 6px;
+  border: none;
+  background: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  color: #666;
+  font-weight: 500;
+}
+.mode-btn.active {
+  background: #fff;
+  color: #333;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.compact-filter-bar {
+  padding: 5px 10px;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #fefefe;
+}
+
+.filter-label {
+  font-size: 10px;
+  color: #999;
+}
+
+.filter-select {
+  font-size: 10px;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  padding: 1px 4px;
+  color: #555;
+  background: #fff;
+  cursor: pointer;
+}
+
+.filter-count {
+  margin-left: auto;
+  font-size: 10px;
+  color: #aaa;
+}
+
+/* ===== 工作区分组 ===== */
+.ws-group {
+  border-bottom: 1px solid #f0f0f0;
+}
+.ws-group:last-child { border-bottom: none; }
+
+.ws-group-header {
+  display: flex;
+  align-items: center;
+  padding: 5px 10px;
+  cursor: pointer;
+  user-select: none;
+  background: #fafafa;
+  gap: 5px;
+}
+.ws-group-header:hover { background: #f3f3f3; }
+
+.ws-arrow {
+  font-size: 9px;
+  color: #aaa;
+  width: 10px;
+  transition: transform 0.15s;
+}
+.ws-arrow.open { transform: rotate(90deg); }
+
+.ws-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #444;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ws-badge {
+  font-size: 9px;
+  background: #e8f0fe;
+  color: #4a7fd4;
+  border-radius: 8px;
+  padding: 1px 5px;
+  font-weight: 600;
+}
+
+.ws-badge.has-modified {
+  background: #fff3e0;
+  color: #e07b00;
+}
+
+/* ===== 파일 목록 ===== */
+.ws-files {
+  padding: 2px 0;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  padding: 3px 10px 3px 22px;
+  cursor: pointer;
+  gap: 5px;
+  position: relative;
+}
+.file-item:hover { background: #f5f5f5; }
+.file-item.active { background: #e8f0fe; }
+.file-item.active .file-name { color: #1a56db; font-weight: 500; }
+
+.file-icon {
+  font-size: 10px;
+  color: #aaa;
+  flex-shrink: 0;
+  width: 12px;
+}
+
+.file-name {
+  font-size: 11px;
+  color: #333;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.file-dot.modified { background: #f59e0b; }
+.file-dot.new { background: #10b981; }
+
+.file-time {
+  font-size: 9px;
+  color: #bbb;
+  flex-shrink: 0;
+}
+
+/* 手动 pin 的文件 */
+.file-item.pinned .file-name::before {
+  content: "📌 ";
+  font-size: 9px;
+}
+
+/* 精简视图里的"展开更多"按钮 */
+.show-more {
+  font-size: 10px;
+  color: #999;
+  padding: 3px 10px 4px 22px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.show-more:hover { color: #555; }
+
+/* 空状态 */
+.ws-empty {
+  font-size: 10px;
+  color: #bbb;
+  padding: 4px 10px 4px 22px;
+  font-style: italic;
+}
+
+/* ===== 说明面板 ===== */
+.notes {
+  max-width: 380px;
+  flex: 1;
+}
+
+.note-card {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+.note-card h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #222;
+  margin-bottom: 8px;
+}
+
+.note-card p, .note-card li {
+  font-size: 12px;
+  color: #555;
+  line-height: 1.6;
+}
+
+.note-card ul { padding-left: 16px; }
+.note-card li { margin-bottom: 3px; }
+
+.tag {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 500;
+  margin-right: 4px;
+}
+.tag.green { background: #d1fae5; color: #065f46; }
+.tag.yellow { background: #fef3c7; color: #92400e; }
+.tag.blue { background: #dbeafe; color: #1e40af; }
+.tag.gray { background: #f3f4f6; color: #374151; }
+
+.divider {
+  height: 1px;
+  background: #f0f0f0;
+  margin: 10px 0;
+}
+</style>
+</head>
+<body>
+
+<!-- 左：侧边栏原型 -->
+<div>
+  <div class="label-row">精简视图原型</div>
+  <div class="sidebar">
+
+    <!-- 顶部：标题 + 模式切换 -->
+    <div class="sidebar-header">
+      <span class="sidebar-title">工作区</span>
+      <div class="mode-toggle">
+        <button class="mode-btn active">精简</button>
+        <button class="mode-btn">全量</button>
+      </div>
+    </div>
+
+    <!-- 精简视图过滤条 -->
+    <div class="compact-filter-bar">
+      <span class="filter-label">最近修改</span>
+      <select class="filter-select">
+        <option>4 小时内</option>
+        <option>1 小时内</option>
+        <option>24 小时内</option>
+      </select>
+      <span class="filter-count">11 个文件</span>
+    </div>
+
+    <!-- 工作区 1：walle-skills（有活跃文件） -->
+    <div class="ws-group">
+      <div class="ws-group-header">
+        <span class="ws-arrow open">▶</span>
+        <span class="ws-name">walle-skills</span>
+        <span class="ws-badge has-modified">2</span>
+      </div>
+      <div class="ws-files">
+        <div class="file-item active">
+          <span class="file-icon">M</span>
+          <span class="file-name">2026-04-06-rgs-download-resume.md</span>
+          <span class="file-dot modified"></span>
+          <span class="file-time">23m</span>
+        </div>
+        <div class="file-item">
+          <span class="file-icon">M</span>
+          <span class="file-name">rgs-skill-design.md</span>
+          <span class="file-dot new"></span>
+          <span class="file-time">1h</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 工作区 2：bots-tmp/0405-ml_classifier -->
+    <div class="ws-group">
+      <div class="ws-group-header">
+        <span class="ws-arrow open">▶</span>
+        <span class="ws-name">0405-ml_classifier</span>
+        <span class="ws-badge">5</span>
+      </div>
+      <div class="ws-files">
+        <div class="file-item">
+          <span class="file-icon">M</span>
+          <span class="file-name">feature-generation-design.md</span>
+          <span class="file-dot modified"></span>
+          <span class="file-time">2h</span>
+        </div>
+        <div class="file-item">
+          <span class="file-icon">M</span>
+          <span class="file-name">rec-fields.md</span>
+          <span class="file-time">2h</span>
+        </div>
+        <div class="file-item">
+          <span class="file-icon">M</span>
+          <span class="file-name">01-from-proto.md</span>
+          <span class="file-time">3h</span>
+        </div>
+        <div class="show-more">▸ 还有 2 个文件…</div>
+      </div>
+    </div>
+
+    <!-- 工作区 3：md-viewer（有 pin 的文件） -->
+    <div class="ws-group">
+      <div class="ws-group-header">
+        <span class="ws-arrow open">▶</span>
+        <span class="ws-name">md-viewer</span>
+        <span class="ws-badge">2</span>
+      </div>
+      <div class="ws-files">
+        <div class="file-item pinned">
+          <span class="file-icon">M</span>
+          <span class="file-name">2026-04-04-json-viewer-design.md</span>
+          <span class="file-time">pin</span>
+        </div>
+        <div class="file-item">
+          <span class="file-icon">M</span>
+          <span class="file-name">CHANGELOG.md</span>
+          <span class="file-dot modified"></span>
+          <span class="file-time">3h</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 工作区 4：无活跃文件（折叠） -->
+    <div class="ws-group">
+      <div class="ws-group-header">
+        <span class="ws-arrow">▶</span>
+        <span class="ws-name">walle2</span>
+        <span class="ws-badge gray" style="background:#f3f4f6;color:#aaa">0</span>
+      </div>
+      <!-- 折叠，不显示文件 -->
+    </div>
+
+    <!-- 工作区 5：无活跃文件（折叠） -->
+    <div class="ws-group">
+      <div class="ws-group-header">
+        <span class="ws-arrow">▶</span>
+        <span class="ws-name">case-cli</span>
+        <span class="ws-badge gray" style="background:#f3f4f6;color:#aaa">0</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 右：设计说明 -->
+<div class="notes">
+  <div class="label-row">设计说明</div>
+
+  <div class="note-card">
+    <h3>精简 / 全量 切换</h3>
+    <p>顶部两个按钮切换模式。精简模式下只展示有活跃文件的工作区内容；全量模式恢复现有的完整目录树。</p>
+  </div>
+
+  <div class="note-card">
+    <h3>过滤逻辑</h3>
+    <p>按 <strong>文件系统 mtime</strong> 过滤，时间窗口可选：</p>
+    <div class="divider"></div>
+    <ul>
+      <li><span class="tag blue">1h</span> 高强度当前任务</li>
+      <li><span class="tag green">4h</span> 默认，覆盖半天工作</li>
+      <li><span class="tag yellow">24h</span> 跨天任务</li>
+    </ul>
+    <div class="divider"></div>
+    <p>可在设置里配置默认值。</p>
+  </div>
+
+  <div class="note-card">
+    <h3>工作区分组行为</h3>
+    <ul>
+      <li>有活跃文件的工作区 → 默认展开，显示文件列表</li>
+      <li>无活跃文件的工作区 → 折叠，显示 badge "0"</li>
+      <li>点击工作区标题可手动展开/折叠</li>
+      <li>文件数 > 3 时显示"还有 N 个文件…"，点击展开</li>
+    </ul>
+  </div>
+
+  <div class="note-card">
+    <h3>手动 Pin <span class="tag blue">待确认</span></h3>
+    <p>右键文件 → "固定到精简视图"，pin 的文件无论 mtime 都常驻显示，图标前显示 📌。</p>
+    <div class="divider"></div>
+    <p>右键 → "取消固定"移除。这解决了"我想持续关注某个文档但它不常修改"的场景。</p>
+  </div>
+
+  <div class="note-card">
+    <h3>文件状态指示</h3>
+    <ul>
+      <li><span class="tag yellow">●</span> 橙点：磁盘有修改未刷新</li>
+      <li><span class="tag green">●</span> 绿点：新文件（窗口内新增）</li>
+      <li>右侧时间：距现在多久前修改</li>
+    </ul>
+  </div>
+
+</div>
+
+</body>
+</html>

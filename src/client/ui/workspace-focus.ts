@@ -7,6 +7,35 @@ import { stripWorkspaceTreeDisplayExtension } from '../utils/workspace-file-name
 import { getPinnedFiles, isPinned } from '../utils/pinned-files';
 import { scanWorkspace } from '../workspace';
 
+// Simple glob matcher for .mdvignore patterns
+// Supports: *, **, ?, and prefix matching (e.g. "bots-ws/" matches any path under bots-ws/)
+function globToRegex(pattern: string): RegExp {
+  // Escape special regex chars except * and ?
+  let p = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  // ** matches any path segment including /
+  p = p.replace(/\*\*/g, '§GLOBSTAR§');
+  // * matches anything except /
+  p = p.replace(/\*/g, '[^/]*');
+  // ? matches single char except /
+  p = p.replace(/\?/g, '[^/]');
+  // restore **
+  p = p.replace(/§GLOBSTAR§/g, '.*');
+  // If pattern ends with /, match as directory prefix
+  if (pattern.endsWith('/')) {
+    return new RegExp(`(^|/)${p}`);
+  }
+  return new RegExp(`(^|/)${p}(/|$)`);
+}
+
+function isIgnored(filePath: string, workspacePath: string, patterns: string[]): boolean {
+  if (!patterns.length) return false;
+  // Get path relative to workspace root
+  const rel = filePath.startsWith(workspacePath + '/')
+    ? filePath.slice(workspacePath.length + 1)
+    : filePath;
+  return patterns.some((p) => globToRegex(p).test(rel));
+}
+
 const FOCUS_WINDOW_MS: Record<string, number> = {
   '8h':  8  * 3600 * 1000,
   '2d':  2  * 86400 * 1000,
@@ -24,7 +53,7 @@ function collectFiles(node: FileTreeNode): FileTreeNode[] {
   return results;
 }
 
-// Returns files that are active: mtime within window OR pinned
+// Returns files that are active: mtime within window OR pinned, minus .mdvignore matches
 function getActiveFiles(
   workspacePath: string,
   tree: FileTreeNode | undefined,
@@ -33,8 +62,11 @@ function getActiveFiles(
 ): FileTreeNode[] {
   if (!tree) return [];
   const cutoff = Date.now() - windowMs;
+  const ignorePatterns = tree.ignorePatterns || [];
   const all = collectFiles(tree);
   return all.filter((f) => {
+    // .mdvignore applies to focus view only (pinned files are also filtered)
+    if (ignorePatterns.length && isIgnored(f.path, workspacePath, ignorePatterns)) return false;
     if (pinned.has(f.path)) return true;
     if (typeof f.lastModified === 'number' && f.lastModified >= cutoff) return true;
     return false;

@@ -188,7 +188,10 @@ async function syncFileFromDisk(
 
   targetFile.content = data.content;
   targetFile.pendingContent = undefined;  // 清理缓存的 pending 内容
-  targetFile.lastModified = data.lastModified;
+  // Only advance lastModified if the fetched value is newer (don't overwrite a more recent SSE update)
+  if (data.lastModified >= (targetFile.lastModified || 0)) {
+    targetFile.lastModified = data.lastModified;
+  }
   targetFile.displayedModified = data.lastModified;
   targetFile.isMissing = false;
   saveState();
@@ -805,7 +808,7 @@ function switchFile(path: string) {
   }
   const file = state.sessionFiles.get(path);
   if (file && !file.isMissing && file.lastModified > file.displayedModified) {
-    void syncFileFromDisk(path, { silent: true, highlight: true });
+    void syncFileFromDisk(path, { silent: true, highlight: false });
   }
 }
 
@@ -1249,6 +1252,7 @@ function connectSSE() {
     if (file) {
       // 已打开的文件：更新 lastModified，M 标记由 getFileListStatus 计算
       file.lastModified = data.lastModified;
+      saveState();
     } else {
       // 未打开的工作区文件：标记 M，与已打开文件保持一致
       markWorkspaceModified(data.path);

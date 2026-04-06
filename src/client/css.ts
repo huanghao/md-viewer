@@ -120,11 +120,9 @@ export const styles = `
       align-items: center;
     }
     #modeSwitchRow {
-      height: 28px;
-      padding: 0 12px;
-      margin-bottom: 4px;
-      display: flex;
-      align-items: center;
+      display: block;
+      padding: 0;
+      margin: 0;
     }
     .mode-switch-row {
       height: 28px;
@@ -173,15 +171,16 @@ export const styles = `
       display: flex;
       border-bottom: 1px solid #e8e8e8;
       background: #fafafa;
-      padding: 0 8px;
+      padding: 0;
       flex-shrink: 0;
+      width: 100%;
     }
     .view-tab {
       flex: 1;
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 500;
       color: #888;
-      padding: 7px 0 6px;
+      padding: 10px 0 9px;
       text-align: center;
       cursor: pointer;
       border: none;
@@ -190,7 +189,7 @@ export const styles = `
       user-select: none;
       transition: color 0.15s, border-color 0.15s;
     }
-    .view-tab:hover { color: #444; }
+    .view-tab:hover { color: #444; background: #f3f3f3; }
     .view-tab.active {
       color: #0969da;
       border-bottom-color: #0969da;

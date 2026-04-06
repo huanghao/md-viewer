@@ -520,16 +520,20 @@ async function loadReplyBatchItems(input: string): Promise<ReplyBatchItem[]> {
   if (!source) {
     throw new Error("缺少 --input");
   }
+  // 支持内联 JSON（以 [ 或 { 开头），否则当文件路径处理
   const raw = source === "-"
     ? await new Response(Bun.stdin.stream()).text()
-    : readFileSync(resolve(source), "utf-8");
+    : (source.startsWith("[") || source.startsWith("{"))
+      ? source
+      : readFileSync(resolve(source), "utf-8");
   let parsed: any;
   try {
     parsed = JSON.parse(raw);
   } catch {
     throw new Error("批量输入必须是 JSON");
   }
-  const rows = Array.isArray(parsed?.replies) ? parsed.replies : [];
+  // 兼容两种格式：{"replies":[...]} 或直接 [...]
+  const rows = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.replies) ? parsed.replies : [];
   if (rows.length === 0) {
     throw new Error("批量输入为空，缺少 replies[]");
   }

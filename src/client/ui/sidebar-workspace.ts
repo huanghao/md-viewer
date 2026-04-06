@@ -16,6 +16,7 @@ import {
   scanWorkspace,
 } from '../workspace';
 import { clearListDiff, clearWorkspaceModified, hasWorkspaceModified } from '../workspace-state';
+import { isPinned } from '../utils/pinned-files';
 
 const ADD_WORKSPACE_DIALOG_ID = 'addWorkspaceDialogOverlay';
 const ADD_WORKSPACE_INPUT_ID = 'addWorkspacePathInput';
@@ -529,6 +530,13 @@ function renderTreeNode(workspaceId: string, node: FileTreeNode, depth: number):
       isCurrentFile ? 'current' : '',
     ].filter(Boolean).join(' ');
 
+    const pinned = isPinned(node.path);
+    const pinBtn = `<button
+  class="tree-pin-btn${pinned ? ' active' : ''}"
+  title="${pinned ? '取消固定到焦点视图' : '固定到焦点视图'}"
+  onclick="event.stopPropagation();${pinned ? `handleUnpinFile` : `handlePinFile`}('${escapeAttr(node.path)}')"
+>📌</button>`;
+
     return `
       <div class="tree-node">
         <div class="${classes}"
@@ -538,6 +546,7 @@ function renderTreeNode(workspaceId: string, node: FileTreeNode, depth: number):
           <span class="file-type-icon ${typeIcon.cls}">${escapeHtml(typeIcon.label)}</span>
           <span class="tree-status-inline">${statusBadge}</span>
           <span class="tree-name" title="${escapeAttr(node.name)}">${renderFileNameWithTailPriority(node.name)}</span>
+          ${pinBtn}
         </div>
       </div>
     `;

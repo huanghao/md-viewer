@@ -65,6 +65,8 @@ export function addWorkspace(name: string, path: string): Workspace {
   const existing = state.config.workspaces.find(ws => ws.path === normalizedPath);
   if (existing) {
     state.currentWorkspace = existing.id;
+    // 清掉旧缓存，确保重新扫描（避免缓存不完整时无法找到文件）
+    state.fileTree.delete(existing.id);
     return existing;
   }
 

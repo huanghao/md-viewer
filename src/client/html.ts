@@ -55,8 +55,8 @@ export function generateClientHTML(): string {
   <!-- Version: ${VERSION} -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"><\/script>
-  <style>${githubMarkdownCSS}</style>
-  <style>${highlightGithubCSS}</style>
+  <style id="theme-md-css">${githubMarkdownCSS}</style>
+  <style id="theme-hl-css">${highlightGithubCSS}</style>
   <style>${styles}</style>
 </head>
 <body>

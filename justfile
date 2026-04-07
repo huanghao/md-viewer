@@ -33,8 +33,17 @@ update-formula version:
 sync-tap version:
     bash scripts/sync-formula-to-tap.sh {{version}}
 
+# 运行单元测试
+test-unit:
+    bun test tests/unit/
+
 # 运行 e2e 测试
+test-e2e:
+    bun run test:e2e
+
+# 运行所有测试（单元 + e2e）
 test:
+    bun test tests/unit/
     bun run test:e2e
 
 # 运行 e2e 测试（有头浏览器）

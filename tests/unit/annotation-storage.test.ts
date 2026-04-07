@@ -57,19 +57,21 @@ describe('annotation-storage', () => {
   });
 
   it('returns one-document comments in agent-friendly structured format', () => {
-    const result = getAnnotationsByDocument('/tmp/a.md', 10, 0);
+    const result = getAnnotationsByDocument('/tmp/a.md', 10, 0, 'all');
     expect(result.path).toBe('/tmp/a.md');
     expect(result.total).toBe(2);
     expect(result.annotations.length).toBe(2);
-    expect(result.annotations[0].id).toBe('a2');
-    expect(result.annotations[0].status).toBe('unanchored');
+    // ASC order by created_at: a1 (1000) before a2 (2000)
+    expect(result.annotations[0].id).toBe('a1');
+    expect(result.annotations[1].id).toBe('a2');
+    expect(result.annotations[1].status).toBe('unanchored');
     expect(typeof result.annotations[0].quote).toBe('string');
     expect(typeof result.annotations[0].note).toBe('string');
     expect(Array.isArray(result.annotations[0].thread)).toBe(true);
   });
 
   it('migrates legacy note into thread and supports appending reply', () => {
-    const before = getAnnotationsByDocument('/tmp/b.md', 10, 0);
+    const before = getAnnotationsByDocument('/tmp/b.md', 10, 0, 'all');
     expect(before.annotations.length).toBe(1);
     expect(before.annotations[0].thread?.[0]?.type).toBe('comment');
     expect(before.annotations[0].thread?.[0]?.note).toBe('note-b1');
@@ -77,7 +79,7 @@ describe('annotation-storage', () => {
     const updated = appendAnnotationReply('/tmp/b.md', { serial: before.annotations[0].serial }, 'reply-b1', 'codex');
     expect(updated.ok).toBe(true);
 
-    const after = getAnnotationsByDocument('/tmp/b.md', 10, 0);
+    const after = getAnnotationsByDocument('/tmp/b.md', 10, 0, 'all');
     expect(after.annotations.length).toBe(1);
     expect(after.annotations[0].thread?.length).toBe(2);
     expect(after.annotations[0].thread?.[1]?.type).toBe('reply');
@@ -98,7 +100,7 @@ describe('annotation-storage', () => {
     expect(result.ok).toBe(true);
     expect(result.annotation?.serial).toBe(3);
 
-    const after = getAnnotationsByDocument('/tmp/a.md', 10, 0);
+    const after = getAnnotationsByDocument('/tmp/a.md', 10, 0, 'all');
     expect(after.total).toBe(3);
     expect(after.annotations.some((item) => item.id === 'a3')).toBe(true);
   });
@@ -111,7 +113,7 @@ describe('annotation-storage', () => {
     const deleted = deleteAnnotation('/tmp/a.md', { id: 'a2' });
     expect(deleted.ok).toBe(true);
 
-    const after = getAnnotationsByDocument('/tmp/a.md', 10, 0);
+    const after = getAnnotationsByDocument('/tmp/a.md', 10, 0, 'all');
     expect(after.total).toBe(2);
     expect(after.annotations.some((item) => item.id === 'a2')).toBe(false);
     expect(after.annotations.find((item) => item.id === 'a1')?.status).toBe('resolved');

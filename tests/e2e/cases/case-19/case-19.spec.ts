@@ -5,7 +5,7 @@ const ROOT = process.cwd();
 
 test('case-19: 轮询重扫后仍保持目录折叠状态', async ({ page }) => {
   await seedConfig(page, {
-    sidebarMode: 'workspace',
+    sidebarTab: 'full',
     workspaces: [
       { id: 'ws-mdv-poll', name: 'md-viewer', path: ROOT, isExpanded: true },
     ],

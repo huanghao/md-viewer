@@ -44,10 +44,9 @@ test('case-26: 关闭右侧与关闭全部行为正确', async ({ page }) => {
     await expect(page.locator('.file-item', { hasText: 'tab-order-a.md' })).toHaveCount(1);
     await expect(page.locator('.file-item.current', { hasText: 'tab-order-b.md' })).toHaveCount(1);
 
-    // 关闭全部应仅保留当前 B
+    // 关闭全部：关掉所有文件（包括当前），列表变空
     await page.locator('.tab-manager-action[data-action="close-all"]').click();
-    await expect(page.locator('.file-item')).toHaveCount(1);
-    await expect(page.locator('.file-item.current', { hasText: 'tab-order-b.md' })).toHaveCount(1);
+    await expect(page.locator('.file-item')).toHaveCount(0);
   } finally {
     [FILE_A, FILE_B, FILE_C, FILE_D].forEach((f) => { if (existsSync(f)) rmSync(f); });
   }

@@ -171,12 +171,17 @@ export function addOrUpdateFile(fileData: FileData, switchTo: boolean = false): 
   const existing = state.sessionFiles.get(fileData.path);
   const isNewPath = !existing;  // 新加入到列表，打列表差异蓝点
 
+  // Preserve dirty flag: if file is already open and dirty, don't reset displayedModified
+  const displayedModified = (existing && existing.lastModified > existing.displayedModified)
+    ? existing.displayedModified
+    : fileData.lastModified;
+
   state.sessionFiles.set(fileData.path, {
     path: fileData.path,
     name: fileData.filename,
     content: fileData.content,
     lastModified: fileData.lastModified,
-    displayedModified: fileData.lastModified,  // 初始化时两者相同
+    displayedModified,
     isRemote: fileData.isRemote || false,
     isMissing: false,
     lastAccessed: Date.now(),

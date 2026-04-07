@@ -23,7 +23,7 @@ test('case-12: 工作区模式删除态样式', async ({ page }) => {
   try {
     await resetAppStorage(page);
     await seedConfig(page, {
-      sidebarMode: 'workspace',
+      sidebarTab: 'full',
       workspaces: [
         { id: 'ws-runtime', name: 'case-12', path: WORKSPACE_ROOT, isExpanded: true },
       ],
@@ -32,14 +32,14 @@ test('case-12: 工作区模式删除态样式', async ({ page }) => {
     await expect(page.locator('.workspace-header', { hasText: 'case-12' })).toBeVisible();
     await expect(page.locator('.tree-loading')).toHaveCount(0);
 
-    const targetItem = page.locator('.tree-item.file-node', { hasText: 'e2e-workspace-delete-style.md' }).first();
+    const targetItem = page.locator('.tree-item.file-node', { hasText: 'e2e-workspace-delete-style' }).first();
     await expect(targetItem).toBeVisible();
     await targetItem.click();
     await page.waitForTimeout(1200); // 等待 watchFile + SSE 订阅稳定
 
     rmSync(FILE);
 
-    const deletedItem = page.locator('.tree-item.file-node', { hasText: 'e2e-workspace-delete-style.md' }).first();
+    const deletedItem = page.locator('.tree-item.file-node', { hasText: 'e2e-workspace-delete-style' }).first();
 
     await expect.poll(async () => {
       const badge = deletedItem.locator('.status-badge');

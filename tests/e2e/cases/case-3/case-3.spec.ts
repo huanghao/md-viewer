@@ -26,7 +26,7 @@ test('case-3: 状态标记在右侧（简单模式 + 工作区模式）', async 
   if (existsSync(WORKSPACE_DOT_FILE)) rmSync(WORKSPACE_DOT_FILE);
   try {
     await seedConfig(page, {
-      sidebarMode: 'workspace',
+      sidebarTab: 'full',
       workspaces: [
         { id: 'ws-docs-case-3', name: 'docs', path: resolve(ROOT, 'docs'), isExpanded: true },
       ],
@@ -38,17 +38,17 @@ test('case-3: 状态标记在右侧（简单模式 + 工作区模式）', async 
     writeFileSync(WORKSPACE_DOT_FILE, '# case-3 workspace dot\\n');
     await page.reload();
 
-    const wsItem = page.locator('.tree-item', { hasText: 'e2e-workspace-dot-case-3.md' }).first();
+    const wsItem = page.locator('.tree-item', { hasText: 'e2e-workspace-dot-case-3' }).first();
     await expect(wsItem).toBeVisible();
     await expect(wsItem.locator('.new-dot')).toBeVisible();
 
     const wsName = wsItem.locator('.tree-name');
-    const wsStatus = wsItem.locator('.file-item-status');
+    const wsStatus = wsItem.locator('.tree-status-inline');
     const wsNameBox = await wsName.boundingBox();
     const wsStatusBox = await wsStatus.boundingBox();
     expect(wsNameBox).not.toBeNull();
     expect(wsStatusBox).not.toBeNull();
-    expect((wsStatusBox as any).x).toBeGreaterThan((wsNameBox as any).x);
+    expect((wsStatusBox as any).x).toBeLessThan((wsNameBox as any).x);
   } finally {
     if (existsSync(WORKSPACE_DOT_FILE)) rmSync(WORKSPACE_DOT_FILE);
   }

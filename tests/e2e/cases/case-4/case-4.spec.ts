@@ -6,7 +6,7 @@ const ROOT = process.cwd();
 
 test('case-4: 工作区排序使用↑/↓，并持久化', async ({ page }) => {
   await seedConfig(page, {
-    sidebarMode: 'workspace',
+    sidebarTab: 'full',
     workspaces: [
       { id: 'ws-a', name: 'alpha', path: ROOT, isExpanded: false },
       { id: 'ws-b', name: 'beta', path: resolve(ROOT, 'docs'), isExpanded: false },

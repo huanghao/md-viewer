@@ -14,7 +14,7 @@ test('case-5: 工作区新扫描文件（未打开）显示蓝点', async ({ pag
   try {
     await resetAppStorage(page);
     await seedConfig(page, {
-      sidebarMode: 'workspace',
+      sidebarTab: 'full',
       workspaces: [
         { id: 'ws-docs', name: 'docs', path: resolve(ROOT, 'docs'), isExpanded: true },
       ],
@@ -26,7 +26,7 @@ test('case-5: 工作区新扫描文件（未打开）显示蓝点', async ({ pag
     writeFileSync(WORKSPACE_NEW_DOT_FILE, '# e2e workspace new dot\n');
     await page.reload();
 
-    const wsNewItem = page.locator('.tree-item', { hasText: 'e2e-workspace-new-dot.md' }).first();
+    const wsNewItem = page.locator('.tree-item', { hasText: 'e2e-workspace-new-dot' }).first();
     await expect(wsNewItem).toBeVisible();
     await expect(wsNewItem.locator('.new-dot')).toBeVisible();
   } finally {

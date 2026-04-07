@@ -26,7 +26,7 @@ test('case-27: 搜索可命中未展开目录中的已知文件', async ({ page 
     const workspaceId = 'ws-case-27';
     await page.evaluate(({ workspaceId, workspacePath, targetFile }) => {
       localStorage.setItem('md-viewer:config', JSON.stringify({
-        sidebarMode: 'workspace',
+        sidebarTab: 'full',
         workspaces: [{
           id: workspaceId,
           name: 'ws-known-search',
@@ -47,11 +47,11 @@ test('case-27: 搜索可命中未展开目录中的已知文件', async ({ page 
 
     await page.fill('#searchInput', 'known-search-target-file');
 
-    const hit = page.locator('.tree-item.file-node', { hasText: 'known-search-target-file.md' });
+    const hit = page.locator('.tree-item.file-node', { hasText: 'known-search-target-file' });
     await expect(hit).toHaveCount(1);
 
     await hit.click();
-    await expect(page.locator('.tree-item.current .tree-name')).toContainText('known-search-target-file.md');
+    await expect(page.locator('.tree-item.current .tree-name')).toContainText('known-search-target-file');
     await expect(page.locator('#content')).toContainText('from known list');
   } finally {
     if (existsSync(CASE_DIR)) rmSync(CASE_DIR, { recursive: true, force: true });

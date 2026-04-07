@@ -5,7 +5,7 @@ const ROOT = process.cwd();
 
 test('case-2: 工作区展开状态刷新后保持，并加载目录树', async ({ page }) => {
   await seedConfig(page, {
-    sidebarMode: 'workspace',
+    sidebarTab: 'full',
     workspaces: [
       { id: 'ws-mdv', name: 'md-viewer', path: ROOT, isExpanded: true },
     ],

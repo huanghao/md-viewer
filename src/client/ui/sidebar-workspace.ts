@@ -749,8 +749,6 @@ export function bindWorkspaceEvents(): void {
     clearWorkspaceModified(filePath);
     clearListDiff(filePath);
 
-    // 导入 switchToFile 和渲染函数
-    const { switchToFile } = await import('../state');
     const { loadFile } = await import('../api/files');
 
     // 如果文件未打开，先加载
@@ -764,16 +762,14 @@ export function bindWorkspaceEvents(): void {
         showError('文件已删除，已标记为 D（无本地缓存）');
         return;
       }
-
       const { addOrUpdateFile } = await import('../state');
       addOrUpdateFile(fileData, true);
+      const main = await import('../main');
+      (main as any).renderAll();
     } else {
-      switchToFile(filePath);
+      // 使用 switchFile（含脏文件自动刷新逻辑）
+      (window as any).switchFile?.(filePath);
     }
-
-    // 重新渲染
-    const main = await import('../main');
-    (main as any).renderAll();
   };
 
   // 关闭文件
@@ -820,7 +816,6 @@ export function bindWorkspaceEvents(): void {
     clearWorkspaceModified(filePath);
     clearListDiff(filePath);
 
-    const { switchToFile } = await import('../state');
     const { loadFile } = await import('../api/files');
 
     if (!hasSessionFile(filePath)) {
@@ -835,12 +830,12 @@ export function bindWorkspaceEvents(): void {
       }
       const { addOrUpdateFile } = await import('../state');
       addOrUpdateFile(fileData, true);
+      const main = await import('../main');
+      (main as any).renderAll();
     } else {
-      switchToFile(filePath);
+      // 使用 switchFile（含脏文件自动刷新逻辑）
+      (window as any).switchFile?.(filePath);
     }
-
-    const main = await import('../main');
-    (main as any).renderAll();
   };
 
   (window as any).handleUnpinFile = async (path: string) => {

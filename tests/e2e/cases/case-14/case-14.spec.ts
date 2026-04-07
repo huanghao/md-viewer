@@ -18,15 +18,15 @@ test('case-14: 工作区模式删除非当前文件', async ({ page }) => {
   try {
     await resetAppStorage(page);
     await seedConfig(page, {
-      sidebarMode: 'workspace',
+      sidebarTab: 'full',
       workspaces: [{ id: 'ws-runtime', name: 'case-14', path: WORKSPACE_ROOT, isExpanded: true }],
     });
 
     await expect(page.locator('.workspace-header', { hasText: 'case-14' })).toBeVisible();
     await expect(page.locator('.tree-loading')).toHaveCount(0);
 
-    const itemA = page.locator('.tree-item.file-node', { hasText: 'e2e-ws-noncurrent-a.md' }).first();
-    const itemB = page.locator('.tree-item.file-node', { hasText: 'e2e-ws-noncurrent-b.md' }).first();
+    const itemA = page.locator('.tree-item.file-node', { hasText: 'e2e-ws-noncurrent-a' }).first();
+    const itemB = page.locator('.tree-item.file-node', { hasText: 'e2e-ws-noncurrent-b' }).first();
     await expect(itemA).toBeVisible();
     await expect(itemB).toBeVisible();
 
@@ -50,7 +50,7 @@ test('case-14: 工作区模式删除非当前文件', async ({ page }) => {
 
     // 刷新后 A 被清理
     await page.reload();
-    await expect(page.locator('.tree-item.file-node:not(.missing)', { hasText: 'e2e-ws-noncurrent-a.md' })).toHaveCount(0);
+    await expect(page.locator('.tree-item.file-node:not(.missing)', { hasText: 'e2e-ws-noncurrent-a' })).toHaveCount(0);
   } finally {
     if (existsSync(FILE_A)) rmSync(FILE_A);
     if (existsSync(FILE_B)) rmSync(FILE_B);

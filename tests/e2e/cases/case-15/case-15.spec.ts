@@ -18,12 +18,12 @@ test('case-15: 工作区中未打开文件删除后立即显示删除态', async
   try {
     await resetAppStorage(page);
     await seedConfig(page, {
-      sidebarMode: 'workspace',
+      sidebarTab: 'full',
       workspaces: [{ id: 'ws-runtime', name: 'case-15', path: WORKSPACE_ROOT, isExpanded: true }],
     });
 
-    const rowAInTree = page.locator('.tree-item.file-node', { hasText: 'e2e-ws-delete-without-open-a.md' }).first();
-    const rowBInTree = page.locator('.tree-item.file-node', { hasText: 'e2e-ws-delete-without-open-b.md' }).first();
+    const rowAInTree = page.locator('.tree-item.file-node', { hasText: 'e2e-ws-delete-without-open-a' }).first();
+    const rowBInTree = page.locator('.tree-item.file-node', { hasText: 'e2e-ws-delete-without-open-b' }).first();
     await expect(rowAInTree).toBeVisible();
     await expect(rowBInTree).toBeVisible();
 
@@ -34,7 +34,7 @@ test('case-15: 工作区中未打开文件删除后立即显示删除态', async
     // 删除未打开文件 A：应立即出现删除态（D + 红色划线）
     rmSync(FILE_A);
 
-    const rowADeleted = page.locator('.tree-item.missing', { hasText: 'e2e-ws-delete-without-open-a.md' }).first();
+    const rowADeleted = page.locator('.tree-item.missing', { hasText: 'e2e-ws-delete-without-open-a' }).first();
     await expect.poll(async () => {
       const badge = rowADeleted.locator('.status-badge');
       return (await badge.count()) > 0 ? (await badge.first().innerText()).trim() : '';

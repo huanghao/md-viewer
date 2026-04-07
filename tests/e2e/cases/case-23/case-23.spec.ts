@@ -4,7 +4,7 @@ import { resolve } from 'path';
 
 const ROOT = process.cwd();
 const LONG_FILE = resolve(ROOT, 'docs/design/20260301-agent-style-learning.md');
-const TARGET_FILE_NAME = '20260301-blue-dot-refresh-test.md';
+const TARGET_FILE_NAME = 'blue-dot-refresh-test.md';
 
 test('case-23: 搜索打开新文件后正文回到顶部', async ({ page, request }) => {
   await resetAppStorage(page);

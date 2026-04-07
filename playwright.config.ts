@@ -10,6 +10,7 @@ export default defineConfig({
     },
   },
   fullyParallel: false,
+  workers: 1,  // SSE/timing-sensitive tests require serial execution
   reporter: [['list']],
   use: {
     baseURL: 'http://127.0.0.1:3000',

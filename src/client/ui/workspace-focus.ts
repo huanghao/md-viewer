@@ -6,6 +6,7 @@ import { getFileTypeIcon } from '../utils/file-type';
 import { stripWorkspaceTreeDisplayExtension } from '../utils/workspace-file-name';
 import { getPinnedFiles, isPinned } from '../utils/pinned-files';
 import { scanWorkspace } from '../workspace';
+import { hasWorkspaceModified, hasListDiff } from '../workspace-state';
 
 // Simple glob matcher for .mdvignore patterns
 // Supports: *, **, ?, and prefix matching (e.g. "bots-ws/" matches any path under bots-ws/)
@@ -104,7 +105,15 @@ function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>, query: str
   const isCurrent = state.currentFile === file.path;
   const isPinnedFile = pinned.has(file.path);
   const fileInfo = state.sessionFiles.get(file.path);
-  const statusType = fileInfo ? getFileListStatus(fileInfo).type : 'normal';
+  // 消费与全量模式相同的状态源：session dirty > workspace modified > list diff
+  let statusType: 'modified' | 'deleted' | 'new' | 'normal' = 'normal';
+  if (fileInfo) {
+    statusType = getFileListStatus(fileInfo, hasListDiff(file.path)).type;
+  } else if (hasWorkspaceModified(file.path)) {
+    statusType = 'modified';
+  } else if (hasListDiff(file.path)) {
+    statusType = 'new';
+  }
   const icon = getFileTypeIcon(file.path);
   const displayName = stripWorkspaceTreeDisplayExtension(file.name) || file.name;
   const timeStr = file.lastModified ? formatRelativeTime(file.lastModified) : '';

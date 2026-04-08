@@ -9,7 +9,7 @@ type JsonArray = JsonValue[];
 
 // ==================== Inline preview ====================
 
-function inlinePreview(value: JsonValue, maxLen = 60): string {
+export function inlinePreview(value: JsonValue, maxLen = 60): string {
   const raw = JSON.stringify(value);
   if (raw.length <= maxLen) return escapeHtml(raw);
   return escapeHtml(raw.slice(0, maxLen)) + '…';
@@ -17,7 +17,7 @@ function inlinePreview(value: JsonValue, maxLen = 60): string {
 
 // ==================== Build node HTML ====================
 
-function buildNode(
+export function buildNode(
   value: JsonValue,
   key: string | null,
   depth: number,
@@ -83,7 +83,7 @@ function buildNode(
     </li>`;
 }
 
-function renderLeaf(value: JsonValue, query: string): string {
+export function renderLeaf(value: JsonValue, query: string): string {
   if (value === null) return `<span class="json-null">${highlight('null', query)}</span>`;
   if (typeof value === 'boolean') return `<span class="json-boolean">${highlight(String(value), query)}</span>`;
   if (typeof value === 'number') return `<span class="json-number">${highlight(String(value), query)}</span>`;
@@ -91,7 +91,7 @@ function renderLeaf(value: JsonValue, query: string): string {
   return `<span class="json-string">${highlight(escapeHtml(JSON.stringify(value)), query)}</span>`;
 }
 
-function highlight(text: string, query: string): string {
+export function highlight(text: string, query: string): string {
   if (!query) return text;
   const lq = query.toLowerCase();
   const lt = text.toLowerCase();

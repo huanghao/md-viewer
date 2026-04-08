@@ -10,16 +10,18 @@ import { hasWorkspaceModified, hasListDiff } from '../workspace-state';
 
 // Simple glob matcher for .mdvignore patterns
 // Supports: *, **, ?, and prefix matching (e.g. "bots-ws/" matches any path under bots-ws/)
-function globToRegex(pattern: string): RegExp {
+export function globToRegex(pattern: string): RegExp {
   // Escape special regex chars except * and ?
   let p = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
-  // ** matches any path segment including /
+  // ** matches any path segment including / (zero or more segments)
+  // **/ should match empty (current dir) or any number of subdirs
   p = p.replace(/\*\*/g, '§GLOBSTAR§');
   // * matches anything except /
   p = p.replace(/\*/g, '[^/]*');
   // ? matches single char except /
   p = p.replace(/\?/g, '[^/]');
-  // restore **
+  // restore **: §GLOBSTAR§/ allows zero or more path segments
+  p = p.replace(/§GLOBSTAR§\//g, '(?:.+/)?');
   p = p.replace(/§GLOBSTAR§/g, '.*');
   // If pattern ends with /, match as directory prefix
   if (pattern.endsWith('/')) {
@@ -28,7 +30,7 @@ function globToRegex(pattern: string): RegExp {
   return new RegExp(`(^|/)${p}(/|$)`);
 }
 
-function isIgnored(filePath: string, workspacePath: string, patterns: string[]): boolean {
+export function isIgnored(filePath: string, workspacePath: string, patterns: string[]): boolean {
   if (!patterns.length) return false;
   // Get path relative to workspace root
   const rel = filePath.startsWith(workspacePath + '/')
@@ -58,7 +60,7 @@ function collectFiles(node: FileTreeNode): FileTreeNode[] {
 }
 
 // Returns files that are active: mtime within window OR pinned, minus .mdvignore matches
-function getActiveFiles(
+export function getActiveFiles(
   workspacePath: string,
   tree: FileTreeNode | undefined,
   windowMs: number,
@@ -83,7 +85,7 @@ function getActiveFiles(
   });
 }
 
-function formatRelativeTime(ms: number): string {
+export function formatRelativeTime(ms: number): string {
   const diff = Date.now() - ms;
   const minutes = Math.floor(diff / 60000);
   if (minutes < 60) return `${minutes}m`;

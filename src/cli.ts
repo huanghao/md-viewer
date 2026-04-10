@@ -91,11 +91,14 @@ function getServerStatus(): ServerStatus {
   }
 }
 
+/**
+ * 检测端口上是否运行着 md-viewer server（通过 /api/files 端点识别）
+ */
 async function isServerHttpReachable(host: string, port: number): Promise<boolean> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 800);
   try {
-    const res = await fetch(`http://${host}:${port}/`, {
+    const res = await fetch(`http://${host}:${port}/api/files`, {
       method: "GET",
       signal: controller.signal,
     });
@@ -105,6 +108,36 @@ async function isServerHttpReachable(host: string, port: number): Promise<boolea
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/**
+ * 检测端口是否被其他进程占用（能连上但不是 md-viewer）
+ */
+async function isPortInUseByOther(host: string, port: number): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 800);
+  try {
+    await fetch(`http://${host}:${port}/`, {
+      method: "GET",
+      signal: controller.signal,
+    });
+    // 能连上说明端口有人在用，但 isServerHttpReachable 已排除是 md-viewer 的情况
+    return true;
+  } catch (e: any) {
+    // ECONNREFUSED 或超时：端口空闲
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
+ * 判断当前是否以源码模式运行（bun run src/cli.ts）
+ * 源码模式下 process.execPath 是 bun，编译模式下是可执行文件自身
+ */
+function isSourceMode(): boolean {
+  const execPath = process.execPath;
+  return execPath.endsWith("/bun") || execPath.endsWith("/bun-debug");
 }
 
 function startServer(daemon: boolean = false): void {
@@ -133,12 +166,25 @@ function startServer(daemon: boolean = false): void {
   const logFile = getLogFilePath();
   const logFd = openSync(logFile, "a");
 
-  // 启动服务器进程（调用自己的 server 模式）
-  const child = spawn(process.execPath, ["--internal-server-mode"], {
-    detached: true,
-    stdio: ["ignore", logFd, logFd], // 输出到日志文件
-    env: { ...process.env, NODE_ENV: "production" },
-  });
+  let child: ReturnType<typeof spawn>;
+
+  if (isSourceMode()) {
+    // 源码模式：用 bun 运行 server.ts
+    // import.meta.url 形如 file:///path/to/src/cli.ts，取目录拼 server.ts
+    const serverPath = new URL("./server.ts", import.meta.url).pathname;
+    child = spawn(process.execPath, ["run", serverPath], {
+      detached: true,
+      stdio: ["ignore", logFd, logFd],
+      env: { ...process.env, NODE_ENV: "production" },
+    });
+  } else {
+    // 编译模式：调用自身的 --internal-server-mode
+    child = spawn(process.execPath, ["--internal-server-mode"], {
+      detached: true,
+      stdio: ["ignore", logFd, logFd],
+      env: { ...process.env, NODE_ENV: "production" },
+    });
+  }
 
   child.unref();
 
@@ -251,12 +297,59 @@ function getAppServerPort(): number {
 
 async function ensureServerRunning(): Promise<void> {
   const port = getAppServerPort();
-  if (await isServerHttpReachable(config.server.host, port)) {
+  const host = config.server.host;
+
+  if (await isServerHttpReachable(host, port)) {
     return;
   }
 
-  console.error(`❌ 无法连接到 MDViewer (${config.server.host}:${port})`);
-  console.error(`   请确保 MDViewer.app 已启动`);
+  // 检测端口是否被其他进程占用
+  if (await isPortInUseByOther(host, port)) {
+    console.error(`❌ 端口 ${port} 已被其他进程占用`);
+    console.error(`   请修改配置文件中的端口: mdv config set server.port <新端口>`);
+    process.exit(1);
+  }
+
+  // Server 未运行，自动在后台启动
+  console.error(`⚠️  Server 未运行，正在启动...`);
+
+  const logFile = getLogFilePath();
+  const logFd = openSync(logFile, "a");
+
+  let child: ReturnType<typeof spawn>;
+
+  if (isSourceMode()) {
+    const serverPath = new URL("./server.ts", import.meta.url).pathname;
+    child = spawn(process.execPath, ["run", serverPath], {
+      detached: true,
+      stdio: ["ignore", logFd, logFd],
+      env: { ...process.env, NODE_ENV: "production" },
+    });
+  } else {
+    child = spawn(process.execPath, ["--internal-server-mode"], {
+      detached: true,
+      stdio: ["ignore", logFd, logFd],
+      env: { ...process.env, NODE_ENV: "production" },
+    });
+  }
+
+  child.unref();
+
+  if (child.pid) {
+    const pidFile = getPidFilePath();
+    writeFileSync(pidFile, String(child.pid), "utf-8");
+  }
+
+  // 等待 server 就绪，最多 5 秒
+  for (let i = 0; i < 10; i++) {
+    await new Promise(r => setTimeout(r, 500));
+    if (await isServerHttpReachable(host, port)) {
+      return;
+    }
+  }
+
+  console.error(`❌ Server 启动超时`);
+  console.error(`   查看日志: tail -f ${logFile}`);
   process.exit(1);
 }
 

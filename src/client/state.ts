@@ -46,6 +46,7 @@ export function saveState(): void {
         name: file.name,
         isRemote: file.isRemote || false,
         isMissing: file.isMissing || false,
+        lastModified: file.lastModified,
         displayedModified: file.displayedModified,
         lastAccessed: file.lastAccessed || Date.now()
       }]),
@@ -66,6 +67,7 @@ export function saveState(): void {
             name: file.name,
             isRemote: file.isRemote || false,
             isMissing: file.isMissing || false,
+            lastModified: file.lastModified,
             displayedModified: file.displayedModified,
             lastAccessed: file.lastAccessed || Date.now()
           }]),
@@ -124,11 +126,16 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
         // 如果磁盘文件已被修改，保持 dirty 状态
         const savedDisplayedModified = fileInfo.displayedModified || fileData.lastModified;
 
+        // Restore the saved lastModified (which may be higher than the disk value if an
+        // SSE "file-changed" event arrived before the page was reloaded).  Take the max
+        // so a file that was modified *again* after the last save is also reflected.
+        const lastModified = Math.max(fileData.lastModified, fileInfo.lastModified || 0);
+
         state.sessionFiles.set(path, {
           path: fileData.path,
           name: fileData.filename,
           content: fileData.content,
-          lastModified: fileData.lastModified,
+          lastModified,
           displayedModified: savedDisplayedModified,
           isRemote: fileData.isRemote || false,
           isMissing: false,  // 恢复时文件存在，清除 isMissing
@@ -176,11 +183,17 @@ export function addOrUpdateFile(fileData: FileData, switchTo: boolean = false): 
     ? existing.displayedModified
     : fileData.lastModified;
 
+  // Don't downgrade lastModified: an SSE "file-changed" event may have already
+  // recorded a newer mtime than what the server returns when re-opening the file.
+  const lastModified = existing
+    ? Math.max(existing.lastModified, fileData.lastModified)
+    : fileData.lastModified;
+
   state.sessionFiles.set(fileData.path, {
     path: fileData.path,
     name: fileData.filename,
     content: fileData.content,
-    lastModified: fileData.lastModified,
+    lastModified,
     displayedModified,
     isRemote: fileData.isRemote || false,
     isMissing: false,

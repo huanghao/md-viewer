@@ -562,18 +562,6 @@ export async function handleScanWorkspace(c: Context) {
 
     const tree = scanDirectory(resolvedPath);
 
-    // 读取工作区根目录的 .mdvignore，附到根节点（仅焦点视图使用）
-    const mdvignorePath = join(resolvedPath, '.mdvignore');
-    if (existsSync(mdvignorePath)) {
-      try {
-        const raw = readFileSync(mdvignorePath, 'utf-8');
-        const patterns = raw.split('\n')
-          .map((l) => l.trim())
-          .filter((l) => l && !l.startsWith('#'));
-        if (patterns.length > 0) tree.ignorePatterns = patterns;
-      } catch { /* ignore */ }
-    }
-
     return c.json(tree);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
@@ -590,6 +578,18 @@ function scanDirectory(dirPath: string): any {
     children: [],
     fileCount: 0
   };
+
+  // Read .mdvignore for this directory (patterns relative to this dir)
+  const mdvignorePath = join(dirPath, '.mdvignore');
+  if (existsSync(mdvignorePath)) {
+    try {
+      const raw = readFileSync(mdvignorePath, 'utf-8');
+      const patterns = raw.split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l && !l.startsWith('#'));
+      if (patterns.length > 0) tree.ignorePatterns = patterns;
+    } catch { /* ignore */ }
+  }
 
   try {
     const entries = readdirSync(dirPath, { withFileTypes: true });

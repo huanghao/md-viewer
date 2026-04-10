@@ -3,7 +3,7 @@ import type { FileData } from './types';
 
 // 导入状态管理
 import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFileFromState, switchToFile, setSearchQuery, markFileMissing, getSessionFile } from './state';
-import { clearListDiff, markWorkspaceModified, clearWorkspaceModified, markWorkspacePathMissing } from './workspace-state';
+import { clearListDiff, markWorkspaceModified, clearWorkspaceModified, markWorkspacePathMissing, clearWorkspacePathMissing } from './workspace-state';
 import { addWorkspace, hydrateExpandedWorkspaces, scanWorkspace, revealFileInWorkspace } from './workspace';
 
 // 导入 API
@@ -1285,6 +1285,11 @@ function connectSSE() {
     if (file) {
       // 已打开的文件：更新 lastModified，M 标记由 getFileListStatus 计算
       file.lastModified = data.lastModified;
+      // 原子保存后文件重新出现，清除 isMissing 标记
+      if (file.isMissing) {
+        file.isMissing = false;
+        clearWorkspacePathMissing(data.path);
+      }
       saveState();
     } else {
       // 未打开的工作区文件：标记 M，与已打开文件保持一致

@@ -816,7 +816,7 @@ function editThreadItem(annotationId: string, itemId: string, filePath: string):
   // 替换成编辑态
   const originalHTML = lineEl.innerHTML;
   lineEl.classList.add('is-editing');
-  lineEl.innerHTML = `<textarea class="annotation-thread-edit-input">${escapeHtml(item.note)}</textarea>`;
+  lineEl.innerHTML = `<textarea class="annotation-thread-edit-input" placeholder="Cmd+Enter 保存，Esc 取消">${escapeHtml(item.note)}</textarea>`;
   const textarea = lineEl.querySelector('textarea') as HTMLTextAreaElement;
   textarea.style.height = `${Math.max(textarea.scrollHeight, 34)}px`;
   textarea.focus();
@@ -866,7 +866,7 @@ function editThreadItem(annotationId: string, itemId: string, filePath: string):
   textarea.addEventListener('keydown', (e) => {
     if (handleEmacsKeys(e, textarea)) { e.preventDefault(); return; }
     if (e.key === 'Escape') { e.preventDefault(); cancel(); }
-    else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save(); }
+    else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); save(); }
   });
   textarea.addEventListener('input', () => {
     textarea.style.height = 'auto';

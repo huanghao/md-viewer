@@ -1,6 +1,7 @@
 import type { Workspace, FileTreeNode } from './types';
 import { state } from './state';
 import { updateWorkspaceListDiff, removeWorkspaceTracking } from './workspace-state';
+import { buildIgnoredSet } from './utils/ignore-filter';
 import { saveConfig } from './config';
 import { mergeDirectoryExpandedState, applyDirectoryExpandedState } from './workspace-tree-expansion';
 import {
@@ -217,7 +218,9 @@ export async function scanWorkspace(workspaceId: string): Promise<FileTreeNode |
     // 缓存文件树
     state.fileTree.set(workspaceId, tree);
     setWorkspaceExpandedState(workspaceId, collectExpandedStateFromTree(tree));
-    updateWorkspaceListDiff(workspaceId, collectFilePaths(tree));
+    const ignored = buildIgnoredSet(tree, workspace.path);
+    const allPaths = collectFilePaths(tree).filter((p) => !ignored.has(p));
+    updateWorkspaceListDiff(workspaceId, allPaths);
 
     return tree;
   } catch (e) {

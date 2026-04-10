@@ -70,6 +70,17 @@ export function generateClientHTML(): string {
             <path d="M 9 11 L 9 21 L 11 21 L 11 14.5 L 16 19.5 L 21 14.5 L 21 21 L 23 21 L 23 11 L 16 18.5 Z" fill="white"/>
           </svg>
           MD Viewer
+          <button
+            class="import-dir-btn"
+            onclick="showAddWorkspaceDialog()"
+            title="导入目录"
+          >
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h3.172a1.5 1.5 0 0 1 1.06.44l.829.828A.5.5 0 0 0 7.914 3.5H13.5A1.5 1.5 0 0 1 15 5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12V3.5z" stroke="currentColor" stroke-width="1.3" fill="none"/>
+              <line x1="8" y1="6.5" x2="8" y2="10.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+              <line x1="6" y1="8.5" x2="10" y2="8.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            </svg>
+          </button>
         </h1>
         <!-- 搜索框 -->
         <div id="searchBox"></div>

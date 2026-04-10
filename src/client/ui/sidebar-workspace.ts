@@ -288,7 +288,29 @@ function createAddWorkspaceDialog(): HTMLElement {
   return overlay;
 }
 
-function showAddWorkspaceDialog(): void {
+async function showAddWorkspaceDialog(): Promise<void> {
+  // 先尝试调起系统文件夹选择器
+  try {
+    const res = await fetch('/api/pick-directory', { method: 'POST' });
+    if (res.ok) {
+      const data = await res.json() as { path?: string; cancelled?: boolean; error?: string };
+      if (data.path) {
+        // 用户选了目录，直接添加工作区
+        const name = data.path.split('/').filter(Boolean).pop() || 'workspace';
+        const { addWorkspace } = await import('../workspace');
+        addWorkspace(name, data.path);
+        const { renderSidebar } = await import('./sidebar');
+        renderSidebar();
+        return;
+      }
+      // data.cancelled === true：用户点了取消，什么都不做
+      if (data.cancelled) return;
+    }
+  } catch {
+    // 接口失败（非 macOS 等），fallback 到文本输入框
+  }
+
+  // Fallback：弹出文本输入框
   const overlay = createAddWorkspaceDialog();
   overlay.classList.add('show');
 

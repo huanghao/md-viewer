@@ -31,6 +31,7 @@ import {
   handleClearAllAnnotations,
   handleGetSessionState,
   handleUpdateSessionState,
+  handlePickDirectory,
 } from "./handlers.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
 
@@ -101,6 +102,7 @@ app.get("/api/events", handleEvents);
 // API: 工作区相关
 app.post("/api/infer-workspace", handleInferWorkspace);
 app.post("/api/scan-workspace", handleScanWorkspace);
+app.post("/api/pick-directory", handlePickDirectory);
 
 // API: 评论相关（SQLite 持久化）
 app.get("/api/annotations", handleGetAnnotations);

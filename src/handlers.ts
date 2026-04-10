@@ -580,6 +580,25 @@ export async function handleScanWorkspace(c: Context) {
   }
 }
 
+// 调用系统文件夹选择器（仅 macOS）
+export async function handlePickDirectory(c: Context) {
+  try {
+    const proc = Bun.spawn(
+      ["osascript", "-e", 'POSIX path of (choose folder with prompt "选择工作区目录")'],
+      { stdout: "pipe", stderr: "pipe" }
+    );
+    const code = await proc.exited;
+    if (code !== 0) {
+      // 用户取消（exit 1）或不支持
+      return c.json({ cancelled: true });
+    }
+    const path = (await new Response(proc.stdout).text()).trim().replace(/\/$/, "");
+    return c.json({ path });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+}
+
 // 扫描目录，构建文件树（只包含 md/html 文件和包含这些文件的目录）
 function scanDirectory(dirPath: string): any {
   const name = basename(dirPath);

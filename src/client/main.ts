@@ -304,6 +304,25 @@ function rewriteMarkdownAssetUrls(container: HTMLElement, currentFilePath: strin
   });
 }
 
+function renderMath(container: HTMLElement): void {
+  const renderMathInElement = (window as any).renderMathInElement;
+  if (!renderMathInElement) return;
+
+  const mathInline = state.config.mathInline !== false;
+  const delimiters = [
+    { left: '$$', right: '$$', display: true },
+    { left: '\\[', right: '\\]', display: true },
+    { left: '\\(', right: '\\)', display: false },
+    ...(mathInline ? [{ left: '$', right: '$', display: false }] : []),
+  ];
+
+  renderMathInElement(container, {
+    delimiters,
+    throwOnError: false,
+    ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+  });
+}
+
 async function renderMermaidDiagrams(container: HTMLElement): Promise<void> {
   const mermaid = (window as any).mermaid;
   if (!mermaid) return;
@@ -493,6 +512,7 @@ function renderContent() {
   container.setAttribute('data-current-file', file.path);
   rewriteMarkdownAssetUrls(container, file.path);
   void renderMermaidDiagrams(container);
+  renderMath(container);
 
   // 应用批注高亮
   applyAnnotations();

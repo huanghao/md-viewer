@@ -38,6 +38,7 @@ export interface AppConfig {
   focusWindowKey: '8h' | '2d' | '1w' | '1m';  // replaces focusWindowHours
   markdownTheme: string;  // 'github' | 'notion' | 'bear'
   codeTheme: string;      // 'github' | 'github-dark' | 'atom-one-dark'
+  mathInline: boolean;    // render $...$ inline math (disable if $ is used as currency)
   workspaces: Workspace[];
 }
 

@@ -7,6 +7,7 @@ import { MD_THEMES, HL_THEMES } from '../themes/index';
 // 打开对话框时保存的原始主题值，用于 Cancel 时恢复
 let _savedMarkdownTheme = '';
 let _savedCodeTheme = '';
+let _savedMathInline = true;
 
 // 初始化：绑定全局函数
 if (typeof window !== 'undefined') {
@@ -19,6 +20,7 @@ export function showSettingsDialog(): void {
   // 保存打开时的原始主题值，Cancel 时恢复
   _savedMarkdownTheme = state.config.markdownTheme || 'github';
   _savedCodeTheme = state.config.codeTheme || 'github';
+  _savedMathInline = state.config.mathInline !== false;
 
   const overlay = document.getElementById('settingsDialogOverlay');
   if (!overlay) {
@@ -93,6 +95,19 @@ function renderSettingsDialog(): void {
       </div>
     </div>
     <div class="settings-section">
+      <div class="settings-section-title">数学公式</div>
+      <div class="settings-section-desc">使用 KaTeX 渲染 LaTeX 公式。<code style="font-size:11px">$$...$$</code> 块级公式始终启用。</div>
+      <div class="settings-kv-grid">
+        <div>行内公式 <code style="font-size:11px">$...$</code></div>
+        <div>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" id="mathInlineCheckbox"${state.config.mathInline !== false ? ' checked' : ''}>
+            <span style="font-size:12px">启用（关闭可避免 <code>$</code> 货币符号误触发）</span>
+          </label>
+        </div>
+      </div>
+    </div>
+    <div class="settings-section">
       <div class="settings-section-title">客户端状态</div>
       <div class="settings-section-desc">用于排查本地缓存是否脏数据，可直接清理。</div>
       <div class="settings-kv-grid">
@@ -146,6 +161,7 @@ export function closeSettingsDialog(): void {
   if (_savedMarkdownTheme) {
     state.config.markdownTheme = _savedMarkdownTheme;
     state.config.codeTheme = _savedCodeTheme;
+    state.config.mathInline = _savedMathInline;
     (window as any).applyTheme?.();
   }
   const overlay = document.getElementById('settingsDialogOverlay');
@@ -158,13 +174,16 @@ export function closeSettingsDialog(): void {
 export function saveSettings(): void {
   const mdSelect = document.getElementById('markdownThemeSelect') as HTMLSelectElement | null;
   const hlSelect = document.getElementById('codeThemeSelect') as HTMLSelectElement | null;
+  const mathInlineCheckbox = document.getElementById('mathInlineCheckbox') as HTMLInputElement | null;
   if (mdSelect) state.config.markdownTheme = mdSelect.value;
   if (hlSelect) state.config.codeTheme = hlSelect.value;
+  if (mathInlineCheckbox) state.config.mathInline = mathInlineCheckbox.checked;
   saveConfig(state.config);
   renderSidebar();
   // 清掉 saved 值，避免 closeSettingsDialog 误恢复
   _savedMarkdownTheme = '';
   _savedCodeTheme = '';
+  _savedMathInline = true;
   closeSettingsDialog();
 }
 

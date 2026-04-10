@@ -8,6 +8,7 @@ export const defaultConfig: AppConfig = {
   focusWindowKey: '8h',
   markdownTheme: 'github',
   codeTheme: 'github',
+  mathInline: true,
   workspaces: [],
 };
 

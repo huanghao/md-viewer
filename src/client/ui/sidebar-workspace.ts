@@ -18,6 +18,28 @@ import {
 } from '../workspace';
 import { clearListDiff, clearWorkspaceModified, hasWorkspaceModified } from '../workspace-state';
 import { isPinned } from '../utils/pinned-files';
+import { buildIgnoredSet } from '../utils/ignore-filter';
+
+/**
+ * Returns a shallow-cloned tree with ignored file nodes removed.
+ * Empty directories (after pruning) are also removed.
+ * Does not mutate the original tree.
+ */
+function pruneIgnored(node: FileTreeNode, ignored: Set<string>): FileTreeNode | null {
+  if (node.type === 'file') {
+    return ignored.has(node.path) ? null : node;
+  }
+  const prunedChildren: FileTreeNode[] = [];
+  for (const child of node.children || []) {
+    const pruned = pruneIgnored(child, ignored);
+    if (pruned) prunedChildren.push(pruned);
+  }
+  if (prunedChildren.length === 0 && (node.children || []).length > 0) {
+    // All children were ignored — drop this directory too
+    return null;
+  }
+  return { ...node, children: prunedChildren };
+}
 
 const ADD_WORKSPACE_DIALOG_ID = 'addWorkspaceDialogOverlay';
 const ADD_WORKSPACE_INPUT_ID = 'addWorkspacePathInput';
@@ -373,7 +395,17 @@ function renderEmptyWorkspace(): string {
 // 渲染单个工作区
 function renderWorkspaceItem(workspace: Workspace, index: number, total: number, query: string): string {
   const isCurrent = state.currentWorkspace === workspace.id;
-  const tree = query ? buildSearchTree(workspace, query) : state.fileTree.get(workspace.id);
+  const rawTree = query ? buildSearchTree(workspace, query) : state.fileTree.get(workspace.id);
+
+  // Apply multi-level .mdvignore filtering (does not mutate state.fileTree)
+  let tree: FileTreeNode | undefined = rawTree;
+  if (rawTree) {
+    const ignored = buildIgnoredSet(rawTree, workspace.path);
+    if (ignored.size > 0) {
+      tree = pruneIgnored(rawTree, ignored) ?? undefined;
+    }
+  }
+
   const shouldExpand = query ? true : workspace.isExpanded;
   const toggle = shouldExpand ? '▼' : '▶';
   const canMoveUp = index > 0;

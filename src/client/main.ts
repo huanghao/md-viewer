@@ -216,10 +216,16 @@ async function syncFileFromDisk(
       if (diffBtn) diffBtn.classList.remove('active');
     }
     renderContent();
-    syncAnnotationsForCurrentFile(false);
-    if (options.highlight) {
-      flashContentUpdated();
-    }
+    // Defer annotation sync to the next frame: renderAnnotationList calls
+    // getBoundingClientRect() on every annotation mark, which forces a
+    // synchronous layout. Deferring lets the browser finish laying out the
+    // freshly-rebuilt content DOM first, avoiding N × forced-reflow lag.
+    requestAnimationFrame(() => {
+      syncAnnotationsForCurrentFile(false);
+      if (options.highlight) {
+        flashContentUpdated();
+      }
+    });
   }
 
   renderSidebar();

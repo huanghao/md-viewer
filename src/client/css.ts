@@ -61,6 +61,26 @@ export const styles = `
       align-items: center;
       gap: 8px;
     }
+    .import-dir-btn {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      padding: 0;
+      border: none;
+      border-radius: 5px;
+      background: transparent;
+      color: #57606a;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.15s, color 0.15s;
+    }
+    .import-dir-btn:hover {
+      background: #e8eaed;
+      color: #24292e;
+    }
     .logo-icon {
       color: #2563eb;
       flex-shrink: 0;

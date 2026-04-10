@@ -181,6 +181,25 @@ describe('getActiveFiles', () => {
     const tree = makeTree([old1, old2]);
     expect(getActiveFiles(ws, tree, windowMs, new Set())).toEqual([]);
   });
+
+  it('respects subdirectory .mdvignore patterns (multi-level)', () => {
+    const sub: FileTreeNode = {
+      name: 'sub',
+      path: '/ws/sub',
+      type: 'directory',
+      children: [
+        { name: 'secret.md', path: '/ws/sub/secret.md', type: 'file', lastModified: now - 100 },
+        { name: 'open.md',   path: '/ws/sub/open.md',   type: 'file', lastModified: now - 100 },
+      ],
+      ignorePatterns: ['secret.md'],
+    };
+    const tree: FileTreeNode = {
+      name: 'root', path: '/ws', type: 'directory', children: [sub],
+    };
+    const result = getActiveFiles('/ws', tree, 4 * 3600 * 1000, new Set());
+    expect(result.map(f => f.path)).not.toContain('/ws/sub/secret.md');
+    expect(result.map(f => f.path)).toContain('/ws/sub/open.md');
+  });
 });
 
 // ==================== formatRelativeTime ====================

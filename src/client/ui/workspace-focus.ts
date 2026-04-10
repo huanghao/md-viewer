@@ -1,5 +1,6 @@
 import type { Workspace, FileTreeNode } from '../types';
 import { state } from '../state';
+import { buildIgnoredSet } from '../utils/ignore-filter';
 import { escapeHtml, escapeAttr } from '../utils/escape';
 import { getFileListStatus } from '../utils/file-status';
 import { getFileTypeIcon } from '../utils/file-type';
@@ -68,11 +69,10 @@ export function getActiveFiles(
 ): FileTreeNode[] {
   if (!tree) return [];
   const cutoff = Date.now() - windowMs;
-  const ignorePatterns = tree.ignorePatterns || [];
+  const ignored = buildIgnoredSet(tree, workspacePath);
   const all = collectFiles(tree);
   return all.filter((f) => {
-    // .mdvignore applies to focus view only (pinned files are also filtered)
-    if (ignorePatterns.length && isIgnored(f.path, workspacePath, ignorePatterns)) return false;
+    if (ignored.has(f.path)) return false;
     if (pinned.has(f.path)) return true;
     if (typeof f.lastModified === 'number' && f.lastModified >= cutoff) return true;
     return false;

@@ -64,13 +64,6 @@ export function generateClientHTML(): string {
     <!-- 侧边栏 -->
     <aside class="sidebar">
       <div class="sidebar-header">
-        <h1>
-          <svg class="logo-icon" width="24" height="24" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="16" cy="16" r="16" fill="#3b82f6"/>
-            <path d="M 9 11 L 9 21 L 11 21 L 11 14.5 L 16 19.5 L 21 14.5 L 21 21 L 23 21 L 23 11 L 16 18.5 Z" fill="white"/>
-          </svg>
-          MD Viewer
-        </h1>
         <!-- 搜索框 -->
         <div id="searchBox"></div>
         <div id="modeSwitchRow"></div>

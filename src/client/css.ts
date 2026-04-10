@@ -51,21 +51,6 @@ export const styles = `
       display: flex;
       flex-direction: column;
     }
-    .sidebar-header h1 {
-      font-size: 16px;
-      color: #24292e;
-      height: 48px;
-      margin: 0;
-      padding: 0 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .logo-icon {
-      color: #2563eb;
-      flex-shrink: 0;
-    }
-
     /* 搜索框 */
     .search-wrapper {
       position: relative;

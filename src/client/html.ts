@@ -55,6 +55,9 @@ export function generateClientHTML(): string {
   <!-- Version: ${VERSION} -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"><\/script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js"><\/script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16/dist/contrib/auto-render.min.js"><\/script>
   <style id="theme-md-css">${githubMarkdownCSS}</style>
   <style id="theme-hl-css">${highlightGithubCSS}</style>
   <style>${styles}</style>

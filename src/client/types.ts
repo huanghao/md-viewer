@@ -39,6 +39,7 @@ export interface AppConfig {
   markdownTheme: string;  // 'github' | 'notion' | 'bear'
   codeTheme: string;      // 'github' | 'github-dark' | 'atom-one-dark'
   mathInline: boolean;    // render $...$ inline math (disable if $ is used as currency)
+  workspacePollInterval: number; // workspace tree polling interval in ms
   workspaces: Workspace[];
 }
 

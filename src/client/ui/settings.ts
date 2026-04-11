@@ -108,6 +108,20 @@ function renderSettingsDialog(): void {
       </div>
     </div>
     <div class="settings-section">
+      <div class="settings-section-title">工作区</div>
+      <div class="settings-section-desc">工作区文件树的轮询间隔，用于感知新增/删除文件。文件内容变化由 SSE 实时推送，不受此设置影响。修改后刷新页面生效。</div>
+      <div class="settings-kv-grid">
+        <div>轮询间隔（毫秒）</div>
+        <div>
+          <select id="pollIntervalSelect" style="font-size:12px;padding:2px 6px;border:1px solid #ddd;border-radius:3px">
+            ${[2000, 5000, 10000, 30000].map(v =>
+              `<option value="${v}"${(state.config.workspacePollInterval ?? 5000) === v ? ' selected' : ''}>${v / 1000}s</option>`
+            ).join('')}
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="settings-section">
       <div class="settings-section-title">客户端状态</div>
       <div class="settings-section-desc">用于排查本地缓存是否脏数据，可直接清理。</div>
       <div class="settings-kv-grid">
@@ -175,9 +189,11 @@ export function saveSettings(): void {
   const mdSelect = document.getElementById('markdownThemeSelect') as HTMLSelectElement | null;
   const hlSelect = document.getElementById('codeThemeSelect') as HTMLSelectElement | null;
   const mathInlineCheckbox = document.getElementById('mathInlineCheckbox') as HTMLInputElement | null;
+  const pollIntervalSelect = document.getElementById('pollIntervalSelect') as HTMLSelectElement | null;
   if (mdSelect) state.config.markdownTheme = mdSelect.value;
   if (hlSelect) state.config.codeTheme = hlSelect.value;
   if (mathInlineCheckbox) state.config.mathInline = mathInlineCheckbox.checked;
+  if (pollIntervalSelect) state.config.workspacePollInterval = parseInt(pollIntervalSelect.value, 10);
   saveConfig(state.config);
   renderSidebar();
   // 清掉 saved 值，避免 closeSettingsDialog 误恢复

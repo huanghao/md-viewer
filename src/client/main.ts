@@ -1483,7 +1483,7 @@ function startWorkspacePolling() {
     } finally {
       workspacePollRunning = false;
     }
-  }, 1500);
+  }, state.config.workspacePollInterval ?? 5000);
 }
 
 // ==================== 初始化 ====================

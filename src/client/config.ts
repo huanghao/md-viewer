@@ -9,6 +9,7 @@ export const defaultConfig: AppConfig = {
   markdownTheme: 'github',
   codeTheme: 'github',
   mathInline: true,
+  workspacePollInterval: 5000,
   workspaces: [],
 };
 

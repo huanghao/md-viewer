@@ -2916,7 +2916,7 @@ export const styles = `
       flex-shrink: 0;
     }
     .focus-file-dot.modified { background: #f59e0b; }
-    .focus-file-dot.new-file { background: #10b981; }
+    .focus-file-dot.new-file { background: #007AFF; }
     .focus-pin-btn {
       border: none;
       background: transparent;

@@ -122,13 +122,10 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
     for (const [path, fileInfo] of data.files) {
       const fileData = await loadFile(path, true); // 静默加载，不弹窗
       if (fileData) {
-        // 恢复时：如果磁盘文件的修改时间没变，使用保存的 displayedModified
-        // 如果磁盘文件已被修改，保持 dirty 状态
-        const savedDisplayedModified = fileInfo.displayedModified || fileData.lastModified;
-
-        // Restore the saved lastModified (which may be higher than the disk value if an
-        // SSE "file-changed" event arrived before the page was reloaded).  Take the max
-        // so a file that was modified *again* after the last save is also reflected.
+        // content is loaded fresh from disk (fileData.content), so displayedModified
+        // must align to fileData.lastModified — we are displaying that version.
+        // lastModified takes the max in case an SSE event before reload recorded a
+        // newer mtime than the disk value we just read.
         const lastModified = Math.max(fileData.lastModified, fileInfo.lastModified || 0);
 
         state.sessionFiles.set(path, {
@@ -136,7 +133,7 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
           name: fileData.filename,
           content: fileData.content,
           lastModified,
-          displayedModified: savedDisplayedModified,
+          displayedModified: fileData.lastModified,
           isRemote: fileData.isRemote || false,
           isMissing: false,  // 恢复时文件存在，清除 isMissing
           lastAccessed: fileInfo.lastAccessed || fileData.lastModified,
@@ -178,10 +175,11 @@ export function addOrUpdateFile(fileData: FileData, switchTo: boolean = false): 
   const existing = state.sessionFiles.get(fileData.path);
   const isNewPath = !existing;  // 新加入到列表，打列表差异蓝点
 
-  // Preserve dirty flag: if file is already open and dirty, don't reset displayedModified
-  const displayedModified = (existing && existing.lastModified > existing.displayedModified)
-    ? existing.displayedModified
-    : fileData.lastModified;
+  // content is always replaced with fileData.content, so displayedModified must
+  // align to fileData.lastModified — the version we are now displaying.
+  // A previously dirty flag (lastModified > displayedModified set by SSE) is no
+  // longer meaningful once we've loaded fresh content from the server.
+  const displayedModified = fileData.lastModified;
 
   // Don't downgrade lastModified: an SSE "file-changed" event may have already
   // recorded a newer mtime than what the server returns when re-opening the file.

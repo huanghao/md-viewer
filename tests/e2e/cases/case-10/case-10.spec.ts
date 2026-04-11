@@ -65,8 +65,23 @@ test('case-10: file-changed 交互正确（当前/非当前都不自动刷新）
       return (await badge.count()) > 0 ? (await badge.first().innerText()).trim() : '';
     }, { timeout: 10000 }).toBe('M');
 
-    // 点击带 M 的 A：自动读取新内容并清除 M
+    // 点击带 M 的 A：切换过去但不自动刷新，正文仍为旧内容，显示 diff/refresh 按钮
     await itemA.click();
+    await expect.poll(async () => {
+      return await page.locator('#content').innerText();
+    }, { timeout: 5000 }).toContain('A v1');
+
+    // M 标记仍在（未自动刷新）
+    await expect.poll(async () => {
+      const badge = itemA.locator('.file-item-status .status-badge');
+      return (await badge.count()) > 0 ? (await badge.first().innerText()).trim() : '';
+    }, { timeout: 5000 }).toBe('M');
+
+    // diff 按钮应出现
+    await expect(page.locator('#diffButton')).toBeVisible({ timeout: 5000 });
+
+    // 手动刷新后，正文更新，M 清除
+    await page.evaluate(() => (window as any).handleRefreshButtonClick());
     await expect.poll(async () => {
       return await page.locator('#content').innerText();
     }, { timeout: 10000 }).toContain('A v2 waiting-for-open');

@@ -4,7 +4,7 @@
  * 文件操作、服务管理、配置管理、运维统计
  */
 
-import { resolve, join } from "path";
+import { resolve, join, dirname } from "path";
 import { existsSync, readFileSync, writeFileSync, unlinkSync, statSync, openSync } from "fs";
 import { spawn } from "child_process";
 import { loadConfig, getConfigDir, getConfigPath, initConfig } from "./config.ts";
@@ -688,14 +688,46 @@ async function replyCommentBatch(
   }
 }
 
-function printCommentDocs(json: boolean, limit: number, offset: number): void {
+function findGitRoot(startDir: string): string | null {
+  let dir = startDir;
+  while (dir !== dirname(dir)) {
+    if (existsSync(join(dir, '.git'))) return dir;
+    dir = dirname(dir);
+  }
+  return null;
+}
+
+function printCommentDocs(json: boolean, all: boolean, limit: number, offset: number): void {
   // SQL 已按 latest_updated_at DESC 排序，只过滤有 open 评论的文档
-  const docs = listAnnotatedDocuments(limit, offset).filter((d) => d.anchoredCount > 0);
+  let docs = listAnnotatedDocuments(1000, 0).filter((d) => d.anchoredCount > 0);
+
+  // 默认按工作区过滤：从 cwd 向上找 git root，只显示该工作区内的文档
+  let workspaceRoot: string | null = null;
+  if (!all) {
+    const gitRoot = findGitRoot(process.cwd());
+    if (gitRoot) {
+      const prefix = gitRoot + '/';
+      const inWorkspace = docs.filter((d) => d.path === gitRoot || d.path.startsWith(prefix));
+      if (inWorkspace.length > 0) {
+        workspaceRoot = gitRoot;
+        docs = inWorkspace;
+      }
+    }
+    // 如果找不到 git root 或工作区内无评论，回退到全局
+    docs = docs.slice(offset, offset + limit);
+  } else {
+    docs = docs.slice(offset, offset + limit);
+  }
+
   if (json) {
-    console.log(JSON.stringify({ totalReturned: docs.length, docs }, null, 2));
+    console.log(JSON.stringify({ totalReturned: docs.length, workspaceRoot, docs }, null, 2));
     return;
   }
-  console.log(`# 有评论的文档`);
+  if (workspaceRoot) {
+    console.log(`# 有评论的文档（${workspaceRoot}）`);
+  } else {
+    console.log(`# 有评论的文档`);
+  }
   console.log(`共返回 ${docs.length} 条`);
   console.log("");
   for (const item of docs) {
@@ -834,7 +866,8 @@ MD Viewer CLI - 命令行工具
   mdv <FILE>                           打开文件
   mdv tabs [--json]                    查看标签页和当前文档
   mdv config [get|set] [KEY] [VALUE]   配置管理
-  mdv comments list                    列出有 open 评论的文档
+  mdv comments list                    列出当前工作区有 open 评论的文档
+  mdv comments list --all              列出所有工作区的评论文档
   mdv comments get --file <FILE>       查看文档评论
   mdv comments reply --file <FILE> [--seq <N> | --id <ID>] --author <NAME> --text <TEXT>
                                        回复一条评论
@@ -866,7 +899,8 @@ MD Viewer CLI - 命令行工具
   mdv config                           查看完整配置
   mdv config get server.port           获取端口配置
   mdv config set server.port 3001      设置端口
-  mdv comments list --json             列出评论文档（JSON）
+  mdv comments list --json             列出当前工作区评论文档（JSON）
+  mdv comments list --all --json       列出所有评论文档（JSON）
   mdv comments tidy                    清理 7 天前的已解决/失锚评论
   mdv comments tidy --days 30          清理 30 天前的已解决/失锚评论
   mdv comments tidy --missing          同时清理已删除文件的评论
@@ -885,6 +919,7 @@ MD Viewer CLI - 命令行工具
 interface CliOptions {
   noFocus: boolean;
   json: boolean;
+  all: boolean;
   limit: number;
   offset: number;
   tail?: number;
@@ -907,6 +942,7 @@ function parseArgs(args: string[]): {
   const options: CliOptions = {
     noFocus: false,
     json: false,
+    all: false,
     limit: 20,
     offset: 0,
     daemon: false,
@@ -950,6 +986,8 @@ function parseArgs(args: string[]): {
       options.days = parseInt(args[++i], 10);
     } else if (arg === "--missing") {
       options.missing = true;
+    } else if (arg === "--all") {
+      options.all = true;
     } else if (!arg.startsWith("-")) {
       if (command.length === 0 && !topLevelCommands.has(arg)) {
         // 兼容 `mdv <FILE>`：首个非选项参数且非保留命令时，按文件路径处理。
@@ -1021,7 +1059,7 @@ async function main() {
     }
   } else if (cmd === "comments") {
     if (subcmd === "list") {
-      printCommentDocs(options.json, options.limit, options.offset);
+      printCommentDocs(options.json, options.all, options.limit, options.offset);
     } else if (subcmd === "get") {
       const target = options.file || rest[0];
       if (!target) {

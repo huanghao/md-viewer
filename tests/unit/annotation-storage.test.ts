@@ -10,6 +10,7 @@ import {
   upsertAnnotation,
   updateAnnotationStatus,
   deleteAnnotation,
+  resetDbForTesting,
 } from '../../src/annotation-storage';
 
 let tempConfigHome = '';
@@ -19,6 +20,7 @@ beforeAll(() => {
   oldConfigHome = process.env.XDG_CONFIG_HOME;
   tempConfigHome = mkdtempSync(join(tmpdir(), 'mdv-ann-db-'));
   process.env.XDG_CONFIG_HOME = tempConfigHome;
+  resetDbForTesting();
 
   replaceAnnotations('/tmp/a.md', [
     { id: 'a1', start: 0, length: 4, quote: 'aaaa', note: 'note-a1', createdAt: 1000, status: 'anchored' },
@@ -31,6 +33,7 @@ beforeAll(() => {
 });
 
 afterAll(() => {
+  resetDbForTesting();
   if (oldConfigHome === undefined) {
     delete process.env.XDG_CONFIG_HOME;
   } else {

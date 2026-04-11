@@ -38,6 +38,12 @@ export interface AnnotationDocSummary {
 
 let db: Database | null = null;
 
+/** Close and reset the DB singleton. Only for use in tests. */
+export function resetDbForTesting(): void {
+  if (db) { try { db.close(); } catch { /* ignore */ } }
+  db = null;
+}
+
 function normalizeDocPath(path: string): string {
   const raw = (path || "").trim();
   if (!raw) return raw;

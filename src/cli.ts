@@ -9,6 +9,7 @@ import { existsSync, readFileSync, writeFileSync, unlinkSync, statSync, openSync
 import { spawn } from "child_process";
 import { loadConfig, getConfigDir, getConfigPath, initConfig } from "./config.ts";
 import { appendAnnotationReply, getAnnotationsByDocument, listAnnotatedDocuments, tidyAnnotations, tidyMissingFiles } from "./annotation-storage.ts";
+import { findGitRoot, filterCommentDocsByWorkspace } from "./comments-filter.ts";
 
 // ==================== 配置 ====================
 
@@ -688,14 +689,6 @@ async function replyCommentBatch(
   }
 }
 
-function findGitRoot(startDir: string): string | null {
-  let dir = startDir;
-  while (dir !== dirname(dir)) {
-    if (existsSync(join(dir, '.git'))) return dir;
-    dir = dirname(dir);
-  }
-  return null;
-}
 
 function printCommentDocs(json: boolean, all: boolean, limit: number, offset: number): void {
   // SQL 已按 latest_updated_at DESC 排序，只过滤有 open 评论的文档
@@ -704,20 +697,11 @@ function printCommentDocs(json: boolean, all: boolean, limit: number, offset: nu
   // 默认按工作区过滤：从 cwd 向上找 git root，只显示该工作区内的文档
   let workspaceRoot: string | null = null;
   if (!all) {
-    const gitRoot = findGitRoot(process.cwd());
-    if (gitRoot) {
-      const prefix = gitRoot + '/';
-      const inWorkspace = docs.filter((d) => d.path === gitRoot || d.path.startsWith(prefix));
-      if (inWorkspace.length > 0) {
-        workspaceRoot = gitRoot;
-        docs = inWorkspace;
-      }
-    }
-    // 如果找不到 git root 或工作区内无评论，回退到全局
-    docs = docs.slice(offset, offset + limit);
-  } else {
-    docs = docs.slice(offset, offset + limit);
+    const { filtered, workspaceRoot: root } = filterCommentDocsByWorkspace(docs, findGitRoot(process.cwd()));
+    docs = filtered;
+    workspaceRoot = root;
   }
+  docs = docs.slice(offset, offset + limit);
 
   if (json) {
     console.log(JSON.stringify({ totalReturned: docs.length, workspaceRoot, docs }, null, 2));

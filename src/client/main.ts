@@ -829,7 +829,7 @@ async function handleSmartAddInput(path: string): Promise<void> {
 }
 
 // 切换文件
-function switchFile(path: string) {
+async function switchFile(path: string) {
   // 切换文件时关闭 diff 视图
   if (diffViewActive) {
     diffViewActive = false;
@@ -845,10 +845,7 @@ function switchFile(path: string) {
   if (previousFile !== path) {
     scrollContentToTop();
   }
-  const file = state.sessionFiles.get(path);
-  if (file && !file.isMissing && file.lastModified > file.displayedModified) {
-    void syncFileFromDisk(path, { silent: true, highlight: false });
-  }
+  await updateToolbarButtons();
 }
 
 // 移除文件（关闭标签页和从列表删除是同一个操作）

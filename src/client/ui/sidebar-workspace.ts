@@ -799,7 +799,6 @@ export function bindWorkspaceEvents(): void {
       const main = await import('../main');
       (main as any).renderAll();
     } else {
-      // 使用 switchFile（含脏文件自动刷新逻辑）
       (window as any).switchFile?.(filePath);
     }
   };
@@ -865,7 +864,6 @@ export function bindWorkspaceEvents(): void {
       const main = await import('../main');
       (main as any).renderAll();
     } else {
-      // 使用 switchFile（含脏文件自动刷新逻辑）
       (window as any).switchFile?.(filePath);
     }
   };

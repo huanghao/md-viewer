@@ -1297,8 +1297,14 @@ document.addEventListener('click', (e) => {
 });
 
 // ==================== SSE 连接 ====================
-function connectSSE() {
+function connectSSE(isReconnect = false) {
   const eventSource = new EventSource('/api/events');
+
+  // 重连时重新触发工作区扫描，让服务端重新注册 watchWorkspace。
+  // 服务端重启会清空 watchedWorkspaceRoots，不重新扫描则文件变化不再广播。
+  if (isReconnect) {
+    void hydrateExpandedWorkspaces();
+  }
 
   // 文件内容变化
   eventSource.addEventListener('file-changed', async (e: any) => {
@@ -1384,7 +1390,7 @@ function connectSSE() {
   eventSource.onerror = () => {
     console.error('SSE 连接断开，尝试重连...');
     eventSource.close();
-    setTimeout(connectSSE, 3000);
+    setTimeout(() => connectSSE(true), 3000);
   };
 }
 

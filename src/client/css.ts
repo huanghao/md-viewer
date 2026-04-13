@@ -825,6 +825,32 @@ export const styles = `
       color: white;
       border-radius: 4px;
     }
+    .tab-context-menu {
+      position: fixed;
+      z-index: 9999;
+      background: #fff;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      box-shadow: 0 8px 24px rgba(140,149,159,0.2);
+      padding: 4px 0;
+      min-width: 140px;
+      font-size: 13px;
+    }
+    .tab-context-item {
+      padding: 7px 16px;
+      cursor: pointer;
+      color: #24292f;
+      white-space: nowrap;
+    }
+    .tab-context-item:hover {
+      background: #f6f8fa;
+    }
+    .tab-context-item-danger {
+      color: #cf222e;
+    }
+    .tab-context-item-danger:hover {
+      background: #fff0f0;
+    }
     .tab-manager-wrap {
       position: relative;
       flex-shrink: 0;

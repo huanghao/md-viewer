@@ -53,6 +53,65 @@ if (typeof window !== 'undefined') {
   (window as any).setTabManagerQuery = setTabManagerQuery;
   (window as any).setTabManagerSort = setTabManagerSort;
   (window as any).applyTabBatchAction = applyTabBatchAction;
+  (window as any).showTabContextMenu = showTabContextMenu;
+}
+
+// ==================== Tab 右键菜单 ====================
+
+let activeContextMenu: HTMLElement | null = null;
+
+function removeContextMenu(): void {
+  if (activeContextMenu) {
+    activeContextMenu.remove();
+    activeContextMenu = null;
+  }
+}
+
+function showTabContextMenu(e: MouseEvent, path: string): void {
+  e.preventDefault();
+  e.stopPropagation();
+  removeContextMenu();
+
+  const removeFile = (window as any).removeFile as ((path: string) => void) | undefined;
+  if (!removeFile) return;
+
+  const menu = document.createElement('div');
+  menu.className = 'tab-context-menu';
+  menu.innerHTML = `
+    <div class="tab-context-item" data-action="close">关闭当前</div>
+    <div class="tab-context-item" data-action="close-others">关闭其他</div>
+    <div class="tab-context-item tab-context-item-danger" data-action="close-all">关闭所有</div>
+  `;
+
+  // 定位到鼠标位置，防止超出视口
+  const menuWidth = 140;
+  const menuHeight = 96;
+  let x = e.clientX;
+  let y = e.clientY;
+  if (x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 4;
+  if (y + menuHeight > window.innerHeight) y = window.innerHeight - menuHeight - 4;
+  menu.style.left = `${x}px`;
+  menu.style.top = `${y}px`;
+
+  menu.addEventListener('click', (ev) => {
+    const action = (ev.target as HTMLElement).dataset.action;
+    if (!action) return;
+    if (action === 'close') {
+      removeFile(path);
+    } else {
+      (window as any).applyTabBatchAction(action === 'close-others' ? 'close-others' : 'close-all', path);
+    }
+    removeContextMenu();
+  });
+
+  document.body.appendChild(menu);
+  activeContextMenu = menu;
+
+  // 点击其他地方关闭
+  setTimeout(() => {
+    document.addEventListener('click', removeContextMenu, { once: true });
+    document.addEventListener('contextmenu', removeContextMenu, { once: true });
+  }, 0);
 }
 
 function touchTabAccess(path: string | null): void {
@@ -119,12 +178,12 @@ function ensureTabsScrollHandler(): void {
   }, { passive: true, capture: true });
 }
 
-function applyTabBatchAction(action: TabBatchAction): void {
+function applyTabBatchAction(action: TabBatchAction, pivotPath?: string): void {
   const filesWithDisplay = generateDistinctNames(state.sessionFiles);
   const targets = getTabBatchTargets(
     action,
     filesWithDisplay,
-    state.currentFile,
+    pivotPath ?? state.currentFile,
     (path) => {
       const file = filesWithDisplay.find((f) => f.path === path);
       if (!file) return false;
@@ -480,7 +539,8 @@ export function renderTabs(): void {
 
       return `
         <div class="${classes.join(' ')}"
-             onclick="window.switchFile('${escapeAttr(file.path)}')">
+             onclick="window.switchFile('${escapeAttr(file.path)}')"
+             oncontextmenu="window.showTabContextMenu(event,'${escapeAttr(file.path)}')">
           <span class="tab-name">${escapeHtml(file.displayName)}</span>
           <span class="tab-close" onclick="event.stopPropagation();window.removeFile('${escapeAttr(file.path)}')">×</span>
         </div>

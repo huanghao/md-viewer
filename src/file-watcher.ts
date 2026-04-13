@@ -122,10 +122,6 @@ export function watchFile(filePath: string) {
 
 /**
  * 添加工作区目录到监听列表（监听其中 Markdown/HTML 文件的增删改）
- *
- * 注意：必须监听目录本身，而不是 glob 模式（如 **\/*.md）。
- * chokidar 的 glob 监听只能感知新文件创建（add），无法感知已有文件的内容变化（change）。
- * 监听目录后在 change 事件里用 isSupportedTextFile 过滤即可。
  */
 export function watchWorkspace(rootPath: string) {
   const resolved = resolve(rootPath);
@@ -134,7 +130,12 @@ export function watchWorkspace(rootPath: string) {
   watchedWorkspaceRoots.add(resolved);
   ensureWatcher();
 
-  watcher?.add(resolved);
+  watcher?.add([
+    `${resolved}/**/*.md`,
+    `${resolved}/**/*.markdown`,
+    `${resolved}/**/*.html`,
+    `${resolved}/**/*.htm`,
+  ]);
 }
 
 /**

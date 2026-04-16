@@ -3058,4 +3058,40 @@ export const styles = `
       color: #fff;
     }
     .sync-dialog-btn-primary:hover { background: #0757ba; }
+
+    /* PDF Viewer */
+    .pdf-viewer-container {
+      padding: 16px;
+      background: #525659;
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .pdf-page-wrapper {
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+      background: white;
+    }
+
+    .pdf-page-wrapper canvas {
+      display: block;
+    }
+
+    .pdf-text-layer span {
+      position: absolute;
+      white-space: pre;
+      cursor: text;
+      transform-origin: 0% 0%;
+    }
+
+    .pdf-highlight {
+      background: rgba(255, 220, 0, 0.4) !important;
+      border-radius: 2px;
+    }
+
+    .pdf-translation-overlay {
+      word-break: break-all;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
 `;

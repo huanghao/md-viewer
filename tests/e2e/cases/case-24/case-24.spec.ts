@@ -33,10 +33,11 @@ test('case-24: Tabs 管理面板支持搜索与切换', async ({ page }) => {
 
     await page.fill('.tab-manager-search', 'tab-manager-a');
     await expect(page.locator('.tab-manager-item')).toHaveCount(1);
-    await expect(page.locator('.tab-manager-item .tab-manager-name')).toContainText('tab-manager-a.md');
+    await expect(page.locator('.tab-manager-item .tab-manager-name')).toContainText('tab-manager-a');
 
     await page.locator('.tab-manager-item').first().click();
-    await expect(page.locator('.file-item.current .name')).toContainText('tab-manager-a.md');
+    await page.waitForSelector('.file-item.current', { timeout: 10000 });
+    await expect(page.locator('.file-item.current')).toContainText('tab-manager-a');
   } finally {
     if (existsSync(FILE_A)) rmSync(FILE_A);
     if (existsSync(FILE_B)) rmSync(FILE_B);

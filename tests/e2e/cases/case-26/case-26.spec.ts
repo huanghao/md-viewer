@@ -32,17 +32,22 @@ test('case-26: 关闭右侧与关闭全部行为正确', async ({ page }) => {
       await (window as any).addFileByPath(d, true);
     }, { a: FILE_A, b: FILE_B, c: FILE_C, d: FILE_D });
 
+    // 等待文件列表渲染（扩展名被剥离）
+    await page.waitForSelector('.file-item', { timeout: 10000 });
+
     // 切到 B，使其右侧有 C/D
-    await page.locator('.file-item', { hasText: 'tab-order-b.md' }).click();
-    await expect(page.locator('.file-item.current .name')).toContainText('tab-order-b.md');
+    await page.locator('.file-item', { hasText: 'tab-order-b' }).click();
+    await page.waitForSelector('.file-item.current', { timeout: 10000 });
+    await expect(page.locator('.file-item.current')).toContainText('tab-order-b');
 
     await page.locator('.tab-manager-toggle').click();
     await page.locator('.tab-manager-action[data-action="close-right"]').click();
 
-    await expect(page.locator('.file-item', { hasText: 'tab-order-c.md' })).toHaveCount(0);
-    await expect(page.locator('.file-item', { hasText: 'tab-order-d.md' })).toHaveCount(0);
-    await expect(page.locator('.file-item', { hasText: 'tab-order-a.md' })).toHaveCount(1);
-    await expect(page.locator('.file-item.current', { hasText: 'tab-order-b.md' })).toHaveCount(1);
+    // 验证 C 和 D 被关闭，A 和 B 保留
+    await expect(page.locator('.file-item', { hasText: 'tab-order-c' })).toHaveCount(0);
+    await expect(page.locator('.file-item', { hasText: 'tab-order-d' })).toHaveCount(0);
+    await expect(page.locator('.file-item', { hasText: 'tab-order-a' })).toHaveCount(1);
+    await expect(page.locator('.file-item.current', { hasText: 'tab-order-b' })).toHaveCount(1);
 
     // 关闭全部：关掉所有文件（包括当前），列表变空
     await page.locator('.tab-manager-action[data-action="close-all"]').click();

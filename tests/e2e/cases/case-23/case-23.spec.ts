@@ -4,7 +4,7 @@ import { resolve } from 'path';
 
 const ROOT = process.cwd();
 const LONG_FILE = resolve(ROOT, 'docs/design/20260301-agent-style-learning.md');
-const TARGET_FILE_NAME = 'blue-dot-refresh-test.md';
+const TARGET_FILE_NAME = 'blue-dot-refresh-test';
 
 test('case-23: 搜索打开新文件后正文回到顶部', async ({ page, request }) => {
   await resetAppStorage(page);
@@ -14,7 +14,9 @@ test('case-23: 搜索打开新文件后正文回到顶部', async ({ page, reque
   });
   expect(resp.ok()).toBeTruthy();
 
-  await page.locator('.file-item', { hasText: '20260301-agent-style-learning.md' }).click();
+  // 等待文件列表渲染（扩展名被剥离）
+  await page.waitForSelector('.file-item', { timeout: 10000 });
+  await page.locator('.file-item', { hasText: '20260301-agent-style-learning' }).click();
 
   await page.evaluate(() => {
     const content = document.getElementById('content');
@@ -31,7 +33,7 @@ test('case-23: 搜索打开新文件后正文回到顶部', async ({ page, reque
   await page.fill('#searchInput', 'blue-dot-refresh-test');
   await page.keyboard.press('Enter');
 
-  await expect(page.locator('.file-item.current .name')).toContainText(TARGET_FILE_NAME);
+  await expect(page.locator('.file-item.current')).toContainText(TARGET_FILE_NAME);
 
   const after = await page.evaluate(() => {
     const content = document.getElementById('content');

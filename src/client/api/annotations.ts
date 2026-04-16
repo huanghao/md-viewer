@@ -73,3 +73,14 @@ export async function updateAnnotationStatusRemote(
   }
   return data.annotation as Annotation;
 }
+
+export async function fetchAnnotationSummaries(): Promise<Map<string, number>> {
+  try {
+    const response = await fetch('/api/annotations/summaries');
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data?.summaries) return new Map();
+    return new Map(Object.entries(data.summaries).map(([k, v]) => [k, Number(v)]));
+  } catch {
+    return new Map();
+  }
+}

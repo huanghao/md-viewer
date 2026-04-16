@@ -137,6 +137,27 @@ export async function handleGetFileAsset(c: Context) {
   });
 }
 
+// API: 获取 PDF 文件
+export async function handleGetPdfAsset(c: Context): Promise<Response> {
+  const path = c.req.query("path");
+  if (!path) return c.json({ error: "path required" }, 400);
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return c.json({ error: "remote PDFs not supported" }, 400);
+  }
+  const resolvedPath = resolve(path);
+  try {
+    const file = Bun.file(resolvedPath);
+    const exists = await file.exists();
+    if (!exists) return c.json({ error: "file not found" }, 404);
+    const buffer = await file.arrayBuffer();
+    return new Response(buffer, {
+      headers: { "Content-Type": "application/pdf" },
+    });
+  } catch (e) {
+    return c.json({ error: String(e) }, 500);
+  }
+}
+
 // API: 获取目录下的可展示文本文件列表（Markdown / HTML）
 export function handleGetFiles(c: Context) {
   const query = (c.req.query("query") || "").trim();

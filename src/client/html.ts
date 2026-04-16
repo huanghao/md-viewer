@@ -107,10 +107,19 @@ export function generateClientHTML(): string {
         <button class="toolbar-text-button" id="refreshButton" onclick="handleRefreshButtonClick()" style="display: none;" title="文件已更新，点击刷新">
           <span id="refreshButtonText">[↻ 刷新]</span>
         </button>
+        <button class="toolbar-text-button" id="pdfMemButton" onclick="togglePdfMemPanel()" title="PDF 内存监控" style="display:none;">
+          <span id="pdfMemButtonText">[▦ 内存]</span>
+        </button>
         <button class="font-scale-button" id="fontScaleButton" onclick="toggleFontScaleMenu()" title="调整字体大小">
           <span id="fontScaleText">100%</span>
         </button>
         <span class="file-meta" id="fileMeta"></span>
+      </div>
+
+      <!-- PDF 内存监控面板 -->
+      <div class="pdf-mem-panel" id="pdfMemPanel" style="display: none;">
+        <div class="pdf-mem-panel-title">PDF 内存监控</div>
+        <div id="pdfMemContent"></div>
       </div>
 
       <!-- 字体缩放菜单 -->

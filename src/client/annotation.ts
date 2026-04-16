@@ -13,6 +13,7 @@ import {
 } from './api/annotations';
 import { showError } from './ui/toast';
 import { resolveAnnotationAnchor } from './utils/annotation-anchor';
+import { isOpen, isResolved, isOrphan, type AnnotationStatus } from '../annotation-status';
 import { adjustAnnotationCount } from './state';
 
 // ==================== 类型定义 ====================
@@ -328,22 +329,22 @@ function getReaderText(root: HTMLElement): string {
   return getTextNodes(root).map((node) => node.nodeValue || '').join('');
 }
 
-function isResolved(ann: Annotation): boolean {
-  return ann.status === 'resolved';
+function isResolvedAnn(ann: Annotation): boolean {
+  return isResolved(ann.status as AnnotationStatus);
 }
 
 function getAnchorTrack(ann: Annotation): 'exact' | 'reanchored' | 'orphan' {
-  if (ann.status === 'unanchored') return 'orphan';
+  if (isOrphan(ann.status as AnnotationStatus)) return 'orphan';
   if ((ann.confidence || 0) >= 0.95) return 'exact';
   return 'reanchored';
 }
 
 function matchesFilter(ann: Annotation, filter: AnnotationFilter): boolean {
-  const isOrphan = ann.status === 'unanchored' || getAnchorTrack(ann) === 'orphan';
+  const orphan = isOrphan(ann.status as AnnotationStatus) || getAnchorTrack(ann) === 'orphan';
   if (filter === 'all') return true;
-  if (filter === 'open') return !isResolved(ann) && !isOrphan;
-  if (filter === 'resolved') return isResolved(ann) && !isOrphan;
-  if (filter === 'orphan') return isOrphan;
+  if (filter === 'open') return isOpen(ann.status as AnnotationStatus);
+  if (filter === 'resolved') return isResolved(ann.status as AnnotationStatus) && !orphan;
+  if (filter === 'orphan') return orphan;
   return true;
 }
 
@@ -922,7 +923,7 @@ function showPopover(ann: Annotation, x: number, y: number): void {
     </div>
   `;
   if (el.popoverResolveBtn) {
-    const resolved = isResolved(ann);
+    const resolved = isResolvedAnn(ann);
     el.popoverResolveBtn.title = resolved ? '重新打开' : '标记已解决';
     el.popoverResolveBtn.setAttribute('aria-label', resolved ? '重新打开' : '标记已解决');
     el.popoverResolveBtn.innerHTML = resolved ? iconSvg('reopen') : iconSvg('check');
@@ -977,22 +978,14 @@ export function savePendingAnnotation(filePath: string): void {
   };
 
   state.annotations.push(ann);
-  console.log('[save] 1 push');
   persistAnnotation(filePath, ann, '创建评论失败');
-  console.log('[save] 2 persist');
   adjustAnnotationCount(filePath, +1);
-  console.log('[save] 3 adjustCount');
   import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
-  console.log('[save] 4 sidebar');
   hideComposer();
-  console.log('[save] 5 hideComposer');
   const isPdf = document.getElementById('content')?.hasAttribute('data-pdf');
   if (!isPdf) applyAnnotations();
-  console.log('[save] 6 applyAnnotations');
   renderAnnotationList(filePath);
-  console.log('[save] 7 renderAnnotationList');
   document.dispatchEvent(new CustomEvent('annotation:created', { detail: { annotation: ann, filePath } }));
-  console.log('[save] 8 dispatched');
 }
 
 export function removeAnnotation(id: string, filePath: string): void {
@@ -1120,7 +1113,7 @@ function decorateMark(wrapper: HTMLElement, ann: Annotation): void {
   wrapper.classList.add('annotation-mark');
   wrapper.dataset.annotationId = ann.id;
   wrapper.classList.add(`status-${getAnchorTrack(ann)}`);
-  if (isResolved(ann)) {
+  if (isResolvedAnn(ann)) {
     wrapper.classList.add('is-resolved');
   }
 }
@@ -1354,13 +1347,13 @@ export function renderAnnotationList(filePath: string | null): void {
   }
 
   const renderItem = (ann: Annotation, index: number, positioned = false, top = 0) => `
-    <div class="annotation-item ${state.activeAnnotationId === ann.id ? 'is-active' : ''} status-${getAnchorTrack(ann)}${isResolved(ann) ? ' is-resolved' : ''}${positioned ? ' positioned' : ''}" data-annotation-id="${ann.id}"${positioned ? ` data-anchor-top="${Math.max(0, Math.round(top))}" style="top:${Math.max(0, Math.round(top))}px"` : ''}>
+    <div class="annotation-item ${state.activeAnnotationId === ann.id ? 'is-active' : ''} status-${getAnchorTrack(ann)}${isResolvedAnn(ann) ? ' is-resolved' : ''}${positioned ? ' positioned' : ''}" data-annotation-id="${ann.id}"${positioned ? ` data-anchor-top="${Math.max(0, Math.round(top))}" style="top:${Math.max(0, Math.round(top))}px"` : ''}>
       <div class="annotation-row-top">
         <div class="annotation-row-title">#${ann.serial || index + 1} | ${escapeHtml(ann.quote.substring(0, 28))}${ann.quote.length > 28 ? '...' : ''}</div>
         <div class="annotation-row-actions">
           <button class="annotation-icon-action" data-action="prev" data-id="${ann.id}" title="上一条">${iconSvg('up')}</button>
           <button class="annotation-icon-action" data-action="next" data-id="${ann.id}" title="下一条">${iconSvg('down')}</button>
-          <button class="annotation-icon-action resolve${isResolved(ann) ? ' is-resolved' : ''}" data-action="resolve" data-id="${ann.id}" title="${isResolved(ann) ? '重新打开' : '标记已解决'}">${isResolved(ann) ? iconSvg('reopen') : iconSvg('check')}</button>
+          <button class="annotation-icon-action resolve${isResolvedAnn(ann) ? ' is-resolved' : ''}" data-action="resolve" data-id="${ann.id}" title="${isResolvedAnn(ann) ? '重新打开' : '标记已解决'}">${isResolvedAnn(ann) ? iconSvg('reopen') : iconSvg('check')}</button>
           <button class="annotation-icon-action danger" data-action="delete" data-id="${ann.id}" title="删除">${iconSvg('trash')}</button>
         </div>
       </div>

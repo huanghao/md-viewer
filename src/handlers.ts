@@ -26,6 +26,7 @@ import {
   deleteAnnotation,
   updateAnnotationStatus,
 } from "./annotation-storage.ts";
+import { calculateOpenCount } from "./annotation-status.ts";
 
 function expandHomePath(input: string): string {
   if (input === "~") return homedir();
@@ -668,8 +669,7 @@ export async function handleGetAnnotationSummaries(c: Context) {
     const docs = listAnnotatedDocuments(1000, 0);
     const summaries: Record<string, { count: number; updatedAt: number }> = {};
     for (const doc of docs) {
-      // open = anchored only (unanchored 算 orphan，不算 open，与前端 filter 保持一致)
-      const openCount = doc.anchoredCount;
+      const openCount = calculateOpenCount(doc.anchoredCount, doc.unanchoredCount, doc.resolvedCount);
       if (openCount > 0) {
         summaries[doc.path] = {
           count: openCount,

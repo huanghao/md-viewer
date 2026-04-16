@@ -1230,9 +1230,55 @@ async function handleDiffButtonClick(): Promise<void> {
 
 function closeDiffView(): void {
   diffViewActive = false;
+  currentDiffBlockIndex = -1;
   const diffBtn = document.getElementById('diffButton');
   if (diffBtn) diffBtn.classList.remove('active');
   renderContent();
+}
+
+let currentDiffBlockIndex = -1; // -1 表示未激活任何 block
+
+function navigateDiffBlock(direction: 1 | -1): void {
+  const scrollEl = document.querySelector('.diff-view-scroll');
+  if (!scrollEl) return;
+
+  // 计算总 block 数（通过 DOM 中的 data-block-index 属性）
+  const allBlockRows = scrollEl.querySelectorAll<HTMLElement>('[data-block-index]');
+  const totalBlocks = allBlockRows.length;
+  if (totalBlocks === 0) return;
+
+  const nextIndex = currentDiffBlockIndex === -1
+    ? (direction === 1 ? 0 : totalBlocks - 1)
+    : Math.max(0, Math.min(totalBlocks - 1, currentDiffBlockIndex + direction));
+
+  if (nextIndex === currentDiffBlockIndex) return;
+
+  // 隐藏旧标签
+  if (currentDiffBlockIndex >= 0) {
+    const oldSpan = scrollEl.querySelector<HTMLElement>(`[data-block-span="${currentDiffBlockIndex}"]`);
+    if (oldSpan) oldSpan.style.display = 'none';
+  }
+
+  // 显示新标签
+  const newSpan = scrollEl.querySelector<HTMLElement>(`[data-block-span="${nextIndex}"]`);
+  if (newSpan) newSpan.style.display = 'inline';
+
+  // 滚动到目标 block 首行
+  const targetRow = scrollEl.querySelector<HTMLElement>(`[data-block-index="${nextIndex}"]`);
+  if (targetRow) {
+    targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  currentDiffBlockIndex = nextIndex;
+
+  // 更新导航条文字和按钮状态
+  const countEl = document.getElementById('diffNavCount');
+  if (countEl) countEl.textContent = `${nextIndex + 1} / ${totalBlocks} 处差异`;
+
+  const prevBtn = document.getElementById('diffNavPrev') as HTMLButtonElement | null;
+  const nextBtn = document.getElementById('diffNavNext') as HTMLButtonElement | null;
+  if (prevBtn) prevBtn.disabled = nextIndex === 0;
+  if (nextBtn) nextBtn.disabled = nextIndex === totalBlocks - 1;
 }
 
 async function acceptDiffUpdate(): Promise<void> {
@@ -1662,6 +1708,7 @@ window.refreshFile = refreshFile;
 window.handleRefreshButtonClick = handleRefreshButtonClick;
 window.handleDiffButtonClick = handleDiffButtonClick;
 window.closeDiffView = closeDiffView;
+(window as any).navigateDiffBlock = navigateDiffBlock;
 window.acceptDiffUpdate = acceptDiffUpdate;
 window.copySingleText = copySingleText;
 window.copyFileName = copyFileName;

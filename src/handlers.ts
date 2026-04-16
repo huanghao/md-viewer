@@ -335,8 +335,9 @@ export async function handleDetectPath(c: Context) {
       const ext = extname(url.pathname || "").toLowerCase();
       const isMd = ext === ".md" || ext === ".markdown";
       const isHtml = ext === ".html" || ext === ".htm";
+      const isPdfFile = ext === ".pdf";
       return c.json({
-        kind: isMd ? "md_file" : (isHtml ? "html_file" : "other_file"),
+        kind: isMd ? "md_file" : (isHtml ? "html_file" : (isPdfFile ? "pdf_file" : "other_file")),
         path: rawPath,
         ext: ext || null,
         isUrl: true,
@@ -368,8 +369,9 @@ export async function handleDetectPath(c: Context) {
       const ext = extname(resolvedPath).toLowerCase();
       const isMd = ext === ".md" || ext === ".markdown";
       const isHtml = ext === ".html" || ext === ".htm";
+      const isPdfFile = ext === ".pdf";
       return c.json({
-        kind: isMd ? "md_file" : (isHtml ? "html_file" : "other_file"),
+        kind: isMd ? "md_file" : (isHtml ? "html_file" : (isPdfFile ? "pdf_file" : "other_file")),
         path: resolvedPath,
         ext: ext || null,
       });

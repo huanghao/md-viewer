@@ -29,7 +29,7 @@ export function isPdf(path: string): boolean {
 
 export function isSupportedTextFile(path: string): boolean {
   const lower = path.toLowerCase();
-  return isMarkdown(lower) || isHtml(lower) || isJson(lower);
+  return isMarkdown(lower) || isHtml(lower) || isJson(lower) || isPdf(lower);
 }
 
 export function isUrl(path: string): boolean {

@@ -837,7 +837,7 @@ async function handleSmartAddInput(path: string): Promise<void> {
   const result = await detectPathType(trimmed);
   const detectedPath = result.path || trimmed;
 
-  if (result.kind === 'md_file' || result.kind === 'html_file') {
+  if (result.kind === 'md_file' || result.kind === 'html_file' || result.kind === 'pdf_file') {
     clearAddConfirm();
     await addFileByPath(detectedPath, true);
     return;

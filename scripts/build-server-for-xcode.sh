@@ -39,14 +39,22 @@ lipo -create \
   -output mdv-server
 echo ""
 
-# 6. 复制到 Xcode 项目
-echo "6️⃣  复制到 Xcode 项目..."
+# 6. Ad-hoc 签名（macOS 要求所有可执行文件必须签名，否则 Gatekeeper 会 SIGKILL）
+# Bun 编译产物内嵌了占位符签名（LC_CODE_SIGNATURE），必须先用 --remove-signature
+# 剥掉它，codesign 才能正常写入真实签名。
+echo "6️⃣  Ad-hoc 签名..."
+codesign --remove-signature mdv-server
+codesign --force --sign - mdv-server
+echo ""
+
+# 7. 复制到 Xcode 项目
+echo "7️⃣  复制到 Xcode 项目..."
 cp mdv-server MDViewer/Resources/mdv-server
 chmod +x MDViewer/Resources/mdv-server
 echo ""
 
-# 7. 清理临时文件
-echo "7️⃣  清理临时文件..."
+# 8. 清理临时文件
+echo "8️⃣  清理临时文件..."
 rm -f mdv-server-arm64 mdv-server-x64 mdv-server
 echo ""
 

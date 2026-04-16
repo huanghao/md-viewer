@@ -425,7 +425,7 @@ export function importLegacyAnnotations(
 }
 
 export function listAnnotatedDocuments(limit = 20, offset = 0): AnnotationDocSummary[] {
-  const safeLimit = Math.max(1, Math.min(200, Math.floor(limit)));
+  const safeLimit = Math.max(1, Math.min(10000, Math.floor(limit)));
   const safeOffset = Math.max(0, Math.floor(offset));
   const rows = getDb()
     .query(

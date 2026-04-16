@@ -1819,7 +1819,6 @@ export const styles = `
       font-weight: 600;
       line-height: 1.4;
       flex-shrink: 0;
-      margin-left: auto;
     }
 
     .tree-missing-section {

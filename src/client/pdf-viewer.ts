@@ -278,7 +278,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
         console.log('[pdf] item anchor:', { pageNum, startItemIdx, endItemIdx });
 
         // Context: items before and after
-        const CONTEXT_ITEMS = 3;
+        const CONTEXT_ITEMS = 10;
         const prefix = allItems
           .slice(Math.max(0, startItemIdx - CONTEXT_ITEMS), startItemIdx)
           .map(it => it.str)

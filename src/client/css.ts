@@ -550,6 +550,11 @@ export const styles = `
       color: #0b64c0;
       border-color: #b9d8fb;
     }
+    .file-type-icon.pdf {
+      background: #fff0f0;
+      color: #c0392b;
+      border-color: #f5b7b1;
+    }
     .file-item.current .file-type-icon.html,
     .tree-item.current .file-type-icon.html {
       background: #f3f8ff;

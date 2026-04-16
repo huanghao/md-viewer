@@ -23,12 +23,19 @@ export function isJsonlFile(path: string): boolean {
   return getFileExtension(path) === 'jsonl';
 }
 
-export function getFileTypeIcon(path: string): { cls: 'md' | 'html' | 'json'; label: string } {
+export function isPdfFile(path: string): boolean {
+  return getFileExtension(path) === 'pdf';
+}
+
+export function getFileTypeIcon(path: string): { cls: 'md' | 'html' | 'json' | 'pdf'; label: string } {
   if (isHtmlFile(path)) {
     return { cls: 'html', label: '<>' };
   }
   if (isJsonFile(path) || isJsonlFile(path)) {
     return { cls: 'json', label: '{}' };
+  }
+  if (isPdfFile(path)) {
+    return { cls: 'pdf', label: 'P' };
   }
   return { cls: 'md', label: 'M' };
 }

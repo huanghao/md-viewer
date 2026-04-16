@@ -62,12 +62,13 @@ function collectFiles(node: FileTreeNode): FileTreeNode[] {
   return results;
 }
 
-// Returns files that are active: mtime within window OR pinned, minus .mdvignore matches
+// Returns files that are active: mtime within window OR recent annotation OR pinned, minus .mdvignore matches
 export function getActiveFiles(
   workspacePath: string,
   tree: FileTreeNode | undefined,
   windowMs: number,
-  pinned: Set<string>
+  pinned: Set<string>,
+  annotationSummaries?: Map<string, { count: number; updatedAt: number }>
 ): FileTreeNode[] {
   if (!tree) return [];
   const cutoff = Date.now() - windowMs;
@@ -77,6 +78,9 @@ export function getActiveFiles(
     if (ignored.has(f.path)) return false;
     if (pinned.has(f.path)) return true;
     if (typeof f.lastModified === 'number' && f.lastModified >= cutoff) return true;
+    // Check if file has recent annotation activity
+    const annotationUpdatedAt = annotationSummaries?.get(f.path)?.updatedAt;
+    if (annotationUpdatedAt && annotationUpdatedAt >= cutoff) return true;
     return false;
   }).sort((a, b) => {
     // Pinned first, then by mtime descending
@@ -175,7 +179,7 @@ export function renderFocusView(): string {
         }
       });
     }
-    let activeFiles = getActiveFiles(ws.path, tree, windowMs, pinned);
+    let activeFiles = getActiveFiles(ws.path, tree, windowMs, pinned, state.annotationSummaries);
     // Apply search filter: match against file name or path
     if (query) {
       activeFiles = activeFiles.filter((f) => {

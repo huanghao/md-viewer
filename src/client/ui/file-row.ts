@@ -71,7 +71,7 @@ export function renderFileRow(
   const highlightedName = highlightQuery(displayName, opts.query);
 
   // 批注计数 badge
-  const annotationCount = state.annotationCounts.get(path) ?? 0;
+  const annotationCount = state.annotationSummaries.get(path)?.count ?? 0;
   const annotationBadge = annotationCount > 0
     ? `<span class="annotation-count-badge">${annotationCount}</span>`
     : '';

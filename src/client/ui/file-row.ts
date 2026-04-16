@@ -59,7 +59,7 @@ export function renderFileRow(
       statusBadge = `<span class="status-badge status-${status.type}" style="color: ${status.color}">${status.badge}</span>`;
     }
   } else if (isMissing) {
-    statusBadge = '<span class="status-badge status-deleted" style="color: #cf222e">D</span>';
+    statusBadge = '<span class="status-badge status-deleted" style="color: #ff3b30">D</span>';
   } else if (wsModified) {
     statusBadge = '<span class="status-badge status-modified" style="color: #ff9500">M</span>';
   } else if (listDiff) {

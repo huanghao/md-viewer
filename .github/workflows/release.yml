@@ -62,9 +62,65 @@ jobs:
           name: mdv-${{ matrix.platform }}
           path: packages/*.tar.gz
 
+  build-app:
+    name: Build Mac App
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: npm install --registry=https://registry.npmjs.org/
+
+      - name: Build mdv-server universal binary
+        run: ./scripts/build-server-for-xcode.sh
+
+      - name: Build Mac App (ad-hoc signed)
+        run: ./scripts/build/build_app_bundle.sh --ad-hoc --skip-dmg
+
+      - name: Create DMG
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          APP_PATH="dist/MD Viewer.app"
+          DMG_NAME="MD-Viewer-${VERSION}.dmg"
+          DMG_TEMP="dist/dmg_temp"
+
+          mkdir -p "$DMG_TEMP"
+          cp -R "$APP_PATH" "$DMG_TEMP/"
+          ln -s /Applications "$DMG_TEMP/Applications"
+
+          hdiutil create \
+            -volname "MD Viewer" \
+            -srcfolder "$DMG_TEMP" \
+            -ov \
+            -format UDZO \
+            "dist/${DMG_NAME}"
+
+          rm -rf "$DMG_TEMP"
+          echo "DMG_NAME=${DMG_NAME}" >> $GITHUB_ENV
+          ls -lh "dist/${DMG_NAME}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mdv-mac-app
+          path: dist/MD-Viewer-*.dmg
+
   release:
     name: Create Release
-    needs: build
+    needs: [build, build-app]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -85,15 +141,12 @@ jobs:
           for dir in mdv-*; do
             if [ -d "$dir" ]; then
               cd "$dir"
-              for file in *.tar.gz; do
+              for file in *.tar.gz *.dmg; do
                 if [ -f "$file" ]; then
                   sha256sum "$file" | tee -a ../SHA256SUMS.txt
                 fi
               done
               cd ..
-            elif [ -f "$dir" ]; then
-              # Handle .tar.gz files directly in packages/
-              sha256sum "$dir" | tee -a SHA256SUMS.txt
             fi
           done
           cat SHA256SUMS.txt
@@ -101,7 +154,8 @@ jobs:
       - name: Collect release files
         run: |
           mkdir -p release-files
-          # Find all unique tarballs (one per platform)
+
+          # CLI tarballs
           for platform in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
             tarball=$(find packages -name "mdv-${platform}.tar.gz" -type f | head -1)
             if [ -f "$tarball" ]; then
@@ -111,6 +165,16 @@ jobs:
               echo "✗ Missing: mdv-${platform}.tar.gz"
             fi
           done
+
+          # Mac App DMG
+          dmg=$(find packages -name "MD-Viewer-*.dmg" -type f | head -1)
+          if [ -f "$dmg" ]; then
+            cp "$dmg" "release-files/$(basename $dmg)"
+            echo "✓ Found: $(basename $dmg)"
+          else
+            echo "✗ Missing: Mac App DMG"
+          fi
+
           cp packages/SHA256SUMS.txt release-files/
           echo ""
           echo "Release files:"

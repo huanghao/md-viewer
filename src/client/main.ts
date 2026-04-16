@@ -507,13 +507,12 @@ function renderContent() {
   const container = document.getElementById('content');
   if (!container) return;
 
-  // When switching away from a PDF, schedule idle eviction
-  const previousFile = state.currentFile;
-  if (previousFile && isPdfPath(previousFile) && pdfViewerRegistry.has(previousFile)) {
-    scheduleEviction(previousFile);
+  // Hide all PDF viewer elements; active one will be shown below if needed.
+  // Schedule eviction for PDFs that are no longer current.
+  for (const [path, entry] of pdfViewerRegistry.entries()) {
+    entry.viewer.el.style.display = 'none';
+    if (path !== state.currentFile) scheduleEviction(path);
   }
-  container.classList.remove("pdf-viewer-container");
-  // Keep currentPdfViewer in sync (may be replaced below)
   currentPdfViewer = null;
 
   if (!state.currentFile) {
@@ -562,12 +561,11 @@ function renderContent() {
     // Cancel any pending eviction for this file (user came back)
     cancelEviction(filePath);
 
-    // Reuse existing viewer if available, otherwise create new
+    // Reuse existing viewer if available (just show its el), otherwise create new
     const existingEntry = pdfViewerRegistry.get(filePath);
     if (existingEntry) {
-      // Viewer already rendered — just re-attach DOM nodes to container
       currentPdfViewer = existingEntry.viewer;
-      container.classList.add("pdf-viewer-container");
+      existingEntry.viewer.el.style.display = '';
       container.setAttribute('data-current-file', filePath);
       renderBreadcrumb();
       updateToolbarButtons();
@@ -585,9 +583,11 @@ function renderContent() {
         bridge?.handleTextSelected(pageNum, selectedText, prefix, suffix);
       },
       onParagraphClick: (block) => {
-        const pageWrapper = container.querySelector(
-          `.pdf-page-wrapper[data-page="${block.pageNum}"]`
-        ) as HTMLElement;
+        const pageWrapper = block.pageNum
+          ? (pdfViewerRegistry.get(filePath)?.viewer.el.querySelector(
+              `.pdf-page-wrapper[data-page="${block.pageNum}"]`
+            ) as HTMLElement | null)
+          : null;
         if (pageWrapper) {
           handleParagraphTranslation(pageWrapper, block, translationProvider, scale);
         }
@@ -1269,8 +1269,16 @@ async function updateToolbarButtons() {
   const file = state.sessionFiles.get(state.currentFile);
   if (!file) return;
 
-  // Show PDF memory monitor button only when viewing a PDF
-  if (pdfMemButton) pdfMemButton.style.display = isPdfPath(file.path) ? 'flex' : 'none';
+  // Show PDF memory monitor button only when viewing a PDF; close panel if switching away
+  const isPdf = isPdfPath(file.path);
+  if (pdfMemButton) pdfMemButton.style.display = isPdf ? 'flex' : 'none';
+  if (!isPdf) {
+    const panel = document.getElementById('pdfMemPanel');
+    if (panel && panel.style.display !== 'none') {
+      panel.style.display = 'none';
+      if (pdfMemPollTimer) { clearInterval(pdfMemPollTimer); pdfMemPollTimer = null; }
+    }
+  }
 
   if (file.isMissing) {
     if (diffButton) diffButton.style.display = 'none';

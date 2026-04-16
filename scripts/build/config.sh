@@ -14,7 +14,7 @@ export BUILD_DIR=".build/release"
 export DIST_DIR="dist"
 
 # Version
-export VERSION="1.0.0"
+export VERSION="0.3.0"
 export BUILD_NUMBER="1"
 
 # Developer Certificate (auto-detected)

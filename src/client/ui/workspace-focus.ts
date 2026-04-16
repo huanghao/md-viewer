@@ -6,12 +6,10 @@ import {
 } from '../state';
 import { buildIgnoredSet } from '../utils/ignore-filter';
 import { escapeHtml, escapeAttr } from '../utils/escape';
-import { getFileListStatus } from '../utils/file-status';
-import { getFileTypeIcon } from '../utils/file-type';
 import { stripWorkspaceTreeDisplayExtension } from '../utils/workspace-file-name';
-import { getPinnedFiles, isPinned } from '../utils/pinned-files';
+import { getPinnedFiles } from '../utils/pinned-files';
 import { scanWorkspace } from '../workspace';
-import { hasWorkspaceModified, hasListDiff } from '../workspace-state';
+import { renderFileRow } from './file-row';
 
 // Simple glob matcher for .mdvignore patterns
 // Supports: *, **, ?, and prefix matching (e.g. "bots-ws/" matches any path under bots-ws/)
@@ -98,55 +96,16 @@ export function formatRelativeTime(ms: number): string {
   return `${Math.floor(diff / 86400000)}d`;
 }
 
-function highlightQuery(text: string, query: string): string {
-  if (!query) return escapeHtml(text);
-  const idx = text.toLowerCase().indexOf(query.toLowerCase());
-  if (idx === -1) return escapeHtml(text);
-  return escapeHtml(text.slice(0, idx))
-    + `<mark class="search-highlight">${escapeHtml(text.slice(idx, idx + query.length))}</mark>`
-    + escapeHtml(text.slice(idx + query.length));
-}
-
 function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>, query: string): string {
-  const isCurrent = state.currentFile === file.path;
-  const isPinnedFile = pinned.has(file.path);
-  const fileInfo = state.sessionFiles.get(file.path);
-  // 消费与全量模式相同的状态源：session dirty > workspace modified > list diff
-  let statusType: 'modified' | 'deleted' | 'new' | 'normal' = 'normal';
-  if (fileInfo) {
-    statusType = getFileListStatus(fileInfo, hasListDiff(file.path)).type;
-  } else if (hasWorkspaceModified(file.path)) {
-    statusType = 'modified';
-  } else if (hasListDiff(file.path)) {
-    statusType = 'new';
-  }
-  const icon = getFileTypeIcon(file.path);
-  const displayName = stripWorkspaceTreeDisplayExtension(file.name) || file.name;
-  const timeStr = file.lastModified ? formatRelativeTime(file.lastModified) : '';
-
-  const statusDot = statusType === 'modified'
-    ? '<span class="focus-file-dot modified"></span>'
-    : statusType === 'new'
-    ? '<span class="focus-file-dot new-file"></span>'
-    : '';
-
-  const pinIcon = isPinnedFile
-    ? `<button class="tree-pin-btn active" title="取消固定" onclick="event.stopPropagation();handleUnpinFile('${escapeAttr(file.path)}')" data-path="${escapeAttr(file.path)}">📌</button>`
-    : `<button class="tree-pin-btn" title="固定到焦点视图" onclick="event.stopPropagation();handlePinFile('${escapeAttr(file.path)}')">📌</button>`;
-
-  return `
-    <div class="tree-item file-node focus-file-item${isCurrent ? ' current' : ''}"
-         data-path="${escapeAttr(file.path)}"
-         onclick="handleFocusFileClick('${escapeAttr(file.path)}')">
-      <span class="tree-indent" style="width:8px"></span>
-      <span class="file-type-icon ${icon.cls}">${escapeHtml(icon.label)}</span>
-      <span class="tree-name"><span class="tree-name-full">${highlightQuery(displayName, query)}</span></span>
-      ${statusDot}
-      ${timeStr ? `<span class="focus-file-time">${escapeHtml(timeStr)}</span>` : ''}
-      ${state.annotationCounts.get(file.path) ? `<span class="annotation-count-badge">${state.annotationCounts.get(file.path)}</span>` : ''}
-      ${pinIcon}
-    </div>
-  `;
+  return renderFileRow(file.path, file.name, file.lastModified, {
+    containerClass: 'tree-item file-node focus-file-item',
+    onClickJs: (p) => `handleFocusFileClick('${escapeAttr(p)}')`,
+    showPin: true,
+    showTime: true,
+    indentPx: 8,
+    query,
+    showClose: false,
+  });
 }
 
 function renderFilterBar(): string {

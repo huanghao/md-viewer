@@ -48,7 +48,7 @@ const RENDER_MARGIN = 1200;
 export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewerInstance> {
   const { container, filePath, scale = SCALE_DEFAULT } = opts;
   container.innerHTML = "";
-  container.className = "pdf-viewer-container";
+  container.classList.add("pdf-viewer-container");
 
   const pdfjs = await getPdfjsLib();
   const url = `/api/pdf-asset?path=${encodeURIComponent(filePath)}`;
@@ -215,6 +215,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
   function destroy() {
     observer.disconnect();
     container.innerHTML = "";
+    container.classList.remove("pdf-viewer-container");
     rendered.clear();
     rendering.clear();
     textBlocksByPage.clear();

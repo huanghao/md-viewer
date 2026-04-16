@@ -1288,7 +1288,7 @@ function navigateDiffBlock(direction: 1 | -1): void {
   // 滚动到目标 block 首行
   const targetRow = scrollEl.querySelector<HTMLElement>(`[data-block-index="${nextIndex}"]`);
   if (targetRow) {
-    targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    targetRow.scrollIntoView({ behavior: 'instant', block: 'center' });
   }
 
   currentDiffBlockIndex = nextIndex;

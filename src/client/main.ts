@@ -25,7 +25,7 @@ import { renderJsonContent } from './ui/json-viewer';
 import { getMdThemeCss, getHlThemeCss } from './themes/index';
 
 import { fetchAnnotationSummaries } from './api/annotations';
-import { setAnnotationCounts } from './state';
+import { setAnnotationSummaries } from './state';
 
 // 导入批注功能
 import {
@@ -65,6 +65,7 @@ let diffViewActive = false;
 let workspacePollRunning = false;
 let mermaidInitialized = false;
 let currentPdfViewer: PdfViewerInstance | null = null;
+let currentPdfBridge: ReturnType<typeof createPdfAnnotationBridge> | null = null;
 const translationProvider = new MyMemoryProvider();
 
 // PDF viewer registry: tracks all open PDF viewers and their idle timers
@@ -518,6 +519,7 @@ function renderContent() {
     if (path !== state.currentFile) scheduleEviction(path);
   }
   currentPdfViewer = null;
+  currentPdfBridge = null;
   container.removeAttribute('data-pdf');
 
   if (!state.currentFile) {
@@ -573,6 +575,14 @@ function renderContent() {
     const existingEntry = pdfViewerRegistry.get(filePath);
     if (existingEntry) {
       currentPdfViewer = existingEntry.viewer;
+      currentPdfBridge = createPdfAnnotationBridge({
+        filePath,
+        viewer: existingEntry.viewer,
+        getAnnotations: () => getAnnotations(),
+        onAnnotationCreated: () => {
+          currentPdfBridge?.renderHighlights(getAnnotations());
+        },
+      });
       container.innerHTML = '';
       container.appendChild(existingEntry.viewer.el);
       container.setAttribute('data-current-file', filePath);
@@ -585,50 +595,31 @@ function renderContent() {
     container.innerHTML = '';
 
 
-    // bridge is set after viewer resolves; callbacks check it defensively
-    let bridge: ReturnType<typeof createPdfAnnotationBridge> | null = null;
-
     createPdfViewer({
       container,
       filePath,
       scale,
-      onTextSelected: (pageNum, selectedText, prefix, suffix, clientX, clientY) => {
-        bridge?.handleTextSelected(pageNum, selectedText, prefix, suffix, clientX, clientY);
+      onTextSelected: (pageNum, selectedText, prefix, suffix, clientX, clientY, startItemIdx, endItemIdx) => {
+        currentPdfBridge?.handleTextSelected(pageNum, selectedText, prefix, suffix, clientX, clientY, startItemIdx, endItemIdx);
       },
-      onParagraphClick: (block) => {
-        const pageWrapper = block.pageNum
-          ? (pdfViewerRegistry.get(filePath)?.viewer.el.querySelector(
-              `.pdf-page-wrapper[data-page="${block.pageNum}"]`
-            ) as HTMLElement | null)
-          : null;
-        if (pageWrapper) {
-          handleParagraphTranslation(pageWrapper, block, translationProvider, scale);
-        }
+      onParagraphClick: (_block) => {
+        // Translation disabled during debug
+      },
+      onPageRendered: (_pageNum) => {
+        // Page just became visible — replay annotation highlights for it
+        currentPdfBridge?.renderHighlights(getAnnotations());
       },
     }).then((viewer) => {
       currentPdfViewer = viewer;
       container.setAttribute('data-current-file', filePath);
       pdfViewerRegistry.set(filePath, { viewer, lastActiveAt: Date.now(), idleTimer: null });
-      bridge = createPdfAnnotationBridge({
+      currentPdfBridge = createPdfAnnotationBridge({
         filePath,
         viewer,
         getAnnotations: () => getAnnotations(),
-        onAnnotationCreated: (ann) => {
-          // Immediately highlight the newly created annotation
-          const anns = getAnnotations();
-          bridge?.renderHighlights(anns);
+        onAnnotationCreated: (_ann) => {
+          currentPdfBridge?.renderHighlights(getAnnotations());
         },
-      });
-      // Re-render annotation highlights when annotations load or a new one is created
-      document.addEventListener("annotations:loaded", () => {
-        const anns = getAnnotations();
-        bridge?.renderHighlights(anns);
-      }, { once: false });
-      document.addEventListener("annotation:created", () => {
-        console.log('[created] renderHighlights start, anns:', getAnnotations().length);
-        const anns = getAnnotations();
-        bridge?.renderHighlights(anns);
-        console.log('[created] renderHighlights done');
       });
     });
     return; // don't fall through to markdown renderer
@@ -1804,8 +1795,8 @@ function startWorkspacePolling() {
   renderSidebar();
 
   // 拉取批注摘要（失败静默忽略，不阻塞主流程）
-  fetchAnnotationSummaries().then((counts) => {
-    setAnnotationCounts(counts);
+  fetchAnnotationSummaries().then((summaries) => {
+    setAnnotationSummaries(summaries);
     renderSidebar();
   }).catch(() => {/* 静默忽略 */});
 
@@ -1858,6 +1849,14 @@ function startWorkspacePolling() {
         }
       }, 500);
     });
+  });
+
+  // App-level PDF annotation event listeners (registered once, delegate to current bridge)
+  document.addEventListener("annotations:loaded", () => {
+    currentPdfBridge?.renderHighlights(getAnnotations());
+  });
+  document.addEventListener("annotation:created", () => {
+    currentPdfBridge?.renderHighlights(getAnnotations());
   });
 
   // 监听 pdf:show-composer 事件

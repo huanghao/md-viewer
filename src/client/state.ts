@@ -21,6 +21,8 @@ export const state: AppState = {
   currentWorkspace: null,
   fileTree: new Map(),
   annotationCounts: new Map(),
+  workspaceLoadingIds: new Set(),
+  workspaceFailedIds: new Set(),
 };
 
 // 状态持久化
@@ -277,6 +279,29 @@ export function adjustAnnotationCount(path: string, delta: number): void {
   } else {
     state.annotationCounts.set(path, next);
   }
+}
+
+export function markWorkspaceLoading(id: string): void {
+  state.workspaceLoadingIds.add(id);
+  state.workspaceFailedIds.delete(id);
+}
+
+export function markWorkspaceFailed(id: string): void {
+  state.workspaceFailedIds.add(id);
+  state.workspaceLoadingIds.delete(id);
+}
+
+export function clearWorkspaceFailed(id: string): void {
+  state.workspaceFailedIds.delete(id);
+  state.workspaceLoadingIds.delete(id);
+}
+
+export function isWorkspaceLoading(id: string): boolean {
+  return state.workspaceLoadingIds.has(id);
+}
+
+export function isWorkspaceFailed(id: string): boolean {
+  return state.workspaceFailedIds.has(id);
 }
 
 export function getFilteredFiles(): FileInfo[] {

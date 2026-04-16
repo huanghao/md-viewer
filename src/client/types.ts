@@ -45,7 +45,7 @@ export interface AppConfig {
 
 // 应用状态类型
 export interface AppState {
-  // 会话级文件缓存（用于 tabs/正文缓存/同步上下文），不等同于“工作区全量文件状态”
+  // 会话级文件缓存（用于 tabs/正文缓存/同步上下文），不等同于”工作区全量文件状态”
   sessionFiles: Map<string, FileInfo>;
   currentFile: string | null;
   searchQuery: string;
@@ -57,6 +57,8 @@ export interface AppState {
   currentWorkspace: string | null;  // 当前工作区 ID
   fileTree: Map<string, FileTreeNode>;  // 工作区文件树缓存
   annotationCounts: Map<string, number>;  // path → open 批注数（只含 > 0 的条目）
+  workspaceLoadingIds: Set<string>;  // 正在扫描中的工作区
+  workspaceFailedIds: Set<string>;   // 扫描失败的工作区（直到重试前永久）
 }
 
 // API 响应类型

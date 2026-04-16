@@ -1,5 +1,15 @@
 import type { Workspace, FileTreeNode, FileInfo } from '../types';
-import { state, getSessionFile, getSessionFiles, hasSessionFile } from '../state';
+import {
+  state,
+  getSessionFile,
+  getSessionFiles,
+  hasSessionFile,
+  markWorkspaceLoading,
+  markWorkspaceFailed,
+  clearWorkspaceFailed,
+  isWorkspaceLoading,
+  isWorkspaceFailed,
+} from '../state';
 import { renderFocusView } from './workspace-focus';
 import { hasListDiff, isWorkspacePathMissing, getWorkspaceMissingPaths } from '../workspace-state';
 import { searchFiles } from '../api/files';
@@ -46,13 +56,7 @@ const ADD_WORKSPACE_INPUT_ID = 'addWorkspacePathInput';
 const ADD_WORKSPACE_PREVIEW_ID = 'addWorkspacePathPreview';
 let pendingRemoveWorkspaceId: string | null = null;
 let removeOutsideClickBound = false;
-const loadingWorkspaceIds = new Set<string>();
-const failedWorkspaceIds = new Set<string>();
 
-export function markWorkspaceFailed(workspaceId: string): void {
-  failedWorkspaceIds.add(workspaceId);
-  loadingWorkspaceIds.delete(workspaceId);
-}
 let workspaceSearchQuery = '';
 let workspaceSearchRootsKey = '';
 let workspaceSearchLoading = false;
@@ -428,8 +432,8 @@ function renderWorkspaceItem(workspace: Workspace, index: number, total: number,
     <div class="workspace-item">
       <div class="workspace-header ${isCurrent ? 'active' : ''}" onclick="handleWorkspaceToggle('${escapeAttr(workspace.id)}')">
         <span class="workspace-toggle">${toggle}</span>
-        <span class="workspace-icon">${failedWorkspaceIds.has(workspace.id) ? '⚠️' : '📁'}</span>
-        <span class="workspace-name${failedWorkspaceIds.has(workspace.id) ? ' workspace-name--failed' : ''}">${escapeHtml(workspace.name)}</span>
+        <span class="workspace-icon">${isWorkspaceFailed(workspace.id) ? '⚠️' : '📁'}</span>
+        <span class="workspace-name${isWorkspaceFailed(workspace.id) ? ' workspace-name--failed' : ''}">${escapeHtml(workspace.name)}</span>
         ${pendingRemoveWorkspaceId === workspace.id ? `
           <div class="workspace-remove-actions" onclick="event.stopPropagation()">
             ${canMoveUp ? `
@@ -494,7 +498,7 @@ function renderFileTree(workspaceId: string, tree: FileTreeNode | undefined, que
     `;
   }
 
-  if (loadingWorkspaceIds.has(workspaceId)) {
+  if (isWorkspaceLoading(workspaceId)) {
     return `
       <div class="file-tree loading">
         <div class="tree-loading">加载中...</div>
@@ -502,7 +506,7 @@ function renderFileTree(workspaceId: string, tree: FileTreeNode | undefined, que
     `;
   }
 
-  if (failedWorkspaceIds.has(workspaceId)) {
+  if (isWorkspaceFailed(workspaceId)) {
     return `
       <div class="file-tree empty">
         <div class="tree-empty" onclick="retryWorkspaceScan('${escapeAttr(workspaceId)}')" style="cursor: pointer;">加载失败，点击重试</div>
@@ -721,18 +725,16 @@ export function bindWorkspaceEvents(): void {
 
     // 如果展开且没有加载文件树，则加载
     if (workspace.isExpanded && !state.fileTree.has(workspaceId)) {
-      loadingWorkspaceIds.add(workspaceId);
-      failedWorkspaceIds.delete(workspaceId);
+      markWorkspaceLoading(workspaceId);
       const { renderSidebar } = await import('./sidebar');
       renderSidebar();
 
       const tree = await scanWorkspace(workspaceId);
-      loadingWorkspaceIds.delete(workspaceId);
       if (!tree) {
-        failedWorkspaceIds.add(workspaceId);
+        markWorkspaceFailed(workspaceId);
         showError(`工作区扫描失败：${workspace.name}`);
       } else {
-        failedWorkspaceIds.delete(workspaceId);
+        clearWorkspaceFailed(workspaceId);
       }
     }
 
@@ -742,16 +744,16 @@ export function bindWorkspaceEvents(): void {
 
   // 失败后点击空白提示可重试
   (window as any).retryWorkspaceScan = async (workspaceId: string) => {
-    loadingWorkspaceIds.add(workspaceId);
-    failedWorkspaceIds.delete(workspaceId);
+    markWorkspaceLoading(workspaceId);
     const { renderSidebar } = await import('./sidebar');
     renderSidebar();
 
     const tree = await scanWorkspace(workspaceId);
-    loadingWorkspaceIds.delete(workspaceId);
     if (!tree) {
-      failedWorkspaceIds.add(workspaceId);
+      markWorkspaceFailed(workspaceId);
       showError('重试失败，请检查工作区路径是否可访问');
+    } else {
+      clearWorkspaceFailed(workspaceId);
     }
 
     renderSidebar();

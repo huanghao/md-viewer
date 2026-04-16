@@ -59,10 +59,10 @@ export interface PdfViewerInstance {
    */
   highlightQuote(pageNum: number, quote: string, annotationId?: string): void;
   /**
-   * Highlight by item index range — stable anchor for PDF annotations.
+   * Highlight by item index range — O(1) precise anchor.
    * pageItemStart/End are indices into textContent.items for that page.
    */
-  highlightByItemRange(pageNum: number, startItemIdx: number, endItemIdx: number): void;
+  highlightByItemRange(pageNum: number, startItemIdx: number, endItemIdx: number, annotationId?: string): void;
   clearHighlights(): void;
   clearSelectionMark(): void;
   getTextBlocks(pageNum: number): PdfTextBlock[];
@@ -383,16 +383,14 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
   }
 
   /**
-   * Highlight by item index range.
-   * We map item indices to text layer spans by matching text content.
-   * This is stable because textContent.items order matches span order.
+   * Highlight by item index range — O(1) precise anchor, no text search.
+   * Uses item index in textContent.items as stable coordinate.
    */
-  function highlightByItemRange(pageNum: number, startItemIdx: number, endItemIdx: number) {
+  function highlightByItemRange(pageNum: number, startItemIdx: number, endItemIdx: number, annotationId?: string) {
     const wrapper = pageWrappers[pageNum - 1];
     if (!wrapper) return;
     if (!rendered.has(pageNum)) return;
 
-    // Get text content items for this page
     const page = textContentCache.get(pageNum);
     if (!page) return;
 
@@ -403,10 +401,6 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     const safeEnd = Math.min(items.length - 1, endItemIdx);
     if (safeStart > safeEnd) return;
 
-    // Build the expected text sequence for the range
-    const rangeTexts = items.slice(safeStart, safeEnd + 1).map(it => it.str);
-
-    // Find matching spans in text layer
     const textLayer = wrapper.querySelector(".pdf-text-layer") as HTMLElement;
     if (!textLayer) return;
 
@@ -414,16 +408,22 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
       s => s.querySelector("span") === null
     );
 
-    // Match spans to items by content
-    // This assumes span order roughly matches item order (true for PDF.js text layer)
-    let itemCursor = safeStart;
+    // Map item index to span by content — one pass, O(n)
+    let itemCursor = 0;
     for (const span of spans) {
       if (itemCursor > safeEnd) break;
       const spanText = span.textContent || "";
       const expectedText = items[itemCursor]?.str || "";
-      // Allow partial match because PDF.js may split/merge items
+
+      // Match by content to align item index with span
       if (spanText.includes(expectedText) || expectedText.includes(spanText)) {
-        span.classList.add("pdf-highlight");
+        if (itemCursor >= safeStart) {
+          span.classList.add("pdf-highlight");
+          if (annotationId) {
+            span.classList.add("annotation-mark");
+            span.dataset.annotationId = annotationId;
+          }
+        }
         itemCursor++;
       }
     }

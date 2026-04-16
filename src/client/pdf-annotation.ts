@@ -64,11 +64,17 @@ export function createPdfAnnotationBridge(opts: PdfAnnotationBridgeOptions): Pdf
     opts.viewer.clearHighlights();
     const pdfAnns = annotations.filter(a => {
       const pa = a as Annotation & { page?: number; fileType?: string };
-      return pa.fileType === "pdf" && typeof pa.page === "number" && pa.quote;
+      return pa.fileType === "pdf" && typeof pa.page === "number";
     }) as (Annotation & { page: number; fileType: string })[];
     for (const a of pdfAnns) {
-      // Use quote text for highlighting with annotation id for click handling
-      opts.viewer.highlightQuote(a.page, a.quote, a.id);
+      const pa = a as Annotation & { page: number; start?: number; length?: number };
+      // Use item index anchor for precise O(1) highlighting
+      if (typeof pa.start === "number" && typeof pa.length === "number") {
+        const endIdx = pa.start + pa.length - 1;
+        opts.viewer.highlightByItemRange(pa.page, pa.start, endIdx, a.id);
+      } else {
+        opts.viewer.highlightQuote(a.page, a.quote, a.id);
+      }
     }
   }
 

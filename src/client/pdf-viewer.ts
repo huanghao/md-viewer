@@ -54,7 +54,10 @@ export interface PdfViewerInstance {
   el: HTMLElement;
   destroy(): void;
   scrollToPage(pageNum: number): void;
-  highlightQuote(pageNum: number, quote: string): void;
+  /**
+   * Highlight quote text. If annotationId is provided, creates clickable annotation-mark.
+   */
+  highlightQuote(pageNum: number, quote: string, annotationId?: string): void;
   /**
    * Highlight by item index range — stable anchor for PDF annotations.
    * pageItemStart/End are indices into textContent.items for that page.
@@ -328,7 +331,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     if (wrapper) wrapper.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  function highlightQuote(pageNum: number, quote: string) {
+  function highlightQuote(pageNum: number, quote: string, annotationId?: string) {
     // Note: clearHighlights() is called once by renderHighlights(), not here
     const wrapper = pageWrappers[pageNum - 1];
     if (!wrapper) return;
@@ -336,13 +339,31 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     if (!rendered.has(pageNum)) return;
     const textLayer = wrapper.querySelector(".pdf-text-layer") as HTMLElement;
     if (!textLayer) return;
+
+    // Find spans that match the quote and wrap them in annotation-mark
     const spans = Array.from(textLayer.querySelectorAll("span")).filter(
       s => s.querySelector("span") === null
     );
+
     const normalizedQuote = quote.toLowerCase().replace(/\s+/g, " ").trim();
+
     for (const span of spans) {
       const text = (span.textContent || "").toLowerCase().replace(/\s+/g, " ").trim();
-      if (text && normalizedQuote.includes(text)) {
+      if (!text) continue;
+
+      // Check if this span's text is part of the quote
+      if (normalizedQuote.includes(text) || text.includes(normalizedQuote)) {
+        // Wrap the span's content in an annotation-mark
+        if (annotationId && !span.closest(".annotation-mark")) {
+          const mark = document.createElement("mark");
+          mark.className = "annotation-mark";
+          mark.dataset.annotationId = annotationId;
+          // Copy the span's children to the mark
+          while (span.firstChild) {
+            mark.appendChild(span.firstChild);
+          }
+          span.appendChild(mark);
+        }
         span.classList.add("pdf-highlight");
       }
     }

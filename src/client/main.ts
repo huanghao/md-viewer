@@ -1155,7 +1155,6 @@ function renderDiffView(oldContent: string, newContent: string): void {
           <div class="diff-header-new">磁盘最新版本 →</div>
         </div>
         <div class="diff-actions">
-          <button class="diff-accept-btn" onclick="window.acceptDiffUpdate()">接受更新</button>
           <button class="diff-close-btn" onclick="window.closeDiffView()">关闭</button>
         </div>
       </div>

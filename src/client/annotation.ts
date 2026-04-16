@@ -13,6 +13,7 @@ import {
 } from './api/annotations';
 import { showError } from './ui/toast';
 import { resolveAnnotationAnchor } from './utils/annotation-anchor';
+import { adjustAnnotationCount } from '../state';
 
 // ==================== 类型定义 ====================
 export interface Annotation {
@@ -682,6 +683,9 @@ function hideComposer(): void {
 }
 
 function clearTempSelectionMark(): void {
+  // Clear PDF selection marks (survive focus changes via CSS class)
+  document.querySelectorAll('.pdf-selection-mark').forEach(el => el.classList.remove('pdf-selection-mark'));
+
   const reader = document.getElementById('reader');
   if (!reader) return;
   const marks = Array.from(reader.querySelectorAll('.annotation-mark-temp'));
@@ -966,9 +970,12 @@ export function savePendingAnnotation(filePath: string): void {
 
   state.annotations.push(ann);
   persistAnnotation(filePath, ann, '创建评论失败');
+  adjustAnnotationCount(filePath, +1);
+  import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
   hideComposer();
   applyAnnotations();
   renderAnnotationList(filePath);
+  document.dispatchEvent(new CustomEvent('annotation:created', { detail: { annotation: ann, filePath } }));
 }
 
 export function removeAnnotation(id: string, filePath: string): void {
@@ -983,8 +990,17 @@ export function removeAnnotation(id: string, filePath: string): void {
   }
   applyAnnotations();
   renderAnnotationList(filePath);
+  const removed = previous.find((a) => a.id === id);
+  if (removed && removed.status !== 'resolved') {
+    adjustAnnotationCount(filePath, -1);
+    import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
+  }
   void deleteAnnotationRemote(filePath, { id }).catch((error) => {
     state.annotations = previous;
+    if (removed && removed.status !== 'resolved') {
+      adjustAnnotationCount(filePath, +1);
+      import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
+    }
     showError(`删除评论失败: ${error?.message || '未知错误'}`, 2600);
     applyAnnotations();
     renderAnnotationList(filePath);
@@ -1062,11 +1078,23 @@ function toggleResolved(id: string, filePath: string): void {
   hidePopover(true);
   applyAnnotations();
   renderAnnotationList(filePath);
+  if (nextStatus === 'resolved') {
+    adjustAnnotationCount(filePath, -1);
+  } else if (previousStatus === 'resolved') {
+    adjustAnnotationCount(filePath, +1);
+  }
+  import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
   void updateAnnotationStatusRemote(filePath, { id }, nextStatus).catch((error) => {
     ann.status = previousStatus;
+    if (nextStatus === 'resolved') {
+      adjustAnnotationCount(filePath, +1);
+    } else if (previousStatus === 'resolved') {
+      adjustAnnotationCount(filePath, -1);
+    }
     showError(`更新评论状态失败: ${error?.message || '未知错误'}`, 2600);
     applyAnnotations();
     renderAnnotationList(filePath);
+    import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
   });
 }
 
@@ -1751,8 +1779,8 @@ export function initAnnotationElements(): void {
   });
 }
 
-export function setPendingAnnotation(annotation: Annotation, filePath: string): void {
+export function setPendingAnnotation(annotation: Annotation, filePath: string, clientX?: number, clientY?: number): void {
   state.pendingAnnotation = annotation;
   state.pendingAnnotationFilePath = filePath;
-  openComposerFromPending();
+  openComposerFromPending(clientX, clientY);
 }

@@ -347,17 +347,36 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
 
     const normalizedQuote = quote.toLowerCase().replace(/\s+/g, " ").trim();
 
+    // Build a map of which spans are part of this quote
+    // Only match spans whose text appears contiguously in the quote
+    let matchedAny = false;
     for (const span of spans) {
       const text = (span.textContent || "").toLowerCase().replace(/\s+/g, " ").trim();
-      if (!text) continue;
+      if (!text || text.length < 3) continue; // Skip very short spans
 
-      // Check if this span's text is part of the quote
-      if (normalizedQuote.includes(text) || text.includes(normalizedQuote)) {
-        // Add highlight class and annotation id directly to span
+      // Strict match: span text must be a substantial substring of quote
+      // and we haven't already matched a similar span
+      if (normalizedQuote.includes(text) && text.length > 5) {
         span.classList.add("pdf-highlight");
         if (annotationId) {
           span.classList.add("annotation-mark");
           span.dataset.annotationId = annotationId;
+        }
+        matchedAny = true;
+      }
+    }
+
+    // If no good match found, fall back to exact quote matching
+    if (!matchedAny) {
+      for (const span of spans) {
+        const text = (span.textContent || "").trim();
+        if (text === quote || text.includes(quote)) {
+          span.classList.add("pdf-highlight");
+          if (annotationId) {
+            span.classList.add("annotation-mark");
+            span.dataset.annotationId = annotationId;
+          }
+          break; // Only match the first exact match
         }
       }
     }

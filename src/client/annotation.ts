@@ -13,7 +13,7 @@ import {
 } from './api/annotations';
 import { showError } from './ui/toast';
 import { resolveAnnotationAnchor } from './utils/annotation-anchor';
-import { adjustAnnotationCount } from '../state';
+import { adjustAnnotationCount } from './state';
 
 // ==================== 类型定义 ====================
 export interface Annotation {
@@ -176,6 +176,9 @@ function persistAnnotation(filePath: string, annotation: Annotation, errorPrefix
     })
     .catch((error) => {
       showError(`${errorPrefix}: ${error?.message || '未知错误'}`, 2600);
+      // 回滚创建时的乐观计数更新
+      adjustAnnotationCount(filePath, -1);
+      import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
     });
 }
 

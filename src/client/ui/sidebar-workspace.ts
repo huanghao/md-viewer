@@ -11,10 +11,9 @@ import {
   isWorkspaceFailed,
 } from '../state';
 import { renderFocusView } from './workspace-focus';
-import { hasListDiff, isWorkspacePathMissing, getWorkspaceMissingPaths } from '../workspace-state';
+import { isWorkspacePathMissing, getWorkspaceMissingPaths } from '../workspace-state';
 import { searchFiles } from '../api/files';
 import { escapeHtml, escapeAttr } from '../utils/escape';
-import { getFileListStatus } from '../utils/file-status';
 import { getFileTypeIcon } from '../utils/file-type';
 import { stripWorkspaceTreeDisplayExtension } from '../utils/workspace-file-name';
 import { showError, showSuccess, showWarning } from './toast';
@@ -26,9 +25,9 @@ import {
   toggleNodeExpanded,
   scanWorkspace,
 } from '../workspace';
-import { clearListDiff, clearWorkspaceModified, hasWorkspaceModified } from '../workspace-state';
-import { isPinned } from '../utils/pinned-files';
+import { clearListDiff, clearWorkspaceModified } from '../workspace-state';
 import { buildIgnoredSet } from '../utils/ignore-filter';
+import { renderFileRow } from './file-row';
 
 /**
  * Returns a shallow-cloned tree with ignored file nodes removed.
@@ -540,65 +539,19 @@ function renderFileTree(workspaceId: string, tree: FileTreeNode | undefined, que
 // 渲染文件树节点
 function renderTreeNode(workspaceId: string, node: FileTreeNode, depth: number): string {
   const indentPx = 4 + depth * 8;
-  const isCurrentFile = state.currentFile === node.path;
 
   if (node.type === 'file') {
-    const openedFile = getSessionFile(node.path);
-    const listDiff = hasListDiff(node.path);
-    const isMissing = !!openedFile?.isMissing || isWorkspacePathMissing(node.path);
-    const typeIcon = getFileTypeIcon(node.path);
+    const rowHtml = renderFileRow(node.path, node.name, node.lastModified, {
+      containerClass: 'tree-item file-node',
+      onClickJs: (p) => `handleFileClick('${escapeAttr(p)}')`,
+      showPin: true,
+      showTime: false,
+      indentPx,
+      query: state.searchQuery.trim().toLowerCase(),
+      showClose: false,
+    });
 
-    // 获取文件状态（优先级：D > M > 蓝点）
-    const wsModified = hasWorkspaceModified(node.path);
-    let statusBadge = '&nbsp;';
-    if (openedFile) {
-      const status = getFileListStatus(openedFile, listDiff);
-      if (status.badge === 'dot') {
-        statusBadge = '<span class="new-dot"></span>';
-      } else if (status.badge) {
-        statusBadge = `<span class="status-badge status-${status.type}" style="color: ${status.color}">${status.badge}</span>`;
-      }
-    } else if (isMissing) {
-      statusBadge = '<span class="status-badge status-deleted" style="color: #cf222e">D</span>';
-    } else if (wsModified) {
-      statusBadge = '<span class="status-badge status-modified" style="color: #ff9500">M</span>';
-    } else if (listDiff) {
-      statusBadge = '<span class="new-dot"></span>';
-    }
-
-    const classes = [
-      'tree-item',
-      'file-node',
-      isMissing ? 'missing' : '',
-      isCurrentFile ? 'current' : '',
-    ].filter(Boolean).join(' ');
-
-    const annotationCount = state.annotationCounts.get(node.path) ?? 0;
-    const annotationBadge = annotationCount > 0
-      ? `<span class="annotation-count-badge">${annotationCount}</span>`
-      : '';
-
-    const pinned = isPinned(node.path);
-    const pinBtn = `<button
-  class="tree-pin-btn${pinned ? ' active' : ''}"
-  title="${pinned ? '取消固定到焦点视图' : '固定到焦点视图'}"
-  onclick="event.stopPropagation();${pinned ? `handleUnpinFile` : `handlePinFile`}('${escapeAttr(node.path)}')"
->📌</button>`;
-
-    return `
-      <div class="tree-node">
-        <div class="${classes}"
-             onclick="handleFileClick('${escapeAttr(node.path)}')">
-          <span class="tree-indent" style="width: ${indentPx}px"></span>
-          <span class="tree-toggle"></span>
-          <span class="file-type-icon ${typeIcon.cls}">${escapeHtml(typeIcon.label)}</span>
-          <span class="tree-status-inline">${statusBadge}</span>
-          <span class="tree-name" title="${escapeAttr(node.name)}">${renderFileNameWithTailPriority(node.name)}</span>
-          ${annotationBadge}
-          ${pinBtn}
-        </div>
-      </div>
-    `;
+    return `<div class="tree-node">${rowHtml}</div>`;
   }
 
   // 目录

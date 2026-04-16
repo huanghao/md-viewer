@@ -24,6 +24,7 @@ import {
   handleInferWorkspace,
   handleScanWorkspace,
   handleGetAnnotations,
+  handleGetAnnotationSummaries,
   handleUpsertAnnotation,
   handleReplyAnnotation,
   handleDeleteAnnotation,
@@ -105,6 +106,7 @@ app.post("/api/infer-workspace", handleInferWorkspace);
 app.post("/api/scan-workspace", handleScanWorkspace);
 
 // API: 评论相关（SQLite 持久化）
+app.get("/api/annotations/summaries", handleGetAnnotationSummaries);
 app.get("/api/annotations", handleGetAnnotations);
 app.post("/api/annotations/item", handleUpsertAnnotation);
 app.post("/api/annotations/reply", handleReplyAnnotation);

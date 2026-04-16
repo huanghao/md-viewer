@@ -18,6 +18,7 @@ const encoder = new TextEncoder();
 import { watchFile, watchWorkspace } from "./file-watcher.ts";
 import {
   listAnnotations,
+  listAnnotatedDocuments,
   importLegacyAnnotations,
   clearAllAnnotations,
   upsertAnnotation,
@@ -659,6 +660,22 @@ function scanDirectory(dirPath: string): any {
   }
 
   return tree;
+}
+
+// API: 获取所有文档的批注数摘要（仅含 open 批注 > 0 的文档）
+export async function handleGetAnnotationSummaries(c: Context) {
+  try {
+    const docs = listAnnotatedDocuments(1000, 0);
+    const summaries: Record<string, number> = {};
+    for (const doc of docs) {
+      if (doc.anchoredCount > 0) {
+        summaries[doc.path] = doc.anchoredCount;
+      }
+    }
+    return c.json({ summaries });
+  } catch (error: any) {
+    return c.json({ error: error?.message || "获取批注摘要失败" }, 500);
+  }
 }
 
 // API: 获取评论（按文件）

@@ -514,6 +514,8 @@ function renderContent() {
     if (path !== state.currentFile) scheduleEviction(path);
   }
   currentPdfViewer = null;
+  // Restore normal content padding (PDF viewer removes it)
+  container.style.padding = '';
 
   if (!state.currentFile) {
     container.removeAttribute('data-current-file');
@@ -561,6 +563,9 @@ function renderContent() {
     // Cancel any pending eviction for this file (user came back)
     cancelEviction(filePath);
 
+    // PDF viewer takes full container — remove padding so #content scroll works correctly
+    container.style.padding = '0';
+
     // Reuse existing viewer if available — re-attach its el to container
     const existingEntry = pdfViewerRegistry.get(filePath);
     if (existingEntry) {
@@ -575,6 +580,7 @@ function renderContent() {
 
     // New viewer — clear container first, then createPdfViewer appends its el
     container.innerHTML = '';
+
 
     // bridge is set after viewer resolves; callbacks check it defensively
     let bridge: ReturnType<typeof createPdfAnnotationBridge> | null = null;

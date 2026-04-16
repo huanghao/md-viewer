@@ -495,14 +495,6 @@ export const styles = `
       position: relative;
       font-weight: 400;
     }
-    .file-item-status {
-      width: 14px;
-      height: 14px;
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
     .file-item:hover {
       background: #f6f8fa;
     }

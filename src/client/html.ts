@@ -56,6 +56,7 @@ export function generateClientHTML(): string {
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"><\/script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/web/pdf_viewer.css">
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js"><\/script>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16/dist/contrib/auto-render.min.js"><\/script>
   <script type="module">
@@ -127,6 +128,7 @@ export function generateClientHTML(): string {
 
       <!-- 字体缩放菜单 -->
       <div class="font-scale-menu" id="fontScaleMenu" style="display: none;">
+        <div class="font-scale-option" onclick="setFontScale(0.5)">50%</div>
         <div class="font-scale-option" onclick="setFontScale(0.75)">75%</div>
         <div class="font-scale-option" onclick="setFontScale(1.0)">100%</div>
         <div class="font-scale-option" onclick="setFontScale(1.25)">125%</div>

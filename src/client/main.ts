@@ -38,6 +38,7 @@ import {
   syncAnnotationSidebarLayout,
   dismissAnnotationPopupByEscape,
   setPendingAnnotation,
+  getAnnotations,
 } from './annotation';
 
 import { createPdfViewer, type PdfViewerInstance } from "./pdf-viewer.js";
@@ -606,25 +607,28 @@ function renderContent() {
       },
     }).then((viewer) => {
       currentPdfViewer = viewer;
+      container.setAttribute('data-current-file', filePath);
       pdfViewerRegistry.set(filePath, { viewer, lastActiveAt: Date.now(), idleTimer: null });
       bridge = createPdfAnnotationBridge({
         filePath,
         viewer,
-        getAnnotations: () => (window as any).__annotationState?.annotations ?? [],
+        getAnnotations: () => getAnnotations(),
         onAnnotationCreated: (ann) => {
           // Immediately highlight the newly created annotation
-          const anns = (window as any).__annotationState?.annotations ?? [];
+          const anns = getAnnotations();
           bridge?.renderHighlights(anns);
         },
       });
       // Re-render annotation highlights when annotations load or a new one is created
       document.addEventListener("annotations:loaded", () => {
-        const anns = (window as any).__annotationState?.annotations ?? [];
+        const anns = getAnnotations();
         bridge?.renderHighlights(anns);
       }, { once: false });
       document.addEventListener("annotation:created", () => {
-        const anns = (window as any).__annotationState?.annotations ?? [];
+        console.log('[created] renderHighlights start, anns:', getAnnotations().length);
+        const anns = getAnnotations();
         bridge?.renderHighlights(anns);
+        console.log('[created] renderHighlights done');
       });
     });
     return; // don't fall through to markdown renderer
@@ -1789,7 +1793,11 @@ function startWorkspacePolling() {
 
   await restoreState(loadFile);
   applyTheme();  // apply saved theme preference
-  await hydrateExpandedWorkspaces();
+  const failedWorkspaceIds = await hydrateExpandedWorkspaces();
+  if (failedWorkspaceIds.length > 0) {
+    const { markWorkspaceFailed } = await import('./ui/sidebar-workspace');
+    failedWorkspaceIds.forEach(markWorkspaceFailed);
+  }
   startWorkspacePolling();
 
   // 根据配置渲染侧边栏

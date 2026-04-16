@@ -42,6 +42,8 @@ export function isIgnored(filePath: string, workspacePath: string, patterns: str
 
 // Track in-flight workspace scans to prevent duplicate requests during render
 const scanningWorkspaceIds = new Set<string>();
+// Track permanently failed workspace scans to prevent infinite retry loops
+const failedWorkspaceIds = new Set<string>();
 
 const FOCUS_WINDOW_MS: Record<string, number> = {
   '8h':  8  * 3600 * 1000,
@@ -139,6 +141,7 @@ function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>, query: str
       <span class="tree-name"><span class="tree-name-full">${highlightQuery(displayName, query)}</span></span>
       ${statusDot}
       ${timeStr ? `<span class="focus-file-time">${escapeHtml(timeStr)}</span>` : ''}
+      ${state.annotationCounts.get(file.path) ? `<span class="annotation-count-badge">${state.annotationCounts.get(file.path)}</span>` : ''}
       ${pinIcon}
     </div>
   `;
@@ -207,12 +210,19 @@ export function renderFocusView(): string {
   const groups = workspaces.map((ws) => {
     const tree = state.fileTree.get(ws.id);
     const loading = !tree;
-    if (!tree && !scanningWorkspaceIds.has(ws.id)) {
+    if (!tree && !scanningWorkspaceIds.has(ws.id) && !failedWorkspaceIds.has(ws.id)) {
       scanningWorkspaceIds.add(ws.id);
       void scanWorkspace(ws.id).then((scanned) => {
         scanningWorkspaceIds.delete(ws.id);
         if (scanned) {
           import('./sidebar').then(({ renderSidebar }) => renderSidebar());
+        } else {
+          // 失败后加入 failedSet，防止重复扫描
+          failedWorkspaceIds.add(ws.id);
+          import('./sidebar-workspace').then(({ markWorkspaceFailed }) => {
+            markWorkspaceFailed(ws.id);
+            import('./sidebar').then(({ renderSidebar }) => renderSidebar());
+          });
         }
       });
     }

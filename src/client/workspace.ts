@@ -295,18 +295,21 @@ function expandRecentFileDirs(root: FileTreeNode, maxCount: number): void {
 }
 
 // 刷新后恢复已展开工作区的目录树，避免出现”已展开但未加载”的占位状态。
-export async function hydrateExpandedWorkspaces(): Promise<void> {
+export async function hydrateExpandedWorkspaces(): Promise<string[]> {
   const expanded = state.config.workspaces.filter((ws) => ws.isExpanded);
+  const failedIds: string[] = [];
 
   for (const ws of expanded) {
-    // 忽略失败，失败态由点击时的重试逻辑处理。
-    await scanWorkspace(ws.id);
+    const tree = await scanWorkspace(ws.id);
+    if (!tree) failedIds.push(ws.id);
   }
 
   // 刷新后如果没有当前工作区，默认选中第一个工作区。
   if (!state.currentWorkspace && state.config.workspaces.length > 0) {
     state.currentWorkspace = state.config.workspaces[0].id;
   }
+
+  return failedIds;
 }
 
 // 在工作区模式下根据文件路径自动展开目录树并定位工作区

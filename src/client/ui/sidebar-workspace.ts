@@ -48,6 +48,11 @@ let pendingRemoveWorkspaceId: string | null = null;
 let removeOutsideClickBound = false;
 const loadingWorkspaceIds = new Set<string>();
 const failedWorkspaceIds = new Set<string>();
+
+export function markWorkspaceFailed(workspaceId: string): void {
+  failedWorkspaceIds.add(workspaceId);
+  loadingWorkspaceIds.delete(workspaceId);
+}
 let workspaceSearchQuery = '';
 let workspaceSearchRootsKey = '';
 let workspaceSearchLoading = false;
@@ -423,8 +428,8 @@ function renderWorkspaceItem(workspace: Workspace, index: number, total: number,
     <div class="workspace-item">
       <div class="workspace-header ${isCurrent ? 'active' : ''}" onclick="handleWorkspaceToggle('${escapeAttr(workspace.id)}')">
         <span class="workspace-toggle">${toggle}</span>
-        <span class="workspace-icon">📁</span>
-        <span class="workspace-name">${escapeHtml(workspace.name)}</span>
+        <span class="workspace-icon">${failedWorkspaceIds.has(workspace.id) ? '⚠️' : '📁'}</span>
+        <span class="workspace-name${failedWorkspaceIds.has(workspace.id) ? ' workspace-name--failed' : ''}">${escapeHtml(workspace.name)}</span>
         ${pendingRemoveWorkspaceId === workspace.id ? `
           <div class="workspace-remove-actions" onclick="event.stopPropagation()">
             ${canMoveUp ? `

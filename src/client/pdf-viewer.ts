@@ -86,19 +86,13 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     pageWrapper.appendChild(textLayerDiv);
 
     const textContent = await page.getTextContent();
-    // PDF.js 4.x API: renderTextLayer accepts textContentSource or textContent
-    const renderTask = pdfjsLib.renderTextLayer({
-      textContentSource: textContent,
+    // PDF.js 3.x API
+    await pdfjsLib.renderTextLayer({
+      textContent,
       container: textLayerDiv,
       viewport,
       textDivs: [],
-    });
-    if (renderTask && renderTask.promise) {
-      await renderTask.promise;
-    } else if (renderTask && typeof renderTask.cancel === 'function') {
-      // older API returns object with cancel(), just wait via settled promise
-      await new Promise<void>(resolve => setTimeout(resolve, 0));
-    }
+    }).promise;
 
     // Build text blocks for this page
     const blocks = buildTextBlocks(pageNum, textContent.items as PdfPageTextItem[], viewport, scale);

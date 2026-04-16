@@ -564,6 +564,11 @@ function renderTreeNode(workspaceId: string, node: FileTreeNode, depth: number):
       isCurrentFile ? 'current' : '',
     ].filter(Boolean).join(' ');
 
+    const annotationCount = state.annotationCounts.get(node.path) ?? 0;
+    const annotationBadge = annotationCount > 0
+      ? `<span class="annotation-count-badge">${annotationCount}</span>`
+      : '';
+
     const pinned = isPinned(node.path);
     const pinBtn = `<button
   class="tree-pin-btn${pinned ? ' active' : ''}"
@@ -580,6 +585,7 @@ function renderTreeNode(workspaceId: string, node: FileTreeNode, depth: number):
           <span class="file-type-icon ${typeIcon.cls}">${escapeHtml(typeIcon.label)}</span>
           <span class="tree-status-inline">${statusBadge}</span>
           <span class="tree-name" title="${escapeAttr(node.name)}">${renderFileNameWithTailPriority(node.name)}</span>
+          ${annotationBadge}
           ${pinBtn}
         </div>
       </div>

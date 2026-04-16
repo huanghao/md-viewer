@@ -1810,6 +1810,18 @@ export const styles = `
       margin-left: 2px;
     }
 
+    .annotation-count-badge {
+      background: #e05252;
+      color: white;
+      border-radius: 10px;
+      padding: 1px 6px;
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.4;
+      flex-shrink: 0;
+      margin-left: auto;
+    }
+
     .tree-missing-section {
       margin-top: 6px;
       padding-left: 8px;
@@ -3129,16 +3141,14 @@ export const styles = `
       display: block;
     }
 
-    .pdf-text-layer span {
-      position: absolute;
-      white-space: pre;
-      cursor: text;
-      transform-origin: 0% 0%;
-    }
-
     .pdf-highlight {
       background: rgba(255, 220, 0, 0.4) !important;
       border-radius: 2px;
+    }
+
+    /* 选中文字的临时高亮（JS class，不依赖 ::selection，在 focus 转移后仍可见） */
+    .pdf-selection-mark {
+      background: rgba(0, 120, 215, 0.35) !important;
     }
 
     .pdf-translation-overlay {

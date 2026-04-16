@@ -1,5 +1,6 @@
 # md-viewer justfile
 
+# ── 开发 ──────────────────────────────────────────────
 # 开发模式（热重载）
 dev:
     bun --watch run src/server.ts
@@ -8,15 +9,12 @@ dev:
 build-client:
     bun run build.ts && bun run scripts/embed-client.ts
 
-# 构建本地二进制（当前平台）
+# ── CLI 构建 ──────────────────────────────────────────
+# 构建本地 CLI 二进制（当前平台）
 build:
     bash scripts/build-all.sh
 
-# 构建并安装到 /Applications
-install:
-    bash scripts/build-and-install.sh
-
-# 打包为 tarball（用于 Homebrew 分发）
+# 打包 CLI 为 tarball（用于 Homebrew 分发）
 package version:
     bash scripts/package.sh {{version}}
 
@@ -25,6 +23,21 @@ release version:
     bash scripts/build-all.sh {{version}}
     bash scripts/package.sh {{version}}
 
+# ── Mac App 构建 ──────────────────────────────────────
+# 构建 mdv-server universal binary（App 依赖）
+build-server:
+    bash scripts/build-server-for-xcode.sh
+
+# 构建 Mac App（生成 dist/MD Viewer.app + DMG）
+build-app:
+    bash scripts/build-server-for-xcode.sh
+    bash scripts/build/build_app_bundle.sh --ad-hoc
+
+# 构建并安装 Mac App 到 /Applications
+install:
+    bash scripts/build-and-install.sh
+
+# ── Homebrew ──────────────────────────────────────────
 # 更新 Homebrew Formula 的 SHA256
 update-formula version:
     bash scripts/update-formula-sha.sh {{version}}
@@ -33,6 +46,7 @@ update-formula version:
 sync-tap version:
     bash scripts/sync-formula-to-tap.sh {{version}}
 
+# ── 测试 ──────────────────────────────────────────────
 # 运行单元测试
 test-unit:
     bun test tests/unit/

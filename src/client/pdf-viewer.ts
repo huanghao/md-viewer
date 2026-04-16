@@ -38,12 +38,15 @@ export interface PdfViewerInstance {
   highlightQuote(pageNum: number, quote: string): void;
   clearHighlights(): void;
   getTextBlocks(pageNum: number): PdfTextBlock[];
+  getRenderedCount(): number;
+  getTotalPages(): number;
 }
 
 const SCALE_DEFAULT = 1.5;
 const LINE_HEIGHT_MULTIPLIER = 1.5;
 // Render pages within this many px of the viewport (above and below)
-const RENDER_MARGIN = 1200;
+// 2500px ≈ 2 A4 pages at scale=1.5, reduces blank-page flicker on fast scroll
+const RENDER_MARGIN = 2500;
 
 export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewerInstance> {
   const { container, filePath, scale = SCALE_DEFAULT } = opts;
@@ -107,6 +110,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     canvas.style.height = `${viewport.height}px`;
     const ctx = canvas.getContext("2d")!;
     ctx.scale(dpr, dpr);
+    const t0 = performance.now();
     await page.render({ canvasContext: ctx, viewport }).promise;
     wrapper.appendChild(canvas);
 
@@ -128,6 +132,9 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
       viewport,
     });
     await textLayerObj.render();
+    if ((window as any).__pdfDebug) {
+      console.log(`[pdf] page ${pageNum}: ${(performance.now() - t0).toFixed(0)}ms`);
+    }
 
     // Build text blocks
     const blocks = buildTextBlocks(pageNum, textContent.items as PdfPageTextItem[], viewport, scale);
@@ -221,7 +228,10 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     textBlocksByPage.clear();
   }
 
-  return { destroy, scrollToPage, highlightQuote, clearHighlights, getTextBlocks };
+  function getRenderedCount(): number { return rendered.size; }
+  function getTotalPages(): number { return numPages; }
+
+  return { destroy, scrollToPage, highlightQuote, clearHighlights, getTextBlocks, getRenderedCount, getTotalPages };
 }
 
 function buildTextBlocks(pageNum: number, items: PdfPageTextItem[], viewport: any, scale: number): PdfTextBlock[] {

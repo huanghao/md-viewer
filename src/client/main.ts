@@ -62,6 +62,40 @@ let workspacePollRunning = false;
 let mermaidInitialized = false;
 let currentPdfViewer: PdfViewerInstance | null = null;
 const translationProvider = new MyMemoryProvider();
+
+// PDF viewer registry: tracks all open PDF viewers and their idle timers
+const PDF_IDLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+interface PdfViewerEntry {
+  viewer: PdfViewerInstance;
+  lastActiveAt: number;
+  idleTimer: ReturnType<typeof setTimeout> | null;
+}
+const pdfViewerRegistry = new Map<string, PdfViewerEntry>();
+
+function evictPdfViewer(filePath: string): void {
+  const entry = pdfViewerRegistry.get(filePath);
+  if (!entry) return;
+  if (entry.idleTimer) clearTimeout(entry.idleTimer);
+  entry.viewer.destroy();
+  pdfViewerRegistry.delete(filePath);
+}
+
+function scheduleEviction(filePath: string): void {
+  const entry = pdfViewerRegistry.get(filePath);
+  if (!entry) return;
+  if (entry.idleTimer) clearTimeout(entry.idleTimer);
+  entry.idleTimer = setTimeout(() => evictPdfViewer(filePath), PDF_IDLE_TIMEOUT_MS);
+}
+
+function cancelEviction(filePath: string): void {
+  const entry = pdfViewerRegistry.get(filePath);
+  if (!entry) return;
+  if (entry.idleTimer) {
+    clearTimeout(entry.idleTimer);
+    entry.idleTimer = null;
+  }
+  entry.lastActiveAt = Date.now();
+}
 function syncAnnotationsForCurrentFile(force = false): void {
   const nextPath = state.currentFile && !isHtmlPath(state.currentFile) ? state.currentFile : null; // HTML 文件不支持批注
   const currentAnnotationFilePath = getAnnotationCurrentFilePath();
@@ -473,12 +507,14 @@ function renderContent() {
   const container = document.getElementById('content');
   if (!container) return;
 
-  // Clean up PDF viewer state when switching away from PDF
-  if (currentPdfViewer && !isPdfPath(state.currentFile || '')) {
-    currentPdfViewer.destroy();
-    currentPdfViewer = null;
+  // When switching away from a PDF, schedule idle eviction
+  const previousFile = state.currentFile;
+  if (previousFile && isPdfPath(previousFile) && pdfViewerRegistry.has(previousFile)) {
+    scheduleEviction(previousFile);
   }
   container.classList.remove("pdf-viewer-container");
+  // Keep currentPdfViewer in sync (may be replaced below)
+  currentPdfViewer = null;
 
   if (!state.currentFile) {
     container.removeAttribute('data-current-file');
@@ -520,19 +556,30 @@ function renderContent() {
   }
 
   if (isPdfPath(file.path)) {
-    // Destroy previous PDF viewer if any
-    if (currentPdfViewer) {
-      currentPdfViewer.destroy();
-      currentPdfViewer = null;
+    const filePath = file.path;
+    const scale = 1.5;
+
+    // Cancel any pending eviction for this file (user came back)
+    cancelEviction(filePath);
+
+    // Reuse existing viewer if available, otherwise create new
+    const existingEntry = pdfViewerRegistry.get(filePath);
+    if (existingEntry) {
+      // Viewer already rendered — just re-attach DOM nodes to container
+      currentPdfViewer = existingEntry.viewer;
+      container.classList.add("pdf-viewer-container");
+      container.setAttribute('data-current-file', filePath);
+      renderBreadcrumb();
+      updateToolbarButtons();
+      return;
     }
 
-    const scale = 1.5;
     // bridge is set after viewer resolves; callbacks check it defensively
     let bridge: ReturnType<typeof createPdfAnnotationBridge> | null = null;
 
     createPdfViewer({
       container,
-      filePath: file.path,
+      filePath,
       scale,
       onTextSelected: (pageNum, selectedText, prefix, suffix) => {
         bridge?.handleTextSelected(pageNum, selectedText, prefix, suffix);
@@ -547,8 +594,9 @@ function renderContent() {
       },
     }).then((viewer) => {
       currentPdfViewer = viewer;
+      pdfViewerRegistry.set(filePath, { viewer, lastActiveAt: Date.now(), idleTimer: null });
       bridge = createPdfAnnotationBridge({
-        filePath: file.path,
+        filePath,
         viewer,
         getAnnotations: () => (window as any).__annotationState?.annotations ?? [],
         onAnnotationCreated: () => {},
@@ -911,6 +959,8 @@ async function switchFile(path: string) {
 
 // 移除文件（关闭标签页和从列表删除是同一个操作）
 function removeFileHandler(path: string) {
+  // Immediately evict PDF viewer if this file is being closed
+  if (isPdfPath(path)) evictPdfViewer(path);
   removeFileFromState(path);
   renderSidebar();
   renderContent();
@@ -1175,15 +1225,20 @@ async function acceptDiffUpdate(): Promise<void> {
 async function updateToolbarButtons() {
   const diffButton = document.getElementById('diffButton');
   const refreshButton = document.getElementById('refreshButton');
+  const pdfMemButton = document.getElementById('pdfMemButton');
 
   if (!state.currentFile) {
     if (diffButton) diffButton.style.display = 'none';
     if (refreshButton) refreshButton.style.display = 'none';
+    if (pdfMemButton) pdfMemButton.style.display = 'none';
     return;
   }
 
   const file = state.sessionFiles.get(state.currentFile);
   if (!file) return;
+
+  // Show PDF memory monitor button only when viewing a PDF
+  if (pdfMemButton) pdfMemButton.style.display = isPdfPath(file.path) ? 'flex' : 'none';
 
   if (file.isMissing) {
     if (diffButton) diffButton.style.display = 'none';
@@ -1323,6 +1378,54 @@ function setFontScale(scale: number) {
 }
 
 // 切换菜单显示
+// PDF memory monitor
+const MEM_PER_PAGE_MB = 27; // A4 @ scale=1.5, dpr=2
+let pdfMemPollTimer: ReturnType<typeof setInterval> | null = null;
+
+function getPdfMemStats(): Array<{ path: string; rendered: number; total: number; memMB: number; idleMins: number | null }> {
+  return Array.from(pdfViewerRegistry.entries()).map(([path, entry]) => {
+    const rendered = entry.viewer.getRenderedCount();
+    const total = entry.viewer.getTotalPages();
+    const memMB = rendered * MEM_PER_PAGE_MB;
+    const idleSecs = entry.idleTimer ? (PDF_IDLE_TIMEOUT_MS - (Date.now() - entry.lastActiveAt)) / 1000 : null;
+    const idleMins = idleSecs !== null ? Math.max(0, Math.round(idleSecs / 60)) : null;
+    return { path: path.split('/').pop() || path, rendered, total, memMB, idleMins };
+  });
+}
+
+function updatePdfMemPanel(): void {
+  const content = document.getElementById('pdfMemContent');
+  if (!content) return;
+  const stats = getPdfMemStats();
+  if (stats.length === 0) {
+    content.innerHTML = '<div class="pdf-mem-row pdf-mem-empty">暂无 PDF 数据</div>';
+    return;
+  }
+  const totalMB = stats.reduce((s, r) => s + r.memMB, 0);
+  content.innerHTML = stats.map(r => `
+    <div class="pdf-mem-row">
+      <span class="pdf-mem-name" title="${r.path}">${r.path}</span>
+      <span class="pdf-mem-pages">${r.rendered}/${r.total} 页</span>
+      <span class="pdf-mem-mb">~${r.memMB}MB</span>
+      ${r.idleMins !== null ? `<span class="pdf-mem-idle">${r.idleMins}min 后回收</span>` : ''}
+    </div>
+  `).join('') + `<div class="pdf-mem-total">合计 ~${totalMB}MB</div>`;
+}
+
+function togglePdfMemPanel(): void {
+  const panel = document.getElementById('pdfMemPanel');
+  if (!panel) return;
+  const isVisible = panel.style.display !== 'none';
+  if (isVisible) {
+    panel.style.display = 'none';
+    if (pdfMemPollTimer) { clearInterval(pdfMemPollTimer); pdfMemPollTimer = null; }
+  } else {
+    panel.style.display = 'block';
+    updatePdfMemPanel();
+    pdfMemPollTimer = setInterval(updatePdfMemPanel, 2000);
+  }
+}
+
 function toggleFontScaleMenu() {
   const menu = document.getElementById('fontScaleMenu');
   if (!menu) return;
@@ -1476,6 +1579,7 @@ declare global {
     showToast?: (message: string, type: string) => void;
     showSettingsDialog: () => void;
     toggleFontScaleMenu: () => void;
+    togglePdfMemPanel: () => void;
     setFontScale: (scale: number) => void;
     openExternalFile?: (path: string) => void | Promise<void>;
     renderContent?: () => void;
@@ -1525,6 +1629,7 @@ window.copyFilePath = copyFilePath;
 window.showToast = showToast;
 window.showSettingsDialog = showSettingsDialog;
 window.toggleFontScaleMenu = toggleFontScaleMenu;
+window.togglePdfMemPanel = togglePdfMemPanel;
 window.setFontScale = setFontScale;
 window.openExternalFile = openFileInBrowser;
 window.renderContent = renderContent;

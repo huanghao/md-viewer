@@ -3099,4 +3099,58 @@ export const styles = `
       word-break: break-all;
       box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     }
+
+    /* PDF Memory Monitor Panel */
+    .pdf-mem-panel {
+      position: absolute;
+      top: 48px;
+      right: 100px;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      padding: 8px 0;
+      min-width: 280px;
+      z-index: 1000;
+      font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Consolas', monospace;
+      font-size: 12px;
+    }
+    .pdf-mem-panel-title {
+      padding: 4px 12px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid #f3f4f6;
+      margin-bottom: 4px;
+    }
+    .pdf-mem-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 12px;
+      color: #374151;
+    }
+    .pdf-mem-row.pdf-mem-empty {
+      color: #9ca3af;
+      font-style: italic;
+    }
+    .pdf-mem-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .pdf-mem-pages { color: #6b7280; white-space: nowrap; }
+    .pdf-mem-mb { color: #0b64c0; white-space: nowrap; min-width: 52px; text-align: right; }
+    .pdf-mem-idle { color: #f59e0b; white-space: nowrap; font-size: 11px; }
+    .pdf-mem-total {
+      padding: 6px 12px 2px;
+      border-top: 1px solid #f3f4f6;
+      margin-top: 4px;
+      color: #374151;
+      font-weight: 600;
+      text-align: right;
+    }
 `;

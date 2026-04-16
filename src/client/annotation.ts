@@ -1021,15 +1021,18 @@ function jumpToAnnotation(id: string): void {
   const el = getElements();
   if (!el.content) return;
   const mark = document.querySelector(`[data-annotation-id="${id}"]`) as HTMLElement | null;
-  if (mark) {
-    const contentRect = el.content.getBoundingClientRect();
-    const markRect = mark.getBoundingClientRect();
-    const currentTop = el.content.scrollTop;
-    const targetTop = currentTop + (markRect.top - contentRect.top);
-    const topPadding = 56;
-    const finalTop = Math.max(0, targetTop - topPadding);
-    el.content.scrollTo({ top: finalTop, behavior: 'smooth' });
-  }
+  if (!mark) return;
+
+  // Check if this is a PDF annotation (inside pdf-viewer-container)
+  const isPdf = mark.closest('.pdf-viewer-container') !== null;
+
+  const contentRect = el.content.getBoundingClientRect();
+  const markRect = mark.getBoundingClientRect();
+  const currentTop = el.content.scrollTop;
+  const targetTop = currentTop + (markRect.top - contentRect.top);
+  const topPadding = isPdf ? 100 : 56;
+  const finalTop = Math.max(0, targetTop - topPadding);
+  el.content.scrollTo({ top: finalTop, behavior: 'smooth' });
 }
 
 function setActiveAnnotation(id: string | null, filePath: string | null): void {
@@ -1716,6 +1719,14 @@ export function initAnnotationElements(): void {
   (window as any).openAnnotationSidebar = openAnnotationSidebar;
   (window as any).closeAnnotationSidebar = closeAnnotationSidebar;
   (window as any).toggleAnnotationSidebar = toggleAnnotationSidebar;
+
+  // PDF annotation popover 事件
+  document.addEventListener('pdf:show-popover', (e: Event) => {
+    const { annotation, x, y } = (e as CustomEvent).detail;
+    if (annotation) {
+      showPopover(annotation, x, y);
+    }
+  });
 
   document.addEventListener('mousedown', (event) => {
     const target = event.target as Node;

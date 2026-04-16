@@ -13,7 +13,7 @@ export default defineConfig({
   workers: 1,  // SSE/timing-sensitive tests require serial execution
   reporter: [['list']],
   use: {
-    baseURL: 'http://127.0.0.1:3000',
+    baseURL: 'http://localhost:3000',
     headless: true,
     viewport: { width: 1440, height: 900 },
     trace: 'retain-on-failure',
@@ -28,7 +28,7 @@ export default defineConfig({
   ],
   webServer: {
     command: 'bun run build:client && bun run src/server.ts',
-    url: 'http://127.0.0.1:3000',
+    url: 'http://localhost:3000',
     reuseExistingServer: true,
     timeout: 120_000,
   },

@@ -52,6 +52,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
   for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
     const page = await pdfDoc.getPage(pageNum);
     const viewport = page.getViewport({ scale });
+    const dpr = window.devicePixelRatio || 1;
 
     // Wrapper div for this page
     const pageWrapper = document.createElement("div");
@@ -62,11 +63,14 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     pageWrapper.style.height = `${viewport.height}px`;
     pageWrapper.style.marginBottom = "16px";
 
-    // Canvas layer
+    // Canvas layer — use devicePixelRatio for sharp rendering on HiDPI screens
     const canvas = document.createElement("canvas");
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
+    canvas.width = Math.floor(viewport.width * dpr);
+    canvas.height = Math.floor(viewport.height * dpr);
+    canvas.style.width = `${viewport.width}px`;
+    canvas.style.height = `${viewport.height}px`;
     const ctx = canvas.getContext("2d")!;
+    ctx.scale(dpr, dpr);
     await page.render({ canvasContext: ctx, viewport }).promise;
     pageWrapper.appendChild(canvas);
 
@@ -82,12 +86,19 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     pageWrapper.appendChild(textLayerDiv);
 
     const textContent = await page.getTextContent();
-    await pdfjsLib.renderTextLayer({
+    // PDF.js 4.x API: renderTextLayer accepts textContentSource or textContent
+    const renderTask = pdfjsLib.renderTextLayer({
       textContentSource: textContent,
       container: textLayerDiv,
       viewport,
       textDivs: [],
-    }).promise;
+    });
+    if (renderTask && renderTask.promise) {
+      await renderTask.promise;
+    } else if (renderTask && typeof renderTask.cancel === 'function') {
+      // older API returns object with cancel(), just wait via settled promise
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+    }
 
     // Build text blocks for this page
     const blocks = buildTextBlocks(pageNum, textContent.items as PdfPageTextItem[], viewport, scale);

@@ -20,6 +20,7 @@ export const state: AppState = {
   // 工作区模式
   currentWorkspace: null,
   fileTree: new Map(),
+  annotationCounts: new Map(),
 };
 
 // 状态持久化
@@ -262,6 +263,20 @@ export function markFileMissing(path: string, switchTo: boolean = false): void {
 
 export function setSearchQuery(query: string): void {
   state.searchQuery = query;
+}
+
+export function setAnnotationCounts(counts: Map<string, number>): void {
+  state.annotationCounts = counts;
+}
+
+export function adjustAnnotationCount(path: string, delta: number): void {
+  const current = state.annotationCounts.get(path) ?? 0;
+  const next = current + delta;
+  if (next <= 0) {
+    state.annotationCounts.delete(path);
+  } else {
+    state.annotationCounts.set(path, next);
+  }
 }
 
 export function getFilteredFiles(): FileInfo[] {

@@ -473,6 +473,13 @@ function renderContent() {
   const container = document.getElementById('content');
   if (!container) return;
 
+  // Clean up PDF viewer state when switching away from PDF
+  if (currentPdfViewer && !isPdfPath(state.currentFile || '')) {
+    currentPdfViewer.destroy();
+    currentPdfViewer = null;
+  }
+  container.classList.remove("pdf-viewer-container");
+
   if (!state.currentFile) {
     container.removeAttribute('data-current-file');
     container.innerHTML = `

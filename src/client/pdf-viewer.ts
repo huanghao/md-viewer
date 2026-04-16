@@ -340,7 +340,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     const textLayer = wrapper.querySelector(".pdf-text-layer") as HTMLElement;
     if (!textLayer) return;
 
-    // Find spans that match the quote and wrap them in annotation-mark
+    // Find spans that match the quote and add annotation class/data
     const spans = Array.from(textLayer.querySelectorAll("span")).filter(
       s => s.querySelector("span") === null
     );
@@ -353,18 +353,12 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
 
       // Check if this span's text is part of the quote
       if (normalizedQuote.includes(text) || text.includes(normalizedQuote)) {
-        // Wrap the span's content in an annotation-mark
-        if (annotationId && !span.closest(".annotation-mark")) {
-          const mark = document.createElement("mark");
-          mark.className = "annotation-mark";
-          mark.dataset.annotationId = annotationId;
-          // Copy the span's children to the mark
-          while (span.firstChild) {
-            mark.appendChild(span.firstChild);
-          }
-          span.appendChild(mark);
-        }
+        // Add highlight class and annotation id directly to span
         span.classList.add("pdf-highlight");
+        if (annotationId) {
+          span.classList.add("annotation-mark");
+          span.dataset.annotationId = annotationId;
+        }
       }
     }
   }

@@ -408,24 +408,42 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
       s => s.querySelector("span") === null
     );
 
-    // Map item index to span by content — one pass, O(n)
-    let itemCursor = 0;
-    for (const span of spans) {
-      if (itemCursor > safeEnd) break;
-      const spanText = span.textContent || "";
-      const expectedText = items[itemCursor]?.str || "";
+    // Get the quote text for this item range
+    const rangeQuote = items.slice(safeStart, safeEnd + 1).map(it => it.str).join(" ").trim();
+    if (!rangeQuote) return;
 
-      // Match by content to align item index with span
-      if (spanText.includes(expectedText) || expectedText.includes(spanText)) {
-        if (itemCursor >= safeStart) {
-          span.classList.add("pdf-highlight");
-          if (annotationId) {
-            span.classList.add("annotation-mark");
-            span.dataset.annotationId = annotationId;
-          }
+    console.log('[pdf] highlightByItemRange:', { pageNum, safeStart, safeEnd, rangeQuote: rangeQuote.substring(0, 50) });
+
+    // Find span that contains this quote (exact or partial match)
+    let matched = false;
+    for (const span of spans) {
+      const spanText = (span.textContent || "").trim();
+      // Try exact match first
+      if (spanText === rangeQuote) {
+        span.classList.add("pdf-highlight");
+        if (annotationId) {
+          span.classList.add("annotation-mark");
+          span.dataset.annotationId = annotationId;
         }
-        itemCursor++;
+        matched = true;
+        console.log('[pdf] exact match');
+        break;
       }
+      // Then try if span contains the quote
+      if (spanText.includes(rangeQuote)) {
+        span.classList.add("pdf-highlight");
+        if (annotationId) {
+          span.classList.add("annotation-mark");
+          span.dataset.annotationId = annotationId;
+        }
+        matched = true;
+        console.log('[pdf] partial match');
+        break;
+      }
+    }
+
+    if (!matched) {
+      console.log('[pdf] no match found for quote:', rangeQuote.substring(0, 50));
     }
   }
 

@@ -109,6 +109,7 @@ export function renderFileRow(
   return `
     <div class="${classes}" onclick="${opts.onClickJs(path)}">
       <span class="tree-indent" style="width: ${opts.indentPx}px"></span>
+      <span class="tree-toggle"></span>
       <span class="file-type-icon ${typeIcon.cls}">${escapeHtml(typeIcon.label)}</span>
       <span class="tree-status-inline">${statusBadge}</span>
       <span class="tree-name" title="${escapeAttr(name)}"><span class="tree-name-full">${highlightedName}</span></span>

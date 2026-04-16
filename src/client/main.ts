@@ -24,6 +24,9 @@ import { renderJsonContent } from './ui/json-viewer';
 
 import { getMdThemeCss, getHlThemeCss } from './themes/index';
 
+import { fetchAnnotationSummaries } from './api/annotations';
+import { setAnnotationCounts } from './state';
+
 // 导入批注功能
 import {
   initAnnotationElements,
@@ -588,8 +591,8 @@ function renderContent() {
       container,
       filePath,
       scale,
-      onTextSelected: (pageNum, selectedText, prefix, suffix) => {
-        bridge?.handleTextSelected(pageNum, selectedText, prefix, suffix);
+      onTextSelected: (pageNum, selectedText, prefix, suffix, clientX, clientY) => {
+        bridge?.handleTextSelected(pageNum, selectedText, prefix, suffix, clientX, clientY);
       },
       onParagraphClick: (block) => {
         const pageWrapper = block.pageNum
@@ -608,13 +611,21 @@ function renderContent() {
         filePath,
         viewer,
         getAnnotations: () => (window as any).__annotationState?.annotations ?? [],
-        onAnnotationCreated: () => {},
+        onAnnotationCreated: (ann) => {
+          // Immediately highlight the newly created annotation
+          const anns = (window as any).__annotationState?.annotations ?? [];
+          bridge?.renderHighlights(anns);
+        },
       });
-      // Re-render annotation highlights when annotations load
+      // Re-render annotation highlights when annotations load or a new one is created
       document.addEventListener("annotations:loaded", () => {
         const anns = (window as any).__annotationState?.annotations ?? [];
         bridge?.renderHighlights(anns);
       }, { once: false });
+      document.addEventListener("annotation:created", () => {
+        const anns = (window as any).__annotationState?.annotations ?? [];
+        bridge?.renderHighlights(anns);
+      });
     });
     return; // don't fall through to markdown renderer
   }
@@ -1784,6 +1795,12 @@ function startWorkspacePolling() {
   // 根据配置渲染侧边栏
   renderSidebar();
 
+  // 拉取批注摘要（失败静默忽略，不阻塞主流程）
+  fetchAnnotationSummaries().then((counts) => {
+    setAnnotationCounts(counts);
+    renderSidebar();
+  }).catch(() => {/* 静默忽略 */});
+
   renderContent();
   syncAnnotationsForCurrentFile(true);
 
@@ -1837,9 +1854,9 @@ function startWorkspacePolling() {
 
   // 监听 pdf:show-composer 事件
   document.addEventListener("pdf:show-composer", (e: Event) => {
-    const { annotation, filePath } = (e as CustomEvent).detail;
+    const { annotation, filePath, clientX, clientY } = (e as CustomEvent).detail;
     if ((window as any).__setPendingAnnotation) {
-      (window as any).__setPendingAnnotation(annotation, filePath);
+      (window as any).__setPendingAnnotation(annotation, filePath, clientX, clientY);
     }
   });
 

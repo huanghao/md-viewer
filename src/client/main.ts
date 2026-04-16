@@ -1099,6 +1099,7 @@ async function loadPendingContent(path: string): Promise<string | null> {
 }
 
 function renderDiffView(oldContent: string, newContent: string): void {
+  currentDiffBlockIndex = -1;
   const container = document.getElementById('content');
   if (!container) return;
 

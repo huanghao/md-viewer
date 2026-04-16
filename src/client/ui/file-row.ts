@@ -3,7 +3,7 @@ import { hasListDiff, hasWorkspaceModified, isWorkspacePathMissing } from '../wo
 import { getFileListStatus } from '../utils/file-status';
 import { getFileTypeIcon } from '../utils/file-type';
 import { stripWorkspaceTreeDisplayExtension } from '../utils/workspace-file-name';
-import { formatRelativeTime } from '../utils/format';
+import { formatRelativeTimeShort } from '../utils/format';
 import { escapeHtml, escapeAttr } from '../utils/escape';
 import { isPinned } from '../utils/pinned-files';
 
@@ -78,7 +78,7 @@ export function renderFileRow(
 
   // 相对修改时间（仅焦点视图）
   const timeStr = opts.showTime && lastModified
-    ? `<span class="focus-file-time">${escapeHtml(formatRelativeTime(lastModified))}</span>`
+    ? `<span class="focus-file-time">${escapeHtml(formatRelativeTimeShort(lastModified))}</span>`
     : '';
 
   // Pin 按钮

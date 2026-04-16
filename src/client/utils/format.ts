@@ -1,3 +1,13 @@
+// 格式化相对时间（短格式，如 "5m", "3h", "2d"）
+export function formatRelativeTimeShort(ms: number): string {
+  const diff = Date.now() - ms;
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(diff / 3600000);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(diff / 86400000)}d`;
+}
+
 // 格式化相对时间
 export function formatRelativeTime(timestamp: number): string {
   const now = Date.now();

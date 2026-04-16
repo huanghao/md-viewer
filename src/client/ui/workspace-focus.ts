@@ -87,14 +87,6 @@ export function getActiveFiles(
   });
 }
 
-export function formatRelativeTime(ms: number): string {
-  const diff = Date.now() - ms;
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(diff / 3600000);
-  if (hours < 24) return `${hours}h`;
-  return `${Math.floor(diff / 86400000)}d`;
-}
 
 function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>, query: string): string {
   return renderFileRow(file.path, file.name, file.lastModified, {

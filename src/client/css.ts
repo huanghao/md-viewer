@@ -2958,14 +2958,6 @@ export const styles = `
       color: #bbb;
       flex-shrink: 0;
     }
-    .focus-file-dot {
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .focus-file-dot.modified { background: #f59e0b; }
-    .focus-file-dot.new-file { background: #007AFF; }
     .focus-pin-btn {
       border: none;
       background: transparent;

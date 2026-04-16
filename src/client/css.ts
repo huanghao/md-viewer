@@ -3105,12 +3105,10 @@ export const styles = `
     .pdf-viewer-container {
       padding: 16px;
       background: #525659;
-      height: 100%;
-      overflow-y: auto;
+      min-height: 100%;
       display: flex;
       flex-direction: column;
       align-items: center;
-      box-sizing: border-box;
     }
 
     .pdf-page-wrapper {

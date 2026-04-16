@@ -184,7 +184,9 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
         }
       }
     },
-    { root: el, rootMargin: `${RENDER_MARGIN}px 0px`, threshold: 0 }
+    // root = container (#content), which is the actual scroll container.
+    // el is just a flex wrapper inside #content, not a scroll container itself.
+    { root: container, rootMargin: `${RENDER_MARGIN}px 0px`, threshold: 0 }
   );
 
   for (const wrapper of pageWrappers) {

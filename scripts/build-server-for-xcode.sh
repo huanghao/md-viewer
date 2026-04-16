@@ -40,7 +40,10 @@ lipo -create \
 echo ""
 
 # 6. Ad-hoc 签名（macOS 要求所有可执行文件必须签名，否则 Gatekeeper 会 SIGKILL）
+# Bun 编译产物内嵌了占位符签名（LC_CODE_SIGNATURE），必须先用 --remove-signature
+# 剥掉它，codesign 才能正常写入真实签名。
 echo "6️⃣  Ad-hoc 签名..."
+codesign --remove-signature mdv-server
 codesign --force --sign - mdv-server
 echo ""
 

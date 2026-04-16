@@ -115,6 +115,9 @@ app.post("/api/annotations/clear", handleClearAllAnnotations);
 app.get("/api/session-state", handleGetSessionState);
 app.post("/api/session-state", handleUpdateSessionState);
 
+// API: 健康检查（供 macOS App 检测 Server 是否就绪）
+app.get("/api/health", (c) => c.json({ status: "ok" }));
+
 // ==================== 启动服务 ====================
 
 const PORT = getServerPort(config);

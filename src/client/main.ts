@@ -1053,6 +1053,23 @@ function setupKeyboardShortcuts() {
         removeFileHandler(state.currentFile);
       }
     }
+
+    // n / p：diff 视图中跳转差异块
+    if (diffViewActive && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag !== 'input' && tag !== 'textarea') {
+        if (e.key === 'n') {
+          e.preventDefault();
+          navigateDiffBlock(1);
+          return;
+        }
+        if (e.key === 'p') {
+          e.preventDefault();
+          navigateDiffBlock(-1);
+          return;
+        }
+      }
+    }
   });
 }
 

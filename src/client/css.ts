@@ -1259,6 +1259,20 @@ export const styles = `
       gap: 8px;
       flex-shrink: 0;
     }
+    .diff-accept-btn {
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1px solid #2da44e;
+      background: #2da44e;
+      color: #fff;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .diff-accept-btn:hover {
+      background: #218a3e;
+      border-color: #218a3e;
+    }
     .diff-close-btn {
       padding: 5px 12px;
       border-radius: 6px;

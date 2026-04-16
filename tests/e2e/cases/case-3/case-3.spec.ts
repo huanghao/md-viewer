@@ -7,12 +7,10 @@ const ROOT = process.cwd();
 const BLUE_DOT_FILE = resolve(ROOT, 'docs/design/blue-dot-refresh-test.md');
 const WORKSPACE_DOT_FILE = resolve(ROOT, 'docs/design/e2e-workspace-dot-case-3.md');
 
-// FIXME: 此测试依赖文件系统 watcher，在测试环境不稳定
-// 需要修改为使用 API 触发文件发现或增加更长的等待时间
-test.fixme('case-3: 状态标记在右侧（简单模式 + 工作区模式）', async ({ page, request }) => {
+// 简单模式测试：状态标记位置
+test('case-3a: 简单模式状态标记在名称右侧', async ({ page, request }) => {
   await resetAppStorage(page);
 
-  // 简单模式测试
   await request.post('/api/open-file', { data: { path: BLUE_DOT_FILE, focus: false } });
   await page.waitForSelector('.file-item', { timeout: 10000 });
 
@@ -27,10 +25,17 @@ test.fixme('case-3: 状态标记在右侧（简单模式 + 工作区模式）', 
   expect(simpleNameBox).not.toBeNull();
   expect(simpleStatusBox).not.toBeNull();
   expect((simpleStatusBox as any).x).toBeGreaterThan((simpleNameBox as any).x);
+});
 
-  // 工作区模式测试
+// 工作区模式测试：状态标记位置（使用 API 触发扫描）
+test('case-3b: 工作区模式状态标记在名称左侧', async ({ page, request }) => {
   if (existsSync(WORKSPACE_DOT_FILE)) rmSync(WORKSPACE_DOT_FILE);
+
   try {
+    // 先创建文件，再启动工作区
+    writeFileSync(WORKSPACE_DOT_FILE, '# case-3 workspace dot\n');
+
+    await resetAppStorage(page);
     await seedConfig(page, {
       sidebarTab: 'full',
       workspaces: [
@@ -41,12 +46,13 @@ test.fixme('case-3: 状态标记在右侧（简单模式 + 工作区模式）', 
     await expect(page.locator('.workspace-header', { hasText: 'docs' })).toBeVisible();
     await expect(page.locator('.tree-loading')).toHaveCount(0);
 
-    writeFileSync(WORKSPACE_DOT_FILE, '# case-3 workspace dot\n');
-    await page.reload();
+    // 触发工作区扫描（替代等待 watcher 自动发现）
+    await request.post('/api/scan-workspace', {
+      data: { path: resolve(ROOT, 'docs') }
+    });
 
-    // 等待工作区加载
-    await expect(page.locator('.workspace-header', { hasText: 'docs' })).toBeVisible();
-    await expect(page.locator('.tree-loading')).toHaveCount(0);
+    // 等待文件出现
+    await page.waitForTimeout(500);
 
     // 注意：扩展名被剥离
     const wsItem = page.locator('.tree-item', { hasText: 'e2e-workspace-dot-case-3' }).first();

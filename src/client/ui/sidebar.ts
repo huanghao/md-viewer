@@ -4,7 +4,8 @@ import { saveConfig } from '../config';
 import { escapeAttr, escapeHtml } from '../utils/escape';
 import { generateDistinctNames } from '../utils/file-names';
 import { getFileListStatus } from '../utils/file-status';
-import { getFileTypeIcon, isJsonFile, isJsonlFile } from '../utils/file-type';
+import { isJsonFile, isJsonlFile } from '../utils/file-type';
+import { renderFileRow } from './file-row';
 import { getTabBatchTargets, type TabBatchAction } from '../utils/tab-batch';
 import { renderWorkspaceSidebar, bindWorkspaceEvents } from './sidebar-workspace';
 import { syncAnnotationSidebarLayout } from '../annotation';
@@ -323,52 +324,18 @@ export function renderFiles(): void {
   const filteredMap = new Map(filteredFiles.map(f => [f.path, f]));
   const filesWithDisplay = generateDistinctNames(filteredMap);
 
-  container.innerHTML = filesWithDisplay
-    .map(file => {
-      const isCurrent = file.path === state.currentFile;
-      const isMissing = file.isMissing || false;
-      const typeIcon = getFileTypeIcon(file.path);
-      const classes = [
-        'file-item',
-        isCurrent ? 'current' : '',
-        isMissing ? 'deleted' : ''
-      ].filter(Boolean).join(' ');
-
-      // 高亮匹配的文本
-      let displayName = file.displayName || file.name;
-      const query = state.searchQuery.toLowerCase().trim();
-      if (query) {
-        const index = displayName.toLowerCase().indexOf(query);
-        if (index !== -1) {
-          const before = displayName.substring(0, index);
-          const match = displayName.substring(index, index + query.length);
-          const after = displayName.substring(index + query.length);
-          displayName = `${before}<mark class="search-highlight">${match}</mark>${after}`;
-        }
-      }
-
-      // 获取文件状态（优先级：D > M > 🔵）
-      const status = getFileListStatus(file, hasListDiff(file.path));
-      let statusBadge = '&nbsp;'; // 默认使用不间断空格占位
-
-      if (status.badge === 'dot') {
-        // 蓝色圆点
-        statusBadge = '<span class="new-dot"></span>';
-      } else if (status.badge) {
-        // M 或 D 字母标识
-        statusBadge = `<span class="status-badge status-${status.type}" style="color: ${status.color}">${status.badge}</span>`;
-      }
-
-      return `
-      <div class="${classes}"
-           onclick="window.switchFile('${escapeAttr(file.path)}')">
-        <span class="file-type-icon ${typeIcon.cls}">${escapeHtml(typeIcon.label)}</span>
-        <span class="name">${displayName}</span>
-        <span class="file-item-status">${statusBadge}</span>
-        ${state.annotationCounts.get(file.path) ? `<span class="annotation-count-badge">${state.annotationCounts.get(file.path)}</span>` : ''}
-        <span class="close" onclick="event.stopPropagation();window.removeFile('${escapeAttr(file.path)}')">×</span>
-      </div>
-    `}).join('');
+  container.innerHTML = filesWithDisplay.map(file => {
+    return renderFileRow(file.path, file.displayName || file.name, undefined, {
+      containerClass: 'file-item',
+      onClickJs: (p) => `window.switchFile('${escapeAttr(p)}')`,
+      showPin: false,
+      showTime: false,
+      indentPx: 0,
+      query: state.searchQuery.toLowerCase().trim(),
+      showClose: true,
+      onCloseJs: (p) => `window.removeFile('${escapeAttr(p)}')`,
+    });
+  }).join('');
 
   // 滚动当前文件到侧边栏40%位置
   scrollCurrentFileIntoView(container);

@@ -32,7 +32,7 @@ export interface Config {
 const DEFAULT_CONFIG: Config = {
   server: {
     port: 3000,
-    host: "localhost",
+    host: "127.0.0.1",
   },
   client: {
     defaultFocus: true,

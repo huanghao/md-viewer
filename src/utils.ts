@@ -23,6 +23,10 @@ export function isJson(path: string): boolean {
   return lower.endsWith(".json") || lower.endsWith(".jsonl");
 }
 
+export function isPdf(path: string): boolean {
+  return path.toLowerCase().endsWith(".pdf");
+}
+
 export function isSupportedTextFile(path: string): boolean {
   const lower = path.toLowerCase();
   return isMarkdown(lower) || isHtml(lower) || isJson(lower);

@@ -3102,6 +3102,15 @@ export const styles = `
     .sync-dialog-btn-primary:hover { background: #0757ba; }
 
     /* PDF Viewer */
+    /* When PDF is active, remove content padding (PDF viewer has its own) */
+    .content[data-pdf] {
+      padding: 0;
+      padding-right: var(--annotation-sidebar-width);
+    }
+    body.annotation-sidebar-collapsed .content[data-pdf] {
+      padding-right: 0;
+    }
+
     .pdf-viewer-container {
       padding: 16px;
       background: #525659;
@@ -3152,16 +3161,31 @@ export const styles = `
       font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Consolas', monospace;
       font-size: 12px;
     }
+    .pdf-mem-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 8px 8px 12px;
+      border-bottom: 1px solid #f3f4f6;
+      margin-bottom: 4px;
+    }
     .pdf-mem-panel-title {
-      padding: 4px 12px 8px;
       font-size: 11px;
       font-weight: 600;
       color: #6b7280;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      border-bottom: 1px solid #f3f4f6;
-      margin-bottom: 4px;
     }
+    .pdf-mem-close {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+      color: #9ca3af;
+      line-height: 1;
+      padding: 0 2px;
+    }
+    .pdf-mem-close:hover { color: #374151; }
     .pdf-mem-row {
       display: flex;
       align-items: center;

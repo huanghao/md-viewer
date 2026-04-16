@@ -196,7 +196,8 @@ function normalizeAnnotation(input: any): StoredAnnotation | null {
   const quote = String(input.quote || "");
   const note = String(input.note || "");
   const createdAt = Number(input.createdAt || Date.now());
-  if (!id || !Number.isFinite(start) || !Number.isFinite(length) || length <= 0 || !quote) {
+  const isPdfAnnotation = input.fileType === "pdf";
+  if (!id || !Number.isFinite(start) || !Number.isFinite(length) || (!isPdfAnnotation && length <= 0) || !quote) {
     return null;
   }
   const statusRaw = String(input.status || "anchored");
@@ -212,6 +213,11 @@ function normalizeAnnotation(input: any): StoredAnnotation | null {
     : buildThreadFromLegacyNote(note, normalizedCreatedAt, id);
   const topNote = thread[0]?.note || note;
 
+  const page = Number.isFinite(Number(input.page)) && Number(input.page) >= 1
+    ? Math.floor(Number(input.page))
+    : undefined;
+  const fileType: "md" | "pdf" = input.fileType === "pdf" ? "pdf" : "md";
+
   return {
     id,
     serial,
@@ -225,13 +231,15 @@ function normalizeAnnotation(input: any): StoredAnnotation | null {
     quoteSuffix,
     status,
     confidence,
+    page,
+    fileType,
   };
 }
 
 function getAnnotationRowById(id: string): any | null {
   return getDb()
     .query(
-      `SELECT id, serial, doc_path, start, length, quote, note, thread_json, created_at, updated_at, quote_prefix, quote_suffix, status, confidence
+      `SELECT id, serial, doc_path, start, length, quote, note, thread_json, created_at, updated_at, quote_prefix, quote_suffix, status, confidence, page, file_type
        FROM annotations WHERE id = ?`
     )
     .get(id) as any | null;
@@ -241,7 +249,7 @@ function getAnnotationRowByRef(path: string, annotationRef: { id?: string; seria
   if (annotationRef.id) {
     return getDb()
       .query(
-        `SELECT id, serial, doc_path, start, length, quote, note, thread_json, created_at, updated_at, quote_prefix, quote_suffix, status, confidence
+        `SELECT id, serial, doc_path, start, length, quote, note, thread_json, created_at, updated_at, quote_prefix, quote_suffix, status, confidence, page, file_type
          FROM annotations WHERE doc_path = ? AND id = ?`
       )
       .get(path, annotationRef.id) as any | null;
@@ -253,7 +261,7 @@ function getAnnotationRowByRef(path: string, annotationRef: { id?: string; seria
   ) {
     return getDb()
       .query(
-        `SELECT id, serial, doc_path, start, length, quote, note, thread_json, created_at, updated_at, quote_prefix, quote_suffix, status, confidence
+        `SELECT id, serial, doc_path, start, length, quote, note, thread_json, created_at, updated_at, quote_prefix, quote_suffix, status, confidence, page, file_type
          FROM annotations WHERE doc_path = ? AND serial = ?`
       )
       .get(path, Math.floor(annotationRef.serial)) as any | null;
@@ -316,8 +324,7 @@ export function listAnnotations(docPath: string): StoredAnnotation[] {
   if (!path) return [];
   const rows = getDb()
     .query(
-      `SELECT id, start, length, quote, note, thread_json, created_at, quote_prefix, quote_suffix, status, confidence
-       , serial
+      `SELECT id, start, length, quote, note, thread_json, created_at, quote_prefix, quote_suffix, status, confidence, serial, page, file_type
        FROM annotations WHERE doc_path = ? ORDER BY created_at ASC`
     )
     .all(path) as any[];

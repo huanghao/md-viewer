@@ -25,23 +25,36 @@
 |------|------|
 | 白屏概率 | 明显降低 |
 | 首屏时间 | 轻微增加（后台多渲染 1 页） |
-| 内存 | +50-100MB（约 1-2 页 canvas） |
+| 内存 | 每增加 1 页预渲染，约 +27MB（见下方内存估算） |
 
 ### 2. 卸载机制（内存回收）
 
-离开视口超过 N 页后，销毁 canvas，换回占位符。
+**不采用基于滚动位置的激进回收**——用户来回翻页是正常行为，频繁销毁/重建 canvas 会造成白屏闪烁，体验差。
+
+**采用基于"文件空闲时间"的回收策略：**
 
 ```
-渲染窗口 = 当前页 ± keep_pages
-超出窗口的页面 → 销毁 canvas → 换回占位符（保留高度）
+活跃 PDF（当前打开 tab）→ 不回收，保留所有已渲染页面
+空闲 PDF（打开列表中但长时间未点击）→ 回收全部 canvas，保留占位符
 ```
 
-权衡：
-- `keep_pages` 越小 → 内存越低，回滚时白屏风险越高
-- `keep_pages` 越大 → 内存越高，体验更流畅
-- 推荐起点：`keep_pages = 5`（当前页上下各 5 页）
+具体触发条件（待定）：
+- 用户切换到其他文件超过 N 分钟（如 10 分钟）
+- 或打开列表里有多个 PDF，总内存超过阈值时，优先回收最久未访问的
 
-### 3. PDF.js Worker 的限制
+这样用户在当前 PDF 来回翻页完全不受影响，只有真正"冷"的文件才会被回收。
+
+### 3. 内存监控 UI
+
+在设置或状态栏里增加一个内存使用面板，类似 Activity Monitor：
+
+- 当前已渲染页数 / 总页数
+- 估算内存占用（已渲染页数 × 27MB）
+- 各打开 PDF 的内存占用列表
+
+这个面板可以帮助判断何时需要手动触发回收，也方便调试。
+
+### 4. PDF.js Worker 的限制
 
 PDF.js 的渲染在单个 Web Worker 里排队执行，`page.render()` 并发调用不会加速，只会增加内存压力。瓶颈在 Worker，不在 JS 主线程。
 
@@ -49,17 +62,22 @@ PDF.js 的渲染在单个 Web Worker 里排队执行，`page.render()` 并发调
 
 ## 可观测指标
 
-### 渲染延迟（最重要）
+### 渲染延迟
 
 在 `renderPage` 里加计时：
 
 ```typescript
 const t0 = performance.now();
 await page.render({ canvasContext: ctx, viewport }).promise;
-console.log(`[pdf] page ${pageNum} canvas: ${(performance.now() - t0).toFixed(0)}ms`);
 await textLayerObj.render();
-console.log(`[pdf] page ${pageNum} total: ${(performance.now() - t0).toFixed(0)}ms`);
+const elapsed = performance.now() - t0;
+// 只在 debug 模式下打印，避免 console.log 本身的 overhead
+if ((window as any).__pdfDebug) {
+  console.log(`[pdf] page ${pageNum}: ${elapsed.toFixed(0)}ms`);
+}
 ```
+
+`performance.now()` 本身几乎零开销（纳秒级），不影响渲染性能。`console.log` 有序列化开销，正式版不应常驻，通过 `window.__pdfDebug = true` 按需开启即可。
 
 目标：用户滚动到某页前 300ms 内完成渲染（即 rootMargin 提供的预渲染时间窗口）。
 
@@ -69,12 +87,18 @@ console.log(`[pdf] page ${pageNum} total: ${(performance.now() - t0).toFixed(0)}
 ```
 每页 = width × height × 4 bytes × dpr²
 A4 @ scale=1.5, dpr=2: 1122 × 1587 × 4 × 4 ≈ 27MB/页
+
+10 页已渲染 ≈ 270MB
 50 页全渲染 ≈ 1.3GB
 ```
+
+注意：这是**每个已渲染页面**的占用，不是每个 PDF 文件。一个 50 页的 PDF 如果只渲染了 3 页，内存约 80MB。
 
 **实测（Chrome DevTools）：**
 - Memory → Heap snapshot：对比渲染前后
 - Console：`performance.memory.usedJSHeapSize / 1024 / 1024` MB
+
+两种指标可以集成到内存监控 UI 里（见上方优化方向 3），不需要每次手动打开 DevTools。
 
 ### IntersectionObserver 触发提前量
 
@@ -86,4 +110,5 @@ A4 @ scale=1.5, dpr=2: 1122 × 1587 × 4 × 4 ≈ 27MB/页
 
 - [ ] 实测当前 rootMargin=1200px 下的渲染延迟和白屏频率
 - [ ] 调整 rootMargin 到 2500px，对比效果
-- [ ] 实现卸载机制，keep_pages=5，观测内存变化
+- [ ] 实现基于文件空闲时间的卸载机制
+- [ ] 实现内存监控 UI（已渲染页数、估算内存、各 PDF 占用列表）

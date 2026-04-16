@@ -507,10 +507,10 @@ function renderContent() {
   const container = document.getElementById('content');
   if (!container) return;
 
-  // Hide all PDF viewer elements; active one will be shown below if needed.
+  // Detach all PDF viewer elements from container so innerHTML resets don't destroy them.
   // Schedule eviction for PDFs that are no longer current.
   for (const [path, entry] of pdfViewerRegistry.entries()) {
-    entry.viewer.el.style.display = 'none';
+    if (entry.viewer.el.parentNode) entry.viewer.el.remove();
     if (path !== state.currentFile) scheduleEviction(path);
   }
   currentPdfViewer = null;
@@ -561,16 +561,20 @@ function renderContent() {
     // Cancel any pending eviction for this file (user came back)
     cancelEviction(filePath);
 
-    // Reuse existing viewer if available (just show its el), otherwise create new
+    // Reuse existing viewer if available — re-attach its el to container
     const existingEntry = pdfViewerRegistry.get(filePath);
     if (existingEntry) {
       currentPdfViewer = existingEntry.viewer;
-      existingEntry.viewer.el.style.display = '';
+      container.innerHTML = '';
+      container.appendChild(existingEntry.viewer.el);
       container.setAttribute('data-current-file', filePath);
       renderBreadcrumb();
       updateToolbarButtons();
       return;
     }
+
+    // New viewer — clear container first, then createPdfViewer appends its el
+    container.innerHTML = '';
 
     // bridge is set after viewer resolves; callbacks check it defensively
     let bridge: ReturnType<typeof createPdfAnnotationBridge> | null = null;

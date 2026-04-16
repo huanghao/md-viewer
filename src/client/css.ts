@@ -512,15 +512,15 @@ export const styles = `
       border: 2px solid transparent;
       font-weight: 400;
     }
-    .file-item.deleted {
+    .file-item.missing {
       color: #cf222e;
       background: #fff5f5;
     }
-    .file-item.deleted .name {
+    .file-item.missing .tree-name {
       color: #cf222e;
       text-decoration: line-through;
     }
-    .file-item.deleted.current {
+    .file-item.missing.current {
       background: #ffebe9;
       color: #cf222e;
     }
@@ -561,7 +561,7 @@ export const styles = `
       color: #4f88bf;
       border-color: #d8e8fb;
     }
-    .file-item.deleted .file-type-icon,
+    .file-item.missing .file-type-icon,
     .tree-item.missing .file-type-icon {
       background: #f8f0f0;
       color: #b56a6a;
@@ -596,14 +596,14 @@ export const styles = `
     .status-deleted {
       color: #ff3b30;
     }
-    .file-item .name {
+    .file-item .tree-name {
       flex: 1;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
       min-width: 0;
     }
-    .file-item .file-item-status {
+    .file-item .tree-status-inline {
       margin-left: auto;
       order: 2;
     }

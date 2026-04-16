@@ -1,5 +1,12 @@
-// PDF.js types via window global (loaded from CDN)
+// PDF.js loaded via ES module in html.ts, exposed as window.pdfjsLib after 'pdfjslib-ready' event
 declare const pdfjsLib: any;
+
+function getPdfjsLib(): Promise<any> {
+  if ((window as any).pdfjsLib) return Promise.resolve((window as any).pdfjsLib);
+  return new Promise(resolve => {
+    window.addEventListener('pdfjslib-ready', () => resolve((window as any).pdfjsLib), { once: true });
+  });
+}
 
 export interface PdfPageTextItem {
   str: string;
@@ -42,9 +49,11 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
   container.innerHTML = "";
   container.className = "pdf-viewer-container";
 
+  const pdfjs = await getPdfjsLib();
+
   // Load PDF bytes via our server endpoint
   const url = `/api/pdf-asset?path=${encodeURIComponent(filePath)}`;
-  const pdfDoc = await pdfjsLib.getDocument(url).promise;
+  const pdfDoc = await pdfjs.getDocument(url).promise;
 
   const pageContainers: HTMLElement[] = [];
   const textBlocksByPage: Map<number, PdfTextBlock[]> = new Map();
@@ -86,13 +95,13 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     pageWrapper.appendChild(textLayerDiv);
 
     const textContent = await page.getTextContent();
-    // PDF.js 3.x API
-    await pdfjsLib.renderTextLayer({
-      textContent,
+    // PDF.js 4.x API: new TextLayer(...).render()
+    const textLayer = new pdfjs.TextLayer({
+      textContentSource: textContent,
       container: textLayerDiv,
       viewport,
-      textDivs: [],
-    }).promise;
+    });
+    await textLayer.render();
 
     // Build text blocks for this page
     const blocks = buildTextBlocks(pageNum, textContent.items as PdfPageTextItem[], viewport, scale);

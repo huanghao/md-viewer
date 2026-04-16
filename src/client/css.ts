@@ -516,6 +516,9 @@ export const styles = `
       background: #ffebe9;
       color: #cf222e;
     }
+    .file-item .tree-toggle {
+      display: none;
+    }
     .file-type-icon {
       width: 18px;
       height: 18px;

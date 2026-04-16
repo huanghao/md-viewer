@@ -68,11 +68,6 @@ function getWorkspaceNameFromPath(path: string): string {
   return parts[parts.length - 1] || 'workspace';
 }
 
-function renderFileNameWithTailPriority(name: string): string {
-  // 始终保留完整文本，省略交给 CSS，避免“缩窄后放大不还原”的不可逆截断
-  const stripped = stripWorkspaceTreeDisplayExtension(name) || name;
-  return `<span class="tree-name-full">${escapeHtml(stripped)}</span>`;
-}
 
 function collectTreeFilePaths(node: FileTreeNode | undefined, bag: Set<string>): void {
   if (!node) return;
@@ -633,7 +628,7 @@ function renderMissingOpenFiles(workspaceId: string, workspacePath: string, tree
             <span class="tree-toggle"></span>
             <span class="file-type-icon ${typeIcon.cls}">${escapeHtml(typeIcon.label)}</span>
             <span class="tree-status-inline"><span class="status-badge status-deleted">D</span></span>
-            <span class="tree-name" title="${escapeAttr(row.name)}">${renderFileNameWithTailPriority(row.name)}</span>
+            <span class="tree-name" title="${escapeAttr(row.name)}"><span class="tree-name-full">${escapeHtml(stripWorkspaceTreeDisplayExtension(row.name) || row.name)}</span></span>
             ${row.hasRetry ? `<button class="tree-inline-action" title="重试加载" onclick="event.stopPropagation(); handleRetryMissingFile('${escapeAttr(row.path)}')">↻</button>` : ''}
             ${row.hasClose ? `<button class="tree-inline-action danger" title="关闭文件" onclick="event.stopPropagation(); handleCloseFile('${escapeAttr(row.path)}')">×</button>` : ''}
           </div>

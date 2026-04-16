@@ -58,6 +58,12 @@ export function generateClientHTML(): string {
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.css">
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js"><\/script>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16/dist/contrib/auto-render.min.js"><\/script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/legacy/build/pdf.js"><\/script>
+  <script>
+    if (typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/legacy/build/pdf.worker.js';
+    }
+  <\/script>
   <style id="theme-md-css">${githubMarkdownCSS}</style>
   <style id="theme-hl-css">${highlightGithubCSS}</style>
   <style>${styles}</style>

@@ -1128,9 +1128,30 @@ function renderDiffView(oldContent: string, newContent: string): void {
     }
   }
 
+  // 计算 diff blocks：连续非 equal 行为一个 block
+  const blocks: Array<{ startRowIndex: number; endRowIndex: number }> = [];
+  let blockStart = -1;
+  for (let ri = 0; ri < rows.length; ri++) {
+    const row = rows[ri];
+    const isChange = !(row.left && row.right && row.left.type === 'equal');
+    if (isChange && blockStart === -1) {
+      blockStart = ri;
+    } else if (!isChange && blockStart !== -1) {
+      blocks.push({ startRowIndex: blockStart, endRowIndex: ri - 1 });
+      blockStart = -1;
+    }
+  }
+  if (blockStart !== -1) {
+    blocks.push({ startRowIndex: blockStart, endRowIndex: rows.length - 1 });
+  }
+  const totalBlocks = blocks.length;
+  // blockFirstRows: rowIndex -> blockIndex (0-based)，记录每个 block 首行
+  const blockFirstRows = new Map<number, number>();
+  blocks.forEach((b, i) => blockFirstRows.set(b.startRowIndex, i));
+
   const escH = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-  const tableRows = rows.map(({ left, right }) => {
+  const tableRows = rows.map(({ left, right }, rowIndex) => {
     if (left && right && left.type === 'equal') {
       return `<tr class="diff-row-equal">
         <td class="diff-line-no">${left.oldLineNo}</td>
@@ -1139,12 +1160,19 @@ function renderDiffView(oldContent: string, newContent: string): void {
         <td>${escH(right.content)}</td>
       </tr>`;
     }
-    const leftNo = left ? `<td class="diff-line-no">${left.oldLineNo ?? ''}</td>` : `<td class="diff-line-no diff-cell-empty"></td>`;
+    const blockIdx = blockFirstRows.get(rowIndex);
+    const blockAttr = blockIdx !== undefined ? ` data-block-index="${blockIdx}"` : '';
+    const blockSpan = blockIdx !== undefined
+      ? `<span class="diff-block-index" data-block-span="${blockIdx}">${blockIdx + 1}/${totalBlocks}</span>`
+      : '';
+    const leftNo = left
+      ? `<td class="diff-line-no">${left.oldLineNo ?? ''}${blockSpan}</td>`
+      : `<td class="diff-line-no diff-cell-empty"></td>`;
     const leftCell = left ? `<td class="diff-row-delete-cell">${escH(left.content)}</td>` : `<td class="diff-cell-empty"></td>`;
     const rightNo = right ? `<td class="diff-line-no">${right.newLineNo ?? ''}</td>` : `<td class="diff-line-no diff-cell-empty"></td>`;
     const rightCell = right ? `<td class="diff-row-insert-cell">${escH(right.content)}</td>` : `<td class="diff-cell-empty"></td>`;
     const rowClass = left && right ? 'diff-row-mixed' : left ? 'diff-row-delete' : 'diff-row-insert';
-    return `<tr class="${rowClass}">${leftNo}${leftCell}${rightNo}${rightCell}</tr>`;
+    return `<tr class="${rowClass}"${blockAttr}>${leftNo}${leftCell}${rightNo}${rightCell}</tr>`;
   }).join('');
 
   container.innerHTML = `
@@ -1157,6 +1185,11 @@ function renderDiffView(oldContent: string, newContent: string): void {
         <div class="diff-actions">
           <button class="diff-close-btn" onclick="window.closeDiffView()">关闭</button>
         </div>
+      </div>
+      <div class="diff-nav-bar">
+        <span class="diff-nav-count" id="diffNavCount">共 ${totalBlocks} 处差异</span>
+        <button class="diff-nav-btn" id="diffNavPrev" onclick="window.navigateDiffBlock(-1)" disabled>↑ 上一处</button>
+        <button class="diff-nav-btn primary" id="diffNavNext" onclick="window.navigateDiffBlock(1)">↓ 下一处</button>
       </div>
       <div class="diff-view-scroll">
         <div class="diff-view">

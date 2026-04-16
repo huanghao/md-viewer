@@ -188,7 +188,7 @@ class ServerManager: ObservableObject {
     // MARK: - 健康检查
 
     private func waitForServer(port: Int) async -> Bool {
-        let maxAttempts = 300
+        let maxAttempts = 100
         let interval: UInt64 = 100_000_000 // 0.1 秒
 
         for attempt in 0..<maxAttempts {
@@ -204,7 +204,7 @@ class ServerManager: ObservableObject {
     }
 
     private func checkServerHealth(port: Int) async -> Bool {
-        guard let url = URL(string: "http://127.0.0.1:\(port)/api/health") else {
+        guard let url = URL(string: "http://127.0.0.1:\(port)/") else {
             return false
         }
 
@@ -301,7 +301,7 @@ enum ServerError: LocalizedError {
         case .serverNotFound:
             return "找不到 mdv-server 二进制文件"
         case .startTimeout:
-            return "Server 启动超时（30秒内未响应）"
+            return "Server 启动超时（10秒内未响应）"
         }
     }
 }

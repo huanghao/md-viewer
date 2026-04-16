@@ -1350,6 +1350,43 @@ export const styles = `
       color: #57606a;
       font-size: 14px;
     }
+    .diff-nav-bar {
+      display: flex;
+      align-items: center;
+      padding: 4px 12px;
+      background: #fff;
+      border-bottom: 1px solid #d0d7de;
+      font-size: 12px;
+      color: #57606a;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .diff-nav-count { flex: 1; }
+    .diff-nav-btn {
+      padding: 3px 10px;
+      border-radius: 4px;
+      border: 1px solid #d0d7de;
+      background: #fff;
+      cursor: pointer;
+      font-size: 11px;
+      color: #24292f;
+    }
+    .diff-nav-btn:hover { background: #f6f8fa; }
+    .diff-nav-btn:disabled { opacity: 0.4; cursor: default; }
+    .diff-nav-btn.primary {
+      background: #0969da;
+      color: #fff;
+      border-color: #0969da;
+    }
+    .diff-nav-btn.primary:hover { background: #0860ca; }
+    .diff-block-index {
+      display: none;
+      font-size: 10px;
+      color: #0969da;
+      font-weight: 600;
+      margin-left: 2px;
+      vertical-align: middle;
+    }
     #diffButton.active {
       color: #0969da;
       background: rgba(9, 105, 218, 0.08);

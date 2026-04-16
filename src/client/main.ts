@@ -514,8 +514,7 @@ function renderContent() {
     if (path !== state.currentFile) scheduleEviction(path);
   }
   currentPdfViewer = null;
-  // Restore normal content padding (PDF viewer removes it)
-  container.style.padding = '';
+  container.removeAttribute('data-pdf');
 
   if (!state.currentFile) {
     container.removeAttribute('data-current-file');
@@ -563,8 +562,8 @@ function renderContent() {
     // Cancel any pending eviction for this file (user came back)
     cancelEviction(filePath);
 
-    // PDF viewer takes full container — remove padding so #content scroll works correctly
-    container.style.padding = '0';
+    // Mark container as PDF mode — CSS handles padding adjustments
+    container.setAttribute('data-pdf', '1');
 
     // Reuse existing viewer if available — re-attach its el to container
     const existingEntry = pdfViewerRegistry.get(filePath);
@@ -1333,28 +1332,15 @@ async function acceptDiffUpdate(): Promise<void> {
 async function updateToolbarButtons() {
   const diffButton = document.getElementById('diffButton');
   const refreshButton = document.getElementById('refreshButton');
-  const pdfMemButton = document.getElementById('pdfMemButton');
 
   if (!state.currentFile) {
     if (diffButton) diffButton.style.display = 'none';
     if (refreshButton) refreshButton.style.display = 'none';
-    if (pdfMemButton) pdfMemButton.style.display = 'none';
     return;
   }
 
   const file = state.sessionFiles.get(state.currentFile);
   if (!file) return;
-
-  // Show PDF memory monitor button only when viewing a PDF; close panel if switching away
-  const isPdf = isPdfPath(file.path);
-  if (pdfMemButton) pdfMemButton.style.display = isPdf ? 'flex' : 'none';
-  if (!isPdf) {
-    const panel = document.getElementById('pdfMemPanel');
-    if (panel && panel.style.display !== 'none') {
-      panel.style.display = 'none';
-      if (pdfMemPollTimer) { clearInterval(pdfMemPollTimer); pdfMemPollTimer = null; }
-    }
-  }
 
   if (file.isMissing) {
     if (diffButton) diffButton.style.display = 'none';

@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  e2e:
+    build:
+      context: .
+      dockerfile: Dockerfile.e2e
+    environment:
+      - CI=true
+      - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+    volumes:
+      # 挂载测试报告到主机
+      - ./test-results:/app/test-results
+      # 挂载 playwright 报告
+      - ./playwright-report:/app/playwright-report
+    # 不使用 host 网络，完全隔离
+    network_mode: bridge
+    ports:
+      # 如需调试，可临时映射端口
+      - "127.0.0.1:3001:3000"

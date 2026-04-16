@@ -1,0 +1,25 @@
+# E2E 测试专用 Docker 镜像
+FROM mcr.microsoft.com/playwright:v1.51.0-noble
+
+WORKDIR /app
+
+# 安装 bun
+RUN apt-get update && apt-get install -y curl unzip \
+  && curl -fsSL https://bun.sh/install | bash \
+  && mv /root/.bun/bin/bun /usr/local/bin/bun
+
+# 复制依赖文件先安装（利用缓存）
+COPY package.json bun.lock ./
+RUN bun install
+
+# 复制项目代码
+COPY . .
+
+# 预构建客户端
+RUN bun run build:client
+
+# 暴露端口（容器内部使用，不绑定主机）
+EXPOSE 3000
+
+# 启动测试
+CMD ["bun", "run", "test:e2e"]

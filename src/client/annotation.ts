@@ -1750,3 +1750,9 @@ export function initAnnotationElements(): void {
     window.addEventListener('mouseup', onUp);
   });
 }
+
+export function setPendingAnnotation(annotation: Annotation, filePath: string): void {
+  state.pendingAnnotation = annotation;
+  state.pendingAnnotationFilePath = filePath;
+  openComposerFromPending();
+}

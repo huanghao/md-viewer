@@ -1,5 +1,4 @@
 // PDF.js loaded via ES module in html.ts, exposed as window.pdfjsLib after 'pdfjslib-ready' event
-declare const pdfjsLib: any;
 
 function getPdfjsLib(): Promise<any> {
   if ((window as any).pdfjsLib) return Promise.resolve((window as any).pdfjsLib);
@@ -42,7 +41,9 @@ export interface PdfViewerInstance {
 }
 
 const SCALE_DEFAULT = 1.5;
-const LINE_HEIGHT_MULTIPLIER = 1.5; // paragraph grouping threshold
+const LINE_HEIGHT_MULTIPLIER = 1.5;
+// Render pages within this many px of the viewport (above and below)
+const RENDER_MARGIN = 1200;
 
 export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewerInstance> {
   const { container, filePath, scale = SCALE_DEFAULT } = opts;
@@ -50,29 +51,55 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
   container.className = "pdf-viewer-container";
 
   const pdfjs = await getPdfjsLib();
-
-  // Load PDF bytes via our server endpoint
   const url = `/api/pdf-asset?path=${encodeURIComponent(filePath)}`;
   const pdfDoc = await pdfjs.getDocument(url).promise;
 
-  const pageContainers: HTMLElement[] = [];
-  const textBlocksByPage: Map<number, PdfTextBlock[]> = new Map();
+  const numPages = pdfDoc.numPages;
+  const dpr = window.devicePixelRatio || 1;
 
-  for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+  // Per-page state
+  const pageWrappers: HTMLElement[] = [];
+  const textBlocksByPage: Map<number, PdfTextBlock[]> = new Map();
+  const rendered = new Set<number>(); // pages already rendered
+  const rendering = new Set<number>(); // pages currently being rendered
+
+  // Step 1: get viewport dimensions for all pages to build placeholders.
+  // We fetch page 1 to get the typical size, then assume uniform pages.
+  // For accuracy we fetch each page's viewport lazily during render.
+  // For placeholder sizing, use page 1's dimensions for all pages initially.
+  const firstPage = await pdfDoc.getPage(1);
+  const firstViewport = firstPage.getViewport({ scale });
+  const placeholderW = firstViewport.width;
+  const placeholderH = firstViewport.height;
+
+  // Step 2: create placeholder divs for all pages
+  for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "pdf-page-wrapper pdf-page-placeholder";
+    wrapper.dataset.page = String(pageNum);
+    wrapper.style.position = "relative";
+    wrapper.style.width = `${placeholderW}px`;
+    wrapper.style.height = `${placeholderH}px`;
+    wrapper.style.marginBottom = "16px";
+    wrapper.style.background = "white";
+    container.appendChild(wrapper);
+    pageWrappers.push(wrapper);
+  }
+
+  // Step 3: render a page (canvas + text layer)
+  async function renderPage(pageNum: number): Promise<void> {
+    if (rendered.has(pageNum) || rendering.has(pageNum)) return;
+    rendering.add(pageNum);
+
+    const wrapper = pageWrappers[pageNum - 1];
     const page = await pdfDoc.getPage(pageNum);
     const viewport = page.getViewport({ scale });
-    const dpr = window.devicePixelRatio || 1;
 
-    // Wrapper div for this page
-    const pageWrapper = document.createElement("div");
-    pageWrapper.className = "pdf-page-wrapper";
-    pageWrapper.dataset.page = String(pageNum);
-    pageWrapper.style.position = "relative";
-    pageWrapper.style.width = `${viewport.width}px`;
-    pageWrapper.style.height = `${viewport.height}px`;
-    pageWrapper.style.marginBottom = "16px";
+    // Update wrapper size in case it differs from page 1
+    wrapper.style.width = `${viewport.width}px`;
+    wrapper.style.height = `${viewport.height}px`;
 
-    // Canvas layer — use devicePixelRatio for sharp rendering on HiDPI screens
+    // Canvas
     const canvas = document.createElement("canvas");
     canvas.width = Math.floor(viewport.width * dpr);
     canvas.height = Math.floor(viewport.height * dpr);
@@ -81,7 +108,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     const ctx = canvas.getContext("2d")!;
     ctx.scale(dpr, dpr);
     await page.render({ canvasContext: ctx, viewport }).promise;
-    pageWrapper.appendChild(canvas);
+    wrapper.appendChild(canvas);
 
     // Text layer
     const textLayerDiv = document.createElement("div");
@@ -92,32 +119,29 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
       overflow: hidden; opacity: 0.2; line-height: 1;
       pointer-events: auto; user-select: text;
     `;
-    pageWrapper.appendChild(textLayerDiv);
+    wrapper.appendChild(textLayerDiv);
 
     const textContent = await page.getTextContent();
-    // PDF.js 4.x API: new TextLayer(...).render()
-    const textLayer = new pdfjs.TextLayer({
+    const textLayerObj = new pdfjs.TextLayer({
       textContentSource: textContent,
       container: textLayerDiv,
       viewport,
     });
-    await textLayer.render();
+    await textLayerObj.render();
 
-    // Build text blocks for this page
+    // Build text blocks
     const blocks = buildTextBlocks(pageNum, textContent.items as PdfPageTextItem[], viewport, scale);
     textBlocksByPage.set(pageNum, blocks);
 
-    // Paragraph click handler
+    // Event handlers
     if (opts.onParagraphClick) {
       textLayerDiv.addEventListener("click", (e) => {
-        if (window.getSelection()?.toString()) return; // ignore if selecting
+        if (window.getSelection()?.toString()) return;
         const clickY = (e as MouseEvent).offsetY / scale;
         const block = findBlockAtY(blocks, clickY);
         if (block) opts.onParagraphClick!(block);
       });
     }
-
-    // Text selection handler
     if (opts.onTextSelected) {
       textLayerDiv.addEventListener("mouseup", () => {
         const sel = window.getSelection();
@@ -129,19 +153,43 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
       });
     }
 
-    container.appendChild(pageWrapper);
-    pageContainers.push(pageWrapper);
+    wrapper.classList.remove("pdf-page-placeholder");
+    rendered.add(pageNum);
+    rendering.delete(pageNum);
   }
 
+  // Step 4: IntersectionObserver — render pages as they approach the viewport
+  const observer = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          const pageNum = parseInt((entry.target as HTMLElement).dataset.page || "0", 10);
+          if (pageNum) renderPage(pageNum);
+        }
+      }
+    },
+    { root: null, rootMargin: `${RENDER_MARGIN}px 0px`, threshold: 0 }
+  );
+
+  for (const wrapper of pageWrappers) {
+    observer.observe(wrapper);
+  }
+
+  // Public API
   function scrollToPage(pageNum: number) {
-    const wrapper = pageContainers[pageNum - 1];
+    const wrapper = pageWrappers[pageNum - 1];
     if (wrapper) wrapper.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function highlightQuote(pageNum: number, quote: string) {
     clearHighlights();
-    const wrapper = pageContainers[pageNum - 1];
+    const wrapper = pageWrappers[pageNum - 1];
     if (!wrapper) return;
+    // If not yet rendered, render first then highlight
+    if (!rendered.has(pageNum)) {
+      renderPage(pageNum).then(() => highlightQuote(pageNum, quote));
+      return;
+    }
     const textLayer = wrapper.querySelector(".pdf-text-layer") as HTMLElement;
     if (!textLayer) return;
     const spans = Array.from(textLayer.querySelectorAll("span"));
@@ -165,7 +213,11 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
   }
 
   function destroy() {
+    observer.disconnect();
     container.innerHTML = "";
+    rendered.clear();
+    rendering.clear();
+    textBlocksByPage.clear();
   }
 
   return { destroy, scrollToPage, highlightQuote, clearHighlights, getTextBlocks };
@@ -173,7 +225,6 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
 
 function buildTextBlocks(pageNum: number, items: PdfPageTextItem[], viewport: any, scale: number): PdfTextBlock[] {
   if (!items.length) return [];
-  // Sort by y descending (PDF coords are bottom-up), then x
   const sorted = [...items].filter(i => i.str.trim()).sort((a, b) => {
     const ay = viewport.height / scale - a.transform[5];
     const by = viewport.height / scale - b.transform[5];

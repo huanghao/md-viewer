@@ -37,6 +37,10 @@ import {
   setPendingAnnotation,
 } from './annotation';
 
+import { createPdfViewer, type PdfViewerInstance } from "./pdf-viewer.js";
+import { createPdfAnnotationBridge } from "./pdf-annotation.js";
+import { MyMemoryProvider, handleParagraphTranslation } from "./pdf-translation.js";
+
 function applyTheme(): void {
   const mdCss = getMdThemeCss(state.config.markdownTheme || 'github');
   const hlCss = getHlThemeCss(state.config.codeTheme || 'github');
@@ -56,6 +60,8 @@ const fileRefreshSeq = new Map<string, number>();
 let diffViewActive = false;
 let workspacePollRunning = false;
 let mermaidInitialized = false;
+let currentPdfViewer: PdfViewerInstance | null = null;
+const translationProvider = new MyMemoryProvider();
 function syncAnnotationsForCurrentFile(force = false): void {
   const nextPath = state.currentFile && !isHtmlPath(state.currentFile) ? state.currentFile : null; // HTML 文件不支持批注
   const currentAnnotationFilePath = getAnnotationCurrentFilePath();
@@ -506,6 +512,49 @@ function renderContent() {
     return;
   }
 
+  if (isPdfPath(file.path)) {
+    // Destroy previous PDF viewer if any
+    if (currentPdfViewer) {
+      currentPdfViewer.destroy();
+      currentPdfViewer = null;
+    }
+
+    const scale = 1.5;
+    // bridge is set after viewer resolves; callbacks check it defensively
+    let bridge: ReturnType<typeof createPdfAnnotationBridge> | null = null;
+
+    createPdfViewer({
+      container,
+      filePath: file.path,
+      scale,
+      onTextSelected: (pageNum, selectedText, prefix, suffix) => {
+        bridge?.handleTextSelected(pageNum, selectedText, prefix, suffix);
+      },
+      onParagraphClick: (block) => {
+        const pageWrapper = container.querySelector(
+          `.pdf-page-wrapper[data-page="${block.pageNum}"]`
+        ) as HTMLElement;
+        if (pageWrapper) {
+          handleParagraphTranslation(pageWrapper, block, translationProvider, scale);
+        }
+      },
+    }).then((viewer) => {
+      currentPdfViewer = viewer;
+      bridge = createPdfAnnotationBridge({
+        filePath: file.path,
+        viewer,
+        getAnnotations: () => (window as any).__annotationState?.annotations ?? [],
+        onAnnotationCreated: () => {},
+      });
+      // Re-render annotation highlights when annotations load
+      document.addEventListener("annotations:loaded", () => {
+        const anns = (window as any).__annotationState?.annotations ?? [];
+        bridge?.renderHighlights(anns);
+      }, { once: false });
+    });
+    return; // don't fall through to markdown renderer
+  }
+
   // 使用 marked 渲染 Markdown
   const html = (window as any).marked.parse(file.content);
   const deletedNotice = file.isMissing
@@ -650,6 +699,10 @@ function isHtmlPath(path: string): boolean {
 function isJsonPath(path: string): boolean {
   const lower = path.toLowerCase();
   return lower.endsWith('.json') || lower.endsWith('.jsonl');
+}
+
+function isPdfPath(path: string): boolean {
+  return path.toLowerCase().endsWith(".pdf");
 }
 
 function isUrlPath(path: string): boolean {
@@ -1538,6 +1591,41 @@ function startWorkspacePolling() {
       const filePath = document.getElementById('content')?.getAttribute('data-current-file') || null;
       handleSelectionForAnnotation(filePath);
     }, 0);
+  });
+
+  // 拦截 pdf:// 协议链接点击
+  document.addEventListener("click", (e) => {
+    const target = (e.target as HTMLElement).closest("a[href]") as HTMLAnchorElement | null;
+    if (!target) return;
+    const href = target.getAttribute("href") || "";
+    if (!href.startsWith("pdf://")) return;
+    e.preventDefault();
+
+    // Parse pdf://path/to/file.pdf#page=3&quote=some+text
+    const withoutProto = href.slice("pdf://".length);
+    const hashIdx = withoutProto.indexOf("#");
+    const filePart = hashIdx >= 0 ? withoutProto.slice(0, hashIdx) : withoutProto;
+    const paramStr = hashIdx >= 0 ? withoutProto.slice(hashIdx + 1) : "";
+    const params = new URLSearchParams(paramStr);
+    const pageNum = parseInt(params.get("page") || "1", 10);
+    const quote = params.get("quote") || "";
+
+    addFileByPath(filePart).then(() => {
+      setTimeout(() => {
+        if (currentPdfViewer) {
+          currentPdfViewer.scrollToPage(pageNum);
+          if (quote) currentPdfViewer.highlightQuote(pageNum, decodeURIComponent(quote));
+        }
+      }, 500);
+    });
+  });
+
+  // 监听 pdf:show-composer 事件
+  document.addEventListener("pdf:show-composer", (e: Event) => {
+    const { annotation, filePath } = (e as CustomEvent).detail;
+    if ((window as any).__setPendingAnnotation) {
+      (window as any).__setPendingAnnotation(annotation, filePath);
+    }
   });
 
   // 页面刷新时，自动刷新当前正在展示的文件

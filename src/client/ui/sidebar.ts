@@ -365,6 +365,7 @@ export function renderFiles(): void {
         <span class="file-type-icon ${typeIcon.cls}">${escapeHtml(typeIcon.label)}</span>
         <span class="name">${displayName}</span>
         <span class="file-item-status">${statusBadge}</span>
+        ${state.annotationCounts.get(file.path) ? `<span class="annotation-count-badge">${state.annotationCounts.get(file.path)}</span>` : ''}
         <span class="close" onclick="event.stopPropagation();window.removeFile('${escapeAttr(file.path)}')">×</span>
       </div>
     `}).join('');

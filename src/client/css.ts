@@ -1586,6 +1586,10 @@ export const styles = `
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+    .workspace-name--failed {
+      color: #cf222e;
+      opacity: 0.7;
+    }
 
     .workspace-remove {
       opacity: 0;
@@ -3145,9 +3149,11 @@ export const styles = `
       border-radius: 2px;
     }
 
-    /* 选中文字的临时高亮（JS class，不依赖 ::selection，在 focus 转移后仍可见） */
-    .pdf-selection-mark {
-      background: rgba(0, 120, 215, 0.35) !important;
+    /* 选中文字的临时高亮：用 <mark> 包裹精确选中范围 */
+    mark.pdf-selection-mark {
+      background: rgba(0, 120, 215, 0.35);
+      color: inherit;
+      border-radius: 2px;
     }
 
     .pdf-translation-overlay {

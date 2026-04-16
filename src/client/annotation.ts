@@ -686,8 +686,13 @@ function hideComposer(): void {
 }
 
 function clearTempSelectionMark(): void {
-  // Clear PDF selection marks (survive focus changes via CSS class)
-  document.querySelectorAll('.pdf-selection-mark').forEach(el => el.classList.remove('pdf-selection-mark'));
+  // Clear PDF selection marks (<mark> elements inserted by markSelectionSpans)
+  document.querySelectorAll('mark.pdf-selection-mark').forEach((mark) => {
+    const parent = mark.parentNode;
+    if (!parent) return;
+    while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+    parent.removeChild(mark);
+  });
 
   const reader = document.getElementById('reader');
   if (!reader) return;
@@ -972,13 +977,22 @@ export function savePendingAnnotation(filePath: string): void {
   };
 
   state.annotations.push(ann);
+  console.log('[save] 1 push');
   persistAnnotation(filePath, ann, '创建评论失败');
+  console.log('[save] 2 persist');
   adjustAnnotationCount(filePath, +1);
+  console.log('[save] 3 adjustCount');
   import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
+  console.log('[save] 4 sidebar');
   hideComposer();
-  applyAnnotations();
+  console.log('[save] 5 hideComposer');
+  const isPdf = document.getElementById('content')?.hasAttribute('data-pdf');
+  if (!isPdf) applyAnnotations();
+  console.log('[save] 6 applyAnnotations');
   renderAnnotationList(filePath);
+  console.log('[save] 7 renderAnnotationList');
   document.dispatchEvent(new CustomEvent('annotation:created', { detail: { annotation: ann, filePath } }));
+  console.log('[save] 8 dispatched');
 }
 
 export function removeAnnotation(id: string, filePath: string): void {

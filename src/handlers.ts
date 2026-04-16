@@ -578,7 +578,7 @@ export async function handleScanWorkspace(c: Context) {
 
     const resolvedPath = resolve(path);
     if (!existsSync(resolvedPath)) {
-      return c.json({ error: "目录不存在" }, 404);
+      return c.json({ error: `目录不存在: ${resolvedPath}` }, 404);
     }
 
     // 扫描后开启目录级监听，保证“未打开文件”也能收到删除事件。

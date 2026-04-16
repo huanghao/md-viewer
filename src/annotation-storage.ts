@@ -24,6 +24,9 @@ export interface StoredAnnotation {
   quoteSuffix?: string;
   status?: "anchored" | "unanchored" | "resolved";
   confidence?: number;
+  // PDF-specific fields
+  page?: number;
+  fileType?: "md" | "pdf";
 }
 
 export interface AnnotationDocSummary {
@@ -124,6 +127,8 @@ function mapRowToAnnotation(row: any): StoredAnnotation {
     quoteSuffix: row.quote_suffix || undefined,
     status: row.status || "anchored",
     confidence: typeof row.confidence === "number" ? row.confidence : undefined,
+    page: row.page ?? undefined,
+    fileType: (row.file_type as "md" | "pdf") ?? "md",
   };
 }
 
@@ -168,6 +173,14 @@ function getDb(): Database {
   }
   if (!hasThreadJson) {
     db.exec(`ALTER TABLE annotations ADD COLUMN thread_json TEXT`);
+  }
+  const hasPage = columns.some((col) => col.name === "page");
+  const hasFileType = columns.some((col) => col.name === "file_type");
+  if (!hasPage) {
+    db.exec(`ALTER TABLE annotations ADD COLUMN page INTEGER`);
+  }
+  if (!hasFileType) {
+    db.exec(`ALTER TABLE annotations ADD COLUMN file_type TEXT NOT NULL DEFAULT 'md'`);
   }
 
   return db;
@@ -273,8 +286,8 @@ function writeAnnotationRow(path: string, ann: StoredAnnotation, updatedAt = Dat
 
   database.prepare(`
     INSERT OR REPLACE INTO annotations
-      (id, serial, doc_path, start, length, quote, note, thread_json, created_at, updated_at, quote_prefix, quote_suffix, status, confidence)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, serial, doc_path, start, length, quote, note, thread_json, created_at, updated_at, quote_prefix, quote_suffix, status, confidence, page, file_type)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     ann.id,
     serial,
@@ -289,7 +302,9 @@ function writeAnnotationRow(path: string, ann: StoredAnnotation, updatedAt = Dat
     ann.quotePrefix || null,
     ann.quoteSuffix || null,
     ann.status || "anchored",
-    ann.confidence ?? null
+    ann.confidence ?? null,
+    ann.page ?? null,
+    ann.fileType ?? "md"
   );
 
   const row = getAnnotationRowById(ann.id);

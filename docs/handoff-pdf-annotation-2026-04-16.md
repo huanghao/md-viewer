@@ -129,11 +129,45 @@ textLayerDiv.addEventListener("mouseup", (e) => {
 
 ---
 
-## 其他已知问题
+## 未解决问题（2026-04-17 后续工作）
 
-1. **高亮精度**：`markSelectionSpans` 用 `surroundContents` 插入 `<mark>` 元素，基本正确，但 `highlightQuote`（已保存评论的高亮）仍用 span class 匹配，精度差
-2. **翻译触发**：`onParagraphClick` 当前已禁用，需要恢复并改为更不容易误触的方式
-3. **quote 上下文**：prefix/suffix 各取 15 个 item（约 100 字符），TODO 记录在 `docs/pdf-render-performance.md`
+### [high] 高亮位置不准确
+**现象**：部分评论的高亮显示在错误位置，或根本不显示。
+**根因**：PDF.js 的 `textContent.items` 和渲染后的 DOM spans 数量/顺序不一致：
+- items: 93, spans: 85（第1页）
+- items: 178, spans: 172（第2页）
+**当前方案**：用 quote 文本匹配 span，但可能匹配到错误位置（多个 span 包含相同文本）。
+**修复方向**：
+1. 用 `getClientRects()` 坐标直接定位，绕过 items/spans 映射
+2. 或存储 render 时的 span 索引（而非 items 索引）
+3. 或改用 PDF 原生高亮（注释层）而非 DOM 高亮
+
+### [medium] 选择粒度太粗
+**现象**：用户选中一个单词，实际返回整行文本作为 quote。
+**根因**：`textContent.items` 最小粒度是行/段，不是单词。
+**影响**：评论 quote 过长，不够精确。
+**修复方向**：
+1. 接受现状（行级评论）
+2. 用坐标比例裁剪 item 文本（需要处理不等宽字体）
+3. 用 DOM Range 的 client rects 精确计算字符位置
+
+### [low] 评论 popover 位置偏移
+**现象**：点击 mark 后，popover 有时显示在错误位置（如标题附近而非正文）。
+**根因**：`getBoundingClientRect()` 获取的是 mark 的位置，但 mark 可能在错误的 span 上。
+**依赖**：先解决高亮位置问题。
+
+### [low] 翻译功能未启用
+**现象**：PDF 段落翻译已禁用。
+**文件**：`pdf-translation.ts`
+
+## 已完成（2026-04-17）
+
+✅ **基本评论流程**：划词 → 弹出评论框 → 提交 → 保存到数据库
+✅ **高亮显示**：`highlightByItemRange` 用 quote 匹配定位
+✅ **点击 mark 显示 popover**：`pdf:show-popover` 事件
+✅ **右侧列表点击跳转**：`jumpToAnnotation` 支持 PDF 滚动
+✅ **懒加载页面高亮**：`onPageRendered` 回调
+✅ **API 适配**：`fileType: "pdf"` 存储和读取
 
 ## 不要碰的地方
 

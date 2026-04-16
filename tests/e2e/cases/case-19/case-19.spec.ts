@@ -33,8 +33,8 @@ test('case-19: 轮询重扫后仍保持目录折叠状态', async ({ page }) => 
   await expect(docsToggle).toHaveText('▶');
   await expect(docsNode.locator(':scope > .file-tree')).toHaveCount(0);
 
-  // workspace polling interval is 1500ms; wait across at least one cycle.
-  await page.waitForTimeout(2200);
+  // workspace polling interval is 1500ms; wait across at least two cycles.
+  await page.waitForTimeout(3500);
 
   await expect(docsToggle).toHaveText('▶');
   await expect(docsNode.locator(':scope > .file-tree')).toHaveCount(0);

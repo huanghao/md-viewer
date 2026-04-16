@@ -661,6 +661,43 @@ export const styles = `
       white-space: nowrap;
     }
 
+    /* 连接状态指示器 */
+    .connection-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #6b7280;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+    }
+    .connection-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #d1d5db;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .connection-indicator.connected {
+      background: #10b981;
+    }
+    .connection-indicator.connecting {
+      background: #f59e0b;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    .connection-indicator.disconnected {
+      background: #ef4444;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .connection-text {
+      white-space: nowrap;
+    }
+
     /* 字体缩放按钮 */
     .font-scale-button {
       padding: 4px 8px;

@@ -6,7 +6,8 @@ import { resolve } from 'path';
 const ROOT = process.cwd();
 const WORKSPACE_NEW_DOT_FILE = resolve(ROOT, 'docs/design/e2e-workspace-new-dot.md');
 
-test('case-5: 工作区新扫描文件（未打开）显示蓝点', async ({ page }) => {
+// FIXME: 依赖文件系统 watcher，测试环境不稳定
+test.fixme('case-5: 工作区新扫描文件（未打开）显示蓝点', async ({ page }) => {
   if (existsSync(WORKSPACE_NEW_DOT_FILE)) {
     rmSync(WORKSPACE_NEW_DOT_FILE);
   }

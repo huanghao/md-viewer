@@ -1,4 +1,6 @@
 // PDF.js loaded via ES module in html.ts, exposed as window.pdfjsLib after 'pdfjslib-ready' event
+// TODO: add zoom controls for PDF (the font-scale button in toolbar doesn't affect PDF rendering,
+//       which uses a fixed scale=1.5 via pdf.js; needs a separate PDF-specific zoom UI)
 
 function getPdfjsLib(): Promise<any> {
   if ((window as any).pdfjsLib) return Promise.resolve((window as any).pdfjsLib);
@@ -28,8 +30,23 @@ export interface PdfViewerOptions {
   container: HTMLElement;
   filePath: string;
   scale?: number;
-  onTextSelected?: (pageNum: number, selectedText: string, prefix: string, suffix: string) => void;
+  /**
+   * Called when user selects text.
+   * startItemIdx and endItemIdx are indices into textContent.items — stable anchors.
+   */
+  onTextSelected?: (
+    pageNum: number,
+    selectedText: string,
+    prefix: string,
+    suffix: string,
+    clientX: number,
+    clientY: number,
+    startItemIdx: number,
+    endItemIdx: number
+  ) => void;
   onParagraphClick?: (block: PdfTextBlock) => void;
+  /** Called after a page finishes rendering (canvas + text layer ready) */
+  onPageRendered?: (pageNum: number) => void;
 }
 
 export interface PdfViewerInstance {
@@ -38,7 +55,13 @@ export interface PdfViewerInstance {
   destroy(): void;
   scrollToPage(pageNum: number): void;
   highlightQuote(pageNum: number, quote: string): void;
+  /**
+   * Highlight by item index range — stable anchor for PDF annotations.
+   * pageItemStart/End are indices into textContent.items for that page.
+   */
+  highlightByItemRange(pageNum: number, startItemIdx: number, endItemIdx: number): void;
   clearHighlights(): void;
+  clearSelectionMark(): void;
   getTextBlocks(pageNum: number): PdfTextBlock[];
   getRenderedCount(): number;
   getTotalPages(): number;
@@ -69,6 +92,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
   // Per-page state
   const pageWrappers: HTMLElement[] = [];
   const textBlocksByPage: Map<number, PdfTextBlock[]> = new Map();
+  const textContentCache: Map<number, any> = new Map(); // Cache textContent for item-based highlighting
   const rendered = new Set<number>(); // pages already rendered
   const rendering = new Set<number>(); // pages currently being rendered
 
@@ -122,16 +146,15 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
 
     // Text layer
     const textLayerDiv = document.createElement("div");
-    textLayerDiv.className = "pdf-text-layer";
+    textLayerDiv.className = "pdf-text-layer textLayer";
     textLayerDiv.style.cssText = `
-      position: absolute; top: 0; left: 0;
       width: ${viewport.width}px; height: ${viewport.height}px;
-      overflow: hidden; opacity: 0.2; line-height: 1;
       pointer-events: auto; user-select: text;
     `;
     wrapper.appendChild(textLayerDiv);
 
     const textContent = await page.getTextContent();
+    textContentCache.set(pageNum, textContent);
     const textLayerObj = new pdfjs.TextLayer({
       textContentSource: textContent,
       container: textLayerDiv,
@@ -156,19 +179,125 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
       });
     }
     if (opts.onTextSelected) {
-      textLayerDiv.addEventListener("mouseup", () => {
+      let mouseDownPageX = 0, mouseDownPageY = 0;
+      textLayerDiv.addEventListener("mousedown", (e) => {
+        const me = e as MouseEvent;
+        const wrapperRect = wrapper.getBoundingClientRect();
+        mouseDownPageX = (me.clientX - wrapperRect.left) / scale;
+        mouseDownPageY = (me.clientY - wrapperRect.top) / scale;
+        console.log('[pdf] mousedown on textLayer page', pageNum);
+      });
+      textLayerDiv.addEventListener("mouseup", (e) => {
         const sel = window.getSelection();
+        console.log('[pdf] mouseup on textLayer page', pageNum, 'collapsed:', sel?.isCollapsed);
         if (!sel || sel.isCollapsed) return;
-        const selectedText = sel.toString().trim();
-        if (!selectedText) return;
-        const { prefix, suffix } = getSelectionContext(textContent.items as PdfPageTextItem[], selectedText);
-        opts.onTextSelected!(pageNum, selectedText, prefix, suffix);
+        const me = e as MouseEvent;
+        const wrapperRect = wrapper.getBoundingClientRect();
+        const mouseUpPageX = (me.clientX - wrapperRect.left) / scale;
+        const mouseUpPageY = (me.clientY - wrapperRect.top) / scale;
+        const pageH = viewport.height / scale;
+        // Build rect from mousedown→mouseup in page coords
+        const selLeft = Math.min(mouseDownPageX, mouseUpPageX);
+        const selRight = Math.max(mouseDownPageX, mouseUpPageX);
+        const selTop = Math.min(mouseDownPageY, mouseUpPageY);
+        const selBottom = Math.max(mouseDownPageY, mouseUpPageY);
+        const allItems = textContent.items as PdfPageTextItem[];
+        const selectedIndices: number[] = [];
+
+        // Simplest robust approach: use the single item at selection center.
+        // This gives stable anchor (single item index) and avoids partial-word issues.
+
+        function itemVisualBounds(item: PdfPageTextItem) {
+          const fontH = item.height || Math.abs(item.transform[3]) || 12;
+          // PDF Y: 0 at bottom, grows upward. Screen Y: 0 at top, grows downward.
+          // transform[5] is baseline in PDF coords. Convert to screen Y:
+          const baselineScreenY = pageH - item.transform[5];
+          // Text extends from (baseline - ascent) to (baseline + descent)
+          // Approximate ascent ≈ fontH, descent ≈ fontH * 0.3
+          return {
+            ix: item.transform[4],
+            iy: baselineScreenY - fontH,          // top of text
+            iRight: item.transform[4] + Math.abs(item.width),
+            iBottom: baselineScreenY + fontH * 0.3, // bottom of text (descenders)
+            cx: item.transform[4] + Math.abs(item.width) / 2,
+            cy: baselineScreenY - fontH * 0.5,      // visual center
+          };
+        }
+
+        // Find item closest to selection center that horizontally overlaps
+        const selCenterX = (selLeft + selRight) / 2;
+        const selCenterY = (selTop + selBottom) / 2;
+
+        let closestIdx = -1;
+        let closestDist = Infinity;
+
+        for (let i = 0; i < allItems.length; i++) {
+          const bounds = itemVisualBounds(allItems[i]);
+          // Must horizontally overlap the selection
+          const hOverlap = bounds.ix < selRight && bounds.iRight > selLeft;
+          // Selection center Y must be within item's vertical bounds
+          const vOverlap = selCenterY >= bounds.iy && selCenterY <= bounds.iBottom;
+
+          if (hOverlap && vOverlap) {
+            const dx = bounds.cx - selCenterX;
+            const dy = bounds.cy - selCenterY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < closestDist) {
+              closestDist = dist;
+              closestIdx = i;
+            }
+          }
+        }
+
+        // Fallback: if no item matches vOverlap, just find closest by Y distance
+        if (closestIdx === -1) {
+          for (let i = 0; i < allItems.length; i++) {
+            const bounds = itemVisualBounds(allItems[i]);
+            const hOverlap = bounds.ix < selRight && bounds.iRight > selLeft;
+            if (hOverlap) {
+              const dy = Math.abs(bounds.cy - selCenterY);
+              if (dy < closestDist) {
+                closestDist = dy;
+                closestIdx = i;
+              }
+            }
+          }
+        }
+
+        if (closestIdx === -1) return;
+
+        // Use single item as anchor and quote
+        const startItemIdx = closestIdx;
+        const endItemIdx = closestIdx;
+        const selectedText = allItems[closestIdx].str;
+
+        console.log('[pdf] selectedText:', selectedText);
+        console.log('[pdf] item anchor:', { pageNum, startItemIdx, endItemIdx });
+
+        // Context: items before and after
+        const CONTEXT_ITEMS = 3;
+        const prefix = allItems
+          .slice(Math.max(0, startItemIdx - CONTEXT_ITEMS), startItemIdx)
+          .map(it => it.str)
+          .join(" ")
+          .trim();
+        const suffix = allItems
+          .slice(endItemIdx + 1, Math.min(allItems.length, endItemIdx + 1 + CONTEXT_ITEMS))
+          .map(it => it.str)
+          .join(" ")
+          .trim();
+
+        markSelectionSpans(sel, textLayerDiv);
+        opts.onTextSelected!(pageNum, selectedText, prefix, suffix, me.clientX, me.clientY, startItemIdx, endItemIdx);
       });
     }
 
     wrapper.classList.remove("pdf-page-placeholder");
     rendered.add(pageNum);
     rendering.delete(pageNum);
+
+    // Notify caller so annotation highlights can be replayed for this page
+    opts.onPageRendered?.(pageNum);
   }
 
   // Step 4: IntersectionObserver — render pages as they approach the viewport
@@ -200,17 +329,16 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
   }
 
   function highlightQuote(pageNum: number, quote: string) {
-    clearHighlights();
+    // Note: clearHighlights() is called once by renderHighlights(), not here
     const wrapper = pageWrappers[pageNum - 1];
     if (!wrapper) return;
-    // If not yet rendered, render first then highlight
-    if (!rendered.has(pageNum)) {
-      renderPage(pageNum).then(() => highlightQuote(pageNum, quote));
-      return;
-    }
+    // Only highlight already-rendered pages — don't trigger new renders
+    if (!rendered.has(pageNum)) return;
     const textLayer = wrapper.querySelector(".pdf-text-layer") as HTMLElement;
     if (!textLayer) return;
-    const spans = Array.from(textLayer.querySelectorAll("span"));
+    const spans = Array.from(textLayer.querySelectorAll("span")).filter(
+      s => s.querySelector("span") === null
+    );
     const normalizedQuote = quote.toLowerCase().replace(/\s+/g, " ").trim();
     for (const span of spans) {
       const text = (span.textContent || "").toLowerCase().replace(/\s+/g, " ").trim();
@@ -220,9 +348,66 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     }
   }
 
+  /**
+   * Highlight by item index range.
+   * We map item indices to text layer spans by matching text content.
+   * This is stable because textContent.items order matches span order.
+   */
+  function highlightByItemRange(pageNum: number, startItemIdx: number, endItemIdx: number) {
+    const wrapper = pageWrappers[pageNum - 1];
+    if (!wrapper) return;
+    if (!rendered.has(pageNum)) return;
+
+    // Get text content items for this page
+    const page = textContentCache.get(pageNum);
+    if (!page) return;
+
+    const items = page.items as PdfPageTextItem[];
+    if (!items || items.length === 0) return;
+
+    const safeStart = Math.max(0, startItemIdx);
+    const safeEnd = Math.min(items.length - 1, endItemIdx);
+    if (safeStart > safeEnd) return;
+
+    // Build the expected text sequence for the range
+    const rangeTexts = items.slice(safeStart, safeEnd + 1).map(it => it.str);
+
+    // Find matching spans in text layer
+    const textLayer = wrapper.querySelector(".pdf-text-layer") as HTMLElement;
+    if (!textLayer) return;
+
+    const spans = Array.from(textLayer.querySelectorAll("span")).filter(
+      s => s.querySelector("span") === null
+    );
+
+    // Match spans to items by content
+    // This assumes span order roughly matches item order (true for PDF.js text layer)
+    let itemCursor = safeStart;
+    for (const span of spans) {
+      if (itemCursor > safeEnd) break;
+      const spanText = span.textContent || "";
+      const expectedText = items[itemCursor]?.str || "";
+      // Allow partial match because PDF.js may split/merge items
+      if (spanText.includes(expectedText) || expectedText.includes(spanText)) {
+        span.classList.add("pdf-highlight");
+        itemCursor++;
+      }
+    }
+  }
+
   function clearHighlights() {
     el.querySelectorAll(".pdf-highlight").forEach((node) => {
       node.classList.remove("pdf-highlight");
+    });
+  }
+
+  function clearSelectionMark() {
+    // <mark> elements inserted by markSelectionSpans — unwrap them
+    el.querySelectorAll("mark.pdf-selection-mark").forEach((mark) => {
+      const parent = mark.parentNode;
+      if (!parent) return;
+      while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+      parent.removeChild(mark);
     });
   }
 
@@ -236,12 +421,13 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     rendered.clear();
     rendering.clear();
     textBlocksByPage.clear();
+    textContentCache.clear();
   }
 
   function getRenderedCount(): number { return rendered.size; }
   function getTotalPages(): number { return numPages; }
 
-  return { el, destroy, scrollToPage, highlightQuote, clearHighlights, getTextBlocks, getRenderedCount, getTotalPages };
+  return { el, destroy, scrollToPage, highlightQuote, highlightByItemRange, clearHighlights, clearSelectionMark, getTextBlocks, getRenderedCount, getTotalPages };
 }
 
 function buildTextBlocks(pageNum: number, items: PdfPageTextItem[], viewport: any, scale: number): PdfTextBlock[] {
@@ -292,4 +478,72 @@ function getSelectionContext(items: PdfPageTextItem[], selectedText: string): { 
     prefix: fullText.slice(Math.max(0, idx - 50), idx).trim(),
     suffix: fullText.slice(idx + selectedText.length, idx + selectedText.length + 50).trim(),
   };
+}
+
+/** Find longest common substring between two strings (case insensitive) */
+function findLongestCommonSubstring(a: string, b: string): string {
+  a = a.toLowerCase().replace(/\s+/g, " ");
+  b = b.toLowerCase().replace(/\s+/g, " ");
+  let longest = "";
+  for (let i = 0; i < a.length; i++) {
+    for (let j = i + 2; j <= a.length && j - i > longest.length; j++) {
+      const substr = a.slice(i, j);
+      if (b.includes(substr)) {
+        longest = substr;
+      }
+    }
+  }
+  return longest;
+}
+
+/**
+ * Wrap the selected text inside the range with <mark class="pdf-selection-mark"> elements.
+ * This gives precise highlighting even when a single span covers an entire line.
+ * Call clearSelectionMark() to remove these wrappers.
+ */
+function markSelectionSpans(sel: Selection, textLayerDiv: HTMLElement): void {
+  if (sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+  if (range.collapsed) return;
+
+  // Only act if the selection is inside our textLayerDiv
+  if (!textLayerDiv.contains(range.commonAncestorContainer)) return;
+
+  try {
+    // surroundContents only works when the range doesn't cross element boundaries.
+    // For multi-span selections we need to handle each text node separately.
+    const mark = document.createElement("mark");
+    mark.className = "pdf-selection-mark";
+
+    if (range.startContainer === range.endContainer) {
+      // Selection within a single text node — simple case
+      range.surroundContents(mark);
+    } else {
+      // Multi-node selection: wrap each text node fragment individually
+      const walker = document.createTreeWalker(textLayerDiv, NodeFilter.SHOW_TEXT, null);
+      const toWrap: { node: Text; start: number; end: number }[] = [];
+      let node: Node | null;
+      while ((node = walker.nextNode())) {
+        const t = node as Text;
+        const nodeRange = document.createRange();
+        nodeRange.selectNode(t);
+        if (
+          nodeRange.compareBoundaryPoints(Range.START_TO_END, range) > 0 &&
+          nodeRange.compareBoundaryPoints(Range.END_TO_START, range) < 0
+        ) {
+          const start = t === range.startContainer ? range.startOffset : 0;
+          const end = t === range.endContainer ? range.endOffset : t.length;
+          toWrap.push({ node: t, start, end });
+        }
+      }
+      for (const { node: t, start, end } of toWrap) {
+        const partial = document.createRange();
+        partial.setStart(t, start);
+        partial.setEnd(t, end);
+        const m = document.createElement("mark");
+        m.className = "pdf-selection-mark";
+        try { partial.surroundContents(m); } catch {}
+      }
+    }
+  } catch {}
 }

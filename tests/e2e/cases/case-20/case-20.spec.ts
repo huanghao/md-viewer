@@ -32,8 +32,15 @@ test('case-20: flowchart fenced code block 渲染为 Mermaid 图', async ({ page
       await (window as any).addFileByPath(path, true);
     }, FILE);
 
-    await expect(page.locator('.file-item.current', { hasText: 'e2e-flowchart-fence.md' })).toBeVisible();
+    // 等待文件项渲染（扩展名被剥离）
+    await page.waitForSelector('.file-item', { timeout: 10000 });
+    await expect(page.locator('.file-item.current', { hasText: 'e2e-flowchart-fence' })).toBeVisible();
+
+    // 等待 Mermaid 渲染（CDN 加载需要时间）
+    await page.waitForSelector('.mermaid-block .mermaid svg', { timeout: 15000 });
     await expect(page.locator('.mermaid-block .mermaid svg')).toBeVisible();
+
+    // 确保没有降级通知
     await expect(page.locator('.mermaid-fallback-notice')).toHaveCount(0);
   } finally {
     if (existsSync(FILE)) rmSync(FILE);

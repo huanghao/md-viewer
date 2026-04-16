@@ -114,9 +114,34 @@ A4 @ scale=1.5, dpr=2: 1122 × 1587 × 4 × 4 ≈ 27MB/页
 
 ---
 
+---
+
+## Bug 记录：highlightQuote 触发页面渲染导致主线程卡死
+
+**现象：** 提交 PDF 批注后，页面完全卡死，JS 主线程无响应。
+
+**根因：** `highlightQuote` 里对未渲染页面调用了 `renderPage(pageNum).then(() => highlightQuote(pageNum, quote))`，导致级联问题：
+
+1. `annotation:created` 事件触发 `renderHighlights`，遍历所有 annotation
+2. 每个未渲染页面的 annotation 都触发 `renderPage`
+3. 每个 `renderPage` 完成后递归调 `highlightQuote`，再次遍历所有 span
+4. 多个页面同时渲染 × 所有 span 遍历 = 指数级 DOM 操作，主线程卡死
+
+**另一个问题：** `clearHighlights()` 放在 `highlightQuote` 内部，导致每次循环都清一次，只有最后一个 annotation 有高亮。
+
+**修复：**
+- `highlightQuote` 遇到未渲染页面直接 `return`，不触发渲染（高亮由 IntersectionObserver 渲染完成后自然触发）
+- `clearHighlights()` 移到 `renderHighlights()` 开头，只调用一次
+
 ## 下一步
 
 - [ ] 实测当前 rootMargin=1200px 下的渲染延迟和白屏频率
 - [ ] 调整 rootMargin 到 2500px，对比效果
 - [ ] 实现基于文件空闲时间的卸载机制
 - [ ] 实现内存监控 UI（已渲染页数、估算内存、各 PDF 占用列表）
+
+---
+
+## TODO
+
+- [ ] PDF 划词评论：quote 需要包含更多上下文（前后各约 100 字符），不能只存选中的词，否则 agent 无法理解评论指向的内容

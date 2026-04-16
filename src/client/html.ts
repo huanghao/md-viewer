@@ -114,6 +114,10 @@ export function generateClientHTML(): string {
         <button class="font-scale-button" id="fontScaleButton" onclick="toggleFontScaleMenu()" title="调整字体大小">
           <span id="fontScaleText">100%</span>
         </button>
+        <span class="connection-status" id="connectionStatus" title="连接状态">
+          <span class="connection-indicator" id="connectionIndicator"></span>
+          <span class="connection-text" id="connectionText"></span>
+        </span>
         <span class="file-meta" id="fileMeta"></span>
       </div>
 

@@ -1310,6 +1310,7 @@ async function acceptDiffUpdate(): Promise<void> {
   saveState();
 
   diffViewActive = false;
+  currentDiffBlockIndex = -1;
   renderContent();
   syncAnnotationsForCurrentFile(false);
   flashContentUpdated();

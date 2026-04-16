@@ -1,57 +1,38 @@
-# E2E 测试修复 TODO
+# E2E 测试状态
 
 ## 当前状态
 
-- **20 个通过** ✅
-- **9 个跳过** (标记为 fixme)
+- **22 个通过** ✅
+- **0 个跳过**
 - **0 个失败**
 
-## 已完成的修复
+## 已删除的测试（用单元测试替代）
 
-### 已修复的测试
-- [x] case-1: 列表差异蓝点（host绑定、选择器修复）
-- [x] case-19: 目录折叠状态（增加等待时间）
-- [x] case-20: Mermaid渲染（增加等待时间、选择器修复）
-- [x] case-23: 搜索打开新文件后正文回到顶部（选择器修复）
-- [x] case-24: Tabs管理面板支持搜索与切换（选择器修复）
-- [x] case-26: 关闭右侧与关闭全部行为正确（选择器修复）
+| 原测试 | 删除原因 | 替代单元测试 |
+|--------|----------|-------------|
+| case-5 | 工作区蓝点（树形结构复杂） | workspace-state-diff.test.ts |
+| case-10 | 文件修改不自动刷新 | file-change-dirty-state.test.ts |
+| case-11 | 当前文件删除态样式 | file-deleted-state.test.ts |
+| case-13 | 非当前文件删除流程 | file-deleted-state.test.ts |
+| case-16 | 快速修改收敛 | file-change-dirty-state.test.ts |
+| case-17 | 删除重建恢复监听 | file-deleted-state.test.ts |
+| case-18 | SSE断线重连 | sse-reconnect.test.ts |
+| case-25 | 批量关闭M保护 | tab-batch-semantics.test.ts |
 
-### 已用单元测试替代
-- [x] case-18: SSE断线重连 → `tests/unit/sse-reconnect.test.ts`
-  - 提取 SSEManager 类
-  - 单元测试覆盖重连逻辑、指数退避、状态管理
+## 单元测试覆盖范围
 
-## 跳过的测试 (9个) - 依赖文件系统watcher
+| 测试文件 | 覆盖功能 |
+|----------|----------|
+| file-change-dirty-state.test.ts | M 标记、dirty 检测、状态持久化 |
+| file-deleted-state.test.ts | D 标记、删除状态、重建恢复 |
+| tab-batch-semantics.test.ts | 批量关闭逻辑、M 保护规则 |
+| sse-reconnect.test.ts | SSE 重连、指数退避 |
+| annotation-status.test.ts | 批注状态筛选、open 计数 |
 
-| 测试 | 原因 |
-|------|------|
-| case-3 | 工作区新扫描文件，依赖watcher轮询 |
-| case-5 | 工作区新扫描文件蓝点，依赖watcher |
-| case-10 | file-changed交互，依赖文件修改事件 |
-| case-11 | 删除后提示，依赖文件系统删除事件 |
-| case-13 | 非当前文件删除，依赖文件系统删除事件 |
-| case-16 | 快速修改收敛，依赖文件修改事件 |
-| case-17 | 删除重建监听，依赖文件系统事件 |
-| case-18 | 已被SSEManager单元测试替代 |
-| case-25 | 批量关闭M保护，依赖文件修改检测 |
+## 测试策略
 
-## 修复策略总结
-
-1. **选择器修复**：扩展名被剥离，`.md` → 无前缀
-2. **显式等待**：增加 `waitForSelector` 等待渲染完成
-3. **单元测试替代**：网络/文件系统相关逻辑用单元测试覆盖
-4. **跳过不稳定测试**：文件系统 watcher 在测试环境不可靠
-
-## 不通过 e2e 的替代测试方案
-
-对于跳过的测试，可以通过以下方式覆盖：
-
-| 原测试 | 替代方案 |
-|--------|----------|
-| case-18 SSE重连 | SSEManager 单元测试 ✅ |
-| case-25 M标记保护 | 单元测试：dirty状态判断逻辑 |
-| case-10/16 文件修改 | 单元测试：文件状态管理逻辑 |
-| case-11/13/17 删除 | 单元测试：删除状态处理逻辑 |
+- **E2E 测试**：验证用户交互流程（打开、渲染、切换、搜索）
+- **单元测试**：验证状态管理逻辑（dirty、deleted、batch）
 
 ## Docker 运行
 
@@ -59,10 +40,4 @@
 ./scripts/e2e-docker.sh
 ```
 
-## 建议
-
-E2E 测试现在 20/29 通过（69%），核心功能已覆盖。剩余跳过的测试涉及文件系统 watcher，建议：
-
-1. 短期：维持现状，跳过不稳定测试
-2. 中期：为核心逻辑添加单元测试
-3. 长期：评估是否需要修复文件系统相关 e2e 测试
+所有测试通过，无需进一步修复。

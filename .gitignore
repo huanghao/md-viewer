@@ -189,4 +189,5 @@ MDViewer/Resources/mdv-server
 # App Bundle (generated)
 dist/
 src/client/embedded-client.ts
+.superpowers/
 .worktrees/

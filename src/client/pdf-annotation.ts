@@ -67,8 +67,8 @@ export function createPdfAnnotationBridge(opts: PdfAnnotationBridgeOptions): Pdf
       return pa.fileType === "pdf" && typeof pa.page === "number" && pa.quote;
     }) as (Annotation & { page: number; fileType: string })[];
     for (const a of pdfAnns) {
-      // Use quote text for highlighting (reliable span matching)
-      opts.viewer.highlightQuote(a.page, a.quote);
+      // Use quote text for highlighting with annotation id for click handling
+      opts.viewer.highlightQuote(a.page, a.quote, a.id);
     }
   }
 

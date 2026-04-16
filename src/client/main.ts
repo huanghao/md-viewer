@@ -34,6 +34,7 @@ import {
   getAnnotationCurrentFilePath,
   syncAnnotationSidebarLayout,
   dismissAnnotationPopupByEscape,
+  setPendingAnnotation,
 } from './annotation';
 
 function applyTheme(): void {
@@ -1501,6 +1502,7 @@ function startWorkspacePolling() {
 
   // 初始化批注功能
   initAnnotationElements();
+  (window as any).__setPendingAnnotation = setPendingAnnotation;
   syncAnnotationSidebarLayout();
   window.addEventListener('resize', () => {
     syncAnnotationSidebarLayout();

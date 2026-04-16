@@ -56,6 +56,7 @@ export interface AppState {
   // 工作区模式相关
   currentWorkspace: string | null;  // 当前工作区 ID
   fileTree: Map<string, FileTreeNode>;  // 工作区文件树缓存
+  annotationCounts: Map<string, number>;  // path → open 批注数（只含 > 0 的条目）
 }
 
 // API 响应类型

@@ -4,8 +4,8 @@ import {
   globToRegex,
   isIgnored,
   getActiveFiles,
-  formatRelativeTime,
 } from '../../src/client/ui/workspace-focus';
+import { formatRelativeTimeShort as formatRelativeTime } from '../../src/client/utils/format';
 
 // ==================== globToRegex ====================
 

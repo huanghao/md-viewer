@@ -1,5 +1,9 @@
 import type { Workspace, FileTreeNode } from '../types';
-import { state } from '../state';
+import {
+  state,
+  markWorkspaceFailed,
+  isWorkspaceFailed,
+} from '../state';
 import { buildIgnoredSet } from '../utils/ignore-filter';
 import { escapeHtml, escapeAttr } from '../utils/escape';
 import { getFileListStatus } from '../utils/file-status';
@@ -40,10 +44,8 @@ export function isIgnored(filePath: string, workspacePath: string, patterns: str
   return patterns.some((p) => globToRegex(p).test(rel));
 }
 
-// Track in-flight workspace scans to prevent duplicate requests during render
-const scanningWorkspaceIds = new Set<string>();
-// Track permanently failed workspace scans to prevent infinite retry loops
-const failedWorkspaceIds = new Set<string>();
+// 防止同一工作区在同一渲染周期内被重复触发扫描
+const pendingScanIds = new Set<string>();
 
 const FOCUS_WINDOW_MS: Record<string, number> = {
   '8h':  8  * 3600 * 1000,
@@ -210,19 +212,15 @@ export function renderFocusView(): string {
   const groups = workspaces.map((ws) => {
     const tree = state.fileTree.get(ws.id);
     const loading = !tree;
-    if (!tree && !scanningWorkspaceIds.has(ws.id) && !failedWorkspaceIds.has(ws.id)) {
-      scanningWorkspaceIds.add(ws.id);
+    if (!tree && !pendingScanIds.has(ws.id) && !isWorkspaceFailed(ws.id)) {
+      pendingScanIds.add(ws.id);
       void scanWorkspace(ws.id).then((scanned) => {
-        scanningWorkspaceIds.delete(ws.id);
+        pendingScanIds.delete(ws.id);
         if (scanned) {
           import('./sidebar').then(({ renderSidebar }) => renderSidebar());
         } else {
-          // 失败后加入 failedSet，防止重复扫描
-          failedWorkspaceIds.add(ws.id);
-          import('./sidebar-workspace').then(({ markWorkspaceFailed }) => {
-            markWorkspaceFailed(ws.id);
-            import('./sidebar').then(({ renderSidebar }) => renderSidebar());
-          });
+          markWorkspaceFailed(ws.id);
+          import('./sidebar').then(({ renderSidebar }) => renderSidebar());
         }
       });
     }

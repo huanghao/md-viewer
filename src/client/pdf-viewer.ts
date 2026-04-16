@@ -33,6 +33,8 @@ export interface PdfViewerOptions {
 }
 
 export interface PdfViewerInstance {
+  /** The root DOM element owned by this viewer — attach/detach from #content to show/hide */
+  el: HTMLElement;
   destroy(): void;
   scrollToPage(pageNum: number): void;
   highlightQuote(pageNum: number, quote: string): void;
@@ -50,8 +52,12 @@ const RENDER_MARGIN = 2500;
 
 export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewerInstance> {
   const { container, filePath, scale = SCALE_DEFAULT } = opts;
-  container.innerHTML = "";
-  container.classList.add("pdf-viewer-container");
+
+  // Each viewer owns its own root div. main.ts appends/removes it from #content.
+  // This allows multiple viewers to coexist without destroying each other's DOM.
+  const el = document.createElement("div");
+  el.className = "pdf-viewer-container";
+  container.appendChild(el);
 
   const pdfjs = await getPdfjsLib();
   const url = `/api/pdf-asset?path=${encodeURIComponent(filePath)}`;
@@ -85,7 +91,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     wrapper.style.height = `${placeholderH}px`;
     wrapper.style.marginBottom = "16px";
     wrapper.style.background = "white";
-    container.appendChild(wrapper);
+    el.appendChild(wrapper);
     pageWrappers.push(wrapper);
   }
 
@@ -166,10 +172,9 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
   }
 
   // Step 4: IntersectionObserver — render pages as they approach the viewport
-  // root must be the scrolling container (#content), NOT null (viewport).
-  // With root:null, all placeholders inside #content are considered "intersecting"
-  // because #content itself is within the viewport, causing all pages to render at once.
-  const scrollRoot = container.closest('.content') as HTMLElement | null;
+  // root must be the scrolling container (container itself = #content).
+  // root:null uses the browser viewport — since #content is inside the viewport,
+  // all child placeholders are considered "intersecting" and render all at once.
   const observer = new IntersectionObserver(
     (entries) => {
       for (const entry of entries) {
@@ -179,7 +184,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
         }
       }
     },
-    { root: scrollRoot, rootMargin: `${RENDER_MARGIN}px 0px`, threshold: 0 }
+    { root: el, rootMargin: `${RENDER_MARGIN}px 0px`, threshold: 0 }
   );
 
   for (const wrapper of pageWrappers) {
@@ -214,8 +219,8 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
   }
 
   function clearHighlights() {
-    container.querySelectorAll(".pdf-highlight").forEach((el) => {
-      el.classList.remove("pdf-highlight");
+    el.querySelectorAll(".pdf-highlight").forEach((node) => {
+      node.classList.remove("pdf-highlight");
     });
   }
 
@@ -225,8 +230,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
 
   function destroy() {
     observer.disconnect();
-    container.innerHTML = "";
-    container.classList.remove("pdf-viewer-container");
+    el.remove();
     rendered.clear();
     rendering.clear();
     textBlocksByPage.clear();
@@ -235,7 +239,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
   function getRenderedCount(): number { return rendered.size; }
   function getTotalPages(): number { return numPages; }
 
-  return { destroy, scrollToPage, highlightQuote, clearHighlights, getTextBlocks, getRenderedCount, getTotalPages };
+  return { el, destroy, scrollToPage, highlightQuote, clearHighlights, getTextBlocks, getRenderedCount, getTotalPages };
 }
 
 function buildTextBlocks(pageNum: number, items: PdfPageTextItem[], viewport: any, scale: number): PdfTextBlock[] {

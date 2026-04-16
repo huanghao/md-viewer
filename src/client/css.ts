@@ -3091,10 +3091,12 @@ export const styles = `
     .pdf-viewer-container {
       padding: 16px;
       background: #525659;
-      min-height: 100%;
+      height: 100%;
+      overflow-y: auto;
       display: flex;
       flex-direction: column;
       align-items: center;
+      box-sizing: border-box;
     }
 
     .pdf-page-wrapper {

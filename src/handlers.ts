@@ -668,8 +668,9 @@ export async function handleGetAnnotationSummaries(c: Context) {
     const docs = listAnnotatedDocuments(1000, 0);
     const summaries: Record<string, number> = {};
     for (const doc of docs) {
-      if (doc.anchoredCount > 0) {
-        summaries[doc.path] = doc.anchoredCount;
+      const openCount = doc.anchoredCount + doc.unanchoredCount;
+      if (openCount > 0) {
+        summaries[doc.path] = openCount;
       }
     }
     return c.json({ summaries });

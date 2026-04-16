@@ -1976,6 +1976,29 @@ function startWorkspacePolling() {
   });
 
   // 页面刷新时，自动刷新当前正在展示的文件
+
+  // PDF annotation mark 点击处理
+  document.getElementById('content')?.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const mark = target.closest('.annotation-mark');
+    if (!mark) return;
+    if (!mark.closest('.pdf-viewer-container')) return;
+
+    const annotationId = mark.getAttribute('data-annotation-id');
+    if (!annotationId) return;
+
+    e.stopPropagation();
+    e.preventDefault();
+
+    const annotations = getAnnotations();
+    const ann = annotations.find((a: any) => a.id === annotationId);
+    if (!ann) return;
+
+    const rect = (mark as HTMLElement).getBoundingClientRect();
+    document.dispatchEvent(new CustomEvent('pdf:show-popover', {
+      detail: { annotation: ann, x: rect.right + 8, y: rect.top }
+    }));
+  });
   await refreshCurrentFile();
   connectSSE();
   setupFindBar();

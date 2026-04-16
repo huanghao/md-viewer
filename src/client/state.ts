@@ -20,7 +20,7 @@ export const state: AppState = {
   // 工作区模式
   currentWorkspace: null,
   fileTree: new Map(),
-  annotationCounts: new Map(),
+  annotationSummaries: new Map(),
   workspaceLoadingIds: new Set(),
   workspaceFailedIds: new Set(),
 };
@@ -267,17 +267,25 @@ export function setSearchQuery(query: string): void {
   state.searchQuery = query;
 }
 
+export function setAnnotationSummaries(summaries: Map<string, { count: number; updatedAt: number }>): void {
+  state.annotationSummaries = summaries;
+}
+
+/** @deprecated 使用 setAnnotationSummaries */
 export function setAnnotationCounts(counts: Map<string, number>): void {
-  state.annotationCounts = counts;
+  state.annotationSummaries = new Map(
+    Array.from(counts.entries()).map(([k, v]) => [k, { count: v, updatedAt: 0 }])
+  );
 }
 
 export function adjustAnnotationCount(path: string, delta: number): void {
-  const current = state.annotationCounts.get(path) ?? 0;
+  const current = state.annotationSummaries.get(path)?.count ?? 0;
   const next = current + delta;
   if (next <= 0) {
-    state.annotationCounts.delete(path);
+    state.annotationSummaries.delete(path);
   } else {
-    state.annotationCounts.set(path, next);
+    const updatedAt = Date.now();
+    state.annotationSummaries.set(path, { count: next, updatedAt });
   }
 }
 

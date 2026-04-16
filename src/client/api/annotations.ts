@@ -74,12 +74,22 @@ export async function updateAnnotationStatusRemote(
   return data.annotation as Annotation;
 }
 
-export async function fetchAnnotationSummaries(): Promise<Map<string, number>> {
+export interface AnnotationSummary {
+  count: number;
+  updatedAt: number;
+}
+
+export async function fetchAnnotationSummaries(): Promise<Map<string, AnnotationSummary>> {
   try {
     const response = await fetch('/api/annotations/summaries');
     const data = await response.json().catch(() => null);
     if (!response.ok || !data?.summaries) return new Map();
-    return new Map(Object.entries(data.summaries).map(([k, v]) => [k, Number(v)]));
+    return new Map(
+      Object.entries(data.summaries).map(([k, v]) => [
+        k,
+        { count: (v as any).count || 0, updatedAt: (v as any).updatedAt || 0 },
+      ])
+    );
   } catch {
     return new Map();
   }

@@ -662,15 +662,19 @@ function scanDirectory(dirPath: string): any {
   return tree;
 }
 
-// API: 获取所有文档的批注数摘要（仅含 open 批注 > 0 的文档）
+// API: 获取所有文档的批注摘要（仅含 open 批注 > 0 的文档）
 export async function handleGetAnnotationSummaries(c: Context) {
   try {
     const docs = listAnnotatedDocuments(1000, 0);
-    const summaries: Record<string, number> = {};
+    const summaries: Record<string, { count: number; updatedAt: number }> = {};
     for (const doc of docs) {
-      const openCount = doc.anchoredCount + doc.unanchoredCount;
+      // open = anchored only (unanchored 算 orphan，不算 open，与前端 filter 保持一致)
+      const openCount = doc.anchoredCount;
       if (openCount > 0) {
-        summaries[doc.path] = openCount;
+        summaries[doc.path] = {
+          count: openCount,
+          updatedAt: doc.latestUpdatedAt,
+        };
       }
     }
     return c.json({ summaries });

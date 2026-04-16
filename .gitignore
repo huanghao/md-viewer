@@ -188,3 +188,4 @@ MDViewer/Resources/mdv-server
 
 # App Bundle (generated)
 dist/
+.worktrees/

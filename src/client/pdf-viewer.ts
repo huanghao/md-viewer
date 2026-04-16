@@ -166,6 +166,10 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
   }
 
   // Step 4: IntersectionObserver — render pages as they approach the viewport
+  // root must be the scrolling container (#content), NOT null (viewport).
+  // With root:null, all placeholders inside #content are considered "intersecting"
+  // because #content itself is within the viewport, causing all pages to render at once.
+  const scrollRoot = container.closest('.content') as HTMLElement | null;
   const observer = new IntersectionObserver(
     (entries) => {
       for (const entry of entries) {
@@ -175,7 +179,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
         }
       }
     },
-    { root: null, rootMargin: `${RENDER_MARGIN}px 0px`, threshold: 0 }
+    { root: scrollRoot, rootMargin: `${RENDER_MARGIN}px 0px`, threshold: 0 }
   );
 
   for (const wrapper of pageWrappers) {

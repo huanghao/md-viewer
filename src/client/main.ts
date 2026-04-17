@@ -532,6 +532,7 @@ function renderContent() {
   for (const [path, entry] of pdfViewerRegistry.entries()) {
     if (entry.viewer.el.parentNode) {
       entry.savedScrollTop = container.scrollTop;
+      localStorage.setItem(`md-viewer:pdf-scroll:${path}`, String(container.scrollTop));
       entry.viewer.el.remove();
     }
     if (path !== state.currentFile) scheduleEviction(path);
@@ -650,7 +651,14 @@ function renderContent() {
     }).then((viewer) => {
       currentPdfViewer = viewer;
       container.setAttribute('data-current-file', filePath);
-      pdfViewerRegistry.set(filePath, { viewer, lastActiveAt: Date.now(), idleTimer: null });
+      const savedScroll = Number(localStorage.getItem(`md-viewer:pdf-scroll:${filePath}`));
+      pdfViewerRegistry.set(filePath, {
+        viewer,
+        lastActiveAt: Date.now(),
+        idleTimer: null,
+        savedScrollTop: Number.isFinite(savedScroll) && savedScroll > 0 ? savedScroll : undefined,
+      });
+      if (savedScroll > 0) container.scrollTop = savedScroll;
       currentPdfBridge = createPdfAnnotationBridge({
         filePath,
         viewer,

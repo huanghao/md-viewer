@@ -2186,22 +2186,25 @@ export const styles = `
     /* PDF 悬停「译」按钮 */
     .pdf-translate-btn {
       position: absolute;
-      left: -28px;
-      background: #f0f6ff;
-      border: 1px solid #0969da;
-      border-radius: 3px;
-      color: #0969da;
-      font-size: 11px;
+      right: 8px;
+      background: #0969da;
+      border: none;
+      border-radius: 4px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
       font-family: inherit;
-      padding: 1px 5px;
+      padding: 2px 8px;
       cursor: pointer;
       white-space: nowrap;
-      z-index: 10;
+      z-index: 20;
       pointer-events: auto;
       line-height: 1.6;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+      opacity: 0.9;
     }
-    .pdf-translate-btn:hover { background: #0969da; color: #fff; }
-    .pdf-translate-btn.is-translated { background: #dafbe1; border-color: #1a7f37; color: #1a7f37; }
+    .pdf-translate-btn:hover { opacity: 1; background: #0550ae; }
+    .pdf-translate-btn.is-translated { background: #1a7f37; }
     .pdf-translate-btn.is-loading { opacity: 0.6; cursor: wait; }
 
     /* 评论侧边栏 */

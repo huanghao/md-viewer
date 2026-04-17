@@ -579,6 +579,99 @@ export function toggleAnnotationSidebar(): void {
   setSidebarCollapsed(!sidebar.classList.contains('collapsed'));
 }
 
+// ==================== 翻译 Tab ====================
+
+let _currentAnnotationTab: 'comments' | 'translation' = 'comments';
+
+export function switchAnnotationTab(tab: 'comments' | 'translation'): void {
+  _currentAnnotationTab = tab;
+  const commentsPanel = document.getElementById('annotationCommentsPanel');
+  const commentsList = document.getElementById('annotationList');
+  const translationList = document.getElementById('translationList');
+  const tabs = document.querySelectorAll('.annotation-tab');
+
+  tabs.forEach((btn) => {
+    const isActive =
+      (tab === 'comments' && (btn as HTMLElement).textContent?.trim() === '评论') ||
+      (tab === 'translation' && (btn as HTMLElement).textContent?.trim() === '翻译');
+    btn.classList.toggle('is-active', isActive);
+  });
+
+  if (commentsPanel) commentsPanel.style.display = tab === 'comments' ? '' : 'none';
+  if (commentsList) commentsList.style.display = tab === 'comments' ? '' : 'none';
+  if (translationList) translationList.style.display = tab === 'translation' ? '' : 'none';
+}
+
+export function openTranslationTab(): void {
+  setSidebarCollapsed(false);
+  persistCurrentFilePanelOpen(true);
+  syncAnnotationSidebarLayout();
+  switchAnnotationTab('translation');
+}
+
+export function renderTranslationList(
+  filePath: string | null,
+  getTranslations: () => import('./pdf-translation.js').StoredTranslation[],
+  onRemove: (pageNum: number, startItemIdx: number) => void,
+  onJump: (pageNum: number, startItemIdx: number, endItemIdx: number) => void
+): void {
+  const el = document.getElementById('translationList');
+  if (!el) return;
+
+  const entries = getTranslations();
+  if (entries.length === 0) {
+    el.innerHTML = '<div class="translation-empty">悬停 PDF 段落，点击「译」按钮翻译</div>';
+    return;
+  }
+
+  el.innerHTML = entries.map((entry) => {
+    const originalEscaped = escapeHtml(entry.originalText);
+    const key = `${entry.pageNum}:${entry.startItemIdx}`;
+    if (!entry.translatedText) {
+      return `
+        <div class="translation-item" data-key="${key}">
+          <div class="translation-item-original">${originalEscaped}</div>
+          <div class="translation-item-loading">翻译中…</div>
+        </div>`;
+    }
+    const translatedEscaped = escapeHtml(entry.translatedText);
+    return `
+      <div class="translation-item" data-key="${key}" data-page="${entry.pageNum}" data-start="${entry.startItemIdx}" data-end="${entry.endItemIdx}">
+        <div class="translation-item-original" title="点击展开原文">${originalEscaped}</div>
+        <div class="translation-item-text">${translatedEscaped}</div>
+        <div class="translation-item-footer">
+          <button class="translation-item-del" data-page="${entry.pageNum}" data-start="${entry.startItemIdx}" title="删除">删除</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  // 点击条目跳转
+  el.querySelectorAll<HTMLElement>('.translation-item[data-page]').forEach((item) => {
+    item.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('.translation-item-del')) return;
+      const pageNum = Number(item.dataset.page);
+      const startItemIdx = Number(item.dataset.start);
+      const endItemIdx = Number(item.dataset.end);
+      if (Number.isFinite(pageNum)) onJump(pageNum, startItemIdx, endItemIdx);
+    });
+    // 原文点击展开
+    item.querySelector('.translation-item-original')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      (e.currentTarget as HTMLElement).classList.toggle('is-expanded');
+    });
+  });
+
+  // 删除按钮
+  el.querySelectorAll<HTMLElement>('.translation-item-del').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const pageNum = Number(btn.dataset.page);
+      const startItemIdx = Number(btn.dataset.start);
+      if (filePath && Number.isFinite(pageNum)) onRemove(pageNum, startItemIdx);
+    });
+  });
+}
+
 export function dismissAnnotationPopupByEscape(): boolean {
   const el = getElements();
   if (el.filterMenu && !el.filterMenu.classList.contains('hidden')) {

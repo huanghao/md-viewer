@@ -160,7 +160,11 @@ export function generateClientHTML(): string {
 
     <!-- 评论侧边栏 -->
     <aside class="annotation-sidebar" id="annotationSidebar">
-      <div class="annotation-sidebar-header">
+      <div class="annotation-tabs" id="annotationTabs">
+        <button class="annotation-tab is-active" onclick="switchAnnotationTab('comments')">评论</button>
+        <button class="annotation-tab" onclick="switchAnnotationTab('translation')">翻译</button>
+      </div>
+      <div class="annotation-sidebar-header" id="annotationCommentsPanel">
         <div class="annotation-header-row">
           <h3 id="annotationTitle">评论(<span id="annotationCount">0</span>)</h3>
           <div class="annotation-header-actions">
@@ -185,6 +189,8 @@ export function generateClientHTML(): string {
       <div class="annotation-list" id="annotationList">
         <div class="annotation-empty">无评论（选中文本即可添加）</div>
       </div>
+      </div>
+      <div class="translation-list" id="translationList" style="display:none;"></div>
     </aside>
     <div class="annotation-sidebar-resizer" id="annotationSidebarResizer" title="拖拽调整评论栏宽度"></div>
     <button class="annotation-floating-open-btn" id="annotationFloatingOpenBtn" title="打开评论侧边栏" aria-label="打开评论侧边栏">

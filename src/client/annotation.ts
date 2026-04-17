@@ -613,7 +613,8 @@ export function renderTranslationList(
   filePath: string | null,
   getTranslations: () => import('./pdf-translation.js').StoredTranslation[],
   onRemove: (pageNum: number, startItemIdx: number) => void,
-  onJump: (pageNum: number, startItemIdx: number, endItemIdx: number) => void
+  onJump: (pageNum: number, startItemIdx: number, endItemIdx: number) => void,
+  onRetry?: (pageNum: number, startItemIdx: number) => void
 ): void {
   const el = document.getElementById('translationList');
   if (!el) return;
@@ -628,6 +629,17 @@ export function renderTranslationList(
     const originalEscaped = escapeHtml(entry.originalText);
     const key = `${entry.pageNum}:${entry.startItemIdx}`;
     if (!entry.translatedText) {
+      if (entry.error) {
+        return `
+          <div class="translation-item is-error" data-key="${key}" data-page="${entry.pageNum}" data-start="${entry.startItemIdx}" data-end="${entry.endItemIdx}">
+            <div class="translation-item-original">${originalEscaped}</div>
+            <div class="translation-item-error">${escapeHtml(entry.error)}</div>
+            <div class="translation-item-footer">
+              <button class="translation-item-retry" data-page="${entry.pageNum}" data-start="${entry.startItemIdx}">重试</button>
+              <button class="translation-item-del" data-page="${entry.pageNum}" data-start="${entry.startItemIdx}">删除</button>
+            </div>
+          </div>`;
+      }
       return `
         <div class="translation-item" data-key="${key}">
           <div class="translation-item-original">${originalEscaped}</div>
@@ -670,6 +682,18 @@ export function renderTranslationList(
       if (filePath && Number.isFinite(pageNum)) onRemove(pageNum, startItemIdx);
     });
   });
+
+  // 重试按钮
+  if (onRetry) {
+    el.querySelectorAll<HTMLElement>('.translation-item-retry').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const pageNum = Number(btn.dataset.page);
+        const startItemIdx = Number(btn.dataset.start);
+        if (Number.isFinite(pageNum)) onRetry(pageNum, startItemIdx);
+      });
+    });
+  }
 }
 
 export function dismissAnnotationPopupByEscape(): boolean {

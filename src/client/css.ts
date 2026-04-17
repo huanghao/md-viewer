@@ -2168,6 +2168,22 @@ export const styles = `
       font-style: italic;
       padding: 4px 0;
     }
+    .translation-item-error {
+      font-size: 12px;
+      color: #cf222e;
+      padding: 4px 0;
+    }
+    .translation-item-retry {
+      background: none;
+      border: 1px solid #0969da;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 11px;
+      color: #0969da;
+      padding: 1px 6px;
+      margin-right: 4px;
+    }
+    .translation-item-retry:hover { background: #0969da; color: #fff; }
     .translation-item-footer {
       display: flex;
       justify-content: flex-end;

@@ -89,6 +89,7 @@ function recordCall(record: TranslationCallRecord): void {
 export interface StoredTranslation {
   originalText: string;
   translatedText: string | null; // null = loading/pending
+  error?: string;                // 失败时的错误信息
   pageNum: number;
   startItemIdx: number;
   endItemIdx: number;
@@ -194,10 +195,17 @@ export async function translateBlock(
   }
   onUpdate();
 
+  const TIMEOUT_MS = 5000;
   const t0 = performance.now();
   const charsSent = block.text.length;
   try {
-    const translated = await provider.translate(block.text, "en", "zh");
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("翻译超时，请重试")), TIMEOUT_MS)
+    );
+    const translated = await Promise.race([
+      provider.translate(block.text, "en", "zh"),
+      timeoutPromise,
+    ]);
     const durationMs = Math.round(performance.now() - t0);
     recordCall({ time: Date.now(), durationMs, charsSent, charsReceived: translated.length, ok: true });
 
@@ -219,10 +227,20 @@ export async function translateBlock(
     const durationMs = Math.round(performance.now() - t0);
     const errMsg = String((e as any)?.message || e).slice(0, 60);
     recordCall({ time: Date.now(), durationMs, charsSent, charsReceived: 0, ok: false, error: errMsg });
-    // 移除 loading 占位
-    currentTranslations = currentTranslations.filter(
-      (t) => !(t.pageNum === block.pageNum && t.startItemIdx === startItemIdx)
+    // 保留条目，显示错误信息（可点击重试）
+    const errorEntry: StoredTranslation = {
+      originalText: block.text,
+      translatedText: null,
+      error: errMsg,
+      pageNum: block.pageNum,
+      startItemIdx,
+      endItemIdx,
+      timestamp: Date.now(),
+    };
+    const idx = currentTranslations.findIndex(
+      (t) => t.pageNum === block.pageNum && t.startItemIdx === startItemIdx
     );
+    if (idx >= 0) currentTranslations[idx] = errorEntry;
     onUpdate();
   }
 }

@@ -1966,6 +1966,12 @@ function startWorkspacePolling() {
   document.addEventListener("annotation:created", () => {
     currentPdfBridge?.renderHighlights(getAnnotations());
   });
+  document.addEventListener("annotation:deleted", () => {
+    currentPdfBridge?.renderHighlights(getAnnotations());
+  });
+  document.addEventListener("annotation:highlights-changed", () => {
+    currentPdfBridge?.renderHighlights(getAnnotations());
+  });
 
   // 监听 pdf:show-composer 事件
   document.addEventListener("pdf:show-composer", (e: Event) => {

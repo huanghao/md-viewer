@@ -189,7 +189,6 @@ export function generateClientHTML(): string {
       <div class="annotation-list" id="annotationList">
         <div class="annotation-empty">无评论（选中文本即可添加）</div>
       </div>
-      </div>
       <div class="translation-list" id="translationList" style="display:none;"></div>
     </aside>
     <div class="annotation-sidebar-resizer" id="annotationSidebarResizer" title="拖拽调整评论栏宽度"></div>

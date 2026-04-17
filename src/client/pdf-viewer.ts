@@ -194,7 +194,10 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
 
       textLayerDiv.addEventListener("mousemove", (e) => {
         const me = e as MouseEvent;
-        const hoverY = me.offsetY / scale;
+        // offsetY 是相对 textLayerDiv 的，但 block.y 是相对 pageWrapper 的。
+        // 用 clientY 减去 wrapper 的 top 得到相对 wrapper 的 Y，再除以 scale。
+        const wrapperRect = wrapper.getBoundingClientRect();
+        const hoverY = (me.clientY - wrapperRect.top) / scale;
         const block = findBlockAtY(blocks, hoverY);
         if (!block) {
           if (translateBtn) translateBtn.style.display = "none";

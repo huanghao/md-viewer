@@ -478,7 +478,7 @@ export function getAnnotationsByDocument(
   const rows = getDb()
     .query(
       `SELECT id, start, length, quote, note, thread_json, created_at, quote_prefix, quote_suffix, status, confidence
-       , serial
+       , serial, page, file_type
        FROM annotations
        WHERE doc_path = ? ${whereStatus}
        ORDER BY start ASC, created_at ASC

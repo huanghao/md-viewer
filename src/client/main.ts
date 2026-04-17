@@ -126,7 +126,7 @@ async function onFileLoaded(data: FileData, focus: boolean = false) {
   renderSidebar();
   renderContent();
   syncAnnotationsForCurrentFile(shouldFocus && previousFile !== data.path);
-  if (shouldFocus && previousFile !== data.path) {
+  if (shouldFocus && previousFile !== data.path && !isPdfPath(data.path)) {
     scrollContentToTop();
   }
 }
@@ -518,7 +518,7 @@ function renderContent() {
   // Schedule eviction for PDFs that are no longer current.
   for (const [path, entry] of pdfViewerRegistry.entries()) {
     if (entry.viewer.el.parentNode) {
-      entry.savedScrollTop = entry.viewer.getScrollTop();
+      entry.savedScrollTop = container.scrollTop;
       entry.viewer.el.remove();
     }
     if (path !== state.currentFile) scheduleEviction(path);
@@ -585,7 +585,7 @@ function renderContent() {
       container.innerHTML = '';
       container.appendChild(existingEntry.viewer.el);
       if (existingEntry.savedScrollTop !== undefined) {
-        existingEntry.viewer.setScrollTop(existingEntry.savedScrollTop);
+        container.scrollTop = existingEntry.savedScrollTop;
       }
       container.setAttribute('data-current-file', filePath);
       renderBreadcrumb();
@@ -962,7 +962,7 @@ async function switchFile(path: string) {
 
   renderContent();
   syncAnnotationsForCurrentFile(true);
-  if (previousFile !== path) {
+  if (previousFile !== path && !isPdfPath(path)) {
     scrollContentToTop();
   }
   await updateToolbarButtons();

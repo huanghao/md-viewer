@@ -10,6 +10,7 @@ import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
 import { log } from "./utils.ts";
 import { generateClientHTML } from "./client/html.ts";
+import { broadcastEvent } from "./sse.ts";
 import {
   handleGetFile,
   handleGetFileAsset,
@@ -148,6 +149,12 @@ app.post("/api/translate", async (c) => {
 import path from "path";
 
 let translateProc: ReturnType<typeof Bun.spawn> | null = null;
+export let translateServiceUp = false;
+
+function setTranslateServiceUp(up: boolean) {
+  translateServiceUp = up;
+  broadcastEvent({ type: 'translate-status', up });
+}
 
 async function startTranslateService(): Promise<void> {
   const scriptPath = path.join(import.meta.dir, "translate_server.py");
@@ -177,10 +184,24 @@ async function startTranslateService(): Promise<void> {
     })().catch(() => {});
   }
 
+  // 轮询等待服务 ready，最多等 60 秒
+  (async () => {
+    for (let i = 0; i < 60; i++) {
+      await Bun.sleep(1000);
+      if (!translateProc) break; // 进程已退出
+      try {
+        const r = await fetch(`${TRANSLATE_SERVICE_URL}/health`, { signal: AbortSignal.timeout(1000) });
+        if (r.ok) { setTranslateServiceUp(true); log('[translate] 翻译服务已就绪'); return; }
+      } catch { /* 还没好 */ }
+    }
+    log('[translate] 翻译服务启动超时');
+  })();
+
   // 进程退出时清理
   translateProc.exited.then((code) => {
     if (code !== 0) log(`[translate] 翻译服务异常退出 (code ${code})`);
     translateProc = null;
+    setTranslateServiceUp(false);
   });
 }
 

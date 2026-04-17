@@ -162,7 +162,7 @@ export function generateClientHTML(): string {
     <aside class="annotation-sidebar" id="annotationSidebar">
       <div class="annotation-tabs" id="annotationTabs">
         <button class="annotation-tab is-active" data-tab="comments" onclick="switchAnnotationTab('comments')">评论<span class="annotation-tab-count" id="annotationTabCount"></span></button>
-        <button class="annotation-tab" data-tab="translation" onclick="switchAnnotationTab('translation')">翻译<span class="annotation-tab-count" id="translationTabCount"></span></button>
+        <button class="annotation-tab" data-tab="translation" onclick="switchAnnotationTab('translation')">翻译<span class="annotation-tab-count" id="translationTabCount"></span><span class="translation-status-dot" id="translationStatusDot" title="翻译服务未连接"></span></button>
       </div>
       <div class="annotation-sidebar-header" id="annotationCommentsPanel">
         <div class="annotation-header-row">

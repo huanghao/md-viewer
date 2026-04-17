@@ -557,7 +557,7 @@ function printComments(path: string, json: boolean, limit: number, offset: numbe
       ? Math.floor(stableSerial)
       : (offset + index + 1);
     console.log(`#${displayID}`);
-    const isPdf = (ann as any).fileType === "pdf";
+    const isPdf = path.toLowerCase().endsWith(".pdf");
     if (!isPdf) {
       const quoted = (ann.quote || "")
         .split("\n")

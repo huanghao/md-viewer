@@ -119,24 +119,77 @@ app.post("/api/annotations/clear", handleClearAllAnnotations);
 app.get("/api/session-state", handleGetSessionState);
 app.post("/api/session-state", handleUpdateSessionState);
 
-// API: 翻译代理（服务端发请求，走系统代理，避免前端跨域/被墙问题）
+// API: 翻译代理 → 本地 Python opus-mt 服务
+const TRANSLATE_SERVICE_URL = "http://127.0.0.1:17823";
+
 app.post("/api/translate", async (c) => {
-  const { text, sourceLang = "en", targetLang = "zh" } = await c.req.json<{
-    text: string;
-    sourceLang?: string;
-    targetLang?: string;
-  }>();
+  const { text } = await c.req.json<{ text: string }>();
   if (!text || typeof text !== "string") {
     return c.json({ error: "missing text" }, 400);
   }
-  const langPair = `${sourceLang}|${targetLang}`;
-  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${encodeURIComponent(langPair)}`;
-  const res = await fetch(url);
-  if (!res.ok) return c.json({ error: `upstream ${res.status}` }, 502);
+  let res: Response;
+  try {
+    res = await fetch(`${TRANSLATE_SERVICE_URL}/translate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch {
+    return c.json({ error: "翻译服务未启动，请运行 src/translate_server.py" }, 503);
+  }
   const data = await res.json() as any;
-  if (data.responseStatus !== 200) return c.json({ error: data.responseDetails || "translation failed" }, 502);
-  return c.json({ translatedText: data.responseData.translatedText });
+  if (!res.ok) return c.json({ error: data.error || "translate failed" }, 502);
+  return c.json({ translatedText: data.translatedText });
 });
+
+// ==================== 翻译子进程 ====================
+
+import path from "path";
+
+let translateProc: ReturnType<typeof Bun.spawn> | null = null;
+
+async function startTranslateService(): Promise<void> {
+  const scriptPath = path.join(import.meta.dir, "translate_server.py");
+  // 找 conda env 里的 python，fallback 到系统 python3
+  const condaEnvPython = path.join(
+    process.env.HOME || "",
+    "miniconda3/envs/3.12/bin/python3"
+  );
+  const python = await Bun.file(condaEnvPython).exists() ? condaEnvPython : "python3";
+
+  translateProc = Bun.spawn([python, scriptPath], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  // 打印模型加载日志
+  const stdout = translateProc.stdout;
+  if (stdout && typeof (stdout as any).getReader === "function") {
+    const reader = (stdout as ReadableStream<Uint8Array>).getReader();
+    const dec = new TextDecoder();
+    (async () => {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        dec.decode(value).split("\n").filter(Boolean).forEach((l) => log(`[translate] ${l}`));
+      }
+    })().catch(() => {});
+  }
+
+  // 进程退出时清理
+  translateProc.exited.then((code) => {
+    if (code !== 0) log(`[translate] 翻译服务异常退出 (code ${code})`);
+    translateProc = null;
+  });
+}
+
+function stopTranslateService(): void {
+  if (translateProc) {
+    translateProc.kill();
+    translateProc = null;
+  }
+}
 
 // ==================== 启动服务 ====================
 
@@ -154,4 +207,10 @@ if (import.meta.main) {
 
   log(`🚀 MD Viewer Server 启动于 http://${HOST}:${PORT}/`);
   log(`📖 使用方法: 在浏览器中打开，然后添加 Markdown/HTML 文件路径`);
+
+  startTranslateService().catch((e) => log(`[translate] 启动失败: ${e}`));
+
+  process.on("exit", stopTranslateService);
+  process.on("SIGINT", () => { stopTranslateService(); process.exit(0); });
+  process.on("SIGTERM", () => { stopTranslateService(); process.exit(0); });
 }

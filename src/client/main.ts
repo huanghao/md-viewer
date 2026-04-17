@@ -620,19 +620,31 @@ function renderContent() {
         currentPdfBridge?.handleTextSelected(pageNum, selectedText, prefix, suffix, clientX, clientY, startItemIdx, endItemIdx);
       },
       onParagraphClick: (block) => {
-        const refreshTranslationList = () => renderTranslationList(
+        const refreshList = () => renderTranslationList(
           filePath,
           getTranslations,
           (pageNum, startItemIdx) => {
             removeTranslation(filePath, pageNum, startItemIdx);
-            refreshTranslationList();
+            refreshList();
           },
           (pageNum, startItemIdx, endItemIdx) => {
             currentPdfViewer?.scrollToPage(pageNum);
             if (currentPdfViewer) highlightTranslationBlock(currentPdfViewer, pageNum, startItemIdx, endItemIdx);
+          },
+          (pageNum, startItemIdx) => {
+            // 重试：从已有条目里取原文，清除 error 状态后重新翻译
+            const entry = getTranslations().find(
+              (t) => t.pageNum === pageNum && t.startItemIdx === startItemIdx
+            );
+            if (!entry) return;
+            // 清除 error，恢复 loading 状态
+            removeTranslation(filePath, pageNum, startItemIdx);
+            const fakeBlock = { ...entry, text: entry.originalText, x: 0, width: 0, items: [] };
+            translateBlock(fakeBlock as any, filePath, translationProvider, refreshList);
+            refreshList();
           }
         );
-        translateBlock(block, filePath, translationProvider, refreshTranslationList);
+        translateBlock(block, filePath, translationProvider, refreshList);
         openTranslationTab();
       },
       onPageRendered: (_pageNum) => {

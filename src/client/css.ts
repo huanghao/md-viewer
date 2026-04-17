@@ -2134,6 +2134,23 @@ export const styles = `
       font-weight: normal;
       opacity: 0.7;
     }
+    .translation-status-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #d1d5db;
+      margin-left: 4px;
+      vertical-align: middle;
+      position: relative;
+      top: -1px;
+    }
+    .translation-status-dot.up {
+      background: #10b981;
+    }
+    .translation-status-dot.down {
+      background: #ef4444;
+    }
 
     /* 翻译列表 */
     .translation-list {

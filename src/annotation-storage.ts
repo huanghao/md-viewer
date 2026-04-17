@@ -181,6 +181,8 @@ function getDb(): Database {
   }
   if (!hasFileType) {
     db.exec(`ALTER TABLE annotations ADD COLUMN file_type TEXT NOT NULL DEFAULT 'md'`);
+    // TODO: file_type 列已冗余，文件类型可直接从 doc_path 后缀推断。
+    //       SQLite 不支持 DROP COLUMN（旧版本），需重建表时一并删除。
   }
 
   return db;

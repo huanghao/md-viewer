@@ -43,7 +43,7 @@ import {
 
 import { createPdfViewer, type PdfViewerInstance } from "./pdf-viewer.js";
 import { createPdfAnnotationBridge } from "./pdf-annotation.js";
-import { MyMemoryProvider, handleParagraphTranslation } from "./pdf-translation.js";
+import { MyMemoryProvider, handleParagraphTranslation, getTranslationStats, clearTranslationStats } from "./pdf-translation.js";
 
 function applyTheme(): void {
   const mdCss = getMdThemeCss(state.config.markdownTheme || 'github');
@@ -74,6 +74,7 @@ interface PdfViewerEntry {
   viewer: PdfViewerInstance;
   lastActiveAt: number;
   idleTimer: ReturnType<typeof setTimeout> | null;
+  savedScrollTop?: number;
 }
 const pdfViewerRegistry = new Map<string, PdfViewerEntry>();
 
@@ -513,9 +514,13 @@ function renderContent() {
   if (!container) return;
 
   // Detach all PDF viewer elements from container so innerHTML resets don't destroy them.
+  // Save scroll position before detaching so we can restore it when switching back.
   // Schedule eviction for PDFs that are no longer current.
   for (const [path, entry] of pdfViewerRegistry.entries()) {
-    if (entry.viewer.el.parentNode) entry.viewer.el.remove();
+    if (entry.viewer.el.parentNode) {
+      entry.savedScrollTop = entry.viewer.getScrollTop();
+      entry.viewer.el.remove();
+    }
     if (path !== state.currentFile) scheduleEviction(path);
   }
   currentPdfViewer = null;
@@ -579,6 +584,9 @@ function renderContent() {
       });
       container.innerHTML = '';
       container.appendChild(existingEntry.viewer.el);
+      if (existingEntry.savedScrollTop !== undefined) {
+        existingEntry.viewer.setScrollTop(existingEntry.savedScrollTop);
+      }
       container.setAttribute('data-current-file', filePath);
       renderBreadcrumb();
       updateToolbarButtons();
@@ -1484,10 +1492,10 @@ function setFontScale(scale: number) {
   closeFontScaleMenu();
 }
 
-// 切换菜单显示
-// PDF memory monitor
+// ==================== 系统监控浮窗 ====================
 const MEM_PER_PAGE_MB = 27; // A4 @ scale=1.5, dpr=2
-let pdfMemPollTimer: ReturnType<typeof setInterval> | null = null;
+let monitorPollTimer: ReturnType<typeof setInterval> | null = null;
+let monitorActiveTab: 'memory' | 'translation' = 'memory';
 
 function getPdfMemStats(): Array<{ path: string; rendered: number; total: number; memMB: number; idleMins: number | null }> {
   return Array.from(pdfViewerRegistry.entries()).map(([path, entry]) => {
@@ -1500,16 +1508,16 @@ function getPdfMemStats(): Array<{ path: string; rendered: number; total: number
   });
 }
 
-function updatePdfMemPanel(): void {
-  const content = document.getElementById('pdfMemContent');
-  if (!content) return;
+function renderMemoryTab(): void {
+  const el = document.getElementById('monitorTabMemory');
+  if (!el) return;
   const stats = getPdfMemStats();
   if (stats.length === 0) {
-    content.innerHTML = '<div class="pdf-mem-row pdf-mem-empty">暂无 PDF 数据</div>';
+    el.innerHTML = '<div class="pdf-mem-row pdf-mem-empty">暂无 PDF 数据</div>';
     return;
   }
   const totalMB = stats.reduce((s, r) => s + r.memMB, 0);
-  content.innerHTML = stats.map(r => `
+  el.innerHTML = stats.map(r => `
     <div class="pdf-mem-row">
       <span class="pdf-mem-name" title="${r.path}">${r.path}</span>
       <span class="pdf-mem-pages">${r.rendered}/${r.total} 页</span>
@@ -1519,18 +1527,84 @@ function updatePdfMemPanel(): void {
   `).join('') + `<div class="pdf-mem-total">合计 ~${totalMB}MB</div>`;
 }
 
-function togglePdfMemPanel(): void {
-  const panel = document.getElementById('pdfMemPanel');
+function renderTranslationTab(): void {
+  const el = document.getElementById('monitorTabTranslation');
+  if (!el) return;
+  const s = getTranslationStats();
+  const avgMs = s.totalCalls > 0 ? Math.round(s.totalDurationMs / s.totalCalls) : 0;
+
+  const statRows = [
+    ['服务商', 'MyMemory'],
+    ['总调用', String(s.totalCalls)],
+    ['成功', String(s.successCalls), s.successCalls > 0 ? 'is-ok' : ''],
+    ['失败', String(s.failCalls), s.failCalls > 0 ? 'is-error' : ''],
+    ['平均延迟', s.totalCalls > 0 ? `${avgMs}ms` : '—'],
+    ['最慢一次', s.maxDurationMs > 0 ? `${s.maxDurationMs}ms` : '—'],
+    ['发送字符', s.totalCharsSent > 0 ? s.totalCharsSent.toLocaleString() : '0'],
+    ['接收字符', s.totalCharsReceived > 0 ? s.totalCharsReceived.toLocaleString() : '0'],
+  ] as [string, string, string?][];
+
+  const callRows = [...s.recentCalls].reverse().map(r => {
+    const t = new Date(r.time);
+    const hms = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}`;
+    const text = r.ok ? `${r.charsSent}→${r.charsReceived} 字符` : (r.error || '失败');
+    return `<div class="monitor-call-row${r.ok ? '' : ' is-error'}">
+      <span class="monitor-call-time">${hms}</span>
+      <span class="monitor-call-dur">${r.durationMs}ms</span>
+      <span class="monitor-call-status">${r.ok ? '✓' : '✗'}</span>
+      <span class="monitor-call-text" title="${text}">${text}</span>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="monitor-stat-section">统计</div>
+    ${statRows.map(([k, v, cls]) => `
+      <div class="monitor-stat-row">
+        <span class="monitor-stat-key">${k}</span>
+        <span class="monitor-stat-val${cls ? ' ' + cls : ''}">${v}</span>
+      </div>`).join('')}
+    <div class="monitor-calls-header">
+      <span class="monitor-calls-title">最近调用</span>
+      <button class="monitor-clear-btn" onclick="clearMonitorTranslationStats()">清除统计</button>
+    </div>
+    ${callRows || '<div class="pdf-mem-row pdf-mem-empty">暂无调用记录</div>'}
+  `;
+}
+
+function updateMonitorPanel(): void {
+  if (monitorActiveTab === 'memory') renderMemoryTab();
+  else renderTranslationTab();
+}
+
+function switchMonitorTab(tab: 'memory' | 'translation'): void {
+  monitorActiveTab = tab;
+  document.querySelectorAll('.monitor-tab').forEach(btn => {
+    btn.classList.toggle('is-active', (btn as HTMLElement).textContent?.trim() === (tab === 'memory' ? '内存' : '翻译'));
+  });
+  const memEl = document.getElementById('monitorTabMemory');
+  const trEl = document.getElementById('monitorTabTranslation');
+  if (memEl) memEl.style.display = tab === 'memory' ? '' : 'none';
+  if (trEl) trEl.style.display = tab === 'translation' ? '' : 'none';
+  updateMonitorPanel();
+}
+
+function toggleMonitorPanel(): void {
+  const panel = document.getElementById('monitorPanel');
   if (!panel) return;
   const isVisible = panel.style.display !== 'none';
   if (isVisible) {
     panel.style.display = 'none';
-    if (pdfMemPollTimer) { clearInterval(pdfMemPollTimer); pdfMemPollTimer = null; }
+    if (monitorPollTimer) { clearInterval(monitorPollTimer); monitorPollTimer = null; }
   } else {
     panel.style.display = 'block';
-    updatePdfMemPanel();
-    pdfMemPollTimer = setInterval(updatePdfMemPanel, 2000);
+    updateMonitorPanel();
+    monitorPollTimer = setInterval(updateMonitorPanel, 2000);
   }
+}
+
+function clearMonitorTranslationStats(): void {
+  clearTranslationStats();
+  renderTranslationTab();
 }
 
 function toggleFontScaleMenu() {
@@ -1806,7 +1880,9 @@ declare global {
     showToast?: (message: string, type: string) => void;
     showSettingsDialog: () => void;
     toggleFontScaleMenu: () => void;
-    togglePdfMemPanel: () => void;
+    toggleMonitorPanel: () => void;
+    switchMonitorTab: (tab: 'memory' | 'translation') => void;
+    clearMonitorTranslationStats: () => void;
     setFontScale: (scale: number) => void;
     openExternalFile?: (path: string) => void | Promise<void>;
     renderContent?: () => void;
@@ -1857,7 +1933,9 @@ window.copyFilePath = copyFilePath;
 window.showToast = showToast;
 window.showSettingsDialog = showSettingsDialog;
 window.toggleFontScaleMenu = toggleFontScaleMenu;
-window.togglePdfMemPanel = togglePdfMemPanel;
+window.toggleMonitorPanel = toggleMonitorPanel;
+window.switchMonitorTab = switchMonitorTab;
+window.clearMonitorTranslationStats = clearMonitorTranslationStats;
 window.setFontScale = setFontScale;
 window.openExternalFile = openFileInBrowser;
 window.renderContent = renderContent;

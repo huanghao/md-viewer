@@ -254,7 +254,6 @@ function getElements() {
     popoverPrevBtn: document.getElementById('popoverPrevBtn') as HTMLButtonElement | null,
     popoverNextBtn: document.getElementById('popoverNextBtn') as HTMLButtonElement | null,
     annotationList: document.getElementById('annotationList'),
-    annotationCount: document.getElementById('annotationCount'),
     filterMenu: document.getElementById('annotationFilterMenu'),
     filterToggle: document.getElementById('annotationFilterToggle'),
     densityToggle: document.getElementById('annotationDensityToggle'),
@@ -489,9 +488,9 @@ function updateControlState(): void {
 }
 
 function updateAnnotationCount(): void {
-  const el = getElements();
-  if (!el.annotationCount) return;
-  el.annotationCount.textContent = String(getVisibleAnnotations().length);
+  const count = getVisibleAnnotations().length;
+  const tabCount = document.getElementById('annotationTabCount');
+  if (tabCount) tabCount.textContent = count > 0 ? `(${count})` : '';
 }
 
 function setSidebarCollapsed(collapsed: boolean): void {
@@ -591,10 +590,7 @@ export function switchAnnotationTab(tab: 'comments' | 'translation'): void {
   const tabs = document.querySelectorAll('.annotation-tab');
 
   tabs.forEach((btn) => {
-    const isActive =
-      (tab === 'comments' && (btn as HTMLElement).textContent?.trim() === '评论') ||
-      (tab === 'translation' && (btn as HTMLElement).textContent?.trim() === '翻译');
-    btn.classList.toggle('is-active', isActive);
+    btn.classList.toggle('is-active', (btn as HTMLElement).dataset.tab === tab);
   });
 
   if (commentsPanel) commentsPanel.style.display = tab === 'comments' ? '' : 'none';
@@ -620,6 +616,8 @@ export function renderTranslationList(
   if (!el) return;
 
   const entries = getTranslations();
+  const translationTabCount = document.getElementById('translationTabCount');
+  if (translationTabCount) translationTabCount.textContent = entries.length > 0 ? `(${entries.length})` : '';
   if (entries.length === 0) {
     el.innerHTML = '<div class="translation-empty">悬停 PDF 段落，点击「译」按钮翻译</div>';
     return;

@@ -161,12 +161,11 @@ export function generateClientHTML(): string {
     <!-- 评论侧边栏 -->
     <aside class="annotation-sidebar" id="annotationSidebar">
       <div class="annotation-tabs" id="annotationTabs">
-        <button class="annotation-tab is-active" onclick="switchAnnotationTab('comments')">评论</button>
-        <button class="annotation-tab" onclick="switchAnnotationTab('translation')">翻译</button>
+        <button class="annotation-tab is-active" data-tab="comments" onclick="switchAnnotationTab('comments')">评论<span class="annotation-tab-count" id="annotationTabCount"></span></button>
+        <button class="annotation-tab" data-tab="translation" onclick="switchAnnotationTab('translation')">翻译<span class="annotation-tab-count" id="translationTabCount"></span></button>
       </div>
       <div class="annotation-sidebar-header" id="annotationCommentsPanel">
         <div class="annotation-header-row">
-          <h3 id="annotationTitle">评论(<span id="annotationCount">0</span>)</h3>
           <div class="annotation-header-actions">
             <button class="annotation-icon-btn" id="annotationDensityToggle" title="切换默认/极简" aria-label="切换默认/极简">
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h10v1H3zm0 4h10v1H3zm0 4h10v1H3z"/></svg>

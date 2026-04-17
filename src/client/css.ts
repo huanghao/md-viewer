@@ -2128,6 +2128,12 @@ export const styles = `
       border-bottom-color: #0969da;
       font-weight: 600;
     }
+    .annotation-tab-count {
+      margin-left: 3px;
+      font-size: 11px;
+      font-weight: normal;
+      opacity: 0.7;
+    }
 
     /* 翻译列表 */
     .translation-list {

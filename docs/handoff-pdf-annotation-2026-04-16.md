@@ -1,4 +1,4 @@
-# PDF 划词评论 Handoff — 2026-04-16 / 2026-04-17 更新
+# PDF 划词评论 Handoff — 2026-04-16 / 2026-04-17 / 2026-04-18 更新
 
 ## 目标
 在 PDF 查看器里实现划词评论，功能和 MD 文件的划词评论一致：
@@ -169,8 +169,15 @@ textLayerDiv.addEventListener("mouseup", (e) => {
 ✅ **懒加载页面高亮**：`onPageRendered` 回调
 ✅ **API 适配**：`fileType: "pdf"` 存储和读取
 
+## 已完成（2026-04-18）
+
+✅ **已解决评论不再高亮**：`renderHighlights` 过滤 `status=resolved`
+✅ **删除/解决评论不破坏 text layer**：PDF 模式下跳过 `applyAnnotations()`，改用 `annotation:highlights-changed` 事件触发 `renderHighlights`
+✅ **`clearHighlights` 同时清除 `annotation-mark` class**：避免删除评论后残留标记
+✅ **mdv comments get 改进**：PDF 去掉冗余 `> quote` 行；排序改为 `start ASC`（文档位置顺序）；`isPdf` 从路径后缀判断，不依赖 `file_type` 字段
+
 ## 不要碰的地方
 
-- `applyAnnotations()` 在 PDF 模式下已跳过（会导致 textLayer DOM 循环）
+- `applyAnnotations()` 在 PDF 模式下已跳过（会导致 clearRenderedMarks 误删 text layer 里的 annotation-mark span）
 - `highlightQuote` 里不能调 `renderPage`（会导致卡死，见 `docs/pdf-render-performance.md`）
 - `clearHighlights()` 只在 `renderHighlights()` 开头调一次

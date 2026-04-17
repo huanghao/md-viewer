@@ -290,7 +290,6 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
           .join(" ")
           .trim();
 
-        markSelectionSpans(sel, textLayerDiv);
         opts.onTextSelected!(pageNum, selectedText, prefix, suffix, me.clientX, me.clientY, startItemIdx, endItemIdx);
       });
     }
@@ -448,8 +447,10 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
   }
 
   function clearHighlights() {
-    el.querySelectorAll(".pdf-highlight").forEach((node) => {
+    el.querySelectorAll(".pdf-highlight, .annotation-mark").forEach((node) => {
       node.classList.remove("pdf-highlight");
+      node.classList.remove("annotation-mark");
+      delete (node as HTMLElement).dataset.annotationId;
     });
   }
 

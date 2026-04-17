@@ -998,8 +998,10 @@ export function removeAnnotation(id: string, filePath: string): void {
   if (state.activeAnnotationId === id) {
     state.activeAnnotationId = null;
   }
-  applyAnnotations();
+  const isPdf = document.getElementById('content')?.hasAttribute('data-pdf');
+  if (!isPdf) applyAnnotations();
   renderAnnotationList(filePath);
+  document.dispatchEvent(new CustomEvent('annotation:deleted', { detail: { id, filePath } }));
   const removed = previous.find((a) => a.id === id);
   if (removed && removed.status !== 'resolved') {
     adjustAnnotationCount(filePath, -1);
@@ -1012,7 +1014,7 @@ export function removeAnnotation(id: string, filePath: string): void {
       import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
     }
     showError(`删除评论失败: ${error?.message || '未知错误'}`, 2600);
-    applyAnnotations();
+    if (!isPdf) applyAnnotations();
     renderAnnotationList(filePath);
   });
 }
@@ -1088,8 +1090,10 @@ function toggleResolved(id: string, filePath: string): void {
     ann.status = 'resolved';
   }
   const nextStatus = ann.status || 'anchored';
+  const isPdf = document.getElementById('content')?.hasAttribute('data-pdf');
   hidePopover(true);
-  applyAnnotations();
+  if (!isPdf) applyAnnotations();
+  else document.dispatchEvent(new CustomEvent('annotation:highlights-changed'));
   renderAnnotationList(filePath);
   if (nextStatus === 'resolved') {
     adjustAnnotationCount(filePath, -1);
@@ -1105,7 +1109,8 @@ function toggleResolved(id: string, filePath: string): void {
       adjustAnnotationCount(filePath, -1);
     }
     showError(`更新评论状态失败: ${error?.message || '未知错误'}`, 2600);
-    applyAnnotations();
+    if (!isPdf) applyAnnotations();
+    else document.dispatchEvent(new CustomEvent('annotation:highlights-changed'));
     renderAnnotationList(filePath);
     import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
   });

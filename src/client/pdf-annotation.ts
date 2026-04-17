@@ -64,7 +64,7 @@ export function createPdfAnnotationBridge(opts: PdfAnnotationBridgeOptions): Pdf
     opts.viewer.clearHighlights();
     const pdfAnns = annotations.filter(a => {
       const pa = a as Annotation & { page?: number; fileType?: string };
-      return pa.fileType === "pdf" && typeof pa.page === "number";
+      return pa.fileType === "pdf" && typeof pa.page === "number" && a.status !== 'resolved';
     }) as (Annotation & { page: number; fileType: string })[];
     for (const a of pdfAnns) {
       const pa = a as Annotation & { page: number; start?: number; length?: number };

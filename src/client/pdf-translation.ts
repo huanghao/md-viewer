@@ -7,13 +7,17 @@ export interface TranslationProvider {
 
 export class MyMemoryProvider implements TranslationProvider {
   async translate(text: string, sourceLang: string, targetLang: string): Promise<string> {
-    const langPair = `${sourceLang}|${targetLang}`;
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${encodeURIComponent(langPair)}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`MyMemory error: ${res.status}`);
-    const data = await res.json();
-    if (data.responseStatus !== 200) throw new Error(data.responseDetails || "Translation failed");
-    return data.responseData.translatedText as string;
+    const res = await fetch("/api/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, sourceLang, targetLang }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as any;
+      throw new Error(err.error || `translate error: ${res.status}`);
+    }
+    const data = await res.json() as { translatedText: string };
+    return data.translatedText;
   }
 }
 

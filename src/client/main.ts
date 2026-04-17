@@ -633,13 +633,10 @@ function renderContent() {
             if (currentPdfViewer) highlightTranslationBlock(currentPdfViewer, pageNum, startItemIdx, endItemIdx);
           },
           (pageNum, startItemIdx) => {
-            // 重试：从已有条目里取原文，清除 error 状态后重新翻译
             const entry = getTranslations().find(
               (t) => t.pageNum === pageNum && t.startItemIdx === startItemIdx
             );
             if (!entry) return;
-            // 清除 error，恢复 loading 状态
-            removeTranslation(filePath, pageNum, startItemIdx);
             retryTranslation(entry, filePath, translationProvider, refreshList);
           }
         );

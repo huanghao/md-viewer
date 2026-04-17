@@ -119,6 +119,25 @@ app.post("/api/annotations/clear", handleClearAllAnnotations);
 app.get("/api/session-state", handleGetSessionState);
 app.post("/api/session-state", handleUpdateSessionState);
 
+// API: 翻译代理（服务端发请求，走系统代理，避免前端跨域/被墙问题）
+app.post("/api/translate", async (c) => {
+  const { text, sourceLang = "en", targetLang = "zh" } = await c.req.json<{
+    text: string;
+    sourceLang?: string;
+    targetLang?: string;
+  }>();
+  if (!text || typeof text !== "string") {
+    return c.json({ error: "missing text" }, 400);
+  }
+  const langPair = `${sourceLang}|${targetLang}`;
+  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${encodeURIComponent(langPair)}`;
+  const res = await fetch(url);
+  if (!res.ok) return c.json({ error: `upstream ${res.status}` }, 502);
+  const data = await res.json() as any;
+  if (data.responseStatus !== 200) return c.json({ error: data.responseDetails || "translation failed" }, 502);
+  return c.json({ translatedText: data.responseData.translatedText });
+});
+
 // ==================== 启动服务 ====================
 
 const PORT = getServerPort(config);

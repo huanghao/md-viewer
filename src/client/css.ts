@@ -2152,11 +2152,7 @@ export const styles = `
       color: #8b949e;
       line-height: 1.4;
       margin-bottom: 5px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
     }
-    .translation-item-original.is-expanded { white-space: normal; }
     .translation-item-text {
       font-size: 13px;
       color: #24292f;

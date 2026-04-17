@@ -149,9 +149,10 @@ app.post("/api/translate", async (c) => {
 import path from "path";
 
 let translateProc: ReturnType<typeof Bun.spawn> | null = null;
-export let translateServiceUp = false;
+// null = unknown/starting, true = up, false = confirmed down
+export let translateServiceUp: boolean | null = null;
 
-function setTranslateServiceUp(up: boolean) {
+function setTranslateServiceUp(up: boolean | null) {
   translateServiceUp = up;
   broadcastEvent({ type: 'translate-status', up });
 }

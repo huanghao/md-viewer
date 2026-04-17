@@ -1724,11 +1724,19 @@ function updateConnectionStatus(status: typeof sseConnectionState, retryInfo?: s
   }
 }
 
-function updateTranslationStatus(up: boolean) {
+function updateTranslationStatus(up: boolean | null) {
   const dot = document.getElementById('translationStatusDot');
   if (!dot) return;
-  dot.className = 'translation-status-dot ' + (up ? 'up' : 'down');
-  dot.title = up ? '翻译服务已连接' : '翻译服务未连接';
+  if (up === true) {
+    dot.className = 'translation-status-dot up';
+    dot.title = '翻译服务已连接';
+  } else if (up === false) {
+    dot.className = 'translation-status-dot down';
+    dot.title = '翻译服务未连接';
+  } else {
+    dot.className = 'translation-status-dot';
+    dot.title = '翻译服务启动中…';
+  }
 }
 
 function resetAndReconnectSSE() {

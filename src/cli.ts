@@ -562,6 +562,16 @@ function printComments(path: string, json: boolean, limit: number, offset: numbe
       .map((line) => `> ${line}`)
       .join("\n");
     console.log(quoted || "> ");
+    const prefix = typeof (ann as any).quotePrefix === "string"
+      ? (ann as any).quotePrefix.replace(/\s+/g, " ").trim()
+      : "";
+    const suffix = typeof (ann as any).quoteSuffix === "string"
+      ? (ann as any).quoteSuffix.replace(/\s+/g, " ").trim()
+      : "";
+    if (prefix || suffix) {
+      const cxt = [prefix, ann.quote?.trim(), suffix].filter(Boolean).join(" … ");
+      console.log(`cxt: ${cxt}`);
+    }
     const thread = Array.isArray((ann as any).thread) ? (ann as any).thread : [];
     const root = thread.find((item: any) => item?.type === "comment") || thread[0];
     const rootAuthor = String(root?.author || "me");

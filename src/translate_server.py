@@ -9,6 +9,11 @@
 import json
 import sys
 import os
+
+# 强制离线，避免启动时联网检查更新导致 hang
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 PORT = 17823

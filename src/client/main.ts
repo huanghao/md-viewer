@@ -1261,17 +1261,28 @@ function closeDiffView(): void {
 let currentDiffBlockIndex = -1; // -1 表示未激活任何 block
 
 function navigateDiffBlock(direction: 1 | -1): void {
-  const scrollEl = document.querySelector('.diff-view-scroll');
+  const scrollEl = document.querySelector('.diff-view-scroll') as HTMLElement | null;
   if (!scrollEl) return;
 
-  // 计算总 block 数（通过 DOM 中的 data-block-index 属性）
-  const allBlockRows = scrollEl.querySelectorAll<HTMLElement>('[data-block-index]');
+  const allBlockRows = Array.from(scrollEl.querySelectorAll<HTMLElement>('[data-block-index]'));
   const totalBlocks = allBlockRows.length;
   if (totalBlocks === 0) return;
 
-  const nextIndex = currentDiffBlockIndex === -1
-    ? (direction === 1 ? 0 : totalBlocks - 1)
-    : Math.max(0, Math.min(totalBlocks - 1, currentDiffBlockIndex + direction));
+  // 基于视口位置确定当前所在 block，避免手动滚动后跳回去
+  const viewportMid = scrollEl.scrollTop + scrollEl.clientHeight / 2;
+  let closestIndex = 0;
+  let closestDist = Infinity;
+  allBlockRows.forEach((row, i) => {
+    const dist = Math.abs(row.offsetTop - viewportMid);
+    if (dist < closestDist) { closestDist = dist; closestIndex = i; }
+  });
+
+  // 首次导航（未激活）时从头/尾开始
+  const baseIndex = currentDiffBlockIndex === -1
+    ? (direction === 1 ? -1 : totalBlocks)
+    : closestIndex;
+
+  const nextIndex = Math.max(0, Math.min(totalBlocks - 1, baseIndex + direction));
 
   if (nextIndex === currentDiffBlockIndex) return;
 
@@ -1285,7 +1296,7 @@ function navigateDiffBlock(direction: 1 | -1): void {
   const newSpan = scrollEl.querySelector<HTMLElement>(`[data-block-span="${nextIndex}"]`);
   if (newSpan) newSpan.style.display = 'inline';
 
-  // 滚动到目标 block 首行
+  // 滚动到目标 block
   const targetRow = scrollEl.querySelector<HTMLElement>(`[data-block-index="${nextIndex}"]`);
   if (targetRow) {
     targetRow.scrollIntoView({ behavior: 'instant', block: 'center' });

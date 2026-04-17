@@ -174,11 +174,41 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
 
     // Event handlers
     if (opts.onParagraphClick) {
-      textLayerDiv.addEventListener("click", (e) => {
-        if (window.getSelection()?.toString()) return;
-        const clickY = (e as MouseEvent).offsetY / scale;
-        const block = findBlockAtY(blocks, clickY);
-        if (block) opts.onParagraphClick!(block);
+      // 悬停「译」按钮：每个 pageWrapper 最多一个，复用移动
+      let translateBtn: HTMLButtonElement | null = null;
+      let translateBtnBlock: PdfTextBlock | null = null;
+
+      function getOrCreateTranslateBtn(): HTMLButtonElement {
+        if (!translateBtn) {
+          translateBtn = document.createElement("button");
+          translateBtn.className = "pdf-translate-btn";
+          translateBtn.textContent = "译";
+          translateBtn.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            if (translateBtnBlock) opts.onParagraphClick!(translateBtnBlock);
+          });
+          wrapper.appendChild(translateBtn);
+        }
+        return translateBtn;
+      }
+
+      textLayerDiv.addEventListener("mousemove", (e) => {
+        const me = e as MouseEvent;
+        const hoverY = me.offsetY / scale;
+        const block = findBlockAtY(blocks, hoverY);
+        if (!block) {
+          if (translateBtn) translateBtn.style.display = "none";
+          return;
+        }
+        if (block === translateBtnBlock && translateBtn && translateBtn.style.display !== "none") return;
+        translateBtnBlock = block;
+        const btn = getOrCreateTranslateBtn();
+        btn.style.display = "block";
+        btn.style.top = `${block.y * scale}px`;
+      });
+
+      textLayerDiv.addEventListener("mouseleave", () => {
+        if (translateBtn) translateBtn.style.display = "none";
       });
     }
     if (opts.onTextSelected) {

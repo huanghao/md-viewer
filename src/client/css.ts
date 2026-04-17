@@ -2103,6 +2103,107 @@ export const styles = `
 
     /* ==================== 圈点评论功能 ==================== */
 
+    /* 评论/翻译 tab 行 */
+    .annotation-tabs {
+      display: flex;
+      flex-shrink: 0;
+      border-bottom: 1px solid #e1e4e8;
+      background: #f6f8fa;
+    }
+    .annotation-tab {
+      flex: 1;
+      padding: 7px 4px;
+      border: none;
+      border-bottom: 2px solid transparent;
+      background: transparent;
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      color: #57606a;
+      transition: color 0.1s, border-color 0.1s;
+    }
+    .annotation-tab:hover { color: #24292f; }
+    .annotation-tab.is-active {
+      color: #0969da;
+      border-bottom-color: #0969da;
+      font-weight: 600;
+    }
+
+    /* 翻译列表 */
+    .translation-list {
+      flex: 1;
+      overflow-y: auto;
+      min-height: 0;
+    }
+    .translation-empty {
+      padding: 24px 16px;
+      color: #8b949e;
+      font-size: 13px;
+      text-align: center;
+    }
+    .translation-item {
+      padding: 10px 12px;
+      border-bottom: 1px solid #eaeef2;
+      cursor: pointer;
+    }
+    .translation-item:hover { background: #f0f3f6; }
+    .translation-item-original {
+      font-size: 11px;
+      color: #8b949e;
+      line-height: 1.4;
+      margin-bottom: 5px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .translation-item-original.is-expanded { white-space: normal; }
+    .translation-item-text {
+      font-size: 13px;
+      color: #24292f;
+      line-height: 1.6;
+    }
+    .translation-item-loading {
+      font-size: 12px;
+      color: #8b949e;
+      font-style: italic;
+      padding: 4px 0;
+    }
+    .translation-item-footer {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 4px;
+    }
+    .translation-item-del {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 11px;
+      color: #8b949e;
+      padding: 0 2px;
+    }
+    .translation-item-del:hover { color: #cf222e; }
+
+    /* PDF 悬停「译」按钮 */
+    .pdf-translate-btn {
+      position: absolute;
+      left: -28px;
+      background: #f0f6ff;
+      border: 1px solid #0969da;
+      border-radius: 3px;
+      color: #0969da;
+      font-size: 11px;
+      font-family: inherit;
+      padding: 1px 5px;
+      cursor: pointer;
+      white-space: nowrap;
+      z-index: 10;
+      pointer-events: auto;
+      line-height: 1.6;
+    }
+    .pdf-translate-btn:hover { background: #0969da; color: #fff; }
+    .pdf-translate-btn.is-translated { background: #dafbe1; border-color: #1a7f37; color: #1a7f37; }
+    .pdf-translate-btn.is-loading { opacity: 0.6; cursor: wait; }
+
     /* 评论侧边栏 */
     .annotation-sidebar {
       width: var(--annotation-sidebar-width);

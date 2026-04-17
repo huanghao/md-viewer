@@ -39,11 +39,23 @@ import {
   dismissAnnotationPopupByEscape,
   setPendingAnnotation,
   getAnnotations,
+  switchAnnotationTab,
+  openTranslationTab,
+  renderTranslationList,
 } from './annotation';
 
 import { createPdfViewer, type PdfViewerInstance } from "./pdf-viewer.js";
 import { createPdfAnnotationBridge } from "./pdf-annotation.js";
-import { MyMemoryProvider, handleParagraphTranslation, getTranslationStats, clearTranslationStats } from "./pdf-translation.js";
+import {
+  MyMemoryProvider,
+  getTranslationStats,
+  clearTranslationStats,
+  loadTranslations,
+  getTranslations,
+  translateBlock,
+  removeTranslation,
+  highlightTranslationBlock,
+} from "./pdf-translation.js";
 
 function applyTheme(): void {
   const mdCss = getMdThemeCss(state.config.markdownTheme || 'github');
@@ -570,6 +582,9 @@ function renderContent() {
     // Mark container as PDF mode — CSS handles padding adjustments
     container.setAttribute('data-pdf', '1');
 
+    // Load persisted translations for this file
+    loadTranslations(filePath);
+
     // Reuse existing viewer if available — re-attach its el to container
     const existingEntry = pdfViewerRegistry.get(filePath);
     if (existingEntry) {
@@ -604,8 +619,21 @@ function renderContent() {
       onTextSelected: (pageNum, selectedText, prefix, suffix, clientX, clientY, startItemIdx, endItemIdx) => {
         currentPdfBridge?.handleTextSelected(pageNum, selectedText, prefix, suffix, clientX, clientY, startItemIdx, endItemIdx);
       },
-      onParagraphClick: (_block) => {
-        // Translation disabled during debug
+      onParagraphClick: (block) => {
+        const refreshTranslationList = () => renderTranslationList(
+          filePath,
+          getTranslations,
+          (pageNum, startItemIdx) => {
+            removeTranslation(filePath, pageNum, startItemIdx);
+            refreshTranslationList();
+          },
+          (pageNum, startItemIdx, endItemIdx) => {
+            currentPdfViewer?.scrollToPage(pageNum);
+            if (currentPdfViewer) highlightTranslationBlock(currentPdfViewer, pageNum, startItemIdx, endItemIdx);
+          }
+        );
+        translateBlock(block, filePath, translationProvider, refreshTranslationList);
+        openTranslationTab();
       },
       onPageRendered: (_pageNum) => {
         // Page just became visible — replay annotation highlights for it
@@ -1883,6 +1911,7 @@ declare global {
     toggleMonitorPanel: () => void;
     switchMonitorTab: (tab: 'memory' | 'translation') => void;
     clearMonitorTranslationStats: () => void;
+    switchAnnotationTab: (tab: 'comments' | 'translation') => void;
     setFontScale: (scale: number) => void;
     openExternalFile?: (path: string) => void | Promise<void>;
     renderContent?: () => void;
@@ -1936,6 +1965,7 @@ window.toggleFontScaleMenu = toggleFontScaleMenu;
 window.toggleMonitorPanel = toggleMonitorPanel;
 window.switchMonitorTab = switchMonitorTab;
 window.clearMonitorTranslationStats = clearMonitorTranslationStats;
+window.switchAnnotationTab = switchAnnotationTab;
 window.setFontScale = setFontScale;
 window.openExternalFile = openFileInBrowser;
 window.renderContent = renderContent;

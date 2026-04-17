@@ -210,8 +210,18 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
         btn.style.top = `${block.y * scale}px`;
       });
 
-      textLayerDiv.addEventListener("mouseleave", () => {
+      textLayerDiv.addEventListener("mouseleave", (e) => {
+        // 鼠标移到「译」按钮上时不隐藏
+        if (translateBtn && e.relatedTarget === translateBtn) return;
         if (translateBtn) translateBtn.style.display = "none";
+      });
+
+      // 鼠标离开按钮时也隐藏（除非移回了 textLayerDiv）
+      wrapper.addEventListener("mouseleave", (e) => {
+        if (!translateBtn) return;
+        const related = e.relatedTarget as Node | null;
+        if (related && (textLayerDiv.contains(related) || related === textLayerDiv)) return;
+        translateBtn.style.display = "none";
       });
     }
     if (opts.onTextSelected) {

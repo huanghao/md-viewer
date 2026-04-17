@@ -108,8 +108,8 @@ export function generateClientHTML(): string {
         <button class="toolbar-text-button" id="refreshButton" onclick="handleRefreshButtonClick()" style="display: none;" title="文件已更新，点击刷新">
           <span id="refreshButtonText">[↻ 刷新]</span>
         </button>
-        <button class="toolbar-text-button" id="pdfMemButton" onclick="togglePdfMemPanel()" title="PDF 内存监控">
-          <span id="pdfMemButtonText">[▦ 内存]</span>
+        <button class="toolbar-text-button" id="monitorButton" onclick="toggleMonitorPanel()" title="系统监控">
+          <span>[▦ 监控]</span>
         </button>
         <button class="font-scale-button" id="fontScaleButton" onclick="toggleFontScaleMenu()" title="调整字体大小">
           <span id="fontScaleText">100%</span>
@@ -121,13 +121,19 @@ export function generateClientHTML(): string {
         <span class="file-meta" id="fileMeta"></span>
       </div>
 
-      <!-- PDF 内存监控面板 -->
-      <div class="pdf-mem-panel" id="pdfMemPanel" style="display: none;">
-        <div class="pdf-mem-panel-header">
-          <span class="pdf-mem-panel-title">PDF 内存监控</span>
-          <button class="pdf-mem-close" onclick="togglePdfMemPanel()" title="关闭">×</button>
+      <!-- 系统监控浮窗 -->
+      <div class="monitor-panel" id="monitorPanel" style="display: none;">
+        <div class="monitor-panel-header">
+          <div class="monitor-tabs">
+            <button class="monitor-tab is-active" onclick="switchMonitorTab('memory')">内存</button>
+            <button class="monitor-tab" onclick="switchMonitorTab('translation')">翻译</button>
+          </div>
+          <button class="monitor-close" onclick="toggleMonitorPanel()" title="关闭">×</button>
         </div>
-        <div id="pdfMemContent"></div>
+        <div class="monitor-body">
+          <div class="monitor-tab-panel" id="monitorTabMemory"></div>
+          <div class="monitor-tab-panel" id="monitorTabTranslation" style="display:none;"></div>
+        </div>
       </div>
 
       <!-- 字体缩放菜单 -->

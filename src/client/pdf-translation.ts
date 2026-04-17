@@ -16,6 +16,75 @@ export class MyMemoryProvider implements TranslationProvider {
   }
 }
 
+// ==================== 翻译统计 ====================
+
+export interface TranslationCallRecord {
+  time: number;
+  durationMs: number;
+  charsSent: number;
+  charsReceived: number;
+  ok: boolean;
+  error?: string;
+}
+
+interface TranslationStats {
+  totalCalls: number;
+  successCalls: number;
+  failCalls: number;
+  totalDurationMs: number;
+  maxDurationMs: number;
+  totalCharsSent: number;
+  totalCharsReceived: number;
+  recentCalls: TranslationCallRecord[];
+}
+
+const translationStats: TranslationStats = {
+  totalCalls: 0,
+  successCalls: 0,
+  failCalls: 0,
+  totalDurationMs: 0,
+  maxDurationMs: 0,
+  totalCharsSent: 0,
+  totalCharsReceived: 0,
+  recentCalls: [],
+};
+
+export function getTranslationStats(): Readonly<TranslationStats> {
+  return translationStats;
+}
+
+export function clearTranslationStats(): void {
+  translationStats.totalCalls = 0;
+  translationStats.successCalls = 0;
+  translationStats.failCalls = 0;
+  translationStats.totalDurationMs = 0;
+  translationStats.maxDurationMs = 0;
+  translationStats.totalCharsSent = 0;
+  translationStats.totalCharsReceived = 0;
+  translationStats.recentCalls = [];
+}
+
+function recordCall(record: TranslationCallRecord): void {
+  translationStats.totalCalls++;
+  translationStats.totalDurationMs += record.durationMs;
+  translationStats.totalCharsSent += record.charsSent;
+  if (record.durationMs > translationStats.maxDurationMs) {
+    translationStats.maxDurationMs = record.durationMs;
+  }
+  if (record.ok) {
+    translationStats.successCalls++;
+    translationStats.totalCharsReceived += record.charsReceived;
+  } else {
+    translationStats.failCalls++;
+  }
+  translationStats.recentCalls.push(record);
+  if (translationStats.recentCalls.length > 20) {
+    translationStats.recentCalls.shift();
+  }
+}
+
+// ==================== 翻译 overlay ====================
+
 // Active translation overlays keyed by a stable block key
 const activeTranslations = new Map<string, HTMLElement>();
 
@@ -99,12 +168,20 @@ export async function handleParagraphTranslation(
   loading.textContent = "翻译中…";
   pageWrapper.appendChild(loading);
 
+  const t0 = performance.now();
+  const charsSent = block.text.length;
+
   try {
     const translated = await provider.translate(block.text, "en", "zh");
+    const durationMs = Math.round(performance.now() - t0);
     loading.remove();
+    recordCall({ time: Date.now(), durationMs, charsSent, charsReceived: translated.length, ok: true });
     createTranslationUI(pageWrapper, block, translated, scale);
   } catch (e) {
+    const durationMs = Math.round(performance.now() - t0);
+    const errMsg = String((e as any)?.message || e).slice(0, 60);
     loading.remove();
+    recordCall({ time: Date.now(), durationMs, charsSent, charsReceived: 0, ok: false, error: errMsg });
     const errDiv = document.createElement("div");
     errDiv.className = "pdf-translation-overlay";
     errDiv.style.cssText = loading.style.cssText;

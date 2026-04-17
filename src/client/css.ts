@@ -3185,46 +3185,70 @@ export const styles = `
       box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     }
 
-    /* PDF Memory Monitor Panel */
-    .pdf-mem-panel {
+    /* 系统监控浮窗 */
+    .monitor-panel {
       position: absolute;
       top: 48px;
       right: 100px;
       background: white;
       border: 1px solid #e5e7eb;
       border-radius: 6px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      padding: 8px 0;
-      min-width: 280px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+      min-width: 340px;
+      max-width: 480px;
       z-index: 1000;
       font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Consolas', monospace;
       font-size: 12px;
+      overflow: hidden;
     }
-    .pdf-mem-panel-header {
+    .monitor-panel-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 4px 8px 8px 12px;
-      border-bottom: 1px solid #f3f4f6;
-      margin-bottom: 4px;
+      padding: 0 8px 0 0;
+      border-bottom: 1px solid #e5e7eb;
+      background: #f9fafb;
     }
-    .pdf-mem-panel-title {
-      font-size: 11px;
-      font-weight: 600;
+    .monitor-tabs {
+      display: flex;
+      gap: 0;
+    }
+    .monitor-tab {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      padding: 8px 14px;
+      font-size: 12px;
+      font-family: inherit;
       color: #6b7280;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color 0.1s, border-color 0.1s;
     }
-    .pdf-mem-close {
+    .monitor-tab:hover { color: #374151; }
+    .monitor-tab.is-active {
+      color: #111827;
+      border-bottom-color: #3b82f6;
+      font-weight: 600;
+    }
+    .monitor-close {
       background: none;
       border: none;
       cursor: pointer;
       font-size: 16px;
       color: #9ca3af;
       line-height: 1;
-      padding: 0 2px;
+      padding: 0 4px;
+      flex-shrink: 0;
     }
-    .pdf-mem-close:hover { color: #374151; }
+    .monitor-close:hover { color: #374151; }
+    .monitor-body {
+      max-height: 360px;
+      overflow-y: auto;
+      padding: 6px 0;
+    }
+
+    /* 内存 tab — 复用旧样式类名 */
     .pdf-mem-row {
       display: flex;
       align-items: center;
@@ -3253,4 +3277,70 @@ export const styles = `
       font-weight: 600;
       text-align: right;
     }
+
+    /* 翻译 tab */
+    .monitor-stat-section {
+      padding: 6px 12px 2px;
+      color: #6b7280;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .monitor-stat-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 12px;
+      color: #374151;
+    }
+    .monitor-stat-key { color: #6b7280; }
+    .monitor-stat-val { color: #111827; font-weight: 500; }
+    .monitor-stat-val.is-error { color: #dc2626; }
+    .monitor-stat-val.is-ok { color: #16a34a; }
+    .monitor-calls-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px 2px;
+      border-top: 1px solid #f3f4f6;
+      margin-top: 4px;
+    }
+    .monitor-calls-title {
+      color: #6b7280;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .monitor-clear-btn {
+      background: none;
+      border: 1px solid #e5e7eb;
+      border-radius: 3px;
+      padding: 1px 6px;
+      font-size: 11px;
+      font-family: inherit;
+      color: #6b7280;
+      cursor: pointer;
+    }
+    .monitor-clear-btn:hover { background: #f3f4f6; color: #374151; }
+    .monitor-call-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 12px;
+      color: #374151;
+      font-size: 11px;
+    }
+    .monitor-call-row.is-error { color: #dc2626; }
+    .monitor-call-time { color: #9ca3af; white-space: nowrap; flex-shrink: 0; }
+    .monitor-call-dur { white-space: nowrap; flex-shrink: 0; min-width: 44px; text-align: right; }
+    .monitor-call-status { flex-shrink: 0; }
+    .monitor-call-text {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #6b7280;
+    }
+    .monitor-call-row.is-error .monitor-call-text { color: #dc2626; }
 `;

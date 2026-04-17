@@ -481,7 +481,7 @@ export function getAnnotationsByDocument(
        , serial
        FROM annotations
        WHERE doc_path = ? ${whereStatus}
-       ORDER BY created_at ASC
+       ORDER BY start ASC, created_at ASC
        LIMIT ? OFFSET ?`
     )
     .all(path, safeLimit, safeOffset) as any[];

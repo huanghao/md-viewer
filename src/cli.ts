@@ -557,11 +557,14 @@ function printComments(path: string, json: boolean, limit: number, offset: numbe
       ? Math.floor(stableSerial)
       : (offset + index + 1);
     console.log(`#${displayID}`);
-    const quoted = (ann.quote || "")
-      .split("\n")
-      .map((line) => `> ${line}`)
-      .join("\n");
-    console.log(quoted || "> ");
+    const isPdf = (ann as any).fileType === "pdf";
+    if (!isPdf) {
+      const quoted = (ann.quote || "")
+        .split("\n")
+        .map((line) => `> ${line}`)
+        .join("\n");
+      console.log(quoted || "> ");
+    }
     const prefix = typeof (ann as any).quotePrefix === "string"
       ? (ann as any).quotePrefix.replace(/\s+/g, " ").trim()
       : "";

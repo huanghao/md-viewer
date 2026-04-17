@@ -649,7 +649,7 @@ export function renderTranslationList(
     const translatedEscaped = escapeHtml(entry.translatedText);
     return `
       <div class="translation-item" data-key="${key}" data-page="${entry.pageNum}" data-start="${entry.startItemIdx}" data-end="${entry.endItemIdx}">
-        <div class="translation-item-original" title="点击展开原文">${originalEscaped}</div>
+        <div class="translation-item-original">${originalEscaped}</div>
         <div class="translation-item-text">${translatedEscaped}</div>
         <div class="translation-item-footer">
           <button class="translation-item-del" data-page="${entry.pageNum}" data-start="${entry.startItemIdx}" title="删除">删除</button>
@@ -665,11 +665,6 @@ export function renderTranslationList(
       const startItemIdx = Number(item.dataset.start);
       const endItemIdx = Number(item.dataset.end);
       if (Number.isFinite(pageNum)) onJump(pageNum, startItemIdx, endItemIdx);
-    });
-    // 原文点击展开
-    item.querySelector('.translation-item-original')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      (e.currentTarget as HTMLElement).classList.toggle('is-expanded');
     });
   });
 

@@ -53,6 +53,7 @@ import {
   loadTranslations,
   getTranslations,
   translateBlock,
+  retryTranslation,
   removeTranslation,
   highlightTranslationBlock,
 } from "./pdf-translation.js";
@@ -639,9 +640,7 @@ function renderContent() {
             if (!entry) return;
             // 清除 error，恢复 loading 状态
             removeTranslation(filePath, pageNum, startItemIdx);
-            const fakeBlock = { ...entry, text: entry.originalText, x: 0, width: 0, items: [] };
-            translateBlock(fakeBlock as any, filePath, translationProvider, refreshList);
-            refreshList();
+            retryTranslation(entry, filePath, translationProvider, refreshList);
           }
         );
         translateBlock(block, filePath, translationProvider, refreshList);

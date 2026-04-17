@@ -139,17 +139,86 @@ export function removeTranslation(filePath: string, pageNum: number, startItemId
   );
 }
 
+export async function retryTranslation(
+  entry: StoredTranslation,
+  filePath: string,
+  provider: TranslationProvider,
+  onUpdate: () => void
+): Promise<void> {
+  // 清除内存中的 error 条目，恢复 loading 状态
+  const idx = currentTranslations.findIndex(
+    (t) => t.pageNum === entry.pageNum && t.startItemIdx === entry.startItemIdx
+  );
+  if (idx >= 0) {
+    currentTranslations[idx] = { ...currentTranslations[idx], translatedText: null, error: undefined };
+  }
+  onUpdate();
+  await _doTranslate(entry.originalText, filePath, entry.pageNum, entry.startItemIdx, entry.endItemIdx, provider, onUpdate);
+}
+
+async function _doTranslate(
+  text: string,
+  filePath: string,
+  pageNum: number,
+  startItemIdx: number,
+  endItemIdx: number,
+  provider: TranslationProvider,
+  onUpdate: () => void
+): Promise<void> {
+  const key = translationKey(filePath, pageNum, startItemIdx);
+  const TIMEOUT_MS = 5000;
+  const t0 = performance.now();
+  const charsSent = text.length;
+  try {
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("翻译超时，请重试")), TIMEOUT_MS)
+    );
+    const translated = await Promise.race([provider.translate(text, "en", "zh"), timeoutPromise]);
+    const durationMs = Math.round(performance.now() - t0);
+    recordCall({ time: Date.now(), durationMs, charsSent, charsReceived: translated.length, ok: true });
+
+    const entry: StoredTranslation = {
+      originalText: text,
+      translatedText: translated,
+      pageNum,
+      startItemIdx,
+      endItemIdx,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem(key, JSON.stringify(entry));
+    const idx = currentTranslations.findIndex(
+      (t) => t.pageNum === pageNum && t.startItemIdx === startItemIdx
+    );
+    if (idx >= 0) currentTranslations[idx] = entry;
+    onUpdate();
+  } catch (e) {
+    const durationMs = Math.round(performance.now() - t0);
+    const errMsg = String((e as any)?.message || e).slice(0, 60);
+    recordCall({ time: Date.now(), durationMs, charsSent, charsReceived: 0, ok: false, error: errMsg });
+    const errorEntry: StoredTranslation = {
+      originalText: text,
+      translatedText: null,
+      error: errMsg,
+      pageNum,
+      startItemIdx,
+      endItemIdx,
+      timestamp: Date.now(),
+    };
+    const idx = currentTranslations.findIndex(
+      (t) => t.pageNum === pageNum && t.startItemIdx === startItemIdx
+    );
+    if (idx >= 0) currentTranslations[idx] = errorEntry;
+    onUpdate();
+  }
+}
+
 export async function translateBlock(
   block: PdfTextBlock,
   filePath: string,
   provider: TranslationProvider,
   onUpdate: () => void
 ): Promise<void> {
-  // PdfTextBlock 里 items[0] 的 index 就是 startItemIdx（由 buildTextBlocks 传入）
-  // 但 block 本身没有存 startItemIdx，用 block 在 page 里的位置近似：
-  // 用 block.y 和 block.pageNum 作为唯一 key 的 fallback
-  // 实际上 buildTextBlocks 没有存 itemIdx，用 y 坐标的整数近似
-  const startItemIdx = Math.round(block.y * 10); // 稳定近似 key
+  const startItemIdx = Math.round(block.y * 10);
   const endItemIdx = startItemIdx;
 
   // 检查缓存
@@ -159,7 +228,6 @@ export async function translateBlock(
     try {
       const entry = JSON.parse(cached) as StoredTranslation;
       if (entry.translatedText) {
-        // 已有缓存，确保在内存列表里
         const exists = currentTranslations.some(
           (t) => t.pageNum === block.pageNum && t.startItemIdx === startItemIdx
         );
@@ -195,54 +263,7 @@ export async function translateBlock(
   }
   onUpdate();
 
-  const TIMEOUT_MS = 5000;
-  const t0 = performance.now();
-  const charsSent = block.text.length;
-  try {
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("翻译超时，请重试")), TIMEOUT_MS)
-    );
-    const translated = await Promise.race([
-      provider.translate(block.text, "en", "zh"),
-      timeoutPromise,
-    ]);
-    const durationMs = Math.round(performance.now() - t0);
-    recordCall({ time: Date.now(), durationMs, charsSent, charsReceived: translated.length, ok: true });
-
-    const entry: StoredTranslation = {
-      originalText: block.text,
-      translatedText: translated,
-      pageNum: block.pageNum,
-      startItemIdx,
-      endItemIdx,
-      timestamp: Date.now(),
-    };
-    localStorage.setItem(key, JSON.stringify(entry));
-    const idx = currentTranslations.findIndex(
-      (t) => t.pageNum === block.pageNum && t.startItemIdx === startItemIdx
-    );
-    if (idx >= 0) currentTranslations[idx] = entry;
-    onUpdate();
-  } catch (e) {
-    const durationMs = Math.round(performance.now() - t0);
-    const errMsg = String((e as any)?.message || e).slice(0, 60);
-    recordCall({ time: Date.now(), durationMs, charsSent, charsReceived: 0, ok: false, error: errMsg });
-    // 保留条目，显示错误信息（可点击重试）
-    const errorEntry: StoredTranslation = {
-      originalText: block.text,
-      translatedText: null,
-      error: errMsg,
-      pageNum: block.pageNum,
-      startItemIdx,
-      endItemIdx,
-      timestamp: Date.now(),
-    };
-    const idx = currentTranslations.findIndex(
-      (t) => t.pageNum === block.pageNum && t.startItemIdx === startItemIdx
-    );
-    if (idx >= 0) currentTranslations[idx] = errorEntry;
-    onUpdate();
-  }
+  await _doTranslate(block.text, filePath, block.pageNum, startItemIdx, endItemIdx, provider, onUpdate);
 }
 
 export function highlightTranslationBlock(

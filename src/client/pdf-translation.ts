@@ -5,12 +5,12 @@ export interface TranslationProvider {
   translate(text: string, sourceLang: string, targetLang: string): Promise<string>;
 }
 
-export class MyMemoryProvider implements TranslationProvider {
-  async translate(text: string, sourceLang: string, targetLang: string): Promise<string> {
+export class LocalTranslationProvider implements TranslationProvider {
+  async translate(text: string, _sourceLang: string, _targetLang: string): Promise<string> {
     const res = await fetch("/api/translate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, sourceLang, targetLang }),
+      body: JSON.stringify({ text }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({})) as any;

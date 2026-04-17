@@ -47,7 +47,7 @@ import {
 import { createPdfViewer, type PdfViewerInstance } from "./pdf-viewer.js";
 import { createPdfAnnotationBridge } from "./pdf-annotation.js";
 import {
-  MyMemoryProvider,
+  LocalTranslationProvider,
   getTranslationStats,
   clearTranslationStats,
   loadTranslations,
@@ -79,7 +79,7 @@ let workspacePollRunning = false;
 let mermaidInitialized = false;
 let currentPdfViewer: PdfViewerInstance | null = null;
 let currentPdfBridge: ReturnType<typeof createPdfAnnotationBridge> | null = null;
-const translationProvider = new MyMemoryProvider();
+const translationProvider = new LocalTranslationProvider();
 
 // PDF viewer registry: tracks all open PDF viewers and their idle timers
 const PDF_IDLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
@@ -1716,6 +1716,13 @@ function updateConnectionStatus(status: typeof sseConnectionState, retryInfo?: s
   }
 }
 
+function updateTranslationStatus(up: boolean) {
+  const dot = document.getElementById('translationStatusDot');
+  if (!dot) return;
+  dot.className = 'translation-status-dot ' + (up ? 'up' : 'down');
+  dot.title = up ? '翻译服务已连接' : '翻译服务未连接';
+}
+
 function resetAndReconnectSSE() {
   sseRetryCount = 0;
   sseCurrentDelay = SSE_INITIAL_DELAY;
@@ -1858,6 +1865,12 @@ function connectSSE(isReconnect = false) {
   eventSource.addEventListener('file-opened', async (e: any) => {
     const data = JSON.parse(e.data);
     await onFileLoaded(data, data.focus !== false);
+  });
+
+  // 翻译服务状态
+  eventSource.addEventListener('translate-status', (e: any) => {
+    const data = JSON.parse(e.data);
+    updateTranslationStatus(data.up);
   });
 
   // 服务端请求状态（用于 mdv tabs）

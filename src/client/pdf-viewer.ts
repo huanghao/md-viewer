@@ -62,7 +62,7 @@ export interface PdfViewerInstance {
    * Highlight by item index range — O(1) precise anchor.
    * pageItemStart/End are indices into textContent.items for that page.
    */
-  highlightByItemRange(pageNum: number, startItemIdx: number, endItemIdx: number, annotationId?: string): void;
+  highlightByItemRange(pageNum: number, startItemIdx: number, endItemIdx: number, annotationId?: string, preciseQuote?: string): void;
   clearHighlights(): void;
   clearSelectionMark(): void;
   getTextBlocks(pageNum: number): PdfTextBlock[];
@@ -473,9 +473,6 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
         const extracted = sel.toString().trim();
         const selectedText = extracted || allItems[closestIdx].str;
 
-        // Keep visual highlight after browser clears selection on next click
-        markSelectionSpans(sel, textLayerDiv);
-
         console.log('[pdf] selectedText:', selectedText);
         console.log('[pdf] item anchor:', { pageNum, startItemIdx, endItemIdx });
 
@@ -587,7 +584,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
    * Highlight by item index range — O(1) precise anchor, no text search.
    * Uses item index in textContent.items as stable coordinate.
    */
-  function highlightByItemRange(pageNum: number, startItemIdx: number, endItemIdx: number, annotationId?: string) {
+  function highlightByItemRange(pageNum: number, startItemIdx: number, endItemIdx: number, annotationId?: string, preciseQuote?: string) {
     const wrapper = pageWrappers[pageNum - 1];
     if (!wrapper) return;
     if (!rendered.has(pageNum)) return;
@@ -609,46 +606,60 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
       s => s.querySelector("span") === null
     );
 
-    // Get the quote text for this item range
     const rangeQuote = items.slice(safeStart, safeEnd + 1).map(it => it.str).join(" ").trim();
-    if (!rangeQuote) return;
+    // Use precise quote (user's actual selection) if available, otherwise full item text
+    const targetQuote = (preciseQuote && preciseQuote.trim()) ? preciseQuote.trim() : rangeQuote;
+    if (!targetQuote) return;
 
-    console.log('[pdf] highlightByItemRange:', { pageNum, safeStart, safeEnd, rangeQuote: rangeQuote.substring(0, 50) });
+    console.log('[pdf] highlightByItemRange:', { pageNum, safeStart, safeEnd, targetQuote: targetQuote.substring(0, 50) });
 
-    // Find span that contains this quote (exact or partial match)
-    let matched = false;
     for (const span of spans) {
-      const spanText = (span.textContent || "").trim();
-      // Try exact match first
-      if (spanText === rangeQuote) {
-        span.classList.add("pdf-highlight");
-        if (annotationId) {
-          span.classList.add("annotation-mark");
-          span.dataset.annotationId = annotationId;
-        }
-        matched = true;
-        console.log('[pdf] exact match');
-        break;
-      }
-      // Then try if span contains the quote
-      if (spanText.includes(rangeQuote)) {
-        span.classList.add("pdf-highlight");
-        if (annotationId) {
-          span.classList.add("annotation-mark");
-          span.dataset.annotationId = annotationId;
-        }
-        matched = true;
-        console.log('[pdf] partial match');
-        break;
-      }
-    }
+      const spanText = span.textContent || "";
+      const spanTextTrimmed = spanText.trim();
+      const isExact = spanTextTrimmed === targetQuote;
+      const containsQuote = !isExact && spanText.includes(targetQuote);
+      if (!isExact && !containsQuote) continue;
 
-    if (!matched) {
-      console.log('[pdf] no match found for quote:', rangeQuote.substring(0, 50));
+      if (isExact) {
+        // Whole span is the quote — add class directly
+        span.classList.add("pdf-highlight");
+        if (annotationId) { span.classList.add("annotation-mark"); span.dataset.annotationId = annotationId; }
+      } else {
+        // Sub-word: wrap only the matching substring inside the span's text node
+        const textNode = span.childNodes[0];
+        if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+          const idx = (textNode.textContent || "").indexOf(targetQuote);
+          if (idx >= 0) {
+            try {
+              const r = document.createRange();
+              r.setStart(textNode, idx);
+              r.setEnd(textNode, idx + targetQuote.length);
+              const mark = document.createElement("mark");
+              mark.className = "pdf-highlight";
+              mark.style.cssText = "background:rgba(255,220,0,0.4);border-radius:2px;padding:0;margin:0;display:inline;vertical-align:baseline;line-height:inherit;color:inherit;";
+              if (annotationId) { mark.classList.add("annotation-mark"); mark.dataset.annotationId = annotationId; }
+              r.surroundContents(mark);
+            } catch {
+              // fallback: highlight whole span
+              span.classList.add("pdf-highlight");
+              if (annotationId) { span.classList.add("annotation-mark"); span.dataset.annotationId = annotationId; }
+            }
+          }
+        }
+      }
+      break;
     }
   }
 
   function clearHighlights() {
+    // Unwrap <mark> elements inserted by sub-word highlighting
+    el.querySelectorAll("mark.pdf-highlight").forEach((mark) => {
+      const parent = mark.parentNode;
+      if (!parent) return;
+      while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+      parent.removeChild(mark);
+    });
+    // Remove classes from span-level highlights
     el.querySelectorAll(".pdf-highlight, .annotation-mark").forEach((node) => {
       node.classList.remove("pdf-highlight");
       node.classList.remove("annotation-mark");

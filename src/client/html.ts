@@ -156,6 +156,11 @@ export function generateClientHTML(): string {
           <p>在左侧添加 Markdown 文件开始阅读</p>
         </div>
       </div>
+      <!-- 自定义滚动条 -->
+      <div id="docScrollbar" class="doc-scrollbar" style="display:none">
+        <div class="doc-scrollbar-markers"></div>
+        <div class="doc-scrollbar-thumb"></div>
+      </div>
     </main>
 
     <!-- 评论侧边栏 -->

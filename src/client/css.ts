@@ -1015,6 +1015,10 @@ export const styles = `
       overflow-y: auto;
       padding: 24px;
       padding-right: calc(var(--annotation-sidebar-width) + 24px);
+      scrollbar-width: none;
+    }
+    .content::-webkit-scrollbar {
+      width: 0;
     }
     .html-preview-frame {
       display: block;
@@ -3478,4 +3482,42 @@ export const styles = `
       color: #6b7280;
     }
     .monitor-call-row.is-error .monitor-call-text { color: #dc2626; }
+
+    /* 自定义滚动条 */
+    .doc-scrollbar {
+      position: fixed;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 8px;
+      z-index: 50;
+      cursor: pointer;
+      background: rgba(0,0,0,0.06);
+    }
+    .doc-scrollbar-thumb {
+      position: absolute;
+      left: 0;
+      right: 0;
+      background: rgba(0,0,0,0.25);
+      border-radius: 4px;
+      min-height: 20px;
+      cursor: grab;
+    }
+    .doc-scrollbar-thumb:active {
+      cursor: grabbing;
+      background: rgba(0,0,0,0.4);
+    }
+    .doc-scrollbar-markers {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .doc-scrollbar-marker {
+      position: absolute;
+      left: 0;
+      right: 0;
+      min-height: 3px;
+      opacity: 0.7;
+      border-radius: 1px;
+    }
 `;

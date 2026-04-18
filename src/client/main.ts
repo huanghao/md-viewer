@@ -1153,6 +1153,81 @@ async function loadPendingContent(path: string): Promise<string | null> {
   return data.content;
 }
 
+function renderInlineDiffHTML(lines: import('./utils/diff').DiffLine[]): { html: string; totalBlocks: number } {
+  const escH = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  type Segment =
+    | { kind: 'equal'; lines: typeof lines }
+    | { kind: 'delete'; lines: typeof lines }
+    | { kind: 'insert'; lines: typeof lines }
+    | { kind: 'modify'; delLines: typeof lines; insLines: typeof lines };
+
+  const segments: Segment[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const l = lines[i];
+    if (l.type === 'equal') {
+      const batch: typeof lines = [];
+      while (i < lines.length && lines[i].type === 'equal') batch.push(lines[i++]);
+      segments.push({ kind: 'equal', lines: batch });
+    } else if (l.type === 'delete') {
+      const delBatch: typeof lines = [];
+      while (i < lines.length && lines[i].type === 'delete') delBatch.push(lines[i++]);
+      if (i < lines.length && lines[i].type === 'insert') {
+        const insBatch: typeof lines = [];
+        while (i < lines.length && lines[i].type === 'insert') insBatch.push(lines[i++]);
+        segments.push({ kind: 'modify', delLines: delBatch, insLines: insBatch });
+      } else {
+        segments.push({ kind: 'delete', lines: delBatch });
+      }
+    } else {
+      const batch: typeof lines = [];
+      while (i < lines.length && lines[i].type === 'insert') batch.push(lines[i++]);
+      segments.push({ kind: 'insert', lines: batch });
+    }
+  }
+
+  let blockIndex = 0;
+  let html = '<div class="diff-inline-body">';
+
+  for (const seg of segments) {
+    if (seg.kind === 'equal') {
+      for (const line of seg.lines) {
+        html += `<p>${escH(line.content) || '&nbsp;'}</p>`;
+      }
+    } else if (seg.kind === 'delete') {
+      html += `<div class="diff-block diff-block-delete" data-block-index="${blockIndex}">`;
+      for (const line of seg.lines) {
+        html += `<p><span class="diff-deleted-text">${escH(line.content) || '&nbsp;'}</span></p>`;
+      }
+      html += '</div>';
+      blockIndex++;
+    } else if (seg.kind === 'insert') {
+      html += `<div class="diff-block diff-block-insert" data-block-index="${blockIndex}">`;
+      for (const line of seg.lines) {
+        html += `<p>${escH(line.content) || '&nbsp;'}</p>`;
+      }
+      html += '</div>';
+      blockIndex++;
+    } else {
+      html += `<div class="diff-block diff-block-modify-del" data-block-index="${blockIndex}">`;
+      for (const line of seg.delLines) {
+        html += `<p><span class="diff-deleted-text">${escH(line.content) || '&nbsp;'}</span></p>`;
+      }
+      html += '</div>';
+      html += `<div class="diff-block diff-block-modify-ins" data-block-index="${blockIndex}">`;
+      for (const line of seg.insLines) {
+        html += `<p>${escH(line.content) || '&nbsp;'}</p>`;
+      }
+      html += '</div>';
+      blockIndex++;
+    }
+  }
+
+  html += '</div>';
+  return { html, totalBlocks: blockIndex };
+}
+
 function renderDiffView(oldContent: string, newContent: string): void {
   currentDiffBlockIndex = -1;
   const container = document.getElementById('content');

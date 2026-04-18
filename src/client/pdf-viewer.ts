@@ -469,13 +469,12 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
         const startItemIdx = closestIdx;
         const endItemIdx = closestIdx;
 
-        // Use Range offsets for precise quote (internals §10: item粒度是整行，用Range截取精确词)
-        let selectedText = allItems[closestIdx].str;
-        const range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
-        if (range && range.startContainer === range.endContainer) {
-          const extracted = range.toString().trim();
-          if (extracted) selectedText = extracted;
-        }
+        // sel.toString() is reliable regardless of span granularity
+        const extracted = sel.toString().trim();
+        const selectedText = extracted || allItems[closestIdx].str;
+
+        // Keep visual highlight after browser clears selection on next click
+        markSelectionSpans(sel, textLayerDiv);
 
         console.log('[pdf] selectedText:', selectedText);
         console.log('[pdf] item anchor:', { pageNum, startItemIdx, endItemIdx });

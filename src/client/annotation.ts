@@ -753,6 +753,11 @@ function openComposerFromPending(x?: number, y?: number): void {
   const el = getElements();
   if (!state.pendingAnnotation || !el.composer || !el.composerNote) return;
   applyTempSelectionMark();
+  // PDF side: blue selection mark → yellow underline while composing
+  document.querySelectorAll('mark.pdf-selection-mark').forEach(m => {
+    m.classList.remove('pdf-selection-mark');
+    m.classList.add('pdf-selection-mark-temp');
+  });
   el.composerNote.value = '';
   autoResizeComposerInput(el.composerNote);
   const left = typeof x === 'number' ? x : (el.quickAdd ? Number.parseFloat(el.quickAdd.style.left || '0') : 0);
@@ -797,8 +802,8 @@ function hideComposer(): void {
 }
 
 function clearTempSelectionMark(): void {
-  // Clear PDF selection marks (<mark> elements inserted by markSelectionSpans)
-  document.querySelectorAll('mark.pdf-selection-mark').forEach((mark) => {
+  // Clear PDF selection marks (blue pre-composer and yellow temp during composing)
+  document.querySelectorAll('mark.pdf-selection-mark, mark.pdf-selection-mark-temp').forEach((mark) => {
     const parent = mark.parentNode;
     if (!parent) return;
     while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);

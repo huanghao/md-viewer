@@ -1381,7 +1381,7 @@ export const styles = `
     .diff-group-context {
       background: #f6f8fa;
       padding: 2px 0;
-      opacity: 0.8;
+      color: #57606a;
     }
 
     /* 无差异提示 */

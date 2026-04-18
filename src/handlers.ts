@@ -13,7 +13,7 @@ import {
   isSupportedTextFile,
 } from "./utils.ts";
 import { broadcastFileOpened, addClient, removeClient, broadcastEvent } from "./sse.ts";
-import { translateServiceUp } from "./server.ts";
+import { translatorReady } from "./translation/index.ts";
 
 const encoder = new TextEncoder();
 import { watchFile, watchWorkspace } from "./file-watcher.ts";
@@ -511,7 +511,7 @@ export function handleEvents(c: Context) {
       // 发送初始连接成功消息
       controller.enqueue(encoder.encode(`event: connected\ndata: ${JSON.stringify({})}\n\n`));
       // 发送翻译服务当前状态
-      controller.enqueue(encoder.encode(`event: translate-status\ndata: ${JSON.stringify({ type: 'translate-status', up: translateServiceUp })}\n\n`));
+      controller.enqueue(encoder.encode(`event: translate-status\ndata: ${JSON.stringify({ type: 'translate-status', up: translatorReady })}\n\n`));
 
       // 清理断开连接的客户端
       c.req.signal.addEventListener("abort", () => {

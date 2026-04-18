@@ -18,6 +18,7 @@
     "test:e2e:update": "playwright test --update-snapshots"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.1.0",
     "chokidar": "^5.0.0",
     "highlight.js": "^11.9.0",
     "hono": "^3.12.8",

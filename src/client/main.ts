@@ -1158,8 +1158,6 @@ async function loadPendingContent(path: string): Promise<string | null> {
 }
 
 function renderInlineDiffHTML(lines: import('./utils/diff').DiffLine[]): { html: string; totalBlocks: number } {
-  const escH = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
   type Segment =
     | { kind: 'equal'; lines: typeof lines }
     | { kind: 'delete'; lines: typeof lines }
@@ -1191,39 +1189,27 @@ function renderInlineDiffHTML(lines: import('./utils/diff').DiffLine[]): { html:
     }
   }
 
+  const md = (s: string) => (window as any).marked.parse(s);
+
   let blockIndex = 0;
-  let html = '<div class="diff-inline-body">';
+  let html = '<div class="markdown-body diff-inline-body">';
 
   for (const seg of segments) {
     if (seg.kind === 'equal') {
-      for (const line of seg.lines) {
-        html += `<p>${escH(line.content) || '&nbsp;'}</p>`;
-      }
+      html += md(seg.lines.map(l => l.content).join('\n'));
     } else if (seg.kind === 'delete') {
-      html += `<div class="diff-block diff-block-delete" data-block-index="${blockIndex}">`;
-      for (const line of seg.lines) {
-        html += `<p><span class="diff-deleted-text">${escH(line.content) || '&nbsp;'}</span></p>`;
-      }
-      html += '</div>';
+      const inner = md(seg.lines.map(l => l.content).join('\n'));
+      html += `<div class="diff-block diff-block-delete" data-block-index="${blockIndex}">${inner}</div>`;
       blockIndex++;
     } else if (seg.kind === 'insert') {
-      html += `<div class="diff-block diff-block-insert" data-block-index="${blockIndex}">`;
-      for (const line of seg.lines) {
-        html += `<p>${escH(line.content) || '&nbsp;'}</p>`;
-      }
-      html += '</div>';
+      const inner = md(seg.lines.map(l => l.content).join('\n'));
+      html += `<div class="diff-block diff-block-insert" data-block-index="${blockIndex}">${inner}</div>`;
       blockIndex++;
     } else {
-      html += `<div class="diff-block diff-block-modify-del" data-block-index="${blockIndex}">`;
-      for (const line of seg.delLines) {
-        html += `<p><span class="diff-deleted-text">${escH(line.content) || '&nbsp;'}</span></p>`;
-      }
-      html += '</div>';
-      html += `<div class="diff-block diff-block-modify-ins" data-block-index="${blockIndex}">`;
-      for (const line of seg.insLines) {
-        html += `<p>${escH(line.content) || '&nbsp;'}</p>`;
-      }
-      html += '</div>';
+      const delInner = md(seg.delLines.map(l => l.content).join('\n'));
+      const insInner = md(seg.insLines.map(l => l.content).join('\n'));
+      html += `<div class="diff-block diff-block-modify-del" data-block-index="${blockIndex}">${delInner}</div>`;
+      html += `<div class="diff-block diff-block-modify-ins" data-block-index="${blockIndex}">${insInner}</div>`;
       blockIndex++;
     }
   }

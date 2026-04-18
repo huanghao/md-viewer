@@ -69,7 +69,7 @@ export function createPdfAnnotationBridge(opts: PdfAnnotationBridgeOptions): Pdf
       // Use item index anchor for precise O(1) highlighting
       if (typeof pa.start === "number" && typeof pa.length === "number") {
         const endIdx = pa.start + pa.length - 1;
-        opts.viewer.highlightByItemRange(pa.page, pa.start, endIdx, a.id);
+        opts.viewer.highlightByItemRange(pa.page, pa.start, endIdx, a.id, a.quote);
       } else {
         opts.viewer.highlightQuote(a.page, a.quote, a.id);
       }

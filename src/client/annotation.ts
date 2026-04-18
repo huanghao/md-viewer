@@ -749,7 +749,7 @@ function hideQuickAdd(clearPending = false): void {
   }
 }
 
-function openComposerFromPending(x?: number, y?: number): void {
+export function openComposerFromPending(x?: number, y?: number): void {
   const el = getElements();
   if (!state.pendingAnnotation || !el.composer || !el.composerNote) return;
   applyTempSelectionMark();

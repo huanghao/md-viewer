@@ -42,6 +42,7 @@ import {
   switchAnnotationTab,
   openTranslationTab,
   renderTranslationList,
+  openComposerFromPending,
 } from './annotation';
 
 import { createPdfViewer, type PdfViewerInstance } from "./pdf-viewer.js";
@@ -2164,6 +2165,18 @@ function startWorkspacePolling() {
   });
 
   // 页面刷新时，自动刷新当前正在展示的文件
+
+  // PDF temp selection mark 点击处理：失焦后重新点击黄色下划线恢复 composer
+  document.getElementById('content')?.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const tempMark = target.closest('mark.pdf-selection-mark-temp');
+    if (!tempMark) return;
+    if (!tempMark.closest('.pdf-viewer-container')) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const rect = (tempMark as HTMLElement).getBoundingClientRect();
+    openComposerFromPending(rect.right + 6, rect.top - 8);
+  });
 
   // PDF annotation mark 点击处理
   document.getElementById('content')?.addEventListener('click', (e) => {

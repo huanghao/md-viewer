@@ -466,10 +466,16 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
 
         if (closestIdx === -1) return;
 
-        // Use single item as anchor and quote
         const startItemIdx = closestIdx;
         const endItemIdx = closestIdx;
-        const selectedText = allItems[closestIdx].str;
+
+        // Use Range offsets for precise quote (internals §10: item粒度是整行，用Range截取精确词)
+        let selectedText = allItems[closestIdx].str;
+        const range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+        if (range && range.startContainer === range.endContainer) {
+          const extracted = range.toString().trim();
+          if (extracted) selectedText = extracted;
+        }
 
         console.log('[pdf] selectedText:', selectedText);
         console.log('[pdf] item anchor:', { pageNum, startItemIdx, endItemIdx });

@@ -17,30 +17,37 @@
       ▼ mouseup
 [步骤2] 项目接管：蓝色 <mark>（精确字符）+ 弹出 [+] 按钮
       │
-      ├─── 用户点 [+]
+      ├─── 用户不点 [+]，点其他地方
       │         │
       │         ▼
-      │   [步骤3] 蓝色→黄色下划线 + 弹出评论输入框
-      │         │
-      │         ├─── 用户写评论，点保存
-      │         │         │
-      │         │         ▼
-      │         │   [步骤4] 保存注释
-      │         │         │
-      │         │         ▼
-      │         │   [步骤5] 黄色精确高亮（持久）
-      │         │
-      │         └─── 用户点 [x] 取消
-      │                   │
-      │                   ▼
-      │             [步骤7b] 清除下划线，取消 pending
+      │    蓝色消失，pending 清除，流程结束
       │
-      └─── 用户不点 [+]，点其他地方
+      └─── 用户点 [+]
                 │
                 ▼
-          [步骤7a] [+] 消失，黄色下划线保留（pending 保留）
+          [步骤3] 蓝色→黄色下划线 + 弹出评论输入框
                 │
-                └─── 用户再次选中同区域 → 回到步骤2（新 pending 覆盖旧 pending）
+                ├─── 用户点 [x] 取消
+                │         │
+                │         ▼
+                │    黄色下划线消失，pending 清除，流程结束
+                │
+                ├─── 用户点评论框外部（失焦）
+                │         │
+                │         ▼
+                │    评论框折叠隐藏（草稿保留，下划线保留）
+                │         │
+                │         └─── 用户点击黄色下划线 → 评论框重新展开
+                │
+                └─── 用户写评论，点保存（或 Cmd+Enter）
+                          │
+                          ▼
+                    [步骤4] 保存注释
+                          │
+                          ▼
+                    [步骤5] 黄色精确高亮（持久）
+                          │
+                    [步骤6] 点击侧边栏评论 → 定位高亮
 ```
 
 ---
@@ -54,8 +61,6 @@
 **发生了什么**：浏览器原生处理文本选中，在透明 span 上渲染蓝色 `::selection` 效果。
 
 **视觉状态**：选中区域显示蓝色高亮（浏览器默认样式）。
-
-**关键数据**：无，浏览器内部状态。
 
 ---
 
@@ -71,15 +76,20 @@
 5. 调用 `onTextSelected` → `showQuickAdd`，在鼠标位置附近显示 `[+]` 按钮
 
 **视觉状态**：
-- 蓝色 `<mark>` 精确覆盖选中字符（项目自己画，替代原生 ::selection）
+- 蓝色 `<mark>` 精确覆盖选中字符（项目自己画，替代原生 `::selection`）
 - `[+]` 按钮出现在鼠标附近
 
 **关键数据**：
 - `selectedText`：精确选中文字（如 `"Language Models"`）
 - `startItemIdx`：item 索引（如 `42`）
-- `state.pendingAnnotation.quote = selectedText`
+- `state.pendingAnnotation = { quote: "Language Models", start: 42, length: 1, page: 1, fileType: "pdf" }`
 
 **双击特殊路径**：双击时走 `dblclick` 事件，通过 `expandDblClick` 自动扩展到词/句边界，其余逻辑相同。
+
+**不点 `[+]`，点其他地方**：
+- `mousedown` 检测到点击在 `quickAdd` 外部
+- `hideQuickAdd(true)`：`[+]` 消失，蓝色 `<mark>` 消失，`state.pendingAnnotation` 清空
+- 流程结束，无任何残留
 
 ---
 
@@ -93,29 +103,54 @@
 3. 弹出评论输入框（`#annotationComposer`），获得焦点
 
 **视觉状态**：
-- 选中区域变为黄色下划线（表示"有待确认的 pending 注释"）
+- 选中区域变为黄色下划线
 - 评论输入框出现
 
 **关键数据**：`state.pendingAnnotation` 保持不变。
 
 ---
 
+#### 分支 A：点 `[x]` 取消
+
+**触发**：用户点击评论输入框的关闭按钮（`#composerCancelBtn`）。
+
+**发生了什么**：`hideComposer` → 清除 `<mark class="pdf-selection-mark-temp">`，清空 `state.pendingAnnotation`，关闭输入框。
+
+**视觉状态**：黄色下划线消失，输入框消失，无残留。
+
+---
+
+#### 分支 B：点评论框外部（失焦）
+
+**触发**：用户点击评论框以外的区域（`mousedown` 检测到）。
+
+**发生了什么**：`collapseComposer` → 仅隐藏输入框浮窗，**不清除** pending、不清除 `<mark class="pdf-selection-mark-temp">`。
+
+**视觉状态**：
+- 评论框消失
+- 黄色下划线**保留**（表示有未提交的 pending 注释）
+- 输入框里已写的内容也保留（草稿）
+
+**再次点击黄色下划线**：
+- `mousedown` 检测到点击在 `.annotation-mark-temp` 上
+- `expandComposer`：重新定位并显示输入框，恢复草稿内容
+
+---
+
 ### 步骤 4：写评论，点保存
 
-**触发**：用户在输入框写完评论，点保存按钮（或按 Enter）。
+**触发**：用户在输入框写完评论，点保存按钮或按 `Cmd+Enter`。
 
 **发生了什么**：
 1. `savePendingAnnotation`：从 `state.pendingAnnotation` 取 `quote`、`start`、`length`，加上 `note`，构造完整注释对象
-2. 保存到本地 state
-3. `persistAnnotation` 发送到服务器（乐观更新）
-4. 触发 `annotation:created` 事件
-5. `hideComposer`：清除 `<mark class="pdf-selection-mark-temp">`，清空 `state.pendingAnnotation`
-6. `renderHighlights` 被触发（通过 `annotation:created` 事件）
+2. 保存到本地 state，`persistAnnotation` 发送到服务器（乐观更新）
+3. 触发 `annotation:created` 事件
+4. PDF 特殊处理：`clearTempSelectionMark(true)`（保留 `pdf-selection-mark-temp`，等 `renderHighlights` 用持久高亮替换它），关闭输入框
+5. `renderHighlights` 被触发
 
 **视觉状态**：
 - 评论输入框消失
-- 黄色下划线消失（`pdf-selection-mark-temp` 被清除）
-- 新的黄色高亮出现（步骤 5）
+- 黄色下划线短暂保留，随后被步骤 5 的持久高亮替换
 
 **关键数据**：
 - 注释对象：`{ quote: "Language Models", start: 42, length: 1, note: "...", page: 1, fileType: "pdf" }`
@@ -124,16 +159,16 @@
 
 ### 步骤 5：高亮渲染（持久）
 
-**触发**：`renderHighlights` 被调用（步骤 4 保存后触发）。
+**触发**：`renderHighlights` 被调用。
 
 **发生了什么**：
 1. `clearHighlights`：清除所有现有高亮（解包 `<mark class="pdf-highlight">`，移除 span 上的 class）
-2. 遍历所有 PDF 注释，对每条调用 `highlightByItemRange(page, start, endIdx, id, quote)`
-3. `highlightByItemRange` 内部逻辑：
+2. 对每条 PDF 注释调用 `highlightByItemRange(page, start, endIdx, id, quote)`
+3. `highlightByItemRange` 内部：
    - 找到 item 对应的 span
-   - 如果 `quote === span.textContent`（整行匹配）：给 span 加 `pdf-highlight` class
-   - 如果 `quote` 是 span 的子串：用 `document.createRange()` + `surroundContents` 包一个 `<mark class="pdf-highlight">`，精确高亮子串
-   - 如果 `surroundContents` 失败（try/catch）：fallback 到给整个 span 加 class
+   - 若 `quote === span.textContent`（整行）：给 span 加 `pdf-highlight` class
+   - 若 `quote` 是 span 的子串：`document.createRange()` + `surroundContents` 包 `<mark class="pdf-highlight">`，精确高亮子串
+   - 若 `surroundContents` 失败（try/catch）：fallback 到整行 span 加 class
 
 **视觉状态**：
 - 选中文字显示黄色背景高亮（精确子串）
@@ -141,9 +176,7 @@
 
 **预期**：高亮范围应与 `quote` 完全一致，不超出右侧。
 
-**已知问题**：
-- 若走 fallback（整行 span 加 class），高亮会覆盖整行，视觉上超出右侧
-- `surroundContents` 失败的原因可能是 span 内部有嵌套节点，或文本节点结构被之前的 clearHighlights 破坏
+**已知问题**：若走 fallback，高亮覆盖整行，视觉上超出右侧。
 
 ---
 
@@ -151,58 +184,9 @@
 
 **触发**：用户点击侧边栏中的评论条目。
 
-**发生了什么**：
-1. 滚动到对应页面
-2. 对应高亮 span/mark 加 `annotation-mark.is-active` class（加深背景）
+**发生了什么**：滚动到对应页面，对应高亮加 `annotation-mark.is-active` class（加深背景）。
 
-**视觉状态**：高亮颜色加深，侧边栏条目高亮。✓
-
----
-
-### 步骤 7a：`[+]` 后点其他地方
-
-**触发**：`[+]` 按钮可见时，用户点击非 `[+]`、非评论框的区域。
-
-**发生了什么**：
-1. `mousedown` 事件检测到点击在 `quickAdd` 外部
-2. `hideQuickAdd(true)`：隐藏 `[+]` 按钮，清除 `state.pendingAnnotation`，清除 `<mark class="pdf-selection-mark">`
-
-**视觉状态**：
-- `[+]` 消失
-- 蓝色 `<mark>` 消失
-- 无任何残留标记
-
-**注意**：此时 pending 已被清除，不存在"黄色下划线保留"的情况——那只发生在步骤 3（已点过 `[+]` 进入评论框）之后。
-
----
-
-### 步骤 7b：评论框中点 `[x]` 取消
-
-**触发**：用户点击评论输入框的关闭按钮（`#composerCancelBtn`）。
-
-**发生了什么**：
-1. `hideComposer`：
-   - `clearTempSelectionMark`：清除 `<mark class="pdf-selection-mark-temp">` 和 `<mark class="pdf-selection-mark">`
-   - `state.pendingAnnotation = null`
-   - 关闭评论输入框
-
-**视觉状态**：
-- 黄色下划线消失
-- 评论输入框消失
-- 无任何残留标记
-
----
-
-### 步骤 7c：评论框可见时重新选中文字
-
-**触发**：评论框已打开（步骤 3 之后），用户在 PDF 上重新拖拽选中文字。
-
-**发生了什么**：
-1. mouseup → `showQuickAdd` 被调用
-2. `showQuickAdd` 检测到评论框未隐藏，先调用 `hideComposer`（清除旧 pending、旧下划线）
-3. 用新选中的文字创建新 pending，显示新的 `[+]` 按钮
-
-**视觉状态**：旧的黄色下划线消失，新的蓝色 mark 出现，`[+]` 出现。
+**视觉状态**：高亮颜色加深。✓
 
 ---
 
@@ -232,14 +216,12 @@
 
 ## 待验证的关键点
 
-这些是目前代码逻辑上存在不确定性的地方，需要通过测试确认：
-
 | # | 步骤 | 待验证 | 预期 |
 |---|------|--------|------|
-| 1 | 步骤 2 | `sel.toString()` 的值是否等于蓝色高亮的文字 | 一致 |
+| 1 | 步骤 2 | `sel.toString()` 是否等于蓝色高亮的文字 | 一致 |
 | 2 | 步骤 2 | `markSelectionSpans` 是否成功（DOM 里有 `<mark class="pdf-selection-mark">`） | 成功 |
 | 3 | 步骤 4 | 保存的 `annotation.quote` 是精确子串还是整行 | 精确子串 |
 | 4 | 步骤 5 | `surroundContents` 是否成功（未走 fallback） | 成功 |
-| 5 | 步骤 5 | 高亮范围是否和 `quote` 完全一致 | 一致，不超出右侧 |
+| 5 | 步骤 5 | 高亮范围是否和 `quote` 完全一致，不超出右侧 | 一致 |
 | 6 | 步骤 5→5 | 多次 clearHighlights + renderHighlights 后高亮是否仍然正确 | 仍然正确 |
-| 7 | 步骤 7a | 点其他地方后是否完全清除（无残留 mark） | 完全清除 |
+| 7 | 分支 B | 失焦后黄色下划线是否保留，再次点击是否能恢复草稿 | 保留且恢复 |

@@ -1238,123 +1238,28 @@ function renderDiffView(oldContent: string, newContent: string): void {
 
   if (!hasChanges) {
     container.innerHTML = `
-      <div class="diff-view-container">
-        <div class="diff-header">
-          <div class="diff-header-titles">
-            <div class="diff-header-old">← 当前版本</div>
-            <div class="diff-header-new">磁盘最新版本 →</div>
-          </div>
-          <div class="diff-actions">
-            <button class="diff-close-btn" onclick="window.closeDiffView()">关闭</button>
-          </div>
-        </div>
-        <div class="diff-no-changes">文件内容与磁盘一致，无差异</div>
-      </div>
+      <div class="diff-no-changes">文件内容与磁盘一致，无差异</div>
     `;
     return;
   }
 
-  // 构建 side-by-side diff 行：delete/insert 配对，equal 直接输出
-  const rows: Array<{ left?: (typeof lines)[0]; right?: (typeof lines)[0] }> = [];
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i];
-    if (line.type === 'equal') {
-      rows.push({ left: line, right: line });
-      i++;
-    } else if (line.type === 'delete') {
-      if (i + 1 < lines.length && lines[i + 1].type === 'insert') {
-        rows.push({ left: line, right: lines[i + 1] });
-        i += 2;
-      } else {
-        rows.push({ left: line });
-        i++;
-      }
-    } else {
-      rows.push({ right: line });
-      i++;
-    }
+  const { html: bodyHTML, totalBlocks } = renderInlineDiffHTML(lines);
+
+  // 更新 banner（banner 元素在 #content 之外，由 handleDiffButtonClick 注入）
+  const banner = document.getElementById('diffBanner');
+  if (banner) {
+    const countEl = banner.querySelector<HTMLElement>('#diffNavCount');
+    if (countEl) countEl.textContent = `1 / ${totalBlocks}`;
+    const prevBtn = banner.querySelector<HTMLButtonElement>('#diffNavPrev');
+    const nextBtn = banner.querySelector<HTMLButtonElement>('#diffNavNext');
+    if (prevBtn) prevBtn.disabled = true;
+    if (nextBtn) nextBtn.disabled = totalBlocks <= 1;
   }
 
-  // 计算 diff blocks：连续非 equal 行为一个 block
-  const blocks: Array<{ startRowIndex: number; endRowIndex: number }> = [];
-  let blockStart = -1;
-  for (let ri = 0; ri < rows.length; ri++) {
-    const row = rows[ri];
-    const isChange = !(row.left && row.right && row.left.type === 'equal');
-    if (isChange && blockStart === -1) {
-      blockStart = ri;
-    } else if (!isChange && blockStart !== -1) {
-      blocks.push({ startRowIndex: blockStart, endRowIndex: ri - 1 });
-      blockStart = -1;
-    }
-  }
-  if (blockStart !== -1) {
-    blocks.push({ startRowIndex: blockStart, endRowIndex: rows.length - 1 });
-  }
-  const totalBlocks = blocks.length;
-  // blockFirstRows: rowIndex -> blockIndex (0-based)，记录每个 block 首行
-  const blockFirstRows = new Map<number, number>();
-  blocks.forEach((b, i) => blockFirstRows.set(b.startRowIndex, i));
+  container.innerHTML = bodyHTML;
 
-  const escH = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-  const tableRows = rows.map(({ left, right }, rowIndex) => {
-    if (left && right && left.type === 'equal') {
-      return `<tr class="diff-row-equal">
-        <td class="diff-line-no">${left.oldLineNo}</td>
-        <td>${escH(left.content)}</td>
-        <td class="diff-line-no">${right.newLineNo}</td>
-        <td>${escH(right.content)}</td>
-      </tr>`;
-    }
-    const blockIdx = blockFirstRows.get(rowIndex);
-    const blockAttr = blockIdx !== undefined ? ` data-block-index="${blockIdx}"` : '';
-    const blockSpan = blockIdx !== undefined
-      ? `<span class="diff-block-index" data-block-span="${blockIdx}">${blockIdx + 1}/${totalBlocks}</span>`
-      : '';
-    const leftNo = left
-      ? `<td class="diff-line-no">${left.oldLineNo ?? ''}${blockSpan}</td>`
-      : `<td class="diff-line-no diff-cell-empty"></td>`;
-    const leftCell = left ? `<td class="diff-row-delete-cell">${escH(left.content)}</td>` : `<td class="diff-cell-empty"></td>`;
-    const rightNo = right ? `<td class="diff-line-no">${right.newLineNo ?? ''}</td>` : `<td class="diff-line-no diff-cell-empty"></td>`;
-    const rightCell = right ? `<td class="diff-row-insert-cell">${escH(right.content)}</td>` : `<td class="diff-cell-empty"></td>`;
-    const rowClass = left && right ? 'diff-row-mixed' : left ? 'diff-row-delete' : 'diff-row-insert';
-    return `<tr class="${rowClass}"${blockAttr}>${leftNo}${leftCell}${rightNo}${rightCell}</tr>`;
-  }).join('');
-
-  container.innerHTML = `
-    <div class="diff-view-container">
-      <div class="diff-header">
-        <div class="diff-header-titles">
-          <div class="diff-header-old">← 当前版本</div>
-          <div class="diff-header-new">磁盘最新版本 →</div>
-        </div>
-        <div class="diff-actions">
-          <button class="diff-accept-btn" onclick="window.acceptDiffUpdate()">采用</button>
-          <button class="diff-close-btn" onclick="window.closeDiffView()">关闭</button>
-        </div>
-      </div>
-      <div class="diff-nav-bar">
-        <span class="diff-nav-count" id="diffNavCount">共 ${totalBlocks} 处差异</span>
-        <button class="diff-nav-btn" id="diffNavPrev" onclick="window.navigateDiffBlock(-1)" disabled>↑ 上一处</button>
-        <button class="diff-nav-btn primary" id="diffNavNext" onclick="window.navigateDiffBlock(1)">↓ 下一处</button>
-      </div>
-      <div class="diff-view-scroll">
-        <div class="diff-view">
-          <table class="diff-table">
-            <colgroup>
-              <col style="width:40px">
-              <col style="width:calc(50% - 40px)">
-              <col style="width:40px">
-              <col style="width:calc(50% - 40px)">
-            </colgroup>
-            <tbody>${tableRows}</tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  `;
+  // 自动跳到第一个 block
+  navigateDiffBlock(1);
 }
 
 async function handleDiffButtonClick(): Promise<void> {

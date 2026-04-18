@@ -72,7 +72,7 @@ echo ""
 
 # Derived paths
 APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
-SERVER_DIR="MDViewer/Resources/server"
+SERVER_DIR="dist-server/server"
 
 # 0. Check prerequisites
 echo "🔍 Step 0: Checking prerequisites..."
@@ -108,8 +108,8 @@ echo ""
 echo "🚀 Step 4: Copying server source..."
 cp -R "$SERVER_DIR" "$APP_BUNDLE/Contents/Resources/"
 # 复制模型（可选）
-if [ -d "MDViewer/Resources/models" ]; then
-    cp -R "MDViewer/Resources/models" "$APP_BUNDLE/Contents/Resources/"
+if [ -d "dist-server/models" ]; then
+    cp -R "dist-server/models" "$APP_BUNDLE/Contents/Resources/"
     echo "  ✓ Copied models"
 fi
 echo "  ✓ Copied server/"

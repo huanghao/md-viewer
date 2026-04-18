@@ -16,10 +16,7 @@ let package = Package(
         .executableTarget(
             name: "MDViewer",
             path: "MDViewer",
-            exclude: ["Resources/.gitkeep", "Info.plist"],
-            resources: [
-                .copy("Resources/mdv-server")
-            ]
+            exclude: ["Resources/.gitkeep", "Info.plist"]
         ),
     ]
 )

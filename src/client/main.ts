@@ -21,6 +21,7 @@ import { renderSidebar } from './ui/sidebar';
 import { showToast, showSuccess, showError, showWarning, showInfo } from './ui/toast';
 import { showSettingsDialog, closeSettingsDialog } from './ui/settings';
 import { renderJsonContent } from './ui/json-viewer';
+import { mountScrollbar, unmountScrollbar, updateDiffMarkers } from './ui/doc-scrollbar';
 
 import { getMdThemeCss, getHlThemeCss } from './themes/index';
 
@@ -695,6 +696,10 @@ function renderContent() {
   // 更新面包屑
   renderBreadcrumb();
 
+  // 挂载自定义滚动条（仅 markdown 页面）
+  unmountScrollbar();
+  mountScrollbar();
+
   // 更新工具栏按钮
   updateToolbarButtons();
 }
@@ -1289,6 +1294,18 @@ function renderDiffView(oldContent: string, newContent: string): void {
   }
 
   container.innerHTML = bodyHTML;
+
+  // 更新滚动条 diff 标记
+  unmountScrollbar();
+  mountScrollbar();
+  const diffGroups: Array<{ el: HTMLElement; kind: 'insert' | 'delete' | 'modify' }> = [];
+  container.querySelectorAll<HTMLElement>('.diff-group[data-block-index]').forEach(groupEl => {
+    const hasInsert = groupEl.querySelector('.diff-block-insert, .diff-block-modify-ins');
+    const hasDelete = groupEl.querySelector('.diff-block-delete, .diff-block-modify-del');
+    const kind = (hasInsert && hasDelete) ? 'modify' : hasInsert ? 'insert' : 'delete';
+    diffGroups.push({ el: groupEl, kind });
+  });
+  updateDiffMarkers(diffGroups);
 
   // 自动跳到第一个 block
   navigateDiffBlock(1);

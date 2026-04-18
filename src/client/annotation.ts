@@ -1113,13 +1113,13 @@ export function removeAnnotation(id: string, filePath: string): void {
   renderAnnotationList(filePath);
   document.dispatchEvent(new CustomEvent('annotation:deleted', { detail: { id, filePath } }));
   const removed = previous.find((a) => a.id === id);
-  if (removed && removed.status !== 'resolved') {
+  if (removed && isOpen(removed.status as AnnotationStatus)) {
     adjustAnnotationCount(filePath, -1);
     import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
   }
   void deleteAnnotationRemote(filePath, { id }).catch((error) => {
     state.annotations = previous;
-    if (removed && removed.status !== 'resolved') {
+    if (removed && isOpen(removed.status as AnnotationStatus)) {
       adjustAnnotationCount(filePath, +1);
       import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
     }
@@ -1205,17 +1205,17 @@ function toggleResolved(id: string, filePath: string): void {
   if (!isPdf) applyAnnotations();
   else document.dispatchEvent(new CustomEvent('annotation:highlights-changed'));
   renderAnnotationList(filePath);
-  if (nextStatus === 'resolved') {
+  if (isOpen(previousStatus as AnnotationStatus) && nextStatus === 'resolved') {
     adjustAnnotationCount(filePath, -1);
-  } else if (previousStatus === 'resolved') {
+  } else if (previousStatus === 'resolved' && isOpen(nextStatus as AnnotationStatus)) {
     adjustAnnotationCount(filePath, +1);
   }
   import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
   void updateAnnotationStatusRemote(filePath, { id }, nextStatus).catch((error) => {
     ann.status = previousStatus;
-    if (nextStatus === 'resolved') {
+    if (isOpen(previousStatus as AnnotationStatus) && nextStatus === 'resolved') {
       adjustAnnotationCount(filePath, +1);
-    } else if (previousStatus === 'resolved') {
+    } else if (previousStatus === 'resolved' && isOpen(nextStatus as AnnotationStatus)) {
       adjustAnnotationCount(filePath, -1);
     }
     showError(`更新评论状态失败: ${error?.message || '未知错误'}`, 2600);

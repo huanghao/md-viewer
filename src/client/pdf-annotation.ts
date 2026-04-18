@@ -59,7 +59,6 @@ export function createPdfAnnotationBridge(opts: PdfAnnotationBridgeOptions): Pdf
   }
 
   function renderHighlights(annotations: Annotation[]) {
-    opts.viewer.clearSelectionMark();
     opts.viewer.clearHighlights();
     const pdfAnns = annotations.filter(a => {
       const pa = a as Annotation & { page?: number; fileType?: string };
@@ -70,7 +69,7 @@ export function createPdfAnnotationBridge(opts: PdfAnnotationBridgeOptions): Pdf
       // Use item index anchor for precise O(1) highlighting
       if (typeof pa.start === "number" && typeof pa.length === "number") {
         const endIdx = pa.start + pa.length - 1;
-        opts.viewer.highlightByItemRange(pa.page, pa.start, endIdx, a.id, a.quote);
+        opts.viewer.highlightByItemRange(pa.page, pa.start, endIdx, a.id);
       } else {
         opts.viewer.highlightQuote(a.page, a.quote, a.id);
       }

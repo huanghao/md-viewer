@@ -1250,184 +1250,133 @@ export const styles = `
       display: inline-block;
     }
 
-    /* Diff 视图 */
-    .diff-view {
-      font-family: 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', monospace;
-      font-size: 13px;
-      line-height: 1.5;
-      overflow-x: auto;
-    }
-    .diff-header {
+    /* ── Diff inline 视图 ── */
+
+    /* Banner 提示条（替代原 diff-header + diff-nav-bar） */
+    .diff-banner {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      padding: 10px 16px;
-      background: #f6f8fa;
-      border-bottom: 1px solid #e1e4e8;
-      font-size: 13px;
-      color: #57606a;
-      flex-shrink: 0;
-    }
-    .diff-header-titles {
-      display: flex;
-      gap: 0;
-      flex: 1;
-    }
-    .diff-header-old,
-    .diff-header-new {
-      flex: 1;
-      padding: 0 8px;
+      gap: 10px;
+      padding: 6px 16px;
+      background: #fff8c5;
+      border-bottom: 1px solid #d4a72c;
       font-size: 12px;
-    }
-    .diff-header-old { color: #b42318; }
-    .diff-header-new { color: #1a7f37; }
-    .diff-actions {
-      display: flex;
-      gap: 8px;
+      color: #633c01;
       flex-shrink: 0;
+    }
+    .diff-banner-label {
+      flex: 1;
+      font-weight: 500;
+    }
+    .diff-nav-btn {
+      padding: 3px 9px;
+      border-radius: 5px;
+      border: 1px solid #d4a72c;
+      background: #fff;
+      color: #633c01;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .diff-nav-btn:hover { background: #fff3cd; }
+    .diff-nav-btn:disabled { opacity: 0.4; cursor: default; }
+    .diff-nav-count {
+      font-size: 11px;
+      color: #633c01;
+      min-width: 36px;
+      text-align: center;
     }
     .diff-accept-btn {
-      padding: 5px 12px;
+      padding: 4px 12px;
       border-radius: 6px;
       border: 1px solid #2da44e;
       background: #2da44e;
       color: #fff;
       font-size: 12px;
       cursor: pointer;
-      white-space: nowrap;
+      font-weight: 500;
     }
-    .diff-accept-btn:hover {
-      background: #218a3e;
-      border-color: #218a3e;
-    }
+    .diff-accept-btn:hover { background: #218a3e; }
     .diff-close-btn {
-      padding: 5px 12px;
+      padding: 4px 10px;
       border-radius: 6px;
       border: 1px solid #d0d7de;
       background: #fff;
-      color: #24292f;
+      color: #57606a;
       font-size: 12px;
       cursor: pointer;
-      white-space: nowrap;
     }
-    .diff-close-btn:hover {
-      background: #f6f8fa;
+    .diff-close-btn:hover { background: #f6f8fa; }
+
+    /* Inline diff 内容区 */
+    .diff-inline-body {
+      padding: 32px 48px 32px 64px;
+      max-width: 860px;
+      margin: 0 auto;
     }
-    .diff-table {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
+
+    /* 每个 diff block 的容器 */
+    .diff-block {
+      position: relative;
+      margin-left: -48px;
+      padding-left: 48px;
+      border-radius: 0 4px 4px 0;
     }
-    .diff-table td {
-      padding: 1px 8px;
-      vertical-align: top;
-      white-space: pre-wrap;
-      word-break: break-all;
-      width: 50%;
+    .diff-block::before {
+      content: '';
+      position: absolute;
+      left: 20px;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      border-radius: 2px;
     }
-    .diff-line-no {
-      width: 40px !important;
-      min-width: 40px;
-      max-width: 40px;
-      color: #8b949e;
-      text-align: right;
-      padding-right: 12px !important;
-      user-select: none;
-      font-size: 11px;
-    }
-    .diff-row-delete td {
-      background: #ffebe9;
-      color: #b42318;
-    }
-    .diff-row-delete .diff-line-no {
-      background: #ffd6d1;
-      color: #b42318;
-    }
-    .diff-row-insert td {
+
+    /* 新增 block — GitHub 配色 */
+    .diff-block-insert {
       background: #e6ffec;
-      color: #1a7f37;
     }
-    .diff-row-insert .diff-line-no {
-      background: #ccffd8;
-      color: #1a7f37;
-    }
-    .diff-row-equal td {
-      background: #fff;
-      color: #24292f;
-    }
-    .diff-row-mixed .diff-row-delete-cell {
+    .diff-block-insert::before { background: #2da44e; }
+
+    /* 删除 block（幽灵行，显示在对应位置上方） */
+    .diff-block-delete {
       background: #ffebe9;
-      color: #b42318;
     }
-    .diff-row-mixed .diff-line-no:first-child {
-      background: #ffd6d1;
-      color: #b42318;
+    .diff-block-delete::before { background: #cf222e; }
+    .diff-block-delete .diff-deleted-text {
+      text-decoration: line-through;
+      color: #82071e;
     }
-    .diff-row-mixed .diff-row-insert-cell {
+
+    /* 修改：删除部分 */
+    .diff-block-modify-del {
+      background: #ffebe9;
+    }
+    .diff-block-modify-del::before { background: #cf222e; }
+    .diff-block-modify-del .diff-deleted-text {
+      text-decoration: line-through;
+      color: #82071e;
+    }
+
+    /* 修改：新增部分 */
+    .diff-block-modify-ins {
       background: #e6ffec;
-      color: #1a7f37;
     }
-    .diff-row-mixed .diff-line-no:last-of-type {
-      background: #ccffd8;
-      color: #1a7f37;
-    }
-    .diff-cell-empty {
-      background: #f6f8fa !important;
-    }
-    .diff-view-container {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      overflow: hidden;
-    }
-    .diff-view-scroll {
-      flex: 1;
-      overflow-y: auto;
-      overflow-x: auto;
-    }
+    .diff-block-modify-ins::before { background: #2da44e; }
+
+    /* 当前 focus block 加深背景 */
+    .diff-block-insert.diff-focused { background: #abf2bc; }
+    .diff-block-delete.diff-focused { background: #ffd7d5; }
+    .diff-block-modify-del.diff-focused { background: #ffd7d5; }
+    .diff-block-modify-ins.diff-focused { background: #abf2bc; }
+
+    /* 无差异提示 */
     .diff-no-changes {
       padding: 40px;
       text-align: center;
       color: #57606a;
       font-size: 14px;
     }
-    .diff-nav-bar {
-      display: flex;
-      align-items: center;
-      padding: 4px 12px;
-      background: #fff;
-      border-bottom: 1px solid #d0d7de;
-      font-size: 12px;
-      color: #57606a;
-      gap: 8px;
-      flex-shrink: 0;
-    }
-    .diff-nav-count { flex: 1; }
-    .diff-nav-btn {
-      padding: 3px 10px;
-      border-radius: 4px;
-      border: 1px solid #d0d7de;
-      background: #fff;
-      cursor: pointer;
-      font-size: 11px;
-      color: #24292f;
-    }
-    .diff-nav-btn:hover { background: #f6f8fa; }
-    .diff-nav-btn:disabled { opacity: 0.4; cursor: default; }
-    .diff-nav-btn.primary {
-      background: #0969da;
-      color: #fff;
-      border-color: #0969da;
-    }
-    .diff-nav-btn.primary:hover { background: #0860ca; }
-    .diff-block-index {
-      display: none;
-      font-size: 10px;
-      color: #0969da;
-      font-weight: 600;
-      margin-left: 2px;
-      vertical-align: middle;
-    }
+
     #diffButton.active {
       color: #0969da;
       background: rgba(9, 105, 218, 0.08);

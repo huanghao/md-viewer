@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 打包 Server 源码到 MDViewer/Resources/server/
+# 打包 Server 源码到 dist-server/（bundle 脚本从这里复制进 app）
 # 运行时由 app 通过系统 bun 启动 src/server.ts
 set -euo pipefail
 
@@ -16,29 +16,27 @@ echo "2️⃣  嵌入客户端脚本..."
 bun run scripts/embed-client.ts
 echo ""
 
-# 3. 打包 server 源码 + node_modules 到 Resources/server/
+# 3. 打包 server 源码 + node_modules 到 dist-server/server/
 echo "3️⃣  打包 Server 源码..."
-SERVER_DST="MDViewer/Resources/server"
-rm -rf "$SERVER_DST"
+SERVER_DST="dist-server/server"
+rm -rf dist-server
 mkdir -p "$SERVER_DST"
 
-# 复制源码和依赖
 cp -R src "$SERVER_DST/"
 cp -R node_modules "$SERVER_DST/"
 cp package.json "$SERVER_DST/"
 cp tsconfig.json "$SERVER_DST/"
-echo "  ✓ 源码已复制到 $SERVER_DST"
+echo "  ✓ 源码已打包到 $SERVER_DST"
 echo ""
 
 # 4. 复制模型文件
 echo "4️⃣  复制模型文件..."
 MODEL_SRC="models/opus-mt-en-zh"
-MODEL_DST="MDViewer/Resources/models/opus-mt-en-zh"
+MODEL_DST="dist-server/models/opus-mt-en-zh"
 if [ -d "$MODEL_SRC" ]; then
-    rm -rf "$MODEL_DST"
     mkdir -p "$(dirname "$MODEL_DST")"
     cp -R "$MODEL_SRC" "$MODEL_DST"
-    echo "  ✓ 模型已复制到 $MODEL_DST"
+    echo "  ✓ 模型已打包到 $MODEL_DST"
 else
     echo "  ⚠️  模型目录不存在: $MODEL_SRC（翻译功能不可用）"
     echo "  如需翻译，请先运行: bun scripts/download-model.ts"

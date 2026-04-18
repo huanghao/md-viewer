@@ -2093,6 +2093,17 @@ export const styles = `
       background: #ef4444;
     }
 
+    .translation-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 2px 6px;
+      border-bottom: 1px solid #e1e4e8;
+      background: #fff;
+      flex-shrink: 0;
+      min-height: 34px;
+    }
+
     /* 翻译列表 */
     .translation-list {
       flex: 1;

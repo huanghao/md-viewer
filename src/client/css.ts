@@ -1258,11 +1258,15 @@ export const styles = `
       align-items: center;
       gap: 10px;
       padding: 6px 16px;
+      padding-right: calc(var(--annotation-sidebar-width) + 16px);
       background: #fff8c5;
       border-bottom: 1px solid #d4a72c;
       font-size: 12px;
       color: #633c01;
       flex-shrink: 0;
+    }
+    body.annotation-sidebar-collapsed .diff-banner {
+      padding-right: 16px;
     }
     .diff-banner-label {
       flex: 1;

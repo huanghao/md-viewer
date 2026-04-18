@@ -45,6 +45,20 @@ export function isIgnored(filePath: string, workspacePath: string, patterns: str
 // 防止同一工作区在同一渲染周期内被重复触发扫描
 const pendingScanIds = new Set<string>();
 
+const FOCUS_COLLAPSED_KEY = 'md-viewer:focus-ws-collapsed';
+
+export function getFocusCollapsed(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(FOCUS_COLLAPSED_KEY) || '[]'));
+  } catch {
+    return new Set();
+  }
+}
+
+export function saveFocusCollapsed(s: Set<string>): void {
+  localStorage.setItem(FOCUS_COLLAPSED_KEY, JSON.stringify([...s]));
+}
+
 const FOCUS_WINDOW_MS: Record<string, number> = {
   '8h':  8  * 3600 * 1000,
   '2d':  2  * 86400 * 1000,
@@ -129,9 +143,11 @@ function renderFocusWorkspaceGroup(
   activeFiles: FileTreeNode[],
   pinned: Set<string>,
   loading: boolean,
-  query: string
+  query: string,
+  collapsed: Set<string>
 ): string {
   const hasFiles = activeFiles.length > 0;
+  const isCollapsed = collapsed.has(workspace.id);
   const badge = loading
     ? `<span class="focus-ws-badge empty">…</span>`
     : hasFiles
@@ -145,11 +161,11 @@ function renderFocusWorkspaceGroup(
   return `
     <div class="focus-ws-group${hasFiles ? ' has-files' : ''}">
       <div class="focus-ws-header" onclick="handleFocusWorkspaceToggle('${escapeAttr(workspace.id)}')">
-        <span class="focus-ws-arrow${hasFiles ? ' open' : ''}">▶</span>
+        <span class="focus-ws-arrow${!isCollapsed ? ' open' : ''}">▶</span>
         <span class="focus-ws-name">${escapeHtml(workspace.name)}</span>
         ${badge}
       </div>
-      ${hasFiles ? `<div class="focus-ws-files">${filesHtml}</div>` : ''}
+      ${hasFiles && !isCollapsed ? `<div class="focus-ws-files">${filesHtml}</div>` : ''}
     </div>
   `;
 }
@@ -163,6 +179,8 @@ export function renderFocusView(): string {
   const windowMs = FOCUS_WINDOW_MS[state.config.focusWindowKey || '8h'] ?? FOCUS_WINDOW_MS['8h'];
   const pinned = getPinnedFiles();
   const query = state.searchQuery.trim().toLowerCase();
+
+  const collapsed = getFocusCollapsed();
 
   const groups = workspaces.map((ws) => {
     const tree = state.fileTree.get(ws.id);
@@ -187,7 +205,7 @@ export function renderFocusView(): string {
         return name.includes(query) || f.path.toLowerCase().includes(query);
       });
     }
-    return renderFocusWorkspaceGroup(ws, activeFiles, pinned, loading, query);
+    return renderFocusWorkspaceGroup(ws, activeFiles, pinned, loading, query, collapsed);
   }).join('');
 
   return `<div class="focus-view">${renderFilterBar()}${groups}</div>`;

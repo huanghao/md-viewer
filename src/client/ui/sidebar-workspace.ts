@@ -410,7 +410,6 @@ function renderWorkspaceItem(workspace: Workspace, index: number, total: number,
   }
 
   const shouldExpand = query ? true : workspace.isExpanded;
-  const toggle = shouldExpand ? '▼' : '▶';
   const canMoveUp = index > 0;
   const canMoveDown = index < total - 1;
   const workspaceMatched = !query || workspace.name.toLowerCase().includes(query) || workspace.path.toLowerCase().includes(query);
@@ -425,7 +424,7 @@ function renderWorkspaceItem(workspace: Workspace, index: number, total: number,
   return `
     <div class="workspace-item">
       <div class="workspace-header ${isCurrent ? 'active' : ''}" onclick="handleWorkspaceToggle('${escapeAttr(workspace.id)}')">
-        <span class="workspace-toggle">${toggle}</span>
+        <span class="workspace-toggle${shouldExpand ? ' open' : ''}">▶</span>
         <span class="workspace-icon">${isWorkspaceFailed(workspace.id) ? '⚠️' : '📁'}</span>
         <span class="workspace-name${isWorkspaceFailed(workspace.id) ? ' workspace-name--failed' : ''}">${escapeHtml(workspace.name)}</span>
         ${pendingRemoveWorkspaceId === workspace.id ? `
@@ -551,14 +550,13 @@ function renderTreeNode(workspaceId: string, node: FileTreeNode, depth: number):
 
   // 目录
   const isExpanded = node.isExpanded !== false;  // 默认展开
-  const toggle = isExpanded ? '▼' : '▶';
   const hasChildren = node.children && node.children.length > 0;
 
   return `
     <div class="tree-node">
       <div class="tree-item directory-node">
         <span class="tree-indent" style="width: ${indentPx}px"></span>
-        <span class="tree-toggle" onclick="${hasChildren ? `event.stopPropagation();handleNodeClick('${escapeAttr(workspaceId)}', '${escapeAttr(node.path)}')` : ''}">${hasChildren ? toggle : ''}</span>
+        <span class="tree-toggle${hasChildren && isExpanded ? ' open' : ''}" onclick="${hasChildren ? `event.stopPropagation();handleNodeClick('${escapeAttr(workspaceId)}', '${escapeAttr(node.path)}')` : ''}">${hasChildren ? '▶' : ''}</span>
         <span class="tree-name" onclick="${hasChildren ? `event.stopPropagation();handleNodeClick('${escapeAttr(workspaceId)}', '${escapeAttr(node.path)}')` : ''}">${escapeHtml(node.name)}</span>
         ${node.fileCount ? `<span class="tree-count">${node.fileCount}</span>` : ''}
       </div>
@@ -843,8 +841,14 @@ export function bindWorkspaceEvents(): void {
     renderSidebar();
   };
 
-  (window as any).handleFocusWorkspaceToggle = (_id: string) => {
-    // no-op: focus view groups auto-expand based on content
+  (window as any).handleFocusWorkspaceToggle = (id: string) => {
+    import('./workspace-focus').then(({ getFocusCollapsed, saveFocusCollapsed }) => {
+      const collapsed = getFocusCollapsed();
+      if (collapsed.has(id)) collapsed.delete(id);
+      else collapsed.add(id);
+      saveFocusCollapsed(collapsed);
+      import('./sidebar').then(({ renderSidebar }) => renderSidebar());
+    });
   };
 
   (window as any).setFocusWindowKey = (key: string) => {

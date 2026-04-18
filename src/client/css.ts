@@ -483,15 +483,14 @@ export const styles = `
     .file-item {
       display: flex;
       align-items: center;
-      padding: 6px 12px;
-      border-radius: 16px;
+      padding: 4px 8px;
+      border-radius: 4px;
       cursor: pointer;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
       font-size: 13px;
       color: #1f2328;
       background: transparent;
-      border: 2px solid transparent;
-      gap: 6px;
+      gap: 4px;
       position: relative;
       font-weight: 400;
     }
@@ -499,9 +498,8 @@ export const styles = `
       background: #f6f8fa;
     }
     .file-item.current {
-      background: #e8f0fe;
+      background: #dbeafe;
       color: #0969da;
-      border: 2px solid transparent;
       font-weight: 400;
     }
     .file-item.missing {
@@ -520,9 +518,9 @@ export const styles = `
       display: none;
     }
     .file-type-icon {
-      width: 18px;
-      height: 18px;
-      border-radius: 5px;
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -563,10 +561,7 @@ export const styles = `
       border-color: #efdbdb;
     }
     .tree-item .file-type-icon {
-      width: 16px;
-      height: 16px;
       font-size: 9px;
-      border-radius: 4px;
     }
     .new-dot {
       width: 6px;
@@ -1587,13 +1582,13 @@ export const styles = `
     .workspace-header {
       display: flex;
       align-items: center;
-      padding: 6px 12px;
-      cursor: default;
-      border-radius: 6px;
-      font-size: 13px;
-      color: #24292e;
+      padding: 5px 10px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #444;
       user-select: none;
-      min-height: 32px;
     }
 
     .workspace-header:hover {
@@ -1601,9 +1596,9 @@ export const styles = `
     }
 
     .workspace-header.active {
-      background: #e8f0fe;
+      background: #dbeafe;
       color: #0969da;
-      font-weight: 400;
+      font-weight: 600;
     }
 
     .workspace-icon {
@@ -1718,18 +1713,14 @@ export const styles = `
     }
 
     .workspace-toggle {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      height: 20px;
-      font-size: 12px;
-      line-height: 1;
-      color: #57606a;
-      margin-right: 4px;
-      width: 16px;
-      text-align: center;
-      cursor: pointer;
+      font-size: 9px;
+      color: #aaa;
+      width: 10px;
       flex-shrink: 0;
+      transition: transform 0.15s;
+    }
+    .workspace-toggle.open {
+      transform: rotate(90deg);
     }
 
     .workspace-name {
@@ -1803,16 +1794,14 @@ export const styles = `
 
     .tree-toggle {
       width: 10px;
-      height: 20px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 10px;
-      line-height: 1;
-      color: #57606a;
       flex-shrink: 0;
-      text-align: center;
+      font-size: 9px;
+      color: #aaa;
       cursor: pointer;
+      transition: transform 0.15s;
+    }
+    .tree-toggle.open {
+      transform: rotate(90deg);
     }
 
     .tree-icon {

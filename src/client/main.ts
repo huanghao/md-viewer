@@ -21,7 +21,7 @@ import { renderSidebar } from './ui/sidebar';
 import { showToast, showSuccess, showError, showWarning, showInfo } from './ui/toast';
 import { showSettingsDialog, closeSettingsDialog } from './ui/settings';
 import { renderJsonContent } from './ui/json-viewer';
-import { mountScrollbar, unmountScrollbar, updateDiffMarkers } from './ui/doc-scrollbar';
+import { mountScrollbar, unmountScrollbar, updateDiffMarkers, clearDiffMarkers } from './ui/doc-scrollbar';
 
 import { getMdThemeCss, getHlThemeCss } from './themes/index';
 
@@ -1197,30 +1197,19 @@ function renderInlineDiffHTML(lines: import('./utils/diff').DiffLine[]): { html:
 
   const md = (s: string) => (window as any).marked.parse(s);
 
-  // 将相邻变更段（中间最多隔 2 行 equal）合并为 group
+  // 将严格相邻（无 equal 间隔）的变更段合并为 group
   type Group = { segments: Segment[]; hasChange: boolean };
   const groups: Group[] = [];
   let currentGroup: Group = { segments: [], hasChange: false };
 
-  for (let si = 0; si < segments.length; si++) {
-    const seg = segments[si];
+  for (const seg of segments) {
     if (seg.kind !== 'equal') {
       currentGroup.segments.push(seg);
       currentGroup.hasChange = true;
     } else {
-      // 判断这段 equal 是否是两个变更段之间的"桥"
-      const nextNonEqual = segments.slice(si + 1).find(s => s.kind !== 'equal');
-      const isShortBridge = seg.lines.length <= 2 && nextNonEqual !== undefined;
-      if (currentGroup.hasChange && isShortBridge) {
-        // 纳入当前 group，继续
-        currentGroup.segments.push(seg);
-      } else {
-        // 当前 group 结束
-        if (currentGroup.hasChange) groups.push(currentGroup);
-        // equal 段单独成一个无变更 group（用于渲染上下文）
-        groups.push({ segments: [seg], hasChange: false });
-        currentGroup = { segments: [], hasChange: false };
-      }
+      if (currentGroup.hasChange) groups.push(currentGroup);
+      groups.push({ segments: [seg], hasChange: false });
+      currentGroup = { segments: [], hasChange: false };
     }
   }
   if (currentGroup.hasChange) groups.push(currentGroup);
@@ -1359,6 +1348,7 @@ function closeDiffView(): void {
   const banner = document.getElementById('diffBanner');
   if (banner) banner.remove();
 
+  clearDiffMarkers();
   renderContent();
 }
 

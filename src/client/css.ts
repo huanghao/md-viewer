@@ -1317,39 +1317,25 @@ export const styles = `
 
     /* Inline diff 内容区 */
     .diff-inline-body {
-      padding: 32px 48px 32px 64px;
+      padding: 32px 48px;
       max-width: 860px;
       margin: 0 auto;
     }
 
     /* 每个 diff block 的容器 */
     .diff-block {
-      position: relative;
-      margin-left: -48px;
-      padding-left: 48px;
-      border-radius: 0 4px 4px 0;
-    }
-    .diff-block::before {
-      content: '';
-      position: absolute;
-      left: 20px;
-      top: 0;
-      bottom: 0;
-      width: 3px;
-      border-radius: 2px;
+      border-radius: 4px;
     }
 
-    /* 新增 block — GitHub 配色 */
+    /* 新增 block */
     .diff-block-insert {
       background: #e6ffec;
     }
-    .diff-block-insert::before { background: #2da44e; }
 
-    /* 删除 block（幽灵行，显示在对应位置上方） */
+    /* 删除 block */
     .diff-block-delete {
       background: #ffebe9;
     }
-    .diff-block-delete::before { background: #cf222e; }
     .diff-block-delete * {
       text-decoration: line-through;
       color: #82071e !important;
@@ -1359,7 +1345,6 @@ export const styles = `
     .diff-block-modify-del {
       background: #ffebe9;
     }
-    .diff-block-modify-del::before { background: #cf222e; }
     .diff-block-modify-del * {
       text-decoration: line-through;
       color: #82071e !important;
@@ -1369,7 +1354,6 @@ export const styles = `
     .diff-block-modify-ins {
       background: #e6ffec;
     }
-    .diff-block-modify-ins::before { background: #2da44e; }
 
     /* 变更分组容器 */
     .diff-group {
@@ -3486,26 +3470,32 @@ export const styles = `
     /* 自定义滚动条 */
     .doc-scrollbar {
       position: fixed;
-      right: 0;
+      right: var(--annotation-sidebar-width);
       top: 0;
       bottom: 0;
-      width: 8px;
+      width: 14px;
       z-index: 50;
       cursor: pointer;
-      background: rgba(0,0,0,0.06);
+      background: rgba(100,100,100,0.08);
+    }
+    body.annotation-sidebar-collapsed .doc-scrollbar {
+      right: 0;
     }
     .doc-scrollbar-thumb {
       position: absolute;
-      left: 0;
-      right: 0;
-      background: rgba(0,0,0,0.25);
-      border-radius: 4px;
+      left: 2px;
+      right: 2px;
+      background: rgba(100,100,100,0.35);
+      border-radius: 3px;
       min-height: 20px;
       cursor: grab;
     }
+    .doc-scrollbar-thumb:hover {
+      background: rgba(100,100,100,0.5);
+    }
     .doc-scrollbar-thumb:active {
       cursor: grabbing;
-      background: rgba(0,0,0,0.4);
+      background: rgba(100,100,100,0.6);
     }
     .doc-scrollbar-markers {
       position: absolute;
@@ -3517,7 +3507,7 @@ export const styles = `
       left: 0;
       right: 0;
       min-height: 3px;
-      opacity: 0.7;
+      opacity: 0.6;
       border-radius: 1px;
     }
 `;

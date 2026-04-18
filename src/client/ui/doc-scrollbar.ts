@@ -49,12 +49,15 @@ export function updateScrollbar(): void {
   const visible = scrollHeight > clientHeight;
   scrollbarEl.style.display = visible ? 'block' : 'none';
   if (!visible) return;
-  // 对齐 .content 右边缘
+  // top/height 跟随 .content，right 由 CSS 变量控制
   const contentRect = contentEl.getBoundingClientRect();
   scrollbarEl.style.top = `${contentRect.top}px`;
   scrollbarEl.style.height = `${contentRect.height}px`;
-  scrollbarEl.style.right = `${window.innerWidth - contentRect.right}px`;
   updateThumb();
+}
+
+export function clearDiffMarkers(): void {
+  if (markersEl) markersEl.innerHTML = '';
 }
 
 export function updateDiffMarkers(groups: Array<{ el: HTMLElement; kind: 'insert' | 'delete' | 'modify' }>): void {

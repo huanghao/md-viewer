@@ -720,7 +720,7 @@ export function mergeAnnotationStatus(
 }
 
 // ==================== UI 操作 ====================
-function showQuickAdd(x: number, y: number, pendingData: Omit<Annotation, 'note' | 'createdAt'>): void {
+export function showQuickAdd(x: number, y: number, pendingData: Omit<Annotation, 'note' | 'createdAt'>): void {
   const el = getElements();
   if (!el.quickAdd) return;
   // 新划词时关闭旧的 composer（明确的焦点转移）

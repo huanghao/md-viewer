@@ -1,5 +1,5 @@
 import type { PdfViewerInstance } from "./pdf-viewer.js";
-import { nextAnnotationSerial } from "./annotation.js";
+import { nextAnnotationSerial, showQuickAdd } from "./annotation.js";
 import type { Annotation } from "./annotation.js";
 
 export interface PdfAnnotationBridgeOptions {
@@ -54,10 +54,8 @@ export function createPdfAnnotationBridge(opts: PdfAnnotationBridgeOptions): Pdf
       pdfItemEnd: endItemIdx,
     } as Annotation & { page: number; fileType: "pdf"; pdfItemStart: number; pdfItemEnd: number };
 
-    // Dispatch custom event that annotation.ts composer listens to
-    document.dispatchEvent(new CustomEvent("pdf:show-composer", {
-      detail: { annotation: pending, filePath: opts.filePath, clientX, clientY }
-    }));
+    // Show quickAdd button (same UX as MD: user clicks + to open composer)
+    showQuickAdd(clientX + 6, clientY - 8, pending);
   }
 
   function renderHighlights(annotations: Annotation[]) {

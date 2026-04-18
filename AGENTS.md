@@ -11,10 +11,10 @@ Do not place tool-operational playbooks here unless they are temporary workaroun
 - Decision boundaries and priorities
 - Stable constraints that should survive model capability changes
 
-## Task Principles
+## 开发原则
 
-- 任务来源：优先从 `TODO.md` 选择。
-- 当完成任务超过一半时，可进行 `TODO.md` 清理重排；不得改写原任务描述语义。
+- 完成功能后考虑增加测试，特别是逻辑复杂的业务功能
+- 相似的代码、功能不要在多个地方重写。如果少量代码重复，但出现在多处，在代码附近加上注释，让agent能注意到关联代码，避免下次修改的时候遗漏
 
 ## Design Principles
 
@@ -48,8 +48,3 @@ Do not place tool-operational playbooks here unless they are temporary workaroun
 
 文档治理规范：`docs/文档治理规范.md`
 
-## Testing
-
-- 测试用例目录（每个 case 自包含）：`tests/e2e/cases/case-*/`
-- 目录结构约定：`README.md`（说明）+ `case-*.spec.ts`（实现）+ `*.spec.ts-snapshots/`（可选）
-- 修改 E2E 测试时，先更新对应 case 目录说明，再更新测试代码。

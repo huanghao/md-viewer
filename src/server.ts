@@ -120,119 +120,59 @@ app.post("/api/annotations/clear", handleClearAllAnnotations);
 app.get("/api/session-state", handleGetSessionState);
 app.post("/api/session-state", handleUpdateSessionState);
 
-// API: 翻译代理 → 本地 Python opus-mt 服务
-const TRANSLATE_SERVICE_URL = "http://127.0.0.1:17823";
+// ==================== 翻译（内嵌 ONNX）====================
+
+import path from "path";
+import { initTranslator, translate, translatorReady } from "./translation/index.ts";
+
+function resolveModelDir(): string {
+  if (process.env.MODELS_DIR) return path.join(process.env.MODELS_DIR, "opus-mt-en-zh");
+  const base = Bun.main.endsWith(".ts")
+    ? path.join(import.meta.dir, "..")
+    : path.dirname(process.execPath);
+  return path.join(base, "models", "opus-mt-en-zh");
+}
 
 app.post("/api/translate", async (c) => {
   const { text } = await c.req.json<{ text: string }>();
   if (!text || typeof text !== "string") {
     return c.json({ error: "missing text" }, 400);
   }
-  let res: Response;
+  if (translatorReady === false) {
+    return c.json({ error: "翻译模型加载失败，请检查 models/ 目录" }, 503);
+  }
+  if (translatorReady === null) {
+    return c.json({ error: "翻译模型正在加载，请稍后重试" }, 503);
+  }
   try {
-    res = await fetch(`${TRANSLATE_SERVICE_URL}/translate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-      signal: AbortSignal.timeout(10000),
-    });
-  } catch {
-    return c.json({ error: "翻译服务未启动，请运行 src/translate_server.py" }, 503);
+    const translatedText = await translate(text);
+    return c.json({ translatedText });
+  } catch (e: any) {
+    return c.json({ error: e.message ?? "translate failed" }, 500);
   }
-  const data = await res.json() as any;
-  if (!res.ok) return c.json({ error: data.error || "translate failed" }, 502);
-  return c.json({ translatedText: data.translatedText });
 });
-
-// ==================== 翻译子进程 ====================
-
-import path from "path";
-
-let translateProc: ReturnType<typeof Bun.spawn> | null = null;
-// null = unknown/starting, true = up, false = confirmed down
-export let translateServiceUp: boolean | null = null;
-
-function setTranslateServiceUp(up: boolean | null) {
-  translateServiceUp = up;
-  broadcastEvent({ type: 'translate-status', up });
-}
-
-async function startTranslateService(): Promise<void> {
-  const scriptPath = path.join(import.meta.dir, "translate_server.py");
-  // 找 conda env 里的 python，fallback 到系统 python3
-  const condaEnvPython = path.join(
-    process.env.HOME || "",
-    "miniconda3/envs/3.12/bin/python3"
-  );
-  const python = await Bun.file(condaEnvPython).exists() ? condaEnvPython : "python3";
-
-  translateProc = Bun.spawn([python, scriptPath], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-
-  // 打印模型加载日志
-  const stdout = translateProc.stdout;
-  if (stdout && typeof (stdout as any).getReader === "function") {
-    const reader = (stdout as ReadableStream<Uint8Array>).getReader();
-    const dec = new TextDecoder();
-    (async () => {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        dec.decode(value).split("\n").filter(Boolean).forEach((l) => log(`[translate] ${l}`));
-      }
-    })().catch(() => {});
-  }
-
-  // 轮询等待服务 ready，最多等 60 秒
-  (async () => {
-    for (let i = 0; i < 60; i++) {
-      await Bun.sleep(1000);
-      if (!translateProc) break; // 进程已退出
-      try {
-        const r = await fetch(`${TRANSLATE_SERVICE_URL}/health`, { signal: AbortSignal.timeout(1000) });
-        if (r.ok) { setTranslateServiceUp(true); log('[translate] 翻译服务已就绪'); return; }
-      } catch { /* 还没好 */ }
-    }
-    log('[translate] 翻译服务启动超时');
-  })();
-
-  // 进程退出时清理
-  translateProc.exited.then((code) => {
-    if (code !== 0) log(`[translate] 翻译服务异常退出 (code ${code})`);
-    translateProc = null;
-    setTranslateServiceUp(false);
-  });
-}
-
-function stopTranslateService(): void {
-  if (translateProc) {
-    translateProc.kill();
-    translateProc = null;
-  }
-}
 
 // ==================== 启动服务 ====================
 
 const PORT = getServerPort(config);
 const HOST = getServerHost(config);
 
-// 检测是否被直接运行（bun run src/server.ts）或被 import
 if (import.meta.main) {
   Bun.serve({
     port: PORT,
     hostname: HOST,
     fetch: app.fetch,
-    idleTimeout: 255, // SSE 长连接 255 秒超时（Bun 最大值）
+    idleTimeout: 255,
   });
 
   log(`🚀 MD Viewer Server 启动于 http://${HOST}:${PORT}/`);
   log(`📖 使用方法: 在浏览器中打开，然后添加 Markdown/HTML 文件路径`);
 
-  startTranslateService().catch((e) => log(`[translate] 启动失败: ${e}`));
+  const modelDir = resolveModelDir();
+  initTranslator(modelDir)
+    .then(() => broadcastEvent({ type: "translate-status", up: true }))
+    .catch(() => broadcastEvent({ type: "translate-status", up: false }));
 
-  process.on("exit", stopTranslateService);
-  process.on("SIGINT", () => { stopTranslateService(); process.exit(0); });
-  process.on("SIGTERM", () => { stopTranslateService(); process.exit(0); });
+  process.on("SIGINT", () => process.exit(0));
+  process.on("SIGTERM", () => process.exit(0));
 }

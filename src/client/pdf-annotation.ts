@@ -59,6 +59,8 @@ export function createPdfAnnotationBridge(opts: PdfAnnotationBridgeOptions): Pdf
   }
 
   function renderHighlights(annotations: Annotation[]) {
+    // Remove temp selection marks now that permanent highlights are about to be drawn
+    opts.viewer.clearSelectionMark();
     opts.viewer.clearHighlights();
     const pdfAnns = annotations.filter(a => {
       const pa = a as Annotation & { page?: number; fileType?: string };

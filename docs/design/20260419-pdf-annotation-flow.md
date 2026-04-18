@@ -82,9 +82,14 @@
 > **设计疑问**：步骤 3~4 清除原生 Selection 后蓝色消失，所以项目用 `markSelectionSpans` 重新画一次蓝色。但两次蓝色之间有视觉跳变，体验奇怪。是否可以不清除原生 Selection，直接保留浏览器蓝色？待评估。
 
 **关键数据**：
-- `selectedText`：精确选中文字（如 `"Language Models"`）——**可疑，需测试工具验证**
+- `selectedText = sel.toString()`：从鼠标按下字符位置截取到抬起字符位置，**不对齐词边界**
+  - 例：用户想选 "individual tasks"，mousedown 落在 "i" 中间，实际得到 "ividual tasks"
+  - `toString()` 本身是准的，问题在于鼠标操作精度不到词边界
+  - **需要词边界扩展**：拿到 `startOffset` 后往左找最近空格，`endOffset` 往右找最近空格
 - `startItemIdx`：item 索引（如 `42`）
-- `state.pendingAnnotation = { quote: "Language Models", start: 42, length: 1, page: 1, fileType: "pdf" }`
+- `state.pendingAnnotation = { quote: "ividual tasks", start: 42, length: 1, ... }` ← quote 不完整
+
+**标题/节标题区域的额外问题**：标题 span 和正文 span 在 DOM 里连续排列，浏览器把它们当成一个文本流，拖拽时会跨越多个 span 扩展选区，无法精确选一个词。这是 TextLayer 布局问题，独立于 `selectedText` 的问题。
 
 **双击特殊路径**：双击时走 `dblclick` 事件，通过 `expandDblClick` 自动扩展到词/句边界，其余逻辑相同。**已知 bug：双击目前不生效，会退化成普通单词选中后弹出评论框。**
 
@@ -218,12 +223,12 @@
 
 ## 待验证的关键点
 
-| # | 步骤 | 待验证 | 预期 |
-|---|------|--------|------|
-| 1 | 步骤 2 | `sel.toString()` 是否等于蓝色高亮的文字 | 一致 |
-| 2 | 步骤 2 | `markSelectionSpans` 是否成功（DOM 里有 `<mark class="pdf-selection-mark">`） | 成功 |
-| 3 | 步骤 4 | 保存的 `annotation.quote` 是精确子串还是整行 | 精确子串 |
-| 4 | 步骤 5 | `surroundContents` 是否成功（未走 fallback） | 成功 |
-| 5 | 步骤 5 | 高亮范围是否和 `quote` 完全一致，不超出右侧 | 一致 |
-| 6 | 步骤 5→5 | 多次 clearHighlights + renderHighlights 后高亮是否仍然正确 | 仍然正确 |
-| 7 | 分支 B | 失焦后黄色下划线是否保留，再次点击是否能恢复草稿 | 保留且恢复 |
+| # | 步骤 | 状态 | 结论 |
+|---|------|------|------|
+| 1 | 步骤 2 | ✅ 已验证 | `sel.toString()` 和蓝色高亮一致，是准的 |
+| 2 | 步骤 2 | ❌ 已发现 bug | `selectedText` 不对齐词边界，需要词边界扩展（往左/右找空格） |
+| 3 | 步骤 2 | ❌ 已发现 bug | 标题区域无法精确选词，span 连续排列导致跨行扩展 |
+| 4 | 步骤 4 | ⏳ 待验证 | 保存的 `annotation.quote` 是截断的子串（来自 bug #2） |
+| 5 | 步骤 5 | ⏳ 待验证 | `surroundContents` 是否成功（未走 fallback 整行高亮） |
+| 6 | 步骤 5 | ⏳ 待验证 | 高亮范围是否和 `quote` 一致，不超出右侧 |
+| 7 | 步骤 5→5 | ⏳ 待验证 | 多次 clearHighlights + renderHighlights 后高亮是否仍然正确 |

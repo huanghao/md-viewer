@@ -1191,27 +1191,68 @@ function renderInlineDiffHTML(lines: import('./utils/diff').DiffLine[]): { html:
 
   const md = (s: string) => (window as any).marked.parse(s);
 
+  // 将相邻变更段（中间最多隔 2 行 equal）合并为 group
+  type Group = { segments: Segment[]; hasChange: boolean };
+  const groups: Group[] = [];
+  let currentGroup: Group = { segments: [], hasChange: false };
+
+  for (let si = 0; si < segments.length; si++) {
+    const seg = segments[si];
+    if (seg.kind !== 'equal') {
+      currentGroup.segments.push(seg);
+      currentGroup.hasChange = true;
+    } else {
+      // 判断这段 equal 是否是两个变更段之间的"桥"
+      const nextNonEqual = segments.slice(si + 1).find(s => s.kind !== 'equal');
+      const isShortBridge = seg.lines.length <= 2 && nextNonEqual !== undefined;
+      if (currentGroup.hasChange && isShortBridge) {
+        // 纳入当前 group，继续
+        currentGroup.segments.push(seg);
+      } else {
+        // 当前 group 结束
+        if (currentGroup.hasChange) groups.push(currentGroup);
+        // equal 段单独成一个无变更 group（用于渲染上下文）
+        groups.push({ segments: [seg], hasChange: false });
+        currentGroup = { segments: [], hasChange: false };
+      }
+    }
+  }
+  if (currentGroup.hasChange) groups.push(currentGroup);
+
   let blockIndex = 0;
   let html = '<div class="markdown-body diff-inline-body">';
 
-  for (const seg of segments) {
-    if (seg.kind === 'equal') {
-      html += md(seg.lines.map(l => l.content).join('\n'));
-    } else if (seg.kind === 'delete') {
-      const inner = md(seg.lines.map(l => l.content).join('\n'));
-      html += `<div class="diff-block diff-block-delete" data-block-index="${blockIndex}">${inner}</div>`;
-      blockIndex++;
-    } else if (seg.kind === 'insert') {
-      const inner = md(seg.lines.map(l => l.content).join('\n'));
-      html += `<div class="diff-block diff-block-insert" data-block-index="${blockIndex}">${inner}</div>`;
-      blockIndex++;
-    } else {
-      const delInner = md(seg.delLines.map(l => l.content).join('\n'));
-      const insInner = md(seg.insLines.map(l => l.content).join('\n'));
-      html += `<div class="diff-block diff-block-modify-del" data-block-index="${blockIndex}">${delInner}</div>`;
-      html += `<div class="diff-block diff-block-modify-ins" data-block-index="${blockIndex}">${insInner}</div>`;
-      blockIndex++;
+  for (const group of groups) {
+    if (!group.hasChange) {
+      // 纯 equal 上下文，直接渲染
+      for (const seg of group.segments) {
+        if (seg.kind === 'equal') {
+          html += md(seg.lines.map(l => l.content).join('\n'));
+        }
+      }
+      continue;
     }
+
+    // 变更 group：外层包 diff-group
+    html += `<div class="diff-group" data-block-index="${blockIndex}">`;
+    for (const seg of group.segments) {
+      if (seg.kind === 'equal') {
+        html += `<div class="diff-group-context">${md(seg.lines.map(l => l.content).join('\n'))}</div>`;
+      } else if (seg.kind === 'delete') {
+        const inner = md(seg.lines.map(l => l.content).join('\n'));
+        html += `<div class="diff-block diff-block-delete">${inner}</div>`;
+      } else if (seg.kind === 'insert') {
+        const inner = md(seg.lines.map(l => l.content).join('\n'));
+        html += `<div class="diff-block diff-block-insert">${inner}</div>`;
+      } else {
+        const delInner = md(seg.delLines.map(l => l.content).join('\n'));
+        const insInner = md(seg.insLines.map(l => l.content).join('\n'));
+        html += `<div class="diff-block diff-block-modify-del">${delInner}</div>`;
+        html += `<div class="diff-block diff-block-modify-ins">${insInner}</div>`;
+      }
+    }
+    html += '</div>';
+    blockIndex++;
   }
 
   html += '</div>';
@@ -1312,7 +1353,7 @@ function navigateDiffBlock(direction: 1 | -1): void {
   // 找所有 block 首元素（每个 blockIndex 只取第一个，modify 的 del+ins 共享同一 index）
   const seen = new Set<number>();
   const blockEls: HTMLElement[] = [];
-  contentEl.querySelectorAll<HTMLElement>('[data-block-index]').forEach(el => {
+  contentEl.querySelectorAll<HTMLElement>('.diff-group[data-block-index]').forEach(el => {
     const idx = parseInt(el.dataset.blockIndex ?? '', 10);
     if (!seen.has(idx)) {
       seen.add(idx);
@@ -1334,7 +1375,7 @@ function navigateDiffBlock(direction: 1 | -1): void {
   });
 
   // 加新 focus（同一 blockIndex 的所有元素，即 modify 的 del+ins 两个都高亮）
-  contentEl.querySelectorAll<HTMLElement>(`[data-block-index="${nextIndex}"]`).forEach(el => {
+  contentEl.querySelectorAll<HTMLElement>(`.diff-group[data-block-index="${nextIndex}"]`).forEach(el => {
     el.classList.add('diff-focused');
   });
 

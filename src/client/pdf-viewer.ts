@@ -671,8 +671,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
   }
 
   function clearSelectionMark() {
-    // <mark> elements inserted by markSelectionSpans — unwrap them
-    el.querySelectorAll("mark.pdf-selection-mark").forEach((mark) => {
+    el.querySelectorAll("mark.pdf-selection-mark, mark.pdf-selection-mark-temp").forEach((mark) => {
       const parent = mark.parentNode;
       if (!parent) return;
       while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);

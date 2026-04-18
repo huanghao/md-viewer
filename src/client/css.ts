@@ -3280,11 +3280,19 @@ export const styles = `
       border-radius: 2px;
     }
 
-    /* 选中文字的临时高亮：用 <mark> 包裹精确选中范围 */
+    /* 选中文字的临时高亮：划词后、点加号前（蓝色背景） */
     mark.pdf-selection-mark {
       background: rgba(0, 120, 215, 0.35);
       color: inherit;
       border-radius: 2px;
+    }
+
+    /* 评论进行中的临时高亮：点加号后、保存/取消前（黄色下划线，对应 annotation-mark-temp） */
+    mark.pdf-selection-mark-temp {
+      background: transparent;
+      border-bottom: 2px solid #fadb14;
+      border-radius: 1px;
+      color: inherit;
     }
 
     .pdf-translation-overlay {

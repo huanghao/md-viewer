@@ -16,6 +16,7 @@ class ServerManager: ObservableObject {
     @Published var port: Int?
     @Published var error: String?
     @Published var isStarting = false
+    @Published var startupSteps: [(label: String, done: Bool?)] = [] // nil=pending, true=ok, false=fail
 
     private var serverProcess: Process?
     private var healthCheckTimer: Timer?
@@ -36,6 +37,16 @@ class ServerManager: ObservableObject {
         print("🔵 开始启动 Server...")
         isStarting = true
         error = nil
+        startupSteps = [
+            (label: "查找可用端口", done: nil),
+            (label: "定位 Server 程序", done: nil),
+            (label: "启动 Server 进程", done: nil),
+            (label: "等待 Server 就绪", done: nil),
+        ]
+
+        func step(_ index: Int, done: Bool) {
+            startupSteps[index] = (label: startupSteps[index].label, done: done)
+        }
 
         do {
             // 1. 查找可用端口
@@ -44,15 +55,19 @@ class ServerManager: ObservableObject {
                 starting: config.serverPort,
                 range: 100
             ) else {
+                step(0, done: false)
                 throw ServerError.noAvailablePort
             }
+            step(0, done: true)
             print("✓ 找到可用端口: \(port)")
 
             // 2. 获取 Server 二进制路径
             print("🔍 查找 Server 二进制...")
             guard let serverPath = getServerPath() else {
+                step(1, done: false)
                 throw ServerError.serverNotFound
             }
+            step(1, done: true)
             print("✓ Server 路径: \(serverPath)")
 
             // 3. 确保可执行权限
@@ -97,7 +112,13 @@ class ServerManager: ObservableObject {
 
             // 6. 启动
             print("🚀 启动 Server 进程...")
-            try process.run()
+            do {
+                try process.run()
+                step(2, done: true)
+            } catch {
+                step(2, done: false)
+                throw error
+            }
             self.serverProcess = process
             self.port = port
 
@@ -107,11 +128,13 @@ class ServerManager: ObservableObject {
             print("⏳ 等待 Server 就绪...")
             let ready = await waitForServer(port: port)
             if ready {
+                step(3, done: true)
                 self.isRunning = true
                 writePortFile(port: port)
                 startHealthCheck()
                 print("✅ Server 启动成功: http://127.0.0.1:\(port)")
             } else {
+                step(3, done: false)
                 throw ServerError.startTimeout
             }
 

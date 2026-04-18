@@ -37,12 +37,32 @@ struct MainWindow: View {
                     .background(Color(NSColor.windowBackgroundColor).opacity(0.8))
                 }
             } else if serverManager.isStarting {
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .scaleEffect(1.2)
+                VStack(alignment: .leading, spacing: 20) {
                     Text("启动服务中...")
                         .font(.headline)
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(Array(serverManager.startupSteps.enumerated()), id: \.offset) { _, step in
+                            HStack(spacing: 10) {
+                                Group {
+                                    if step.done == nil {
+                                        ProgressView().scaleEffect(0.7)
+                                    } else if step.done == true {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.green)
+                                    } else {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundColor(.red)
+                                    }
+                                }
+                                .frame(width: 18, height: 18)
+                                Text(step.label)
+                                    .font(.body)
+                                    .foregroundColor(step.done == false ? .red : .primary)
+                            }
+                        }
+                    }
                 }
+                .padding(32)
             } else {
                 VStack(spacing: 16) {
                     Image(systemName: "exclamationmark.triangle")

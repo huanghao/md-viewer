@@ -753,11 +753,39 @@ export function openComposerFromPending(x?: number, y?: number): void {
   const el = getElements();
   if (!state.pendingAnnotation || !el.composer || !el.composerNote) return;
   applyTempSelectionMark();
-  // PDF side: blue selection mark → yellow underline while composing
-  document.querySelectorAll('mark.pdf-selection-mark').forEach(m => {
-    m.classList.remove('pdf-selection-mark');
-    m.classList.add('pdf-selection-mark-temp');
-  });
+  // PDF side: insert yellow underline using the stored Range from mouseup
+  const pdfPending = (window as any).__pdfPendingSelectionRange;
+  if (pdfPending) {
+    (window as any).__pdfPendingSelectionRange = null;
+    try {
+      const { range, textLayerDiv } = pdfPending as { range: Range; textLayerDiv: HTMLElement };
+      if (range && textLayerDiv) {
+        const wrapNode = (r: Range) => {
+          const m = document.createElement('mark');
+          m.className = 'pdf-selection-mark-temp';
+          try { r.surroundContents(m); return; } catch {}
+          // multi-node fallback
+          const walker = document.createTreeWalker(textLayerDiv, NodeFilter.SHOW_TEXT, null);
+          const toWrap: { node: Text; start: number; end: number }[] = [];
+          let node: Node | null;
+          while ((node = walker.nextNode())) {
+            const t = node as Text;
+            const nr = document.createRange(); nr.selectNode(t);
+            if (nr.compareBoundaryPoints(Range.START_TO_END, r) > 0 &&
+                nr.compareBoundaryPoints(Range.END_TO_START, r) < 0) {
+              toWrap.push({ node: t, start: t === r.startContainer ? r.startOffset : 0, end: t === r.endContainer ? r.endOffset : t.length });
+            }
+          }
+          for (const { node: t, start, end } of toWrap) {
+            const pr = document.createRange(); pr.setStart(t, start); pr.setEnd(t, end);
+            const mk = document.createElement('mark'); mk.className = 'pdf-selection-mark-temp';
+            try { pr.surroundContents(mk); } catch {}
+          }
+        };
+        wrapNode(range);
+      }
+    } catch {}
+  }
   el.composerNote.value = '';
   autoResizeComposerInput(el.composerNote);
   const left = typeof x === 'number' ? x : (el.quickAdd ? Number.parseFloat(el.quickAdd.style.left || '0') : 0);

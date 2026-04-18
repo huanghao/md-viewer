@@ -233,6 +233,13 @@ export function renderFocusView(): string {
         return name.includes(query) || f.path.toLowerCase().includes(query);
       });
     }
+    // Apply type filter: pinned files bypass type filter
+    activeFiles = activeFiles.filter((f) => {
+      if (pinned.has(f.path)) return true;
+      const ext = getFileExtension(f.path);
+      const normalizedExt = ext === 'markdown' ? 'md' : ext === 'htm' ? 'html' : ext === 'jsonl' ? 'json' : ext;
+      return activeTypes.has(normalizedExt);
+    });
     return renderFocusWorkspaceGroup(ws, activeFiles, pinned, loading, query, collapsed);
   }).join('');
 

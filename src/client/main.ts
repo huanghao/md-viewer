@@ -1279,6 +1279,24 @@ async function handleDiffButtonClick(): Promise<void> {
   const diffBtn = document.getElementById('diffButton');
   if (diffBtn) diffBtn.classList.add('active');
 
+  // 插入 banner 到 #content 父元素
+  const contentEl = document.getElementById('content');
+  const parent = contentEl?.parentElement;
+  if (parent && !document.getElementById('diffBanner')) {
+    const banner = document.createElement('div');
+    banner.id = 'diffBanner';
+    banner.className = 'diff-banner';
+    banner.innerHTML = `
+      <span class="diff-banner-label">Diff 模式 · 显示新版本变更</span>
+      <button class="diff-nav-btn" id="diffNavPrev" onclick="window.navigateDiffBlock(-1)" disabled>↑ 上一处</button>
+      <span class="diff-nav-count" id="diffNavCount">- / -</span>
+      <button class="diff-nav-btn" id="diffNavNext" onclick="window.navigateDiffBlock(1)">↓ 下一处</button>
+      <button class="diff-accept-btn" onclick="window.acceptDiffUpdate()">✓ 采用新版本</button>
+      <button class="diff-close-btn" onclick="window.closeDiffView()">✕ 关闭</button>
+    `;
+    parent.insertBefore(banner, contentEl);
+  }
+
   renderDiffView(file.content, newContent);
 }
 
@@ -1287,6 +1305,11 @@ function closeDiffView(): void {
   currentDiffBlockIndex = -1;
   const diffBtn = document.getElementById('diffButton');
   if (diffBtn) diffBtn.classList.remove('active');
+
+  // 移除 banner
+  const banner = document.getElementById('diffBanner');
+  if (banner) banner.remove();
+
   renderContent();
 }
 

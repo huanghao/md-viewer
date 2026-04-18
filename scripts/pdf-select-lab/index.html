@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<title>PDF 选中功能交互测试</title>
+<title>PDF 批注流程测试</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/web/pdf_viewer.css">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -15,179 +15,130 @@ body { font-family: -apple-system, sans-serif; font-size: 13px; background: #f5f
   background: #525659; padding: 16px;
   display: flex; flex-direction: column; align-items: center; gap: 8px;
 }
-.page-wrapper {
-  position: relative;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-  background: white; cursor: crosshair;
-}
+.page-wrapper { position: relative; box-shadow: 0 2px 8px rgba(0,0,0,.4); background: white; cursor: crosshair; }
 .page-wrapper canvas { display: block; }
 .pdf-text-layer { position: absolute; top:0; left:0; pointer-events:auto; user-select:text; }
 .bbox-overlay   { position: absolute; top:0; left:0; pointer-events:none; }
 
 /* ── 右侧面板 ── */
 #panel {
-  width: 420px; min-width: 420px;
+  width: 400px; min-width: 400px;
   background: white; border-left: 1px solid #e0e0e0;
   display: flex; flex-direction: column; overflow: hidden;
 }
 #panel-header {
-  padding: 10px 14px; background: #1a1a2e; color: white;
+  padding: 10px 14px; background: #1a1a2e; color: white; flex-shrink: 0;
 }
 #panel-header h2 { font-size: 13px; font-weight: 600; }
 #panel-header p  { font-size: 11px; color: #aaa; margin-top: 2px; }
 
 #controls {
   padding: 10px 14px; border-bottom: 1px solid #e0e0e0;
-  display: flex; flex-direction: column; gap: 6px;
+  display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;
 }
-select#pdf-select {
-  width: 100%; padding: 5px 8px;
-  border: 1px solid #ccc; border-radius: 4px; font-size: 12px; background: white;
-}
-.row { display: flex; gap: 8px; align-items: center; }
-button.primary {
-  padding: 5px 12px; background: #1a73e8; color: white;
-  border: none; border-radius: 4px; cursor: pointer; font-size: 12px;
-}
-button.primary:hover { background: #1557b0; }
-.toggle { display:flex; align-items:center; gap:3px; font-size:11px; color:#444; cursor:pointer; }
+select#pdf-select { width:100%; padding:5px 8px; border:1px solid #ccc; border-radius:4px; font-size:12px; }
+.row { display:flex; gap:8px; align-items:center; }
+button.primary { padding:5px 12px; background:#1a73e8; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px; }
+button.primary:hover { background:#1557b0; }
 
-/* ── 结果区 ── */
-#results {
+/* ── 步骤面板（唯一，覆盖式） ── */
+#step-panel {
   flex: 1; overflow-y: auto; padding: 10px 14px;
-  display: flex; flex-direction: column; gap: 0;
-}
-.empty-hint { color:#aaa; font-size:12px; text-align:center; padding:24px; }
-
-/* 每次选中的记录 */
-.record { border: 1px solid #e0e0e0; border-radius: 6px; overflow: hidden; margin-bottom: 10px; }
-
-/* 你看到的（用户输入） */
-.section-you {
-  padding: 8px 10px; background: #e8f5e9;
-  border-bottom: 1px solid #c8e6c9;
-}
-.section-you label { font-size: 11px; color: #2e7d32; font-weight: 600; display: block; margin-bottom: 4px; }
-.section-you input {
-  width: 100%; padding: 4px 6px;
-  border: 1px solid #a5d6a7; border-radius: 3px;
-  font-size: 12px; font-family: monospace; background: white;
+  display: flex; flex-direction: column; gap: 8px;
 }
 
-/* sel.toString() */
-.section-tostring {
-  padding: 8px 10px; background: #fff8e1;
-  border-bottom: 1px solid #ffe082;
+/* 步骤标题 */
+.step-title {
+  font-size: 11px; font-weight: 600; color: #555;
+  padding: 4px 0; border-bottom: 1px solid #e8e8e8; margin-bottom: 4px;
+  display: flex; justify-content: space-between; align-items: center;
 }
-.section-tostring .label { font-size: 11px; color: #f57f17; font-weight: 600; margin-bottom: 4px; }
-.section-tostring .val {
-  font-family: monospace; font-size: 11px; color: #333;
-  white-space: pre-wrap; word-break: break-all;
-  background: white; padding: 4px 6px; border-radius: 3px;
-  border: 1px solid #ffe082; max-height: 80px; overflow-y: auto;
+.step-badge {
+  font-size: 10px; padding: 1px 6px; border-radius: 10px;
+  background: #e8f0fe; color: #1a73e8;
 }
+.step-badge.ok  { background: #e6f4ea; color: #188038; }
+.step-badge.bad { background: #fce8e6; color: #c5221f; }
+.step-badge.warn { background: #fff3e0; color: #e65100; }
 
-/* span 列表 */
-.section-spans {
-  padding: 8px 10px; border-bottom: 1px solid #e0e0e0;
-}
-.section-spans .label { font-size: 11px; color: #555; font-weight: 600; margin-bottom: 6px; }
-.span-row {
-  display: grid;
-  grid-template-columns: 22px 1fr 1fr;
-  gap: 4px; align-items: start;
-  padding: 3px 0; border-bottom: 1px solid #f5f5f5; font-size: 11px;
-}
-.span-row:last-child { border-bottom: none; }
-.span-idx { color: #aaa; font-family: monospace; padding-top: 1px; }
-.span-cell {
-  font-family: monospace; word-break: break-all;
-  padding: 2px 4px; border-radius: 3px;
-}
-.span-cell.span-text { background: #fff3e0; color: #e65100; }
-.span-cell.item-str  { background: #e3f2fd; color: #1565c0; }
-.span-cell.mismatch  { background: #fce8e6; color: #c62828; }
-.col-headers {
-  display: grid; grid-template-columns: 22px 1fr 1fr;
-  gap: 4px; font-size: 10px; color: #999; margin-bottom: 4px;
-}
+/* 数据行 */
+.kv { display:flex; gap:6px; margin-bottom:3px; font-size:12px; }
+.k  { color:#888; min-width:80px; font-size:11px; flex-shrink:0; }
+.v  { font-family:monospace; word-break:break-all; }
+.v.hi   { color:#1a73e8; font-weight:600; }
+.v.warn { color:#e65100; }
+.v.ok   { color:#188038; }
+.v.bad  { color:#c5221f; }
 
-/* 区域标签 */
-.region-badge {
-  display: inline-block; font-size: 10px; padding: 1px 6px;
-  border-radius: 10px; margin-bottom: 6px;
-}
-.region-body    { background: #e3f2fd; color: #1565c0; }
-.region-title   { background: #f3e5f5; color: #6a1b9a; }
-.region-other   { background: #f5f5f5; color: #555; }
-
-/* 反馈 */
-.section-feedback {
-  padding: 6px 10px; display: flex; gap: 6px; align-items: center;
-  background: #fafafa;
-}
-.fb-label { font-size: 11px; color: #888; }
-button.fb-ok  { padding:2px 10px; background:#e8f5e9; color:#2e7d32; border:1px solid #a5d6a7; border-radius:3px; cursor:pointer; font-size:11px; }
-button.fb-bad { padding:2px 10px; background:#fce8e6; color:#c62828; border:1px solid #ef9a9a; border-radius:3px; cursor:pointer; font-size:11px; }
+/* 反馈按钮 */
+.fb-row { display:flex; gap:6px; align-items:center; margin-top:6px; padding-top:6px; border-top:1px solid #f0f0f0; }
+.fb-label { font-size:11px; color:#888; }
+button.fb-ok  { padding:2px 10px; background:#e6f4ea; color:#188038; border:1px solid #c8e6c9; border-radius:3px; cursor:pointer; font-size:11px; }
+button.fb-bad { padding:2px 10px; background:#fce8e6; color:#c5221f; border:1px solid #ffcdd2; border-radius:3px; cursor:pointer; font-size:11px; }
 button.fb-ok:hover  { background:#c8e6c9; }
 button.fb-bad:hover { background:#ffcdd2; }
 .fb-done { font-size:11px; padding:2px 8px; border-radius:3px; }
-.fb-done.ok  { background:#e8f5e9; color:#2e7d32; }
-.fb-done.bad { background:#fce8e6; color:#c62828; }
+.fb-done.ok  { background:#e6f4ea; color:#188038; }
+.fb-done.bad { background:#fce8e6; color:#c5221f; }
+
+/* section 分隔 */
+.section { padding:6px 8px; border-radius:4px; margin-bottom:4px; }
+.section.blue  { background:#e8f0fe; }
+.section.green { background:#e6f4ea; }
+.section.amber { background:#fff3e0; }
+.section.red   { background:#fce8e6; }
+.section.gray  { background:#f5f5f5; }
+.section-label { font-size:10px; font-weight:600; color:#555; margin-bottom:4px; }
+
+/* 空状态 */
+.empty { color:#aaa; font-size:12px; text-align:center; padding:24px; }
 
 /* 日志 */
 #log {
-  border-top: 1px solid #e0e0e0; height: 80px; overflow-y: auto;
-  padding: 4px 10px; font-family: monospace; font-size: 10px; color: #777;
-  background: #fafafa;
+  border-top:1px solid #e0e0e0; height:80px; overflow-y:auto;
+  padding:4px 10px; font-family:monospace; font-size:10px; color:#777;
+  background:#fafafa; flex-shrink:0;
 }
-.log-line { line-height: 1.6; }
-.log-line.error { color: #c62828; }
+.log-line { line-height:1.6; }
+.log-line.error { color:#c5221f; }
 
 /* 底部 */
-#footer { padding: 8px 14px; border-top: 1px solid #e0e0e0; display: flex; gap: 8px; }
+#footer { padding:8px 14px; border-top:1px solid #e0e0e0; display:flex; gap:8px; flex-shrink:0; }
 button.export { flex:1; padding:5px; background:#f5f5f5; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-size:11px; }
-button.export:hover { background:#e8e8e8; }
-button.danger { padding:5px 10px; background:#fce8e6; border:1px solid #ef9a9a; border-radius:4px; cursor:pointer; font-size:11px; color:#c62828; }
-button.danger:hover { background:#ffcdd2; }
+button.danger { padding:5px 10px; background:#fce8e6; border:1px solid #ffcdd2; border-radius:4px; cursor:pointer; font-size:11px; color:#c5221f; }
 </style>
 </head>
 <body>
 <div id="app">
   <div id="pdf-area">
-    <div style="color:#aaa;font-size:12px;margin-top:60px">← 选择 PDF 并加载</div>
+    <div class="empty" style="margin-top:60px">← 选择 PDF 并加载</div>
   </div>
 
   <div id="panel">
     <div id="panel-header">
-      <h2>PDF 选中功能交互测试</h2>
-      <p>拖拽选中文字 → 填写你看到的蓝色文字 → 点击反馈</p>
+      <h2>PDF 批注流程测试</h2>
+      <p>每次操作只显示当前步骤，不累积</p>
     </div>
 
     <div id="controls">
-      <select id="pdf-select">
-        <option value="">加载中...</option>
-      </select>
+      <select id="pdf-select"><option value="">加载中...</option></select>
       <div class="row">
         <button class="primary" onclick="loadPdf()">加载 PDF</button>
-        <label class="toggle">
+        <label style="display:flex;align-items:center;gap:4px;font-size:11px">
           <input type="number" id="page-count" value="3" min="1" max="20"
             style="width:36px;padding:2px 4px;border:1px solid #ccc;border-radius:3px;font-size:11px"> 页
-        </label>
-        <label class="toggle">
-          <input type="checkbox" id="cb-all" onchange="redrawAll()"> 所有 item
         </label>
       </div>
     </div>
 
-    <div id="results">
-      <div class="empty-hint">加载 PDF 后拖拽选中文字</div>
+    <div id="step-panel">
+      <div class="empty">加载 PDF 后拖拽选中文字</div>
     </div>
 
     <div id="log"></div>
 
     <div id="footer">
-      <button class="export" onclick="exportJSON()">导出数据 (JSON)</button>
+      <button class="export" onclick="exportJSON()">导出数据</button>
       <button class="danger" onclick="clearAll()">清空</button>
     </div>
   </div>
@@ -200,10 +151,9 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 
 const SCALE = 1.5;
 let pdfDoc = null;
-const textContents = {};
-const viewports    = {};
-const bboxCanvases = {};
+const textContents = {}, viewports = {}, bboxCanvases = {};
 let sessionData = [];
+let currentEntry = null; // 当前步骤的数据，每次选中覆盖
 
 // ── 日志 ─────────────────────────────────────────────────
 function log(msg, level = '') {
@@ -226,34 +176,28 @@ fetch('/pdfs').then(r => r.json()).then(list => {
 // ── 加载 PDF ─────────────────────────────────────────────
 window.loadPdf = async function() {
   const path = document.getElementById('pdf-select').value.trim();
-  const n    = parseInt(document.getElementById('page-count').value) || 3;
+  const n = parseInt(document.getElementById('page-count').value) || 3;
   if (!path) return;
-
   Object.keys(textContents).forEach(k => delete textContents[k]);
   Object.keys(viewports).forEach(k => delete viewports[k]);
-  Object.keys(bboxCanvases).forEach(k => delete bboxCanvases[k]);
   pdfDoc = null;
-
-  document.getElementById('pdf-area').innerHTML =
-    '<div style="color:#aaa;font-size:12px;margin-top:60px">加载中…</div>';
+  document.getElementById('pdf-area').innerHTML = '<div class="empty" style="margin-top:60px">加载中…</div>';
   log(`加载: ${path.split('/').pop()}`);
-
   try {
     pdfDoc = await pdfjsLib.getDocument(`/pdf?path=${encodeURIComponent(path)}`).promise;
-    log(`共 ${pdfDoc.numPages} 页，渲染前 ${n} 页`);
     document.getElementById('pdf-area').innerHTML = '';
     for (let p = 1; p <= Math.min(n, pdfDoc.numPages); p++) await renderPage(p);
+    log(`共 ${pdfDoc.numPages} 页，渲染前 ${n} 页`);
   } catch(e) {
     log(`加载失败: ${e.message}`, 'error');
-    document.getElementById('pdf-area').innerHTML =
-      `<div style="color:#c62828;font-size:12px;margin-top:60px">失败: ${e.message}</div>`;
+    document.getElementById('pdf-area').innerHTML = `<div class="empty" style="color:#c5221f;margin-top:60px">失败: ${e.message}</div>`;
   }
 };
 
 // ── 渲染单页 ─────────────────────────────────────────────
 async function renderPage(pageNum) {
   const page = await pdfDoc.getPage(pageNum);
-  const vp   = page.getViewport({ scale: SCALE });
+  const vp = page.getViewport({ scale: SCALE });
   viewports[pageNum] = vp;
   const dpr = window.devicePixelRatio || 1;
 
@@ -263,7 +207,7 @@ async function renderPage(pageNum) {
   wrapper.style.cssText = `width:${vp.width}px;height:${vp.height}px`;
 
   const canvas = document.createElement('canvas');
-  canvas.width  = Math.floor(vp.width  * dpr);
+  canvas.width = Math.floor(vp.width * dpr);
   canvas.height = Math.floor(vp.height * dpr);
   canvas.style.cssText = `width:${vp.width}px;height:${vp.height}px`;
   const ctx = canvas.getContext('2d');
@@ -280,258 +224,201 @@ async function renderPage(pageNum) {
   textContents[pageNum] = tc;
   await new pdfjsLib.TextLayer({ textContentSource: tc, container: tlDiv, viewport: vp }).render();
 
-  const ov = document.createElement('canvas');
-  ov.className = 'bbox-overlay';
-  ov.width  = Math.floor(vp.width  * dpr);
-  ov.height = Math.floor(vp.height * dpr);
-  ov.style.cssText = `width:${vp.width}px;height:${vp.height}px`;
-  wrapper.appendChild(ov);
-  bboxCanvases[pageNum] = ov;
-
   attachEvents(wrapper, tlDiv, pageNum, vp);
   document.getElementById('pdf-area').appendChild(wrapper);
   log(`第 ${pageNum} 页完成（${tc.items.length} items）`);
 }
 
-// ── 绑定选中事件 ─────────────────────────────────────────
+// ── 选中事件 ─────────────────────────────────────────────
 function attachEvents(wrapper, tlDiv, pageNum, vp) {
   wrapper.addEventListener('mouseup', () => {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed) return;
 
     const items = textContents[pageNum]?.items || [];
-    const leafSpans = Array.from(tlDiv.querySelectorAll('span'))
-      .filter(s => !s.querySelector('span'));
 
-    // sel.toString() 的原始内容（保留换行等）
+    // 1. sel.toString()
     const rawToString = sel.toString();
 
-    // 命中的 span 列表
-    const range = sel.getRangeAt(0);
-    const hitSpans = leafSpans.filter(s => {
-      try { return range.intersectsNode(s); } catch { return false; }
-    });
+    // 2. Range 信息
+    let rangeInfo = null;
+    if (sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0);
+      const startNode = range.startContainer;
+      const endNode = range.endContainer;
+      rangeInfo = {
+        startOffset: range.startOffset,
+        endOffset: range.endOffset,
+        sameContainer: startNode === endNode,
+        startText: startNode.nodeType === 3 ? (startNode.textContent || '').slice(0, 60) : '[非文本节点]',
+      };
+      // 用 Range 精确截取
+      if (startNode.nodeType === 3 && startNode === endNode) {
+        rangeInfo.preciseQuote = (startNode.textContent || '').slice(range.startOffset, range.endOffset);
+      } else if (startNode.nodeType === 3) {
+        rangeInfo.preciseQuote = (startNode.textContent || '').slice(range.startOffset);
+      }
+    }
 
-    // 每个命中 span 的详情
-    const spanDetails = hitSpans.map(span => {
-      const spanText = span.textContent || '';
-      // 找对应的 item（按 str 匹配）
+    // 3. 命中的 span
+    const leafSpans = Array.from(tlDiv.querySelectorAll('span')).filter(s => !s.querySelector('span'));
+    const range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+    const hitSpans = range ? leafSpans.filter(s => {
+      try { return range.intersectsNode(s); } catch { return false; }
+    }) : [];
+    const spanDetails = hitSpans.map(s => {
+      const spanText = s.textContent || '';
       const itemIdx = items.findIndex(it => it.str === spanText);
-      const itemStr = itemIdx !== -1 ? items[itemIdx].str : null;
       return {
-        spanText,
+        spanText: spanText.slice(0, 80),
         itemIdx,
-        itemStr,
-        match: itemStr === spanText,  // span 和 item str 是否完全一致
+        itemStr: itemIdx >= 0 ? items[itemIdx].str.slice(0, 80) : null,
+        match: itemIdx >= 0 && items[itemIdx].str === spanText,
       };
     });
 
-    // 把 rawToString 存起来，输入框获焦时蓝色消失但文字已保存
+    // 4. item 定位（当前代码逻辑：选区中心）
+    const pageH = vp.height / SCALE;
+    const wrapperRect = wrapper.getBoundingClientRect();
+    // 用第一个命中 span 的位置估算选区中心（工具里简化）
+    let closestItemIdx = -1;
+    if (hitSpans.length > 0) {
+      const firstSpan = hitSpans[0];
+      const r = firstSpan.getBoundingClientRect();
+      const centerX = (r.left + r.right) / 2 - wrapperRect.left;
+      const centerY = (r.top + r.bottom) / 2 - wrapperRect.top;
+      const pageX = centerX / SCALE;
+      const pageY = centerY / SCALE;
+      let bestDist = Infinity;
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        const fontH = it.height || Math.abs(it.transform[3]) || 12;
+        const bsY = pageH - it.transform[5];
+        const cx = it.transform[4] + Math.abs(it.width) / 2;
+        const cy = bsY - fontH * 0.5;
+        const d = Math.hypot(cx - pageX, cy - pageY);
+        if (d < bestDist) { bestDist = d; closestItemIdx = i; }
+      }
+    }
+
+    // 不清除 Selection，保留蓝色
     // sel.removeAllRanges();
 
-    // 绘制命中 span 的包围盒（橙色）
-    drawHitSpans(pageNum, hitSpans, vp);
-
     const eId = Date.now();
-    const entry = {
+    currentEntry = {
       id: eId, pageNum,
       rawToString,
+      rangeInfo,
       spanCount: hitSpans.length,
       spanDetails,
-      userSaw: '',   // 用户填写
-      feedback: null,
+      closestItemIdx,
+      closestItemStr: closestItemIdx >= 0 ? items[closestItemIdx].str.slice(0, 80) : null,
+      feedback: {},
     };
-    sessionData.push(entry);
+    sessionData.push(currentEntry);
 
-    showRecord(eId, pageNum, rawToString, spanDetails);
+    renderStepPanel(currentEntry);
 
     fetch('/report', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(entry),
+      body: JSON.stringify(currentEntry),
     }).catch(() => {});
 
-    log(`page=${pageNum} spans=${hitSpans.length} toString="${rawToString.slice(0,30).replace(/\n/g,'↵')}"`);
+    log(`page=${pageNum} toString="${rawToString.slice(0,30).replace(/\n/g,'↵')}" spans=${hitSpans.length} item=${closestItemIdx}`);
   });
 }
 
-// ── 绘制命中 span 的包围盒 ───────────────────────────────
-function drawHitSpans(pageNum, hitSpans, vp) {
-  const ov = bboxCanvases[pageNum];
-  if (!ov) return;
-  const dpr = window.devicePixelRatio || 1;
-  const ctx = ov.getContext('2d');
-  ctx.clearRect(0, 0, ov.width, ov.height);
+// ── 渲染步骤面板（覆盖式，不累积） ───────────────────────
+function renderStepPanel(entry) {
+  const panel = document.getElementById('step-panel');
+  panel.innerHTML = ''; // 每次清空，只显示最新一次
 
-  // 显示所有 item 包围盒（如果勾选）
-  if (document.getElementById('cb-all').checked) {
-    const items = textContents[pageNum]?.items || [];
-    const pageH = vp.height / SCALE;
-    ctx.save();
-    ctx.scale(dpr * SCALE, dpr * SCALE);
-    ctx.strokeStyle = 'rgba(100,100,200,0.2)';
-    ctx.lineWidth = 0.5 / SCALE;
-    for (const it of items) {
-      if (!it.str.trim()) continue;
-      const fontH = it.height || Math.abs(it.transform[3]) || 12;
-      const bsY = pageH - it.transform[5];
-      ctx.strokeRect(it.transform[4], bsY - fontH, Math.abs(it.width), fontH * 1.3);
-    }
-    ctx.restore();
-  }
+  const { rawToString, rangeInfo, spanDetails, closestItemIdx, closestItemStr, pageNum } = entry;
 
-  // 命中 span 的包围盒（橙色）
-  ctx.save();
-  ctx.scale(dpr, dpr);
-  ctx.strokeStyle = 'rgba(255, 120, 0, 0.9)';
-  ctx.fillStyle   = 'rgba(255, 200, 0, 0.25)';
-  ctx.lineWidth   = 1.5;
-  for (const span of hitSpans) {
-    const r = span.getBoundingClientRect();
-    const wr = ov.parentElement.getBoundingClientRect();
-    const x = r.left - wr.left;
-    const y = r.top  - wr.top;
-    ctx.fillRect(x, y, r.width, r.height);
-    ctx.strokeRect(x, y, r.width, r.height);
-  }
-  ctx.restore();
-}
+  // ── 步骤 2 验证：selectedText ──────────────────────────
+  const s2 = document.createElement('div');
 
-window.redrawAll = function() {
-  // 重新绘制 all-items overlay（无命中 span 时）
-  Object.keys(bboxCanvases).forEach(p => {
-    const ov = bboxCanvases[p];
-    const vp = viewports[p];
-    if (!ov || !vp) return;
-    const dpr = window.devicePixelRatio || 1;
-    const ctx = ov.getContext('2d');
-    ctx.clearRect(0, 0, ov.width, ov.height);
-    if (!document.getElementById('cb-all').checked) return;
-    const items = textContents[p]?.items || [];
-    const pageH = vp.height / SCALE;
-    ctx.save();
-    ctx.scale(dpr * SCALE, dpr * SCALE);
-    ctx.strokeStyle = 'rgba(100,100,200,0.2)';
-    ctx.lineWidth = 0.5 / SCALE;
-    for (const it of items) {
-      if (!it.str.trim()) continue;
-      const fontH = it.height || Math.abs(it.transform[3]) || 12;
-      const bsY = pageH - it.transform[5];
-      ctx.strokeRect(it.transform[4], bsY - fontH, Math.abs(it.width), fontH * 1.3);
-    }
-    ctx.restore();
-  });
-};
+  // sel.toString()
+  const toStringOk = rawToString && !rawToString.includes('\n') && rawToString.trim().length > 0;
+  s2.innerHTML = `
+    <div class="step-title">
+      步骤 2：mouseup — selectedText 提取
+      <span class="step-badge ${toStringOk ? '' : 'warn'}">${toStringOk ? '待确认' : '可疑'}</span>
+    </div>
 
-// ── 显示记录卡片 ─────────────────────────────────────────
-function showRecord(eId, pageNum, rawToString, spanDetails) {
-  const container = document.getElementById('results');
-  container.querySelector('.empty-hint')?.remove();
+    <div class="section blue">
+      <div class="section-label">sel.toString()</div>
+      <div class="kv"><span class="k">原始值</span><span class="v hi">"${esc(rawToString)}"</span></div>
+      <div class="kv"><span class="k">含换行</span><span class="v ${rawToString.includes('\\n') ? 'warn' : 'ok'}">${rawToString.includes('\n') ? '是（跨行选中）' : '否'}</span></div>
+    </div>
 
-  const record = document.createElement('div');
-  record.className = 'record';
-  record.dataset.eid = eId;
+    <div class="section green">
+      <div class="section-label">Range 精确截取</div>
+      ${rangeInfo ? `
+        <div class="kv"><span class="k">startOffset</span><span class="v">${rangeInfo.startOffset}</span></div>
+        <div class="kv"><span class="k">endOffset</span><span class="v">${rangeInfo.endOffset}</span></div>
+        <div class="kv"><span class="k">同一节点</span><span class="v ${rangeInfo.sameContainer ? 'ok' : 'warn'}">${rangeInfo.sameContainer ? '是' : '否（跨 span）'}</span></div>
+        ${rangeInfo.preciseQuote !== undefined ? `<div class="kv"><span class="k">精确截取</span><span class="v hi">"${esc(rangeInfo.preciseQuote)}"</span></div>` : ''}
+      ` : '<div class="kv"><span class="v warn">无 Range 信息</span></div>'}
+    </div>
 
-  // 区域推断（简单启发：span 文字长度）
-  const avgLen = spanDetails.length
-    ? spanDetails.reduce((s, d) => s + d.spanText.length, 0) / spanDetails.length
-    : 0;
-  const regionCls  = avgLen > 30 ? 'region-body' : avgLen > 5 ? 'region-title' : 'region-other';
-  const regionName = avgLen > 30 ? '正文' : avgLen > 5 ? '标题/作者' : '短文本';
+    <div class="section gray">
+      <div class="section-label">命中 item（定位）</div>
+      <div class="kv"><span class="k">item idx</span><span class="v">${closestItemIdx >= 0 ? closestItemIdx : '未命中'}</span></div>
+      <div class="kv"><span class="k">item.str</span><span class="v">${closestItemStr ? '"' + esc(closestItemStr) + '"' : '—'}</span></div>
+    </div>
 
-  // 1. 你看到的蓝色文字（用户输入，默认填入 rawToString 单行版本）
-  const defaultVal = rawToString.replace(/\n/g, ' ').trim();
-  record.innerHTML += `
-    <div class="section-you">
-      <label>① 你看到蓝色选中的文字是什么？（可修改）</label>
-      <input type="text" value="${defaultVal.replace(/"/g, '&quot;')}"
-        oninput="updateUserSaw(${eId}, this.value)"
-        onfocus="updateUserSaw(${eId}, this.value)">
-    </div>`;
+    <div class="section ${spanDetails.length > 0 ? (spanDetails.every(d => d.match) ? 'green' : 'amber') : 'red'}">
+      <div class="section-label">命中 span（${spanDetails.length} 个）</div>
+      ${spanDetails.slice(0, 3).map((d, i) => `
+        <div class="kv">
+          <span class="k">span ${i+1}</span>
+          <span class="v ${d.match ? 'ok' : 'warn'}">"${esc(d.spanText)}" ${d.match ? '✓' : '≠item'}</span>
+        </div>
+      `).join('')}
+      ${spanDetails.length > 3 ? `<div class="kv"><span class="k"></span><span class="v" style="color:#aaa">...共 ${spanDetails.length} 个</span></div>` : ''}
+    </div>
 
-  // 2. sel.toString() 原始内容
-  const escaped = JSON.stringify(rawToString);  // 显示换行符等
-  record.innerHTML += `
-    <div class="section-tostring">
-      <div class="label">② sel.toString() 原始内容 <span class="region-badge ${regionCls}">${regionName}</span></div>
-      <div class="val">${escaped}</div>
-    </div>`;
-
-  // 3. 命中 span 列表
-  const spanRows = spanDetails.map((d, i) => {
-    const matchCls = d.match ? '' : 'mismatch';
-    const itemCell = d.itemStr !== null
-      ? `<span class="span-cell item-str ${matchCls}">${esc(d.itemStr)}</span>`
-      : `<span class="span-cell mismatch">未找到匹配 item</span>`;
-    return `<div class="span-row">
-      <span class="span-idx">${i+1}</span>
-      <span class="span-cell span-text">${esc(d.spanText)}</span>
-      ${itemCell}
-    </div>`;
-  }).join('');
-
-  record.innerHTML += `
-    <div class="section-spans">
-      <div class="label">③ 命中的 span（橙色框）共 ${spanDetails.length} 个</div>
-      <div class="col-headers">
-        <span></span><span>span.textContent</span><span>item.str</span>
-      </div>
-      ${spanRows || '<div style="color:#aaa;font-size:11px">无命中 span</div>'}
-    </div>`;
-
-  // 4. 反馈
-  record.innerHTML += `
-    <div class="section-feedback">
-      <span class="fb-label">span 和 item str 是否一致？</span>
-      <button class="fb-ok"  onclick="fb(${eId}, true,  this)">✓ 一致</button>
-      <button class="fb-bad" onclick="fb(${eId}, false, this)">✗ 不一致</button>
-    </div>`;
-
-  // 新记录插到顶部
-  container.appendChild(record);
-  record.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    <div class="fb-row">
+      <span class="fb-label">selectedText 和你看到的蓝色一致吗？</span>
+      <button class="fb-ok"  onclick="fb('step2', true,  this)">✓ 一致</button>
+      <button class="fb-bad" onclick="fb('step2', false, this)">✗ 不一致</button>
+    </div>
+  `;
+  panel.appendChild(s2);
 }
 
 function esc(str) {
-  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'↵');
 }
 
-window.updateUserSaw = function(eId, val) {
-  const entry = sessionData.find(e => e.id === eId);
-  if (entry) entry.userSaw = val;
-};
-
-window.fb = function(eId, ok, btn) {
-  const entry = sessionData.find(e => e.id === eId);
-  if (entry) entry.feedback = ok;
-  const row = btn.closest('.section-feedback');
-  row.innerHTML = `<span class="fb-done ${ok?'ok':'bad'}">${ok ? '✓ span=item，一致' : '✗ span≠item，不一致'}</span>`;
-  log(`反馈 eid=${eId} consistent=${ok}`);
-
-  // 把完整记录（含用户填写的文字）上报
-  fetch('/report', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(sessionData.find(e => e.id === eId)),
-  }).catch(() => {});
+window.fb = function(key, ok, btn) {
+  if (currentEntry) currentEntry.feedback[key] = ok;
+  const row = btn.closest('.fb-row');
+  row.innerHTML = `<span class="fb-done ${ok?'ok':'bad'}">${ok ? '✓ 一致' : '✗ 不一致'}</span>`;
+  log(`反馈 ${key}=${ok}`);
+  if (currentEntry) {
+    fetch('/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(currentEntry),
+    }).catch(() => {});
+  }
 };
 
 window.exportJSON = function() {
   const blob = new Blob([JSON.stringify(sessionData, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `pdf-select-${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.json`;
+  a.download = `pdf-test-${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.json`;
   a.click();
-  log(`导出 ${sessionData.length} 条记录`);
 };
 
 window.clearAll = function() {
   sessionData = [];
-  Object.keys(bboxCanvases).forEach(p => {
-    const ctx = bboxCanvases[p].getContext('2d');
-    ctx.clearRect(0, 0, bboxCanvases[p].width, bboxCanvases[p].height);
-  });
-  document.getElementById('results').innerHTML = '<div class="empty-hint">已清空</div>';
+  currentEntry = null;
+  document.getElementById('step-panel').innerHTML = '<div class="empty">已清空</div>';
   document.getElementById('log').innerHTML = '';
 };
 </script>

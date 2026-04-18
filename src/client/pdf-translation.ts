@@ -83,7 +83,7 @@ function recordCall(record: TranslationCallRecord): void {
     translationStats.failCalls++;
   }
   translationStats.recentCalls.push(record);
-  if (translationStats.recentCalls.length > 20) {
+  if (translationStats.recentCalls.length > 10) {
     translationStats.recentCalls.shift();
   }
 }
@@ -143,6 +143,17 @@ export function removeTranslation(filePath: string, pageNum: number, startItemId
   );
 }
 
+export function clearAllTranslations(filePath: string): void {
+  const prefix = `md-viewer:translation:${filePath}:`;
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith(prefix)) keysToRemove.push(key);
+  }
+  keysToRemove.forEach((k) => localStorage.removeItem(k));
+  currentTranslations = [];
+}
+
 export async function retryTranslation(
   entry: StoredTranslation,
   filePath: string,
@@ -190,6 +201,31 @@ async function _doTranslate(
       timestamp: Date.now(),
     };
     localStorage.setItem(key, JSON.stringify(entry));
+    // 超出 10 条时删除最旧的
+    const allKeys: string[] = [];
+    const filePrefix = `md-viewer:translation:${filePath}:`;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(filePrefix)) allKeys.push(k);
+    }
+    if (allKeys.length > 10) {
+      const entries: Array<{ key: string; ts: number }> = allKeys.map((k) => {
+        try {
+          const v = localStorage.getItem(k);
+          const parsed = v ? (JSON.parse(v) as { timestamp?: number }) : null;
+          return { key: k, ts: parsed?.timestamp ?? 0 };
+        } catch {
+          return { key: k, ts: 0 };
+        }
+      });
+      entries.sort((a, b) => a.ts - b.ts);
+      entries.slice(0, allKeys.length - 10).forEach(({ key: k }) => {
+        localStorage.removeItem(k);
+        currentTranslations = currentTranslations.filter(
+          (t) => translationKey(filePath, t.pageNum, t.startItemIdx) !== k
+        );
+      });
+    }
     const idx = currentTranslations.findIndex(
       (t) => t.pageNum === pageNum && t.startItemIdx === startItemIdx
     );

@@ -364,15 +364,15 @@ item.height（PDF 字体元数据，部分 PDF 中为 0）
 - `endContainer`：选区结束的 DOM 节点
 - `endOffset`：在 endContainer 内，选区到第几个字符结束
 
-**`sel.toString()` 为什么不可靠**
+**`sel.toString()` 是可靠的**
 
-`sel.toString()` 直接把 Range 内的文字拼起来返回。问题在于 PDF.js 的 span 是整行粒度——span 里装着一整行文字。当用户在这个 span 内部拖拽时，`startOffset` 是鼠标按下时在 span 内的字符位置，不是词边界。
+`sel.toString()` 忠实返回用户实际拖选的字符范围，和蓝色高亮显示的范围完全一致——浏览器用同一套 Range 对象驱动两者，不可能一个准一个不准。
 
-举例：标题 span 的 `textContent` 是 `"Quiet-STaR: Language Models Can Teach Themselves to"`。用户想选 "Language Models"，但 mousedown 落在 "L" 的中间偏右（字符偏移 = 1），`toString()` 就返回 `"anguage Models"` 而不是 `"Language Models"`。
+蓝色高亮准，`toString()` 就准。如果看起来"截断了"，那是因为用户鼠标按下时没有精确落在词的起始位置，拖选范围本身就从那个字符开始。这是用户操作精度的问题，不是 API 的问题。
 
-**正确做法：用 Range 的偏移直接截取**
+**用 Range 精确截取 quote**
 
-`Range.startOffset` 和 `endOffset` 是精确的字符位置。由于 `item.str` 和 `span.textContent` 一致（实测验证），可以直接用这两个偏移从 `item.str` 里切出精确的选中文字：
+`Range.startOffset` 和 `endOffset` 是精确的字符位置。由于 `item.str` 和 `span.textContent` 一致（实测验证），可以直接用这两个偏移从 `item.str` 里切出选中文字：
 
 ```typescript
 const sel = window.getSelection();
@@ -383,23 +383,23 @@ const range = sel.getRangeAt(0);
 // item.str 和 span.textContent 一致，所以可以直接用同样的偏移截取
 
 const quote = item.str.slice(range.startOffset, range.endOffset);
-// 用户选了 "Language Models" → startOffset=12, endOffset=27
+// 用户从 "L" 拖到 "s" → startOffset=12, endOffset=27
 // item.str.slice(12, 27) = "Language Models"，精确
 ```
 
-这样无论是正文还是标题，都能拿到精确的选中文字，不依赖 fontH 或坐标计算。
+这样拿到的 `quote` 就是用户实际选中的文字，而不是整行 `item.str`。这是当前实现需要改进的地方：现在存的是整行，应该改为存这个精确的子串。
 
 **三种方法的对比（实测）**
 
-| 方法 | 单行选词（item 定位） | 单行 quote 精度 | 跨行选中 |
-|------|-------------------|---------------|---------|
-| **A（当前：选区中心）** | ✓ 正确命中整行 item | ✗ quote = 整行 | ✗ 只命中 1 个 item |
+| 方法 | 单行 item 定位 | quote 精度 | 跨行选中 |
+|------|--------------|-----------|---------|
+| **A（当前：选区中心）** | ✓ 正确命中整行 item | ✗ 存的是整行 `item.str` | ✗ 只命中 1 个 item |
 | **B（down→up 范围）** | ✗ 跑偏到其他行 | — | ✗ 范围不足 |
-| **C（原生 Selection 反查）** | ✓ 与 A 一致 | ✓ 可用 Range 截取精确 quote | ✓ 完整覆盖所有行 |
+| **C（原生 Selection 反查）** | ✓ 与 A 一致 | ✓ 用 `Range.startOffset/endOffset` 截取精确子串 | ✓ 完整覆盖所有行 |
 
 **结论**：
 - item **定位**用方法 A（当前实现）即可，合理
-- **quote 文字**应改用 `Range.startOffset/endOffset` 从 `item.str` 截取，而不是用 `item.str` 整行
+- **quote 文字**应改用 `Range.startOffset/endOffset` 从 `item.str` 截取精确子串，而不是用整行 `item.str`
 - 跨行选中（目前不支持）应用方法 C 反查所有命中 span 的 item 索引范围
 
 ---

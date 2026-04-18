@@ -10,6 +10,7 @@ import { stripWorkspaceTreeDisplayExtension } from '../utils/workspace-file-name
 import { getPinnedFiles } from '../utils/pinned-files';
 import { scanWorkspace } from '../workspace';
 import { renderFileRow } from './file-row';
+import { getFileExtension } from '../utils/file-type';
 
 // Simple glob matcher for .mdvignore patterns
 // Supports: *, **, ?, and prefix matching (e.g. "bots-ws/" matches any path under bots-ws/)
@@ -44,6 +45,19 @@ export function isIgnored(filePath: string, workspacePath: string, patterns: str
 
 // 防止同一工作区在同一渲染周期内被重复触发扫描
 const pendingScanIds = new Set<string>();
+
+const activeTypes: Set<string> = new Set(['md', 'pdf']);
+
+export function toggleFocusTypeFilter(ext: string): void {
+  if (activeTypes.has(ext)) {
+    if (activeTypes.size > 1) {
+      activeTypes.delete(ext);
+    }
+  } else {
+    activeTypes.add(ext);
+  }
+  import('./sidebar').then(({ renderSidebar }) => renderSidebar());
+}
 
 const FOCUS_COLLAPSED_KEY = 'md-viewer:focus-ws-collapsed';
 
@@ -209,4 +223,8 @@ export function renderFocusView(): string {
   }).join('');
 
   return `<div class="focus-view">${renderFilterBar()}${groups}</div>`;
+}
+
+if (typeof window !== 'undefined') {
+  (window as any).toggleFocusTypeFilter = toggleFocusTypeFilter;
 }

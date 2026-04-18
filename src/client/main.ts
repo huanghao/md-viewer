@@ -1373,6 +1373,8 @@ async function acceptDiffUpdate(): Promise<void> {
   saveState();
 
   diffViewActive = false;
+  const banner = document.getElementById('diffBanner');
+  if (banner) banner.remove();
   currentDiffBlockIndex = -1;
   renderContent();
   syncAnnotationsForCurrentFile(false);

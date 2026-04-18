@@ -53,8 +53,24 @@ cp mdv-server MDViewer/Resources/mdv-server
 chmod +x MDViewer/Resources/mdv-server
 echo ""
 
-# 8. 清理临时文件
-echo "8️⃣  清理临时文件..."
+# 8. 复制模型到 Xcode 项目
+echo "8️⃣  复制模型文件..."
+MODEL_SRC="models/opus-mt-en-zh"
+MODEL_DST="MDViewer/Resources/models/opus-mt-en-zh"
+if [ -d "$MODEL_SRC" ]; then
+    rm -rf "$MODEL_DST"
+    mkdir -p "$(dirname "$MODEL_DST")"
+    cp -R "$MODEL_SRC" "$MODEL_DST"
+    echo "  ✓ 模型已复制到 $MODEL_DST"
+else
+    echo "  ❌ 模型目录不存在: $MODEL_SRC"
+    echo "  请先运行: bun scripts/download-model.ts"
+    exit 1
+fi
+echo ""
+
+# 9. 清理临时文件
+echo "9️⃣  清理临时文件..."
 rm -f mdv-server-arm64 mdv-server-x64 mdv-server
 echo ""
 

@@ -78,11 +78,13 @@ class ServerManager: ObservableObject {
                 .filter { !$0.isEmpty }
                 .joined(separator: ":")
 
+            let modelsDir = (Bundle.main.resourcePath ?? "") + "/models"
             process.environment = [
                 "PORT": "\(port)",
                 "HOST": "127.0.0.1",
                 "PATH": fullPath,
                 "HOME": NSHomeDirectory(),
+                "MODELS_DIR": modelsDir,
             ]
 
             // 5. 重定向日志

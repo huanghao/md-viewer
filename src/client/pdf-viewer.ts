@@ -473,6 +473,11 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
         const extracted = sel.toString().trim();
         const selectedText = extracted || allItems[closestIdx].str;
 
+        // Store cloned Range so openComposerFromPending can insert yellow underline mark
+        if (sel.rangeCount > 0) {
+          (window as any).__pdfPendingSelectionRange = { range: sel.getRangeAt(0).cloneRange(), textLayerDiv };
+        }
+
         console.log('[pdf] selectedText:', selectedText);
         console.log('[pdf] item anchor:', { pageNum, startItemIdx, endItemIdx });
 

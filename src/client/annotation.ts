@@ -829,9 +829,10 @@ function hideComposer(): void {
   el.composer.classList.add('hidden');
 }
 
-function clearTempSelectionMark(): void {
+function clearTempSelectionMark(keepPdfTempMark = false): void {
   // Clear PDF selection marks (blue pre-composer and yellow temp during composing)
-  document.querySelectorAll('mark.pdf-selection-mark, mark.pdf-selection-mark-temp').forEach((mark) => {
+  const pdfSelector = keepPdfTempMark ? 'mark.pdf-selection-mark' : 'mark.pdf-selection-mark, mark.pdf-selection-mark-temp';
+  document.querySelectorAll(pdfSelector).forEach((mark) => {
     const parent = mark.parentNode;
     if (!parent) return;
     while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
@@ -1124,8 +1125,18 @@ export function savePendingAnnotation(filePath: string): void {
   persistAnnotation(filePath, ann, '创建评论失败');
   adjustAnnotationCount(filePath, +1);
   import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
-  hideComposer();
+  // For PDF: keep pdf-selection-mark-temp alive until renderHighlights replaces it with permanent highlight
   const isPdf = document.getElementById('content')?.hasAttribute('data-pdf');
+  if (isPdf) {
+    clearTempSelectionMark(true); // keep PDF temp mark
+    state.pendingAnnotation = null;
+    state.pendingAnnotationFilePath = null;
+    const composerEl = getElements();
+    if (composerEl.composerNote) composerEl.composerNote.value = '';
+    composerEl.composer?.classList.add('hidden');
+  } else {
+    hideComposer();
+  }
   if (!isPdf) applyAnnotations();
   renderAnnotationList(filePath);
   document.dispatchEvent(new CustomEvent('annotation:created', { detail: { annotation: ann, filePath } }));

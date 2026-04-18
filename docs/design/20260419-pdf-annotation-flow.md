@@ -79,12 +79,14 @@
 - 蓝色 `<mark>` 精确覆盖选中字符（项目自己画，替代原生 `::selection`）
 - `[+]` 按钮出现在鼠标附近
 
+> **设计疑问**：步骤 3~4 清除原生 Selection 后蓝色消失，所以项目用 `markSelectionSpans` 重新画一次蓝色。但两次蓝色之间有视觉跳变，体验奇怪。是否可以不清除原生 Selection，直接保留浏览器蓝色？待评估。
+
 **关键数据**：
-- `selectedText`：精确选中文字（如 `"Language Models"`）
+- `selectedText`：精确选中文字（如 `"Language Models"`）——**可疑，需测试工具验证**
 - `startItemIdx`：item 索引（如 `42`）
 - `state.pendingAnnotation = { quote: "Language Models", start: 42, length: 1, page: 1, fileType: "pdf" }`
 
-**双击特殊路径**：双击时走 `dblclick` 事件，通过 `expandDblClick` 自动扩展到词/句边界，其余逻辑相同。
+**双击特殊路径**：双击时走 `dblclick` 事件，通过 `expandDblClick` 自动扩展到词/句边界，其余逻辑相同。**已知 bug：双击目前不生效，会退化成普通单词选中后弹出评论框。**
 
 **不点 `[+]`，点其他地方**：
 - `mousedown` 检测到点击在 `quickAdd` 外部

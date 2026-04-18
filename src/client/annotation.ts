@@ -593,9 +593,11 @@ export function switchAnnotationTab(tab: 'comments' | 'translation'): void {
     btn.classList.toggle('is-active', (btn as HTMLElement).dataset.tab === tab);
   });
 
+  const translationToolbar = document.getElementById('translationToolbar');
   if (commentsPanel) commentsPanel.style.display = tab === 'comments' ? '' : 'none';
   if (commentsList) commentsList.style.display = tab === 'comments' ? '' : 'none';
   if (translationList) translationList.style.display = tab === 'translation' ? '' : 'none';
+  if (translationToolbar) translationToolbar.style.display = tab === 'translation' ? '' : 'none';
 }
 
 export function openTranslationTab(): void {

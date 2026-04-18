@@ -274,6 +274,8 @@ async function syncFileFromDisk(
       diffViewActive = false;
       const diffBtn = document.getElementById('diffButton');
       if (diffBtn) diffBtn.classList.remove('active');
+      const banner = document.getElementById('diffBanner');
+      if (banner) banner.remove();
     }
     renderContent();
     // Defer annotation sync to the next frame: renderAnnotationList calls
@@ -999,6 +1001,8 @@ async function switchFile(path: string) {
     diffViewActive = false;
     const diffBtn = document.getElementById('diffButton');
     if (diffBtn) diffBtn.classList.remove('active');
+    const banner = document.getElementById('diffBanner');
+    if (banner) banner.remove();
   }
   const previousFile = state.currentFile;
   switchToFile(path);
@@ -1333,7 +1337,7 @@ function navigateDiffBlock(direction: 1 | -1): void {
   if (totalBlocks === 0) return;
 
   const nextIndex = currentDiffBlockIndex === -1
-    ? 0
+    ? (direction === 1 ? 0 : totalBlocks - 1)
     : Math.max(0, Math.min(totalBlocks - 1, currentDiffBlockIndex + direction));
 
   if (nextIndex === currentDiffBlockIndex && currentDiffBlockIndex !== -1) return;
@@ -1373,6 +1377,8 @@ async function acceptDiffUpdate(): Promise<void> {
   saveState();
 
   diffViewActive = false;
+  const diffBtn = document.getElementById('diffButton');
+  if (diffBtn) diffBtn.classList.remove('active');
   const banner = document.getElementById('diffBanner');
   if (banner) banner.remove();
   currentDiffBlockIndex = -1;

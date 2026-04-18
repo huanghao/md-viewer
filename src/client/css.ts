@@ -1342,9 +1342,9 @@ export const styles = `
       background: #ffebe9;
     }
     .diff-block-delete::before { background: #cf222e; }
-    .diff-block-delete .diff-deleted-text {
+    .diff-block-delete * {
       text-decoration: line-through;
-      color: #82071e;
+      color: #82071e !important;
     }
 
     /* 修改：删除部分 */
@@ -1352,9 +1352,9 @@ export const styles = `
       background: #ffebe9;
     }
     .diff-block-modify-del::before { background: #cf222e; }
-    .diff-block-modify-del .diff-deleted-text {
+    .diff-block-modify-del * {
       text-decoration: line-through;
-      color: #82071e;
+      color: #82071e !important;
     }
 
     /* 修改：新增部分 */

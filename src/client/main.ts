@@ -57,6 +57,7 @@ import {
   translateBlock,
   retryTranslation,
   removeTranslation,
+  clearAllTranslations,
   highlightTranslationBlock,
 } from "./pdf-translation.js";
 
@@ -591,6 +592,16 @@ function renderContent() {
     // Load persisted translations for this file
     loadTranslations(filePath);
 
+    const clearBtn = document.getElementById('translationClearBtn');
+    if (clearBtn) {
+      const newBtn = clearBtn.cloneNode(true) as HTMLElement;
+      clearBtn.parentNode?.replaceChild(newBtn, clearBtn);
+      newBtn.addEventListener('click', () => {
+        clearAllTranslations(filePath);
+        refreshTranslationList();
+      });
+    }
+
     // Reuse existing viewer if available — re-attach its el to container
     const existingEntry = pdfViewerRegistry.get(filePath);
     if (existingEntry) {
@@ -617,6 +628,25 @@ function renderContent() {
     // New viewer — clear container first, then createPdfViewer appends its el
     container.innerHTML = '';
 
+    const refreshTranslationList = () => renderTranslationList(
+      filePath,
+      getTranslations,
+      (pageNum, startItemIdx) => {
+        removeTranslation(filePath, pageNum, startItemIdx);
+        refreshTranslationList();
+      },
+      (pageNum, startItemIdx, endItemIdx) => {
+        currentPdfViewer?.scrollToPage(pageNum);
+        if (currentPdfViewer) highlightTranslationBlock(currentPdfViewer, pageNum, startItemIdx, endItemIdx);
+      },
+      (pageNum, startItemIdx) => {
+        const entry = getTranslations().find(
+          (t) => t.pageNum === pageNum && t.startItemIdx === startItemIdx
+        );
+        if (!entry) return;
+        retryTranslation(entry, filePath, translationProvider, refreshTranslationList);
+      }
+    );
 
     createPdfViewer({
       container,
@@ -626,26 +656,7 @@ function renderContent() {
         currentPdfBridge?.handleTextSelected(pageNum, selectedText, prefix, suffix, clientX, clientY, startItemIdx, endItemIdx);
       },
       onParagraphClick: (block) => {
-        const refreshList = () => renderTranslationList(
-          filePath,
-          getTranslations,
-          (pageNum, startItemIdx) => {
-            removeTranslation(filePath, pageNum, startItemIdx);
-            refreshList();
-          },
-          (pageNum, startItemIdx, endItemIdx) => {
-            currentPdfViewer?.scrollToPage(pageNum);
-            if (currentPdfViewer) highlightTranslationBlock(currentPdfViewer, pageNum, startItemIdx, endItemIdx);
-          },
-          (pageNum, startItemIdx) => {
-            const entry = getTranslations().find(
-              (t) => t.pageNum === pageNum && t.startItemIdx === startItemIdx
-            );
-            if (!entry) return;
-            retryTranslation(entry, filePath, translationProvider, refreshList);
-          }
-        );
-        translateBlock(block, filePath, translationProvider, refreshList);
+        translateBlock(block, filePath, translationProvider, refreshTranslationList);
         openTranslationTab();
       },
       onPageRendered: (_pageNum) => {

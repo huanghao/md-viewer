@@ -126,11 +126,16 @@ import path from "path";
 import { initTranslator, translate, translatorReady } from "./translation/index.ts";
 
 function resolveModelDir(): string {
-  if (process.env.MODELS_DIR) return path.join(process.env.MODELS_DIR, "opus-mt-en-zh");
-  const base = Bun.main.endsWith(".ts")
-    ? path.join(import.meta.dir, "..")
-    : path.dirname(process.execPath);
-  return path.join(base, "models", "opus-mt-en-zh");
+  // @huggingface/transformers cache_dir 下载后结构为 <cache_dir>/Xenova/opus-mt-en-zh/
+  const cacheBase = process.env.MODELS_DIR
+    ? path.join(process.env.MODELS_DIR, "opus-mt-en-zh")
+    : (() => {
+        const base = Bun.main.endsWith(".ts")
+          ? path.join(import.meta.dir, "..")
+          : path.dirname(process.execPath);
+        return path.join(base, "models", "opus-mt-en-zh");
+      })();
+  return path.join(cacheBase, "Xenova", "opus-mt-en-zh");
 }
 
 app.post("/api/translate", async (c) => {

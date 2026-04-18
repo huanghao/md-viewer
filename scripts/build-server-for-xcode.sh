@@ -16,45 +16,30 @@ bun run scripts/embed-client.ts
 echo ""
 
 # 3. 编译 Server（Apple Silicon）
+# onnxruntime-node 不支持交叉编译，只编译 arm64
 echo "3️⃣  编译 Server (arm64)..."
 bun build --compile \
   --target=bun-darwin-aarch64 \
-  --outfile=mdv-server-arm64 \
+  --outfile=mdv-server \
   src/server.ts
 echo ""
 
-# 4. 编译 Server（Intel）
-echo "4️⃣  编译 Server (x64)..."
-bun build --compile \
-  --target=bun-darwin-x64 \
-  --outfile=mdv-server-x64 \
-  src/server.ts
-echo ""
-
-# 5. 创建通用二进制（Universal Binary）
-echo "5️⃣  创建通用二进制..."
-lipo -create \
-  mdv-server-arm64 \
-  mdv-server-x64 \
-  -output mdv-server
-echo ""
-
-# 6. Ad-hoc 签名（macOS 要求所有可执行文件必须签名，否则 Gatekeeper 会 SIGKILL）
+# 4. Ad-hoc 签名（macOS 要求所有可执行文件必须签名，否则 Gatekeeper 会 SIGKILL）
 # Bun 编译产物内嵌了占位符签名（LC_CODE_SIGNATURE），必须先用 --remove-signature
 # 剥掉它，codesign 才能正常写入真实签名。
-echo "6️⃣  Ad-hoc 签名..."
+echo "4️⃣  Ad-hoc 签名..."
 codesign --remove-signature mdv-server
 codesign --force --sign - mdv-server
 echo ""
 
-# 7. 复制到 Xcode 项目
-echo "7️⃣  复制到 Xcode 项目..."
+# 5. 复制到 Xcode 项目
+echo "5️⃣  复制到 Xcode 项目..."
 cp mdv-server MDViewer/Resources/mdv-server
 chmod +x MDViewer/Resources/mdv-server
 echo ""
 
-# 8. 复制模型到 Xcode 项目
-echo "8️⃣  复制模型文件..."
+# 6. 复制模型到 Xcode 项目
+echo "6️⃣  复制模型文件..."
 MODEL_SRC="models/opus-mt-en-zh"
 MODEL_DST="MDViewer/Resources/models/opus-mt-en-zh"
 if [ -d "$MODEL_SRC" ]; then
@@ -69,9 +54,9 @@ else
 fi
 echo ""
 
-# 9. 清理临时文件
-echo "9️⃣  清理临时文件..."
-rm -f mdv-server-arm64 mdv-server-x64 mdv-server
+# 7. 清理临时文件
+echo "7️⃣  清理临时文件..."
+rm -f mdv-server
 echo ""
 
 echo "✅ Server 二进制已准备好！"

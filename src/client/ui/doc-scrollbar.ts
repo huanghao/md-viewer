@@ -29,6 +29,8 @@ export function mountScrollbar(): void {
   resizeObserver = new ResizeObserver(updateScrollbar);
   resizeObserver.observe(contentEl);
 
+  window.addEventListener('resize', updateScrollbar);
+
   updateScrollbar();
 }
 
@@ -38,6 +40,7 @@ export function unmountScrollbar(): void {
   thumbEl?.removeEventListener('pointerdown', onThumbPointerDown);
   resizeObserver?.disconnect();
   resizeObserver = null;
+  window.removeEventListener('resize', updateScrollbar);
 }
 
 export function updateScrollbar(): void {
@@ -67,7 +70,7 @@ export function updateDiffMarkers(groups: Array<{ el: HTMLElement; kind: 'insert
   };
 
   for (const { el, kind } of groups) {
-    const top = el.offsetTop / totalHeight * 100;
+    const top = (el.getBoundingClientRect().top - contentEl.getBoundingClientRect().top + contentEl.scrollTop) / totalHeight * 100;
     const height = Math.max(el.offsetHeight / totalHeight * 100, 0.5);
     const marker = document.createElement('div');
     marker.className = 'doc-scrollbar-marker';

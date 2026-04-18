@@ -32,6 +32,14 @@ Do not place tool-operational playbooks here unless they are temporary workaroun
 - 优先使用非模态交互：页面内嵌输入、侧栏表单、行内编辑、抽屉。
 - 仅在高风险且不可逆操作中允许确认交互。
 
+## Count/Badge Consistency
+
+凡是涉及"计数"的地方（badge、tab 数字、摘要 API），必须使用同一个判断函数，不得内联重写条件：
+
+- 批注 open 计数统一用 `isOpen(status)`（来自 `annotation-status.ts`），禁止写 `status !== 'resolved'` 或 `status === 'anchored'` 等等价但分散的条件
+- 服务端聚合（`calculateOpenCount`）、客户端增量（`adjustAnnotationCount` 的调用处）、UI 过滤（`matchesFilter`）三处逻辑必须基于同一函数，改一处必须同步检查其他处
+- 新增状态枚举值时，必须同步更新 `annotation-status.ts` 中的所有判断函数，并补充 `annotation-count-badge.test.ts` 中的覆盖用例
+
 ## Collaboration Principles
 
 - 提交应聚焦单一目标，避免把无关改动混入同一提交。

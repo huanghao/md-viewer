@@ -3066,6 +3066,32 @@ export const styles = `
       border-color: #0969da;
       color: #fff;
     }
+    .focus-filter-sep {
+      color: #ddd;
+      font-size: 12px;
+      margin: 0 2px;
+      flex-shrink: 0;
+    }
+    .focus-type-pills {
+      display: flex;
+      gap: 3px;
+    }
+    .focus-type-pill {
+      font-size: 10px;
+      padding: 1px 7px;
+      border-radius: 10px;
+      border: 1px solid #e0e0e0;
+      background: #fff;
+      color: #bbb;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .focus-type-pill:hover { border-color: #aaa; color: #666; }
+    .focus-type-pill.active {
+      background: #0969da;
+      border-color: #0969da;
+      color: #fff;
+    }
     .focus-ws-group {
       border-bottom: 1px solid #f0f0f0;
     }

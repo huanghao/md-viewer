@@ -72,6 +72,99 @@ export interface PdfViewerInstance {
 
 const SCALE_DEFAULT = 1.5;
 const LINE_HEIGHT_MULTIPLIER = 1.5;
+
+type ItemClass = 'h1' | 'h2' | 'body' | 'caption';
+
+function classifyPageItems(items: PdfPageTextItem[]): ItemClass[] {
+  // Skip empty items for median calculation
+  const nonEmpty = items.filter(it => it.str.trim() !== '');
+  if (!nonEmpty.length) return items.map(() => 'body');
+
+  const heights = nonEmpty.map(it => it.height || Math.abs(it.transform[3]) || 10);
+  const sorted = [...heights].sort((a, b) => a - b);
+  const medianSize = sorted[Math.floor(sorted.length / 2)];
+  if (!medianSize) return items.map(() => 'body');
+
+  // Group items into visual lines by PDF Y coordinate (transform[5])
+  // Items with Y diff < 2pt are on the same line
+  const lineGroups: { items: PdfPageTextItem[]; avgHeight: number; text: string }[] = [];
+  const itemToLine: number[] = new Array(items.length).fill(-1);
+
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    const y = it.transform[5];
+    const h = it.height || Math.abs(it.transform[3]) || 10;
+    let found = -1;
+    for (let g = lineGroups.length - 1; g >= Math.max(0, lineGroups.length - 8); g--) {
+      const rep = lineGroups[g].items[0];
+      if (Math.abs(rep.transform[5] - y) < 2) { found = g; break; }
+    }
+    if (found === -1) {
+      found = lineGroups.length;
+      lineGroups.push({ items: [], avgHeight: 0, text: '' });
+    }
+    lineGroups[found].items.push(it);
+    itemToLine[i] = found;
+  }
+
+  // Compute per-line stats
+  for (const g of lineGroups) {
+    const hs = g.items.map(it => it.height || Math.abs(it.transform[3]) || 10);
+    g.avgHeight = hs.reduce((a, b) => a + b, 0) / hs.length;
+    g.text = g.items.map(it => it.str).join('').trim();
+  }
+
+  // Classify each line, then map back to items
+  const lineClass: ItemClass[] = lineGroups.map(g => {
+    const ratio = g.avgHeight / medianSize;
+    const text = g.text;
+    if (!text) return 'caption';
+    if (ratio < 0.92) return 'caption';
+    if (ratio > 1.05 && text.length < 100) {
+      // Exclude: long sentences with mid-text period, URLs, math symbols
+      const hasMidPeriod = /\w\.\s+\w/.test(text);
+      const hasUrl = /https?:|www\./.test(text);
+      const hasMath = /[∼∈≥≤∑∏∫αβγδεζηθλμπρστφψω]/.test(text);
+      if (!hasMidPeriod && !hasUrl && !hasMath) {
+        return ratio > 1.2 ? 'h1' : 'h2';
+      }
+    }
+    return 'body';
+  });
+
+  return items.map((_, i) => lineClass[itemToLine[i]] ?? 'body');
+}
+
+function expandDblClick(
+  items: PdfPageTextItem[],
+  classifications: ItemClass[],
+  anchorIdx: number
+): [number, number] {
+  const cls = classifications[anchorIdx];
+  if (cls !== 'h1' && cls !== 'h2') {
+    // body / caption: select single item
+    return [anchorIdx, anchorIdx];
+  }
+
+  // heading: collect body items until next heading of same or higher level
+  const anchorLevel = cls === 'h1' ? 1 : 2;
+  let end = anchorIdx;
+  let foundBody = false;
+  for (let i = anchorIdx + 1; i < items.length; i++) {
+    const c = classifications[i];
+    if (c === 'h1' || (c === 'h2' && anchorLevel <= 2)) {
+      // Stop at same or higher level heading
+      if (c === 'h1' || anchorLevel === 2) break;
+    }
+    if (c === 'body') { end = i; foundBody = true; }
+  }
+  if (!foundBody) return [anchorIdx, anchorIdx];
+  // Find first body item after anchor
+  let start = anchorIdx + 1;
+  while (start <= end && classifications[start] !== 'body') start++;
+  if (start > end) return [anchorIdx, anchorIdx];
+  return [start, end];
+}
 // Render pages within this many px of the viewport (above and below)
 // 2500px ≈ 2 A4 pages at scale=1.5, reduces blank-page flicker on fast scroll
 const RENDER_MARGIN = 2500;
@@ -226,14 +319,73 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     }
     if (opts.onTextSelected) {
       let mouseDownPageX = 0, mouseDownPageY = 0;
+      let lastMouseDownTime = 0;
       textLayerDiv.addEventListener("mousedown", (e) => {
         const me = e as MouseEvent;
         const wrapperRect = wrapper.getBoundingClientRect();
         mouseDownPageX = (me.clientX - wrapperRect.left) / scale;
         mouseDownPageY = (me.clientY - wrapperRect.top) / scale;
+        lastMouseDownTime = Date.now();
         console.log('[pdf] mousedown on textLayer page', pageNum);
       });
+
+      textLayerDiv.addEventListener("dblclick", (e) => {
+        const me = e as MouseEvent;
+        const wrapperRect = wrapper.getBoundingClientRect();
+        const clickPageX = (me.clientX - wrapperRect.left) / scale;
+        const clickPageY = (me.clientY - wrapperRect.top) / scale;
+        const pageH = viewport.height / scale;
+        const allItems = textContent.items as PdfPageTextItem[];
+
+        // Find closest item (same logic as mouseup)
+        let closestIdx = -1;
+        let closestDist = Infinity;
+        for (let i = 0; i < allItems.length; i++) {
+          const item = allItems[i];
+          const fontH = item.height || Math.abs(item.transform[3]) || 12;
+          const baselineScreenY = pageH - item.transform[5];
+          const ix = item.transform[4];
+          const iRight = ix + Math.abs(item.width);
+          const iy = baselineScreenY - fontH;
+          const iBottom = baselineScreenY + fontH * 0.3;
+          const cx = ix + Math.abs(item.width) / 2;
+          const cy = baselineScreenY - fontH * 0.5;
+          const hOverlap = ix < clickPageX + 20 && iRight > clickPageX - 20;
+          const vOverlap = clickPageY >= iy && clickPageY <= iBottom;
+          if (hOverlap && vOverlap) {
+            const dist = Math.sqrt((cx - clickPageX) ** 2 + (cy - clickPageY) ** 2);
+            if (dist < closestDist) { closestDist = dist; closestIdx = i; }
+          }
+        }
+        if (closestIdx === -1) {
+          for (let i = 0; i < allItems.length; i++) {
+            const item = allItems[i];
+            const fontH = item.height || Math.abs(item.transform[3]) || 12;
+            const baselineScreenY = pageH - item.transform[5];
+            const ix = item.transform[4];
+            const iRight = ix + Math.abs(item.width);
+            const cy = baselineScreenY - fontH * 0.5;
+            if (ix < clickPageX + 20 && iRight > clickPageX - 20) {
+              const dy = Math.abs(cy - clickPageY);
+              if (dy < closestDist) { closestDist = dy; closestIdx = i; }
+            }
+          }
+        }
+        if (closestIdx === -1) return;
+
+        const classifications = classifyPageItems(allItems);
+        const [startIdx, endIdx] = expandDblClick(allItems, classifications, closestIdx);
+        const selectedText = allItems.slice(startIdx, endIdx + 1).map(it => it.str).join(' ').trim();
+        const CONTEXT_ITEMS = 10;
+        const prefix = allItems.slice(Math.max(0, startIdx - CONTEXT_ITEMS), startIdx).map(it => it.str).join(' ').trim();
+        const suffix = allItems.slice(endIdx + 1, Math.min(allItems.length, endIdx + 1 + CONTEXT_ITEMS)).map(it => it.str).join(' ').trim();
+        console.log('[pdf] dblclick expand:', { pageNum, startIdx, endIdx, cls: classifications[closestIdx] });
+        opts.onTextSelected!(pageNum, selectedText, prefix, suffix, me.clientX, me.clientY, startIdx, endIdx);
+      });
+
       textLayerDiv.addEventListener("mouseup", (e) => {
+        // Suppress if this mouseup is part of a double-click (second mousedown came within 300ms)
+        if (Date.now() - lastMouseDownTime < 300 && (e as MouseEvent).detail >= 2) return;
         const sel = window.getSelection();
         console.log('[pdf] mouseup on textLayer page', pageNum, 'collapsed:', sel?.isCollapsed);
         if (!sel || sel.isCollapsed) return;

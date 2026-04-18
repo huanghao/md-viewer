@@ -592,6 +592,26 @@ function renderContent() {
     // Load persisted translations for this file
     loadTranslations(filePath);
 
+    const refreshTranslationList = () => renderTranslationList(
+      filePath,
+      getTranslations,
+      (pageNum, startItemIdx) => {
+        removeTranslation(filePath, pageNum, startItemIdx);
+        refreshTranslationList();
+      },
+      (pageNum, startItemIdx, endItemIdx) => {
+        currentPdfViewer?.scrollToPage(pageNum);
+        if (currentPdfViewer) highlightTranslationBlock(currentPdfViewer, pageNum, startItemIdx, endItemIdx);
+      },
+      (pageNum, startItemIdx) => {
+        const entry = getTranslations().find(
+          (t) => t.pageNum === pageNum && t.startItemIdx === startItemIdx
+        );
+        if (!entry) return;
+        retryTranslation(entry, filePath, translationProvider, refreshTranslationList);
+      }
+    );
+
     const clearBtn = document.getElementById('translationClearBtn');
     if (clearBtn) {
       const newBtn = clearBtn.cloneNode(true) as HTMLElement;
@@ -627,26 +647,6 @@ function renderContent() {
 
     // New viewer — clear container first, then createPdfViewer appends its el
     container.innerHTML = '';
-
-    const refreshTranslationList = () => renderTranslationList(
-      filePath,
-      getTranslations,
-      (pageNum, startItemIdx) => {
-        removeTranslation(filePath, pageNum, startItemIdx);
-        refreshTranslationList();
-      },
-      (pageNum, startItemIdx, endItemIdx) => {
-        currentPdfViewer?.scrollToPage(pageNum);
-        if (currentPdfViewer) highlightTranslationBlock(currentPdfViewer, pageNum, startItemIdx, endItemIdx);
-      },
-      (pageNum, startItemIdx) => {
-        const entry = getTranslations().find(
-          (t) => t.pageNum === pageNum && t.startItemIdx === startItemIdx
-        );
-        if (!entry) return;
-        retryTranslation(entry, filePath, translationProvider, refreshTranslationList);
-      }
-    );
 
     createPdfViewer({
       container,

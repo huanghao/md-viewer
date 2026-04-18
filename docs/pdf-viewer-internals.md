@@ -433,13 +433,23 @@ const quote = item.str.slice(range.startOffset, range.endOffset);
 
 结果：用户看到蓝色一闪而过，加号出现时没有任何高亮残留。输入评论时自然也没有高亮。
 
-**问题 2：`clearSelectionMark` 也从未被调用**
+**问题 2：蓝色高亮在点击加号后消失**
+
+`removeAllRanges` 并不在当前代码里。蓝色消失的真正原因是：**点击加号按钮时，浏览器的 `click` 事件自动清除了原生 selection**（这是浏览器默认行为，点击任何元素都会清除文本选区）。所以蓝色在 mouseup 到点击加号这段时间是存在的，点击加号的瞬间消失。
+
+MD 的解法是 `applyTempSelectionMark`：在 mouseup 时立即把选中范围用 `<mark class="annotation-mark-temp">` 包裹，这样即使原生 selection 被清除，视觉高亮依然保留，直到评论完成。PDF 侧需要同样的机制，即调用已有的 `markSelectionSpans`。
+
+**问题 2b：`clearSelectionMark` 也从未被调用**
 
 `clearSelectionMark` 暴露在 `PdfViewerInstance` 接口上，但 `main.ts` 里没有任何地方调用它。`renderHighlights` 里也没有调用。所以即使 `<mark>` 被插入，它也永远不会被清除。
 
 **问题 3：`quote` 内容错误**
 
-`mouseup` 里记录的 `selectedText` 当前是用 `range.toString().trim()`，但只在 `startContainer === endContainer`（单 span 内拖拽）时才截取，否则退回整行 `item.str`。实际上 PDF.js TextLayer 的 span 粒度是整行，用户拖拽选中几个词时，`startContainer` 和 `endContainer` 通常是同一个 span 的 TextNode，所以 `range.toString()` 应该能工作——**但前提是 `getSelection()` 还没被清除**。当前代码在 `mouseup` 里先调用 `onTextSelected`，`onTextSelected` 里调用 `showQuickAdd`，这时 selection 还在，所以 quote 是对的。但 `window.getSelection().removeAllRanges()` 如果在 `onTextSelected` 之前调用就会导致 quote 为空。**目前代码没有显式清除 selection**，所以 quote 问题来自别处：`selectedText` 在 `closestIdx === -1` 时没有 fallback，且 `range.startContainer === range.endContainer` 的条件在跨 span 时不满足，退回整行。
+`sel.toString()` 是浏览器原生 API，返回用户实际选中的文字，span 是整行还是单词都无关紧要——浏览器知道用户选了哪几个字符，`toString()` 就是那几个字符，不存在偏移问题。
+
+当前代码用 `range.toString().trim()` 截取 quote，但加了 `startContainer === endContainer` 的条件限制，跨 span 时退回整行 `item.str`。这个限制是多余的——`sel.toString()` 跨 span 也能正确返回选中文字。
+
+**真正的 quote 错误原因**：`removeAllRanges` 并不在当前代码里（`pdf-viewer.ts` 中不存在此调用）。quote 退回整行的原因只是那个多余的 `startContainer === endContainer` 条件。去掉该条件，直接用 `sel.toString().trim()` 即可。
 
 **问题 4：保存后高亮整行而非选中词**
 

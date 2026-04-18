@@ -62,7 +62,7 @@ export interface PdfViewerInstance {
    * Highlight by item index range — O(1) precise anchor.
    * pageItemStart/End are indices into textContent.items for that page.
    */
-  highlightByItemRange(pageNum: number, startItemIdx: number, endItemIdx: number, annotationId?: string): void;
+  highlightByItemRange(pageNum: number, startItemIdx: number, endItemIdx: number, annotationId?: string, preciseQuote?: string): void;
   clearHighlights(): void;
   clearSelectionMark(): void;
   getTextBlocks(pageNum: number): PdfTextBlock[];
@@ -469,13 +469,12 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
         const startItemIdx = closestIdx;
         const endItemIdx = closestIdx;
 
-        // Use Range offsets for precise quote (internals §10: item粒度是整行，用Range截取精确词)
-        let selectedText = allItems[closestIdx].str;
-        const range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
-        if (range && range.startContainer === range.endContainer) {
-          const extracted = range.toString().trim();
-          if (extracted) selectedText = extracted;
-        }
+        // sel.toString() is reliable — browser knows exactly which chars are selected
+        const extracted = sel.toString().trim();
+        const selectedText = extracted || allItems[closestIdx].str;
+
+        // Insert <mark class="pdf-selection-mark"> to keep visual highlight after selection is cleared
+        markSelectionSpans(sel, textLayerDiv);
 
         console.log('[pdf] selectedText:', selectedText);
         console.log('[pdf] item anchor:', { pageNum, startItemIdx, endItemIdx });
@@ -588,7 +587,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
    * Highlight by item index range — O(1) precise anchor, no text search.
    * Uses item index in textContent.items as stable coordinate.
    */
-  function highlightByItemRange(pageNum: number, startItemIdx: number, endItemIdx: number, annotationId?: string) {
+  function highlightByItemRange(pageNum: number, startItemIdx: number, endItemIdx: number, annotationId?: string, preciseQuote?: string) {
     const wrapper = pageWrappers[pageNum - 1];
     if (!wrapper) return;
     if (!rendered.has(pageNum)) return;
@@ -610,42 +609,56 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
       s => s.querySelector("span") === null
     );
 
-    // Get the quote text for this item range
+    // Use preciseQuote if available, otherwise fall back to full item text
     const rangeQuote = items.slice(safeStart, safeEnd + 1).map(it => it.str).join(" ").trim();
-    if (!rangeQuote) return;
+    const highlightQuoteStr = (preciseQuote && preciseQuote.length > 0) ? preciseQuote : rangeQuote;
+    if (!highlightQuoteStr) return;
 
-    console.log('[pdf] highlightByItemRange:', { pageNum, safeStart, safeEnd, rangeQuote: rangeQuote.substring(0, 50) });
+    console.log('[pdf] highlightByItemRange:', { pageNum, safeStart, safeEnd, highlightQuoteStr: highlightQuoteStr.substring(0, 50) });
 
-    // Find span that contains this quote (exact or partial match)
-    let matched = false;
     for (const span of spans) {
       const spanText = (span.textContent || "").trim();
-      // Try exact match first
-      if (spanText === rangeQuote) {
-        span.classList.add("pdf-highlight");
-        if (annotationId) {
-          span.classList.add("annotation-mark");
-          span.dataset.annotationId = annotationId;
-        }
-        matched = true;
-        console.log('[pdf] exact match');
-        break;
-      }
-      // Then try if span contains the quote
-      if (spanText.includes(rangeQuote)) {
-        span.classList.add("pdf-highlight");
-        if (annotationId) {
-          span.classList.add("annotation-mark");
-          span.dataset.annotationId = annotationId;
-        }
-        matched = true;
-        console.log('[pdf] partial match');
-        break;
-      }
-    }
+      const isFullMatch = spanText === highlightQuoteStr;
+      const isSubMatch = !isFullMatch && spanText.includes(highlightQuoteStr);
 
-    if (!matched) {
-      console.log('[pdf] no match found for quote:', rangeQuote.substring(0, 50));
+      if (!isFullMatch && !isSubMatch) continue;
+
+      if (isFullMatch || highlightQuoteStr === rangeQuote) {
+        // Whole span matches — add class directly
+        span.classList.add("pdf-highlight");
+        if (annotationId) {
+          span.classList.add("annotation-mark");
+          span.dataset.annotationId = annotationId;
+        }
+      } else {
+        // Precise sub-word highlight: wrap only the matching substring with a <mark>
+        const textNode = span.firstChild;
+        if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+          const idx = (textNode.textContent || "").indexOf(highlightQuoteStr);
+          if (idx >= 0) {
+            try {
+              const r = document.createRange();
+              r.setStart(textNode, idx);
+              r.setEnd(textNode, idx + highlightQuoteStr.length);
+              const mark = document.createElement("mark");
+              mark.className = "pdf-highlight pdf-precise-highlight";
+              if (annotationId) {
+                mark.classList.add("annotation-mark");
+                mark.dataset.annotationId = annotationId;
+              }
+              r.surroundContents(mark);
+            } catch {
+              // fallback: highlight whole span
+              span.classList.add("pdf-highlight");
+              if (annotationId) {
+                span.classList.add("annotation-mark");
+                span.dataset.annotationId = annotationId;
+              }
+            }
+          }
+        }
+      }
+      break;
     }
   }
 

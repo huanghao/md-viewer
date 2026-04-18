@@ -1367,11 +1367,22 @@ export const styles = `
     }
     .diff-block-modify-ins::before { background: #2da44e; }
 
-    /* 当前 focus block 加深背景 */
-    .diff-block-insert.diff-focused { background: #abf2bc; }
-    .diff-block-delete.diff-focused { background: #ffd7d5; }
-    .diff-block-modify-del.diff-focused { background: #ffd7d5; }
-    .diff-block-modify-ins.diff-focused { background: #abf2bc; }
+    /* 变更分组容器 */
+    .diff-group {
+      border-radius: 4px;
+      margin: 2px 0;
+    }
+    .diff-group.diff-focused .diff-block-insert { background: #abf2bc; }
+    .diff-group.diff-focused .diff-block-delete { background: #ffd7d5; }
+    .diff-group.diff-focused .diff-block-modify-del { background: #ffd7d5; }
+    .diff-group.diff-focused .diff-block-modify-ins { background: #abf2bc; }
+
+    /* group 内的 equal 上下文行 */
+    .diff-group-context {
+      background: #f6f8fa;
+      padding: 2px 0;
+      opacity: 0.8;
+    }
 
     /* 无差异提示 */
     .diff-no-changes {

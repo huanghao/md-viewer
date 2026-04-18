@@ -193,6 +193,11 @@ export function generateClientHTML(): string {
       <div class="annotation-list" id="annotationList">
         <div class="annotation-empty">无评论（选中文本即可添加）</div>
       </div>
+      <div class="translation-toolbar" id="translationToolbar" style="display:none;">
+        <button class="annotation-icon-btn" id="translationClearBtn" title="清空全部翻译" aria-label="清空全部翻译">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2h4v1H6zM3 4h10v1H3zm1 1.5h8l-.8 8H4.8L4 5.5zm2 1.5v5h1V7H6zm3 0v5h1V7H9z"/></svg>
+        </button>
+      </div>
       <div class="translation-list" id="translationList" style="display:none;"></div>
     </aside>
     <div class="annotation-sidebar-resizer" id="annotationSidebarResizer" title="拖拽调整评论栏宽度"></div>

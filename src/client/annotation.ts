@@ -617,7 +617,7 @@ export function renderTranslationList(
   const el = document.getElementById('translationList');
   if (!el) return;
 
-  const entries = getTranslations();
+  const entries = [...getTranslations()].sort((a, b) => b.timestamp - a.timestamp);
   const translationTabCount = document.getElementById('translationTabCount');
   if (translationTabCount) translationTabCount.textContent = entries.length > 0 ? `(${entries.length})` : '';
   if (entries.length === 0) {

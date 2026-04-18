@@ -24,7 +24,8 @@
     "hono": "^3.12.8",
     "marked": "^11.1.1",
     "marked-highlight": "^2.0.6",
-    "onnxruntime-node": "^1.24.3"
+    "onnxruntime-node": "^1.24.3",
+    "pdfjs-dist": "^5.6.205"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",

@@ -406,13 +406,63 @@ const quote = item.str.slice(range.startOffset, range.endOffset);
 
 ### 11. 拖拽选中时的视觉高亮
 
-**文件：`src/client/pdf-viewer.ts:500`**（`markSelectionSpans`）
+**文件：`src/client/pdf-viewer.ts`**（`markSelectionSpans`、`clearSelectionMark`）
 
-用户拖拽时，浏览器原生的文本选中会在 TextLayer 的 span 上显示蓝色选中效果（CSS `::selection`）。`mouseup` 后项目清除了 `window.getSelection()`（为了让后续点击不受上次选区干扰），蓝色效果随之消失。
+#### 理想流程（设计意图）
 
-为了给用户保留视觉反馈，项目在 `mouseup` 时额外插入 `<mark class="pdf-selection-mark">` 元素包裹命中 span 的文字，显示蓝色背景。这个 `<mark>` 是临时的，下次操作时会被 `clearSelectionMark()` 移除。
+```
+用户拖拽
+  → 浏览器原生 ::selection 蓝色高亮（自动）
+  → mouseup 触发
+  → markSelectionSpans(sel, textLayerDiv)  ← 插入 <mark class="pdf-selection-mark"> 保留视觉
+  → window.getSelection().removeAllRanges()  ← 清除原生选区（避免干扰后续点击）
+  → onTextSelected 回调 → showQuickAdd 显示加号按钮
+  → 用户点加号 → 打开 composer（mark 仍在，用户看到高亮）
+  → 用户保存评论 → renderHighlights 给 span 加 pdf-highlight + annotation-mark（永久黄色高亮）
+  → clearSelectionMark 移除临时 <mark>
+```
 
-> 当前清除 Selection 是为了让后续点击不受上次选区干扰。实测证明原生 Selection 的 Range 对象可以可靠地反查 item 索引和精确 quote，后续改进应利用这一点（见 §10 实测结论）。
+#### 当前实际代码的状态（2026-04-19）
+
+**问题 1：`markSelectionSpans` 从未被调用**
+
+`markSelectionSpans` 函数已定义（`pdf-viewer.ts:760`），但 `mouseup` 回调里没有调用它。所以：
+- 步骤 1：浏览器原生蓝色高亮 ✓（PDF.js TextLayer span 支持 `::selection`）
+- 步骤 2：`mouseup` 后蓝色消失 ✓（浏览器清除选区）
+- 步骤 3：`markSelectionSpans` 未调用 → **没有 `<mark>` 插入** → 高亮消失 ✗
+
+结果：用户看到蓝色一闪而过，加号出现时没有任何高亮残留。输入评论时自然也没有高亮。
+
+**问题 2：`clearSelectionMark` 也从未被调用**
+
+`clearSelectionMark` 暴露在 `PdfViewerInstance` 接口上，但 `main.ts` 里没有任何地方调用它。`renderHighlights` 里也没有调用。所以即使 `<mark>` 被插入，它也永远不会被清除。
+
+**问题 3：`quote` 内容错误**
+
+`mouseup` 里记录的 `selectedText` 当前是用 `range.toString().trim()`，但只在 `startContainer === endContainer`（单 span 内拖拽）时才截取，否则退回整行 `item.str`。实际上 PDF.js TextLayer 的 span 粒度是整行，用户拖拽选中几个词时，`startContainer` 和 `endContainer` 通常是同一个 span 的 TextNode，所以 `range.toString()` 应该能工作——**但前提是 `getSelection()` 还没被清除**。当前代码在 `mouseup` 里先调用 `onTextSelected`，`onTextSelected` 里调用 `showQuickAdd`，这时 selection 还在，所以 quote 是对的。但 `window.getSelection().removeAllRanges()` 如果在 `onTextSelected` 之前调用就会导致 quote 为空。**目前代码没有显式清除 selection**，所以 quote 问题来自别处：`selectedText` 在 `closestIdx === -1` 时没有 fallback，且 `range.startContainer === range.endContainer` 的条件在跨 span 时不满足，退回整行。
+
+**问题 4：保存后高亮整行而非选中词**
+
+`renderHighlights` 调用 `highlightByItemRange(page, startItemIdx, endItemIdx)`，这个函数用 `items[start..end].map(it => it.str).join(" ")` 重建 `rangeQuote`，然后在 span 里找完全匹配或包含匹配。因为 `startItemIdx === endItemIdx`（单 item 锚点），`rangeQuote` 就是整行 `item.str`，所以命中的 span 是整行 span → **整行变黄**。
+
+即使 quote 里存了精确词（如 "Language Models"），`highlightByItemRange` 也**不用 quote 字段**，它只用 item 索引重建文字。所以精确 quote 存进去了，但高亮时被忽略了。
+
+#### 正确的实现方案
+
+要实现"高亮精确到用户选中的词"，需要：
+
+1. **mouseup 时**：调用 `markSelectionSpans(sel, textLayerDiv)` 插入 `<mark>` 保留视觉，然后再清除原生 selection
+2. **quote 存储**：存 `range.toString().trim()`（精确词），同时存 `startItemIdx`（行锚点）
+3. **高亮渲染**：`highlightByItemRange` 需要支持子串高亮——找到命中 span 后，不是给整个 span 加 class，而是用 `Range` 在 span 内定位精确词，插入 `<mark class="pdf-highlight">` 包裹精确词
+4. **clearSelectionMark**：在 `renderHighlights` 开头（已有）和 composer 取消时调用
+
+#### 涉及文件
+
+| 文件 | 需要改动 |
+|------|---------|
+| `pdf-viewer.ts` | mouseup 里调用 `markSelectionSpans`；`highlightByItemRange` 支持子串精确高亮 |
+| `pdf-annotation.ts` | 传递精确 quote 给 `highlightByItemRange` |
+| `main.ts` | 在适当时机调用 `clearSelectionMark`（composer 取消、保存后） |
 
 ---
 

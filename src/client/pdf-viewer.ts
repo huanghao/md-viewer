@@ -319,13 +319,12 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     }
     if (opts.onTextSelected) {
       let mouseDownPageX = 0, mouseDownPageY = 0;
-      let lastMouseDownTime = 0;
+      let lastMouseUpTime = 0;
       textLayerDiv.addEventListener("mousedown", (e) => {
         const me = e as MouseEvent;
         const wrapperRect = wrapper.getBoundingClientRect();
         mouseDownPageX = (me.clientX - wrapperRect.left) / scale;
         mouseDownPageY = (me.clientY - wrapperRect.top) / scale;
-        lastMouseDownTime = Date.now();
         console.log('[pdf] mousedown on textLayer page', pageNum);
       });
 
@@ -384,8 +383,11 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
       });
 
       textLayerDiv.addEventListener("mouseup", (e) => {
-        // Suppress if this mouseup is part of a double-click (second mousedown came within 300ms)
-        if (Date.now() - lastMouseDownTime < 300 && (e as MouseEvent).detail >= 2) return;
+        // Suppress if two mouseups came within 300ms — this is a double-click, let dblclick handler take over
+        const now = Date.now();
+        const isDoubleClick = now - lastMouseUpTime < 300;
+        lastMouseUpTime = now;
+        if (isDoubleClick) return;
         const sel = window.getSelection();
         console.log('[pdf] mouseup on textLayer page', pageNum, 'collapsed:', sel?.isCollapsed);
         if (!sel || sel.isCollapsed) return;

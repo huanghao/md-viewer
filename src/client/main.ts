@@ -1350,15 +1350,10 @@ function navigateDiffBlock(direction: 1 | -1): void {
   const contentEl = document.getElementById('content');
   if (!contentEl) return;
 
-  // 找所有 block 首元素（每个 blockIndex 只取第一个，modify 的 del+ins 共享同一 index）
-  const seen = new Set<number>();
+  // 找所有 diff-group 元素，按 DOM 顺序收集
   const blockEls: HTMLElement[] = [];
   contentEl.querySelectorAll<HTMLElement>('.diff-group[data-block-index]').forEach(el => {
-    const idx = parseInt(el.dataset.blockIndex ?? '', 10);
-    if (!seen.has(idx)) {
-      seen.add(idx);
-      blockEls.push(el);
-    }
+    blockEls.push(el);
   });
   const totalBlocks = blockEls.length;
   if (totalBlocks === 0) return;

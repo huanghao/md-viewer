@@ -1,19 +1,21 @@
 # PDF 双击语义选择 设计文档
 
-Date: 2026-04-18
+Date: 2026-04-18，更新 2026-04-19
 
 ## 背景
 
-用户在 PDF 文本层双击时，希望选中语义上完整的单元（句子或标题下的段落），而不是单个词。
+用户在 PDF 文本层双击时，希望选中语义上完整的单元，而不是单个词。
+
+根据 pdf-textitem-analysis.md 的实验结论，正文 item 粒度是**整行**（含空格 item 占 45–80%），句子级精度不可达，精度上限是行（item）。
 
 ## 交互行为
 
 **触发**：在 PDF 文本层双击（`dblclick` 事件）。`mouseup` 里加时间戳判断，双击间隔 < 300ms 时跳过普通选择逻辑，避免同时触发批注创建。
 
 **两级行为：**
-- 双击**正文词** → 扩展选中该词所在的**句子**（拼接周边 items 文本后做字符串级句子边界检测，再反查 item 索引）
-- 双击**标题文字** → 扩展选中该标题下直到下一个同级或更高级标题前的所有正文 items
-- 识别不出结构时（如字号无差异的 PDF）→ 静默降级，选中当前**句子**（正文双击逻辑）或当前**标题行**（标题双击逻辑）
+- 双击**正文行** → 选中该行对应的 item（即当前锚点 item，不扩展）
+- 双击**标题行** → 扩展选中该标题下直到下一个同级或更高级标题前的所有 body items
+- 识别不出结构时（如字号无差异的 PDF）→ 静默降级，选中当前锚点 item（单行）
 
 双击后调用现有的 `opts.onTextSelected()`，传入扩展后的 `startItemIdx/endItemIdx`，下游批注/高亮流程完全不变（`highlightByItemRange` 已支持多 item 范围）。
 
@@ -23,24 +25,24 @@ Date: 2026-04-18
 
 **步骤：**
 
-1. **计算基准字号**：对当前页所有 items 取字号中位数（`item.height` 字段）→ `medianSize`
+1. **过滤空 str item**：跳过 `item.str.trim() === ''` 的 item（占 15–40%，是纯空格占位符）
 
-2. **按行合并 items**：将 Y 坐标差 < 2px 的相邻 items 视为同一行，对行单元整体计算平均字号和拼接文本。这一步处理标题被拆成字母级 item 的情况。
+2. **计算基准字号**：对过滤后的 items 取 `item.height` 中位数 → `medianSize`。实验证明行级 median 稳定，公式字符不会拉低基准。
 
-3. **分类每一行**：
-   - `avgHeight / medianSize > 1.05` 且拼接文本短（<100字符）且非长句（无句中句号）且非 URL/数学符号 → `heading`
-   - `avgHeight / medianSize < 0.92` → `caption`
+3. **按行合并 items**：将 `transform[5]`（PDF Y 坐标）差 < 2pt 的相邻 items 视为同一行，取行内平均字号和拼接文本。主要目的是处理标题被拆成字母级 item 的情况。
+
+4. **分类每一行**：
+   - `avgHeight / medianSize > 1.05` 且拼接文本 < 100 字符且无句中句号且非 URL/数学符号 → `heading`
+   - `avgHeight / medianSize < 0.92` → `caption`（跳过）
    - 其余 → `body`
 
-4. **标题层级**：`size_ratio > 1.2` → h1，否则 → h2
+5. **标题层级**：`size_ratio > 1.2` → h1，否则 → h2
 
-5. **句子边界检测**（正文双击）：将锚点前后 items 的 `str` 拼接为文本串，用 `.!?` 做字符串级句子分割，定位锚点所在句子的字符范围，再反查对应的 item 索引范围
-
-6. **标题扩展**（标题双击）：从锚点行向后扫描，收集所有 body items，直到遇到同级或更高级 heading 行为止
+6. **标题扩展**（标题双击）：从锚点行向后扫描所有 items，收集 body items，直到遇到同级或更高级 heading 为止，返回 `[firstBodyItemIdx, lastBodyItemIdx]`
 
 **约束**：同步执行，无异步，无额外 API 调用。
 
-**泛化策略**：基于相对字号（比值），不依赖绝对字号，适用于不同 PDF。字号无差异的 PDF（size_ratio 全部接近 1.0，无 heading 被识别）自动降级为句子选择。
+**泛化策略**：基于相对字号（比值），不依赖绝对字号。字号无差异的 PDF（无 heading 被识别）自动降级为单行选择。
 
 ## 代码改动范围
 
@@ -48,24 +50,23 @@ Date: 2026-04-18
 
 ### 新增函数
 
-**`classifyPageLines(items, pageH)`**（约50行）
-- 输入：当前页 textContent items + 页高
-- 先按 Y 坐标将 items 合并为行单元
-- 输出：每个 item 对应的分类 `Array<'h1' | 'h2' | 'body' | 'caption'>`
+**`classifyPageItems(items, pageH)`**（约50行）
+- 过滤空 str → 计算 medianSize → 按 Y 坐标合并行 → 分类
+- 返回每个原始 item 对应的分类 `Array<'h1' | 'h2' | 'body' | 'caption'>`
 
-**`expandSelectionSemantically(items, classifications, anchorIdx)`**（约70行）
-- 锚点是 heading → 找下一个同级或更高级标题，返回 `[anchorIdx, nextHeadingIdx - 1]`；无法识别结构时返回当前标题行范围
-- 锚点是 body → 拼接周边文本，字符串级句子分割，反查 item 索引，返回 `[sentenceStart, sentenceEnd]`
-- caption → 同 body 处理
+**`expandDblClick(items, classifications, anchorIdx)`**（约40行）
+- 锚点是 h1/h2 → 向后收集 body items 直到下一个同级或更高标题，返回 `[firstBody, lastBody]`；无 body items 则返回 `[anchorIdx, anchorIdx]`
+- 锚点是 body/caption → 返回 `[anchorIdx, anchorIdx]`（单行）
+- 降级同上
 
 ### 修改事件监听
 
-在现有 `mouseup` 监听器开头加双击检测（时间戳判断，< 300ms 则 return）。
+`mouseup` 开头加双击检测：记录上次 mousedown 时间戳，间隔 < 300ms 则 return。
 
 新增 `dblclick` 监听器（约20行）：
 - 复用现有最近 item 查找逻辑定位锚点
-- 调用 `classifyPageLines` + `expandSelectionSemantically`
-- 调用 `opts.onTextSelected!` 传入扩展后的范围
+- 调用 `classifyPageItems` + `expandDblClick`
+- 调用 `opts.onTextSelected!` 传入扩展范围
 
 ### 不改动
 
@@ -73,11 +74,11 @@ Date: 2026-04-18
 
 ### 规模
 
-约 140 行新增，~3 行修改（mouseup 开头加双击检测）。
+约 110 行新增，~3 行修改。
 
 ## 已知边界情况
 
-- 字号无差异 PDF（如 ruler.pdf）：无 heading 被识别，双击标题降级为选中当前行，双击正文选中当前句子
-- 多栏布局：行合并只按 Y 坐标，同行不同栏的 items 可能被误合并；但句子边界（`.!?`）检测在字符串层面仍然有效
-- 数学公式行：字符级 item，字号可能偏小，被分类为 caption，句子扩展时跳过
-- 标题跨行（如论文大标题分两行）：每行独立分类为 heading，双击任一行都触发标题扩展逻辑
+- 字号无差异 PDF（ruler.pdf 类）：无 heading 被识别，双击任何位置均选中单行
+- 标题跨行（如论文大标题分两行）：每行独立分类为 heading，双击任一行都触发标题扩展
+- 公式行：字符级 item 被行合并后字号偏小，分类为 caption，标题扩展时跳过不收集
+- 多栏布局：行合并只按 Y 坐标，同行不同栏 items 可能被误合并；但标题扩展按 item 顺序扫描，影响有限

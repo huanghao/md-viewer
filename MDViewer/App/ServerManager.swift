@@ -39,7 +39,7 @@ class ServerManager: ObservableObject {
         error = nil
         startupSteps = [
             (label: "查找可用端口", done: nil),
-            (label: "定位 Server 程序", done: nil),
+            (label: "定位 bun 和 server 源码", done: nil),
             (label: "启动 Server 进程", done: nil),
             (label: "等待 Server 就绪", done: nil),
         ]
@@ -61,25 +61,20 @@ class ServerManager: ObservableObject {
             step(0, done: true)
             print("✓ 找到可用端口: \(port)")
 
-            // 2. 获取 Server 二进制路径
-            print("🔍 查找 Server 二进制...")
-            guard let serverPath = getServerPath() else {
+            // 2. 查找 bun 和 server 源码目录
+            print("🔍 查找 bun 和 server 源码...")
+            guard let (bunPath, serverDir) = getBunAndServerDir() else {
                 step(1, done: false)
                 throw ServerError.serverNotFound
             }
             step(1, done: true)
-            print("✓ Server 路径: \(serverPath)")
-
-            // 3. 确保可执行权限
-            try FileManager.default.setAttributes(
-                [.posixPermissions: 0o755],
-                ofItemAtPath: serverPath
-            )
+            print("✓ bun: \(bunPath), server: \(serverDir)")
 
             // 4. 启动进程
             let process = Process()
-            process.executableURL = URL(fileURLWithPath: serverPath)
-            process.arguments = ["--internal-server-mode"]
+            process.executableURL = URL(fileURLWithPath: bunPath)
+            process.currentDirectoryURL = URL(fileURLWithPath: serverDir)
+            process.arguments = ["run", "src/server.ts", "--internal-server-mode"]
             // 继承当前进程的 PATH，并补充常见工具路径
             // macOS App 默认 PATH 很短，需要手动补充 Go/Homebrew 等路径
             let currentPath = ProcessInfo.processInfo.environment["PATH"] ?? ""
@@ -100,6 +95,7 @@ class ServerManager: ObservableObject {
                 "PATH": fullPath,
                 "HOME": NSHomeDirectory(),
                 "MODELS_DIR": modelsDir,
+                "HF_HUB_OFFLINE": "1",
             ]
 
             // 5. 重定向日志
@@ -261,25 +257,38 @@ class ServerManager: ObservableObject {
 
     // MARK: - 路径管理
 
-    private func getServerPath() -> String? {
-        // 1. 尝试从 Bundle 中获取（发布版本）
-        if let bundlePath = Bundle.main.path(forResource: "mdv-server", ofType: nil) {
-            return bundlePath
+    private func getBunAndServerDir() -> (bunPath: String, serverDir: String)? {
+        // 查找 bun 可执行文件
+        let bunCandidates = [
+            NSHomeDirectory() + "/.bun/bin/bun",
+            "/opt/homebrew/bin/bun",
+            "/usr/local/bin/bun",
+        ]
+        guard let bunPath = bunCandidates.first(where: { FileManager.default.fileExists(atPath: $0) }) else {
+            print("❌ 找不到 bun，请安装：curl -fsSL https://bun.sh/install | bash")
+            return nil
         }
 
-        // 2. 尝试从项目目录获取（开发版本）
-        let projectPath = URL(fileURLWithPath: #file)
+        // 查找 server 源码目录
+        // 1. app bundle 内（发布版本）
+        if let bundleResources = Bundle.main.resourcePath {
+            let bundleServerDir = bundleResources + "/server"
+            if FileManager.default.fileExists(atPath: bundleServerDir + "/src/server.ts") {
+                return (bunPath, bundleServerDir)
+            }
+        }
+
+        // 2. 开发模式：项目根目录
+        let projectRoot = URL(fileURLWithPath: #file)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appendingPathComponent("dist/mdv")
             .path
-
-        if FileManager.default.fileExists(atPath: projectPath) {
-            return projectPath
+        if FileManager.default.fileExists(atPath: projectRoot + "/src/server.ts") {
+            return (bunPath, projectRoot)
         }
 
-        print("❌ 找不到 mdv-server 二进制文件")
+        print("❌ 找不到 server 源码目录")
         return nil
     }
 

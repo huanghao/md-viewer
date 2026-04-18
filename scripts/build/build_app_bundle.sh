@@ -72,16 +72,16 @@ echo ""
 
 # Derived paths
 APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
-SERVER_BINARY="MDViewer/Resources/mdv-server"
+SERVER_DIR="MDViewer/Resources/server"
 
 # 0. Check prerequisites
 echo "🔍 Step 0: Checking prerequisites..."
-if [ ! -f "$SERVER_BINARY" ]; then
-    echo "  ❌ mdv-server not found at $SERVER_BINARY"
+if [ ! -d "$SERVER_DIR" ]; then
+    echo "  ❌ server/ not found at $SERVER_DIR"
     echo "  Please run: ./scripts/build-server-for-xcode.sh"
     exit 1
 fi
-echo "  ✓ mdv-server found"
+echo "  ✓ server/ found"
 
 # 1. Build in release mode
 echo ""
@@ -103,12 +103,16 @@ cp "$BUILD_DIR/$EXECUTABLE_NAME" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 chmod +x "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 echo "  ✓ Copied executable"
 
-# 4. Copy mdv-server
+# 4. Copy server source
 echo ""
-echo "🚀 Step 4: Copying mdv-server..."
-cp "$SERVER_BINARY" "$APP_BUNDLE/Contents/Resources/"
-chmod +x "$APP_BUNDLE/Contents/Resources/mdv-server"
-echo "  ✓ Copied mdv-server"
+echo "🚀 Step 4: Copying server source..."
+cp -R "$SERVER_DIR" "$APP_BUNDLE/Contents/Resources/"
+# 复制模型（可选）
+if [ -d "MDViewer/Resources/models" ]; then
+    cp -R "MDViewer/Resources/models" "$APP_BUNDLE/Contents/Resources/"
+    echo "  ✓ Copied models"
+fi
+echo "  ✓ Copied server/"
 
 # 5. Copy icon (if exists)
 echo ""
@@ -242,7 +246,7 @@ if [ "$INSTALL_TO_APPLICATIONS" = true ]; then
     # Kill running app and its server processes
     echo "  Stopping running instances..."
     pkill -x "$APP_NAME" 2>/dev/null || true
-    pkill -f "mdv-server --internal-server-mode" 2>/dev/null || true
+    pkill -f "server/src/server.ts --internal-server-mode" 2>/dev/null || true
     sleep 2
 
     # Remove old version

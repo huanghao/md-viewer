@@ -5,6 +5,7 @@ mdv
 md-viewer
 test-results/
 dist/
+docs/research/pdf-textitem-results/
 
 ########## Node START ##########
 # Logs

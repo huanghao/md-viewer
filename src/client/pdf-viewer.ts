@@ -630,9 +630,17 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
         span.classList.add("pdf-highlight");
         if (annotationId) { span.classList.add("annotation-mark"); span.dataset.annotationId = annotationId; }
       } else {
-        // Sub-word: wrap only the matching substring inside the span's text node
-        const textNode = span.childNodes[0];
-        if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+        // Sub-word: find the first text node inside the span (may be nested if temp mark was present)
+        let textNode: Text | null = null;
+        for (const child of Array.from(span.childNodes)) {
+          if (child.nodeType === Node.TEXT_NODE) { textNode = child as Text; break; }
+          if (child.nodeType === Node.ELEMENT_NODE) {
+            const inner = (child as Element).childNodes[0];
+            if (inner && inner.nodeType === Node.TEXT_NODE) { textNode = inner as Text; break; }
+          }
+        }
+        let subWordDone = false;
+        if (textNode) {
           const idx = (textNode.textContent || "").indexOf(targetQuote);
           if (idx >= 0) {
             try {
@@ -644,12 +652,14 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
               mark.style.cssText = "background:rgba(255,220,0,0.4);border-radius:2px;padding:0;margin:0;display:inline;vertical-align:baseline;line-height:inherit;color:inherit;";
               if (annotationId) { mark.classList.add("annotation-mark"); mark.dataset.annotationId = annotationId; }
               r.surroundContents(mark);
-            } catch {
-              // fallback: highlight whole span
-              span.classList.add("pdf-highlight");
-              if (annotationId) { span.classList.add("annotation-mark"); span.dataset.annotationId = annotationId; }
-            }
+              subWordDone = true;
+            } catch {}
           }
+        }
+        if (!subWordDone) {
+          // fallback: highlight whole span
+          span.classList.add("pdf-highlight");
+          if (annotationId) { span.classList.add("annotation-mark"); span.dataset.annotationId = annotationId; }
         }
       }
       break;

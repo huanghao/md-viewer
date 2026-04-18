@@ -107,26 +107,60 @@ interface TextItem {
 
 **一个 item 代表多大的文字单元？**
 
-这取决于 PDF 的生成方式，没有统一规律：
+item 的粒度由 PDF 生成时的**字体切换**决定——同一字体的连续文字合为一个 item，字体变化（粗体、斜体、字号变化）就会切断。实测 15 份 arXiv 学术论文的结果：
 
-| 内容类型 | 典型粒度 |
-|----------|---------|
-| 正文段落 | 1-3 个单词 |
-| 标题 | 整行，或逐字母 |
-| 数学公式 | 单个字符（每个 α、∑、= 都是独立 item） |
-| 页眉/页脚 | 整行 |
-| 表格单元格 | 单元格内容 |
+| 内容类型 | 实际粒度 | 说明 |
+|----------|---------|------|
+| 正文段落 | **整行**（含空格） | 整行是一个 item，`str` 包含整行文字 |
+| 标题 | **整行** | 同上 |
+| 斜体/粗体词 | **单词或短语** | 字体切换处切断，每段相同字体是一个 item |
+| 数学公式 | **单字符** | 每个 α、∑、=、数字各是独立 item |
+| 页眉/页脚 | **整行** | 通常一行一个 item |
+| 空格占位符 | **空字符串** | `str = " "` 或 `str = ""`，纯占位用 |
 
-示例——一段正文的 items（节选）：
+单字符 item 在公式密集的论文里占比高达 40–50%（实测数据）。
+
+**示例 1：正文整行 item（正常情况）**
 
 ```
-{ str: "We",      transform: [..., x:72,  y:720], width:14.4, height:10 }
-{ str: "propose", transform: [..., x:89,  y:720], width:38.2, height:10 }
-{ str: "a",       transform: [..., x:130, y:720], width: 6.1, height:10 }
-{ str: "novel",   transform: [..., x:139, y:720], width:30.5, height:10 }
-{ str: "method",  transform: [..., x:172, y:720], width:35.8, height:10 }
-{ str: "for",     transform: [..., x:72,  y:708], width:16.2, height:10 }  ← 换行，y 变小
+// 一整行正文是一个 item
+{ str: "We make design choices that seek to maximize our ability to scale the model",
+  transform: [10, 0, 0, -10, 70.9, 713.2],  // 10pt 字体，x=70.9, y=713.2
+  width: 453.5,
+  height: 10.0 }
+
+// 下一行
+{ str: "while ensuring it remains stable during training. For example, we opt for a",
+  transform: [10, 0, 0, -10, 70.9, 700.8],  // y 减小 ≈ 行高
+  width: 453.2,
+  height: 10.0 }
 ```
+
+**示例 2：斜体词打断整行（字体切换）**
+
+同一行 "We present **Quiet-STaR**, a generalization..." 会被切成多个 item：
+
+```
+{ str: "We",           transform: [10, 0, 0, -10, 70.9, 650.1], width: 12.2, height: 10 }
+{ str: "present",      transform: [10, 0, 0, -10, 85.4, 650.1], width: 33.8, height: 10 }
+{ str: " ",            transform: [10, 0, 0, -10, 121.2, 650.1], width: 3.0, height: 0  }  ← 空格，height=0
+{ str: "Quiet-STaR",   transform: [10, 0, 0, -10, 124.2, 650.1], width: 52.1, height: 10 }  ← 斜体，独立 item
+{ str: ", a generalization of STaR in which LMs learn to",
+                       transform: [10, 0, 0, -10, 178.3, 650.1], width: 255.4, height: 10 }
+```
+
+**示例 3：数学公式字符（height=0 的情况）**
+
+```
+// 公式 "∑_{i=1}^{n}" 会被切成很多单字符 item，且 height 通常为 0
+{ str: "∑",  transform: [14, 0, 0, -14, 120.0, 580.0], width: 9.8,  height: 0 }  ← height=0！
+{ str: "n",  transform: [8,  0, 0, -8,  130.1, 590.0], width: 5.2,  height: 0 }  ← 上标，字号更小
+{ str: "i",  transform: [8,  0, 0, -8,  130.1, 572.0], width: 3.1,  height: 0 }  ← 下标
+{ str: "=",  transform: [8,  0, 0, -8,  134.0, 572.0], width: 6.4,  height: 0 }
+{ str: "1",  transform: [8,  0, 0, -8,  141.2, 572.0], width: 4.8,  height: 0 }
+```
+
+公式字符的 `height=0` 是正常现象——这些字符的字体元数据不完整，`height` 字段没有值。Canvas 渲染不受影响（直接用字形数据），但项目代码的包围盒计算需要 fallback 到 `Math.abs(transform[3])`。
 
 同一行的 items Y 坐标相同（或差 < 1px），换行时 Y 跳变，跳变量约等于行高。
 
@@ -306,46 +340,60 @@ item.height（PDF 字体元数据，部分 PDF 中为 0）
 
 如果 fallback 到 `12` 而实际字体是 18pt，包围盒上边界偏低，鼠标点击文字顶部时落在包围盒外，选中失败。
 
-**实测结论（2026-04-19，基于 Quiet-STaR / DeepSeek-R1 / Llama-3 论文）**
+**实测结论（2026-04-19）与实现合理性分析**
 
-通过交互测试工具对多次选中做了实测。
+通过交互测试工具（`scripts/pdf-select-lab/`）对多次选中做了实测，结合 15 份论文的定量数据，得出以下结论。
 
-**item 粒度：整行为主，特殊格式词为例外**
+**当前实现的合理性评估**
 
-这几份学术论文 PDF 的正文 item 粒度是**整行**，每个 `str` 是一整行文字：
-- 正文 item：`"General reasoning represents a long-standing and formidable challenge in artificial intelli-"`（含断字符）
-- 标题 item：`"1. Introduction"`
+当前实现（方法 A，选区中心找最近 item）的核心逻辑：
+1. 用鼠标坐标找到对应的 item（整行）→ **这一步是正确的**
+2. 把 `item.str`（整行文字）存为注释的 `quote` → **这一步是问题所在**
 
-但**斜体/粗体等特殊格式的词**会被单独切成 item，粒度更细：
-- `"We"`, `"present"`, `"Quiet-STaR"`, `", a generalization of STaR in which LMs learn to"` 各是独立 item
+问题不在"找到了哪个 item"，而在于"用整行当 quote"。因为 item 粒度是整行，所以高亮时会高亮整行，而不是用户实际选中的词。
 
-这说明 item 粒度由 PDF 生成时的字体切换决定，同一行内字体变化的地方就是 item 的边界。
+**`sel.toString()` 为什么不可靠**
 
-**span 和 item 的映射：可靠**
+浏览器的 `sel.toString()` 返回的是 DOM Range 内的文字。DOM Range 有 `startContainer`（起始节点）、`startOffset`（起始字符位置）、`endContainer`、`endOffset` 四个属性。
 
-实测 20+ 个 span，所有 `span.textContent === item.str`，match=true。span 和 item 是 1:1 对应的（空格 span 除外，同一个空格 item 可能对应多处）。
+当用户在一个整行 span 内部拖拽时：
+- `startContainer` = 这个 span 的文本节点
+- `startOffset` = 鼠标按下时落在 span 内的字符位置（从 0 开始计数）
+- `endOffset` = 鼠标抬起时的字符位置
 
-**`sel.toString()` 的可靠性**
+所以 `toString()` 从 `startOffset` 开始截取，不是从词边界开始。
 
-| 场景 | `sel.toString()` 可用吗 | 原因 |
-|------|------------------------|------|
-| 正文内选词 | ✓ 可用，字符级精确 | 从鼠标落点字符到抬起字符，正确截取 |
-| 标题行内选词 | ✗ 不可用，截断开头 | 从 mousedown 落点字符开始，不是词边界 |
-| 跨行选中 | △ 内容完整但含换行符 | 包含所有 span 的内容，用 `\n` 连接 |
+举例：用户想选 "Language Models"，但 mousedown 落在 "L" 的中间偏右（字符偏移 = 1），`toString()` 就返回 `"anguage Models"` 而不是 `"Language Models"`。
 
-**根本原因**：`sel.toString()` 依赖 DOM Range 的 `startOffset`，而 PDF.js 的 span 是整行粒度，鼠标落在 span 内部任意字符时，Range 从那个字符偏移开始，不是从词边界开始。正文里因为鼠标通常落在词的开头附近，截断不明显；标题字号大、字间距宽，截断更容易被感知。
+**正确做法：用 Range 精确截取**
 
-**正确做法**：不用 `sel.toString()`，改用 `Range.startContainer/startOffset/endContainer/endOffset` 直接读取选中的精确字符范围，然后从 `item.str` 里截取对应子串。
+`Range.startContainer` 是 span 的文本节点，`Range.startOffset` 是字符偏移。从 `item.str` 里用这两个偏移截取子串，就能得到精确的选中文字：
+
+```typescript
+const range = sel.getRangeAt(0);
+// range.startContainer 是 span 的 TextNode
+// range.startOffset 是字符偏移（从 span 开头算起）
+// range.endOffset 是结束字符偏移
+
+// item.str 和 span.textContent 一致（实测），所以可以直接截取
+const quote = item.str.slice(range.startOffset, range.endOffset);
+// quote = "Language Models"，精确
+```
+
+这样无论是正文还是标题，都能拿到精确的选中文字，不依赖 fontH 或坐标计算。
 
 **三种方法的对比（实测）**
 
-| 方法 | 单行选词 | 跨行选中 | 结论 |
-|------|---------|---------|------|
-| **A（选区中心）** | ✓ 命中正确行 item | ✗ 只命中 1 个 item | 跨行时丢失范围 |
-| **B（down→up 范围）** | ✗ 跑偏到其他行 | ✗ 范围不足 | 整行粒度下比 A 更差 |
-| **C（原生 Selection 反查）** | ✓ 与 A 一致 | ✓ 完整覆盖所有行 | 单行和跨行都正确 |
+| 方法 | 单行选词（item 定位） | 单行 quote 精度 | 跨行选中 |
+|------|-------------------|---------------|---------|
+| **A（当前：选区中心）** | ✓ 正确命中整行 item | ✗ quote = 整行 | ✗ 只命中 1 个 item |
+| **B（down→up 范围）** | ✗ 跑偏到其他行 | — | ✗ 范围不足 |
+| **C（原生 Selection 反查）** | ✓ 与 A 一致 | ✓ 可用 Range 截取精确 quote | ✓ 完整覆盖所有行 |
 
-**结论**：坐标→item 定位用方法 A（当前实现）即可，quote 文字用 `Range` 对象精确截取，不用 `toString()`。
+**结论**：
+- item **定位**用方法 A（当前实现）即可，合理
+- **quote 文字**应改用 `Range.startOffset/endOffset` 从 `item.str` 截取，而不是用 `item.str` 整行
+- 跨行选中（目前不支持）应用方法 C 反查所有命中 span 的 item 索引范围
 
 ---
 
@@ -357,7 +405,7 @@ item.height（PDF 字体元数据，部分 PDF 中为 0）
 
 为了给用户保留视觉反馈，项目在 `mouseup` 时额外插入 `<mark class="pdf-selection-mark">` 元素包裹命中 span 的文字，显示蓝色背景。这个 `<mark>` 是临时的，下次操作时会被 `clearSelectionMark()` 移除。
 
-> 是否有必要清除原生 Selection、能否直接利用 Selection 结果反查 item 索引，是待验证的设计问题（见 TODO.md：PDF 选中功能交互式验证实验）。
+> 当前清除 Selection 是为了让后续点击不受上次选区干扰。实测证明原生 Selection 的 Range 对象可以可靠地反查 item 索引和精确 quote，后续改进应利用这一点（见 §10 实测结论）。
 
 ---
 

@@ -191,3 +191,4 @@ dist/
 src/client/embedded-client.ts
 .superpowers/
 .worktrees/
+models/

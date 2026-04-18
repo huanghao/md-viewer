@@ -1364,6 +1364,7 @@ export function applyAnnotations(): void {
 
     let changed = false;
     const changedAnnotations: Annotation[] = [];
+    const currentFile = getActiveAnnotationFilePath();
     for (const ann of state.annotations) {
       const resolved = resolveAnnotationAnchor(text, ann);
       let annChanged = false;
@@ -1378,11 +1379,20 @@ export function applyAnnotations(): void {
         changed = true;
         annChanged = true;
       }
+      const prevStatus = ann.status || 'anchored';
       const mergedStatus = mergeAnnotationStatus(ann.status, nextStatus);
-      if ((ann.status || 'anchored') !== mergedStatus) {
+      if (prevStatus !== mergedStatus) {
         ann.status = mergedStatus;
         changed = true;
         annChanged = true;
+        // 同步 badge 计数：anchored ↔ unanchored 转变
+        if (currentFile) {
+          if (isOpen(prevStatus as AnnotationStatus) && !isOpen(mergedStatus as AnnotationStatus)) {
+            adjustAnnotationCount(currentFile, -1);
+          } else if (!isOpen(prevStatus as AnnotationStatus) && isOpen(mergedStatus as AnnotationStatus)) {
+            adjustAnnotationCount(currentFile, +1);
+          }
+        }
       }
       if (ann.confidence !== resolved.confidence) {
         ann.confidence = resolved.confidence;
@@ -1395,7 +1405,6 @@ export function applyAnnotations(): void {
     }
 
     if (changed) {
-      const currentFile = getActiveAnnotationFilePath();
       if (currentFile) {
         persistAnnotations(currentFile, changedAnnotations, '同步评论锚点失败');
       }

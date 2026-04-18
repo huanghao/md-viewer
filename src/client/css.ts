@@ -3285,6 +3285,23 @@ export const styles = `
       background: rgba(0, 120, 215, 0.35);
       color: inherit;
       border-radius: 2px;
+      display: inline;
+      padding: 0;
+      margin: 0;
+      line-height: inherit;
+      vertical-align: baseline;
+    }
+
+    /* 评论进行中：点加号后变为黄色下划线（对应 MD 的 annotation-mark-temp） */
+    mark.pdf-selection-mark-temp {
+      background: transparent;
+      color: inherit;
+      display: inline;
+      padding: 0;
+      margin: 0;
+      line-height: inherit;
+      vertical-align: baseline;
+      border-bottom: 2px solid #fadb14;
     }
 
     .pdf-translation-overlay {

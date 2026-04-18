@@ -1316,53 +1316,46 @@ function closeDiffView(): void {
 let currentDiffBlockIndex = -1; // -1 表示未激活任何 block
 
 function navigateDiffBlock(direction: 1 | -1): void {
-  const scrollEl = document.querySelector('.diff-view-scroll') as HTMLElement | null;
-  if (!scrollEl) return;
+  const contentEl = document.getElementById('content');
+  if (!contentEl) return;
 
-  const allBlockRows = Array.from(scrollEl.querySelectorAll<HTMLElement>('[data-block-index]'));
-  const totalBlocks = allBlockRows.length;
+  // 找所有 block 首元素（每个 blockIndex 只取第一个，modify 的 del+ins 共享同一 index）
+  const seen = new Set<number>();
+  const blockEls: HTMLElement[] = [];
+  contentEl.querySelectorAll<HTMLElement>('[data-block-index]').forEach(el => {
+    const idx = parseInt(el.dataset.blockIndex ?? '', 10);
+    if (!seen.has(idx)) {
+      seen.add(idx);
+      blockEls.push(el);
+    }
+  });
+  const totalBlocks = blockEls.length;
   if (totalBlocks === 0) return;
 
-  // 基于视口位置确定当前所在 block，避免手动滚动后跳回去
-  const viewportMid = scrollEl.scrollTop + scrollEl.clientHeight / 2;
-  let closestIndex = 0;
-  let closestDist = Infinity;
-  allBlockRows.forEach((row, i) => {
-    const dist = Math.abs(row.offsetTop - viewportMid);
-    if (dist < closestDist) { closestDist = dist; closestIndex = i; }
+  const nextIndex = currentDiffBlockIndex === -1
+    ? 0
+    : Math.max(0, Math.min(totalBlocks - 1, currentDiffBlockIndex + direction));
+
+  if (nextIndex === currentDiffBlockIndex && currentDiffBlockIndex !== -1) return;
+
+  // 移除旧 focus
+  contentEl.querySelectorAll<HTMLElement>('.diff-focused').forEach(el => {
+    el.classList.remove('diff-focused');
   });
 
-  // 首次导航（未激活）时从头/尾开始
-  const baseIndex = currentDiffBlockIndex === -1
-    ? (direction === 1 ? -1 : totalBlocks)
-    : closestIndex;
+  // 加新 focus（同一 blockIndex 的所有元素，即 modify 的 del+ins 两个都高亮）
+  contentEl.querySelectorAll<HTMLElement>(`[data-block-index="${nextIndex}"]`).forEach(el => {
+    el.classList.add('diff-focused');
+  });
 
-  const nextIndex = Math.max(0, Math.min(totalBlocks - 1, baseIndex + direction));
-
-  if (nextIndex === currentDiffBlockIndex) return;
-
-  // 隐藏旧标签
-  if (currentDiffBlockIndex >= 0) {
-    const oldSpan = scrollEl.querySelector<HTMLElement>(`[data-block-span="${currentDiffBlockIndex}"]`);
-    if (oldSpan) oldSpan.style.display = 'none';
-  }
-
-  // 显示新标签
-  const newSpan = scrollEl.querySelector<HTMLElement>(`[data-block-span="${nextIndex}"]`);
-  if (newSpan) newSpan.style.display = 'inline';
-
-  // 滚动到目标 block
-  const targetRow = scrollEl.querySelector<HTMLElement>(`[data-block-index="${nextIndex}"]`);
-  if (targetRow) {
-    targetRow.scrollIntoView({ behavior: 'instant', block: 'center' });
-  }
+  // 滚动到第一个匹配元素
+  blockEls[nextIndex]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
   currentDiffBlockIndex = nextIndex;
 
-  // 更新导航条文字和按钮状态
+  // 更新 banner 计数和按钮状态
   const countEl = document.getElementById('diffNavCount');
-  if (countEl) countEl.textContent = `${nextIndex + 1} / ${totalBlocks} 处差异`;
-
+  if (countEl) countEl.textContent = `${nextIndex + 1} / ${totalBlocks}`;
   const prevBtn = document.getElementById('diffNavPrev') as HTMLButtonElement | null;
   const nextBtn = document.getElementById('diffNavNext') as HTMLButtonElement | null;
   if (prevBtn) prevBtn.disabled = nextIndex === 0;

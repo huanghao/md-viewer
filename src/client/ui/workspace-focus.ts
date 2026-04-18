@@ -134,20 +134,34 @@ function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>, query: str
 
 function renderFilterBar(): string {
   const current = state.config.focusWindowKey || '8h';
-  const options: Array<{ key: string; label: string }> = [
+  const timeOptions: Array<{ key: string; label: string }> = [
     { key: '8h', label: '8h' },
     { key: '2d', label: '2d' },
     { key: '1w', label: '1w' },
     { key: '1m', label: '1m' },
   ];
-  const pills = options.map(o =>
+  const timePills = timeOptions.map(o =>
     `<button class="focus-time-pill${current === o.key ? ' active' : ''}"
              onclick="setFocusWindowKey('${o.key}')">${o.label}</button>`
   ).join('');
+
+  const typeOptions: Array<{ ext: string; label: string }> = [
+    { ext: 'md', label: 'MD' },
+    { ext: 'pdf', label: 'PDF' },
+    { ext: 'html', label: 'HTML' },
+    { ext: 'json', label: 'JSON' },
+  ];
+  const typePills = typeOptions.map(o =>
+    `<button class="focus-type-pill${activeTypes.has(o.ext) ? ' active' : ''}"
+             onclick="toggleFocusTypeFilter('${o.ext}')">${o.label}</button>`
+  ).join('');
+
   return `
     <div class="focus-filter-bar">
       <span class="focus-filter-label">最近</span>
-      <div class="focus-time-pills">${pills}</div>
+      <div class="focus-time-pills">${timePills}</div>
+      <span class="focus-filter-sep">│</span>
+      <div class="focus-type-pills">${typePills}</div>
     </div>
   `;
 }

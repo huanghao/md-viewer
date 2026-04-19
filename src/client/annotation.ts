@@ -1580,12 +1580,13 @@ export function renderAnnotationList(filePath: string | null): void {
       autoResizeReplyInput(input);
       input.focus();
     });
-    entry.addEventListener('keydown', (event: KeyboardEvent) => {
+    entry.addEventListener('keydown', (event) => {
+      const keyboardEvent = event as KeyboardEvent;
       const target = event.target as HTMLElement;
       if (target instanceof HTMLTextAreaElement) return;
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      event.preventDefault();
-      event.stopPropagation();
+      if (keyboardEvent.key !== 'Enter' && keyboardEvent.key !== ' ') return;
+      keyboardEvent.preventDefault();
+      keyboardEvent.stopPropagation();
       const id = (entry as HTMLElement).getAttribute('data-reply-entry');
       if (!id) return;
       const input = el.annotationList?.querySelector(`[data-reply-input="${id}"]`) as HTMLTextAreaElement | null;
@@ -1614,15 +1615,16 @@ export function renderAnnotationList(filePath: string | null): void {
     const input = inputEl as HTMLTextAreaElement;
     input.addEventListener('input', () => autoResizeReplyInput(input));
     input.addEventListener('click', (event) => event.stopPropagation());
-    inputEl.addEventListener('keydown', (event: KeyboardEvent) => {
-      if (handleEmacsKeys(event, event.currentTarget as HTMLTextAreaElement)) {
-        event.preventDefault();
+    inputEl.addEventListener('keydown', (event) => {
+      const keyboardEvent = event as KeyboardEvent;
+      if (handleEmacsKeys(keyboardEvent, keyboardEvent.currentTarget as HTMLTextAreaElement)) {
+        keyboardEvent.preventDefault();
         return;
       }
-      if (event.key !== 'Enter') return;
-      if (!(event.metaKey || event.ctrlKey)) return; // Cmd/Ctrl+Enter 提交
-      event.preventDefault();
-      const input = event.currentTarget as HTMLTextAreaElement;
+      if (keyboardEvent.key !== 'Enter') return;
+      if (!(keyboardEvent.metaKey || keyboardEvent.ctrlKey)) return; // Cmd/Ctrl+Enter 提交
+      keyboardEvent.preventDefault();
+      const input = keyboardEvent.currentTarget as HTMLTextAreaElement;
       const id = input.getAttribute('data-reply-input');
       if (!id || !filePath) return;
       appendReply(id, filePath, input.value);

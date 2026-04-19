@@ -61,6 +61,10 @@ import {
   highlightTranslationBlock,
 } from "./pdf-translation.js";
 
+declare global {
+  function cleanupAllExpiredRecords(): number;
+}
+
 function applyTheme(): void {
   const mdCss = getMdThemeCss(state.config.markdownTheme || 'github');
   const hlCss = getHlThemeCss(state.config.codeTheme || 'github');

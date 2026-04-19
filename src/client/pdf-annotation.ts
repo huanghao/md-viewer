@@ -1,5 +1,5 @@
 import type { PdfViewerInstance } from "./pdf-viewer.js";
-import { nextAnnotationSerial, showQuickAdd } from "./annotation.js";
+import { nextAnnotationSerial, showQuickAdd, showPopover } from "./annotation.js";
 import type { Annotation } from "./annotation.js";
 
 export interface PdfAnnotationBridgeOptions {
@@ -20,6 +20,7 @@ export interface PdfAnnotationBridge {
     startItemIdx: number,
     endItemIdx: number
   ): void;
+  handleAnnotationClick(annotationId: string, clientX: number, clientY: number): void;
   renderHighlights(annotations: Annotation[]): void;
 }
 
@@ -37,6 +38,12 @@ export function createPdfAnnotationBridge(opts: PdfAnnotationBridgeOptions): Pdf
     // Build a pending annotation and show the composer
     const annotations = opts.getAnnotations();
     const serial = nextAnnotationSerial(annotations);
+    const pendingRect = (window as any).__pdfPendingRectCoords as
+      { pageNum: number; x1: number; y1: number; x2: number; y2: number } | null | undefined;
+    (window as any).__pdfPendingRectCoords = null;
+    const rectCoords = pendingRect && pendingRect.pageNum === pageNum
+      ? { x1: pendingRect.x1, y1: pendingRect.y1, x2: pendingRect.x2, y2: pendingRect.y2 }
+      : undefined;
     const pending: Annotation = {
       id: crypto.randomUUID(),
       serial,
@@ -52,6 +59,7 @@ export function createPdfAnnotationBridge(opts: PdfAnnotationBridgeOptions): Pdf
       fileType: "pdf",
       pdfItemStart: startItemIdx,
       pdfItemEnd: endItemIdx,
+      rectCoords,
     } as Annotation & { page: number; fileType: "pdf"; pdfItemStart: number; pdfItemEnd: number };
 
     // Show quickAdd button (same UX as MD: user clicks + to open composer)
@@ -67,7 +75,12 @@ export function createPdfAnnotationBridge(opts: PdfAnnotationBridgeOptions): Pdf
       return pa.fileType === "pdf" && typeof pa.page === "number" && a.status !== 'resolved';
     }) as (Annotation & { page: number; fileType: string })[];
     for (const a of pdfAnns) {
-      const pa = a as Annotation & { page: number; start?: number; length?: number };
+      const pa = a as Annotation & {
+        page: number;
+        start?: number;
+        length?: number;
+        rectCoords?: { x1: number; y1: number; x2: number; y2: number };
+      };
       // Use item index anchor for precise O(1) highlighting
       if (typeof pa.start === "number" && typeof pa.length === "number") {
         const endIdx = pa.start + pa.length - 1;
@@ -75,8 +88,18 @@ export function createPdfAnnotationBridge(opts: PdfAnnotationBridgeOptions): Pdf
       } else {
         opts.viewer.highlightQuote(a.page, a.quote, a.id);
       }
+      if (pa.rectCoords) {
+        const { x1, y1, x2, y2 } = pa.rectCoords;
+        opts.viewer.renderRectHighlight(pa.page, x1, y1, x2, y2, a.id);
+      }
     }
   }
 
-  return { handleTextSelected, renderHighlights };
+  function handleAnnotationClick(annotationId: string, clientX: number, clientY: number) {
+    const ann = opts.getAnnotations().find(a => a.id === annotationId);
+    if (!ann) return;
+    showPopover(ann, clientX + 8, clientY - 8);
+  }
+
+  return { handleTextSelected, handleAnnotationClick, renderHighlights };
 }

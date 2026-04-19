@@ -1195,13 +1195,16 @@ function setActiveAnnotation(id: string | null, filePath: string | null): void {
       const mark = document.querySelector(`[data-annotation-id="${id}"]`) as HTMLElement | null;
       if (!ann || !mark) return;
       if (mark.classList.contains('pdf-rect-anchor') && mark.dataset.rectX2) {
-        // Compute screen position of rect bottom-right corner
+        // Anchor is at top-left of rect (y1*scale, x1*scale).
+        // Bottom-right = anchor screen pos + rect size in screen pixels.
         const x2 = parseFloat(mark.dataset.rectX2);
         const y2 = parseFloat(mark.dataset.rectY2 || '0');
         const s = parseFloat(mark.dataset.rectScale || '1.5');
-        const wrapperRect = (mark.parentElement as HTMLElement).getBoundingClientRect();
-        const screenX = wrapperRect.left + x2 * s;
-        const screenY = wrapperRect.top + y2 * s;
+        const x1 = parseFloat(mark.style.left) / s;  // recover x1 from inline style
+        const y1 = parseFloat(mark.style.top) / s;   // recover y1 from inline style
+        const anchorRect = mark.getBoundingClientRect();
+        const screenX = anchorRect.left + (x2 - x1) * s;
+        const screenY = anchorRect.top + (y2 - y1) * s;
         showPopover(ann, screenX + 8, screenY + 8);
       } else {
         const rect = mark.getBoundingClientRect();

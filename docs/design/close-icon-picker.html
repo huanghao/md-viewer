@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>关闭图标选择</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f6f8fa; margin: 0; padding: 32px; }
+  h2 { font-size: 15px; color: #24292f; margin: 0 0 6px; }
+  .section-label { font-size: 11px; color: #8b949e; margin: 0 0 14px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .section { margin-bottom: 32px; }
+  .section-title { font-size: 12px; font-weight: 600; color: #57606a; margin: 0 0 12px; padding-bottom: 6px; border-bottom: 1px solid #e1e4e8; }
+  .grid { display: flex; flex-wrap: wrap; gap: 12px; }
+  .card {
+    background: #fff;
+    border: 2px solid #d0d7de;
+    border-radius: 10px;
+    padding: 16px 18px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 90px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .card:hover { border-color: #0969da; box-shadow: 0 0 0 3px rgba(9,105,218,0.12); }
+  .card.selected { border-color: #0969da; background: #edf4ff; }
+  .icon-wrap {
+    width: 32px; height: 32px;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    background: #f6f8fa;
+    display: flex; align-items: center; justify-content: center;
+    color: #57606a;
+  }
+  .icon-wrap svg { width: 17px; height: 17px; }
+  .label { font-size: 11px; color: #57606a; text-align: center; line-height: 1.4; }
+  .sublabel { font-size: 10px; color: #8b949e; text-align: center; }
+  .id { font-size: 10px; color: #8b949e; font-family: monospace; background: #f6f8fa; padding: 1px 5px; border-radius: 3px; }
+  .result {
+    position: fixed;
+    bottom: 24px; left: 50%; transform: translateX(-50%);
+    padding: 12px 20px;
+    background: #24292f;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #fff;
+    display: none;
+    white-space: nowrap;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  }
+  .result.show { display: block; }
+</style>
+</head>
+<body>
+<h2>收起侧边栏图标选择</h2>
+<p class="section-label">点击选择，然后告诉 Claude 字母编号</p>
+
+<div class="section">
+  <div class="section-title">方向箭头类</div>
+  <div class="grid">
+
+    <div class="card" onclick="select(this,'A1')">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 4l4 4-4 4"/>
+        </svg>
+      </div>
+      <div class="label">chevron right</div>
+      <div class="id">A1</div>
+    </div>
+
+    <div class="card" onclick="select(this,'A2')">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 4l3 4-3 4M9 4l3 4-3 4"/>
+        </svg>
+      </div>
+      <div class="label">double chevron</div>
+      <div class="id">A2</div>
+    </div>
+
+    <div class="card" onclick="select(this,'A3')">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 8h8M9 5l3 3-3 3"/>
+        </svg>
+      </div>
+      <div class="label">arrow right</div>
+      <div class="id">A3</div>
+    </div>
+
+    <div class="card" onclick="select(this,'A4')">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 4v8M7 5l-3 3 3 3"/>
+        </svg>
+      </div>
+      <div class="label">arrow to bar</div>
+      <div class="sublabel">向右收起</div>
+      <div class="id">A4</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">面板/布局类（VS Code 风格）</div>
+  <div class="grid">
+
+    <div class="card" onclick="select(this,'B1')">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="2.5" width="12" height="11" rx="1.5"/>
+          <path d="M10 2.5v11"/>
+        </svg>
+      </div>
+      <div class="label">panel right</div>
+      <div class="sublabel">VS Code</div>
+      <div class="id">B1</div>
+    </div>
+
+    <div class="card" onclick="select(this,'B2')">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="2.5" width="12" height="11" rx="1.5"/>
+          <path d="M10 2.5v11"/>
+          <path d="M7 7l2 1-2 1"/>
+        </svg>
+      </div>
+      <div class="label">panel + arrow</div>
+      <div class="sublabel">VS Code 变体</div>
+      <div class="id">B2</div>
+    </div>
+
+    <div class="card" onclick="select(this,'B3')">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="2.5" width="12" height="11" rx="1.5"/>
+          <path d="M6 2.5v11"/>
+        </svg>
+      </div>
+      <div class="label">panel left</div>
+      <div class="sublabel">左侧栏变体</div>
+      <div class="id">B3</div>
+    </div>
+
+    <div class="card" onclick="select(this,'B4')">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="2.5" width="12" height="11" rx="1.5"/>
+          <path d="M10 2.5v11"/>
+          <path d="M12.5 6.5l-2 1.5 2 1.5"/>
+        </svg>
+      </div>
+      <div class="label">panel close</div>
+      <div class="sublabel">带箭头</div>
+      <div class="id">B4</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">关闭/消除类（GitHub、Linear 风格）</div>
+  <div class="grid">
+
+    <div class="card" onclick="select(this,'C1')">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/>
+        </svg>
+      </div>
+      <div class="label">细 ×</div>
+      <div class="sublabel">Linear</div>
+      <div class="id">C1</div>
+    </div>
+
+    <div class="card" onclick="select(this,'C2')">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 16 16" fill="currentColor">
+          <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.749.749 0 011.275.326.749.749 0 01-.215.734L9.06 8l3.22 3.22a.749.749 0 01-.326 1.275.749.749 0 01-.734-.215L8 9.06l-3.22 3.22a.751.751 0 01-1.042-.018.751.751 0 01-.018-1.042L6.94 8 3.72 4.78a.75.75 0 010-1.06z"/>
+        </svg>
+      </div>
+      <div class="label">filled ×</div>
+      <div class="sublabel">GitHub</div>
+      <div class="id">C2</div>
+    </div>
+
+    <div class="card" onclick="select(this,'C3')">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/>
+        </svg>
+      </div>
+      <div class="label">粗 ×</div>
+      <div class="sublabel">Figma 风格</div>
+      <div class="id">C3</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">竖线 + 箭头（IDE 通用）</div>
+  <div class="grid">
+
+    <div class="card" onclick="select(this,'D1')">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 3v10M5 5l-2 3 2 3"/>
+        </svg>
+      </div>
+      <div class="label">← 竖线</div>
+      <div class="sublabel">收起到右</div>
+      <div class="id">D1</div>
+    </div>
+
+    <div class="card" onclick="select(this,'D2')">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 3v10M11 5l2 3-2 3"/>
+        </svg>
+      </div>
+      <div class="label">竖线 →</div>
+      <div class="sublabel">展开方向</div>
+      <div class="id">D2</div>
+    </div>
+
+    <div class="card" onclick="select(this,'D3')">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 3v10M8 5l3 3-3 3"/>
+        </svg>
+      </div>
+      <div class="label">竖线 ›</div>
+      <div class="sublabel">JetBrains</div>
+      <div class="id">D3</div>
+    </div>
+
+    <div class="card" onclick="select(this,'D4')">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 3v10M8 5l-3 3 3 3"/>
+        </svg>
+      </div>
+      <div class="label">‹ 竖线</div>
+      <div class="sublabel">收起变体</div>
+      <div class="id">D4</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="result" id="result"></div>
+
+<script>
+function select(el, id) {
+  document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  const r = document.getElementById('result');
+  r.classList.add('show');
+  r.textContent = '已选 ' + id + '：' + el.querySelector('.label').textContent + ' — 告诉 Claude "' + id + '" 即可';
+}
+</script>
+</body>
+</html>

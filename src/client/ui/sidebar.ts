@@ -305,10 +305,7 @@ function renderViewTabs(): void {
       </button>
     </div>
   `;
-  document.getElementById('tocToggleTabBtn')?.addEventListener('click', () => {
-    const sidebar = document.querySelector('.sidebar') as HTMLElement | null;
-    if (sidebar) sidebar.classList.toggle('toc-visible');
-  });
+  // TOC toggle is handled in main.ts via event delegation
 }
 
 // 渲染文件列表

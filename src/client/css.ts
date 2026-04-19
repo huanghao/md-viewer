@@ -626,6 +626,30 @@ export const styles = `
       display: block;
     }
 
+    .toc-open-btn {
+      display: none;
+      align-items: center;
+      gap: 4px;
+      width: 100%;
+      padding: 5px 10px;
+      border: none;
+      border-top: 1px solid var(--color-border, #d0d7de);
+      background: transparent;
+      color: var(--color-text-muted, #8b949e);
+      font-size: var(--text-xs);
+      cursor: pointer;
+      text-align: left;
+      flex-shrink: 0;
+    }
+    .toc-open-btn:hover {
+      background: var(--color-bg-subtle, #f6f8fa);
+      color: var(--color-text-secondary, #57606a);
+    }
+    /* Show open button only when toc-has-content and NOT toc-visible */
+    .sidebar.toc-has-content:not(.toc-visible) .toc-open-btn {
+      display: flex;
+    }
+
     .toc-pane {
       overflow-y: auto;
       flex-shrink: 0;
@@ -688,7 +712,7 @@ export const styles = `
 
     .toc-item {
       display: block;
-      padding: 3px 6px;
+      padding: 4px 8px;
       font-size: var(--text-sm);
       color: #1f2328;
       cursor: pointer;
@@ -697,8 +721,7 @@ export const styles = `
       text-overflow: ellipsis;
       border-radius: var(--radius-sm);
       text-decoration: none;
-      border-left: 2px solid transparent;
-      margin-bottom: 1px;
+      margin-bottom: 2px;
     }
 
     .toc-item:hover {
@@ -707,13 +730,12 @@ export const styles = `
 
     .toc-item.active {
       color: var(--color-accent, #0969da);
-      border-left-color: var(--color-accent, #0969da);
       background: #dbeafe;
     }
 
-    .toc-item[data-level="1"] { padding-left: 6px; font-weight: 500; }
-    .toc-item[data-level="2"] { padding-left: 18px; font-weight: 400; }
-    .toc-item[data-level="3"] { padding-left: 30px; font-size: var(--text-xs); color: var(--color-text-secondary, #57606a); }
+    .toc-item[data-level="1"] { padding-left: 8px; font-weight: 500; }
+    .toc-item[data-level="2"] { padding-left: 20px; font-weight: 400; }
+    .toc-item[data-level="3"] { padding-left: 32px; font-size: var(--text-xs); color: var(--color-text-secondary, #57606a); }
 
     .file-item {
       display: flex;

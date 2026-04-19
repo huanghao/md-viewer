@@ -71,6 +71,8 @@ export interface PdfViewerInstance {
   /** Called when user clicks a persistent annotation rect */
   onAnnotationClick?: (annotationId: string, clientX: number, clientY: number) => void;
   getPdfDoc(): any;
+  /** Mark translate icons as translated/untranslated based on current translation list */
+  markTranslatedIcons(keys: Set<string>): void;
 }
 
 const SCALE_DEFAULT: number = (typeof window !== 'undefined' && (window as any).__pdfDefaultScale)
@@ -329,13 +331,28 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     // Event handlers: 每段左侧固定「译」图标
     if (opts.onParagraphClick) {
       for (const block of blocks) {
+        const startItemIdx = Math.round(block.y * 10);
         const icon = document.createElement("button");
         icon.className = "pdf-translate-icon";
         icon.textContent = "译";
         icon.style.top = `${block.y * scale}px`;
+        icon.dataset.page = String(block.pageNum);
+        icon.dataset.start = String(startItemIdx);
         icon.addEventListener("click", (ev) => {
           ev.stopPropagation();
           opts.onParagraphClick!(block);
+        });
+        icon.addEventListener("mouseenter", () => {
+          el.dispatchEvent(new CustomEvent("pdf-translate-hover", {
+            bubbles: true,
+            detail: { pageNum: block.pageNum, startItemIdx, active: true },
+          }));
+        });
+        icon.addEventListener("mouseleave", () => {
+          el.dispatchEvent(new CustomEvent("pdf-translate-hover", {
+            bubbles: true,
+            detail: { pageNum: block.pageNum, startItemIdx, active: false },
+          }));
         });
         wrapper.appendChild(icon);
       }
@@ -697,6 +714,13 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
   function getRenderedCount(): number { return rendered.size; }
   function getTotalPages(): number { return numPages; }
 
+  function markTranslatedIcons(keys: Set<string>): void {
+    el.querySelectorAll<HTMLElement>('.pdf-translate-icon[data-page]').forEach(icon => {
+      const k = `${icon.dataset.page}:${icon.dataset.start}`;
+      icon.classList.toggle('is-translated', keys.has(k));
+    });
+  }
+
   return {
     el, destroy, scrollToPage,
     highlightQuote, highlightByItemRange, clearHighlights, clearSelectionMark,
@@ -704,6 +728,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     getTextBlocks, getRenderedCount, getTotalPages,
     drawTempRect, clearTempRect,
     getPdfDoc: () => pdfDoc,
+    markTranslatedIcons,
     get onAnnotationClick() { return opts.onAnnotationClick; },
     set onAnnotationClick(fn: ((annotationId: string, clientX: number, clientY: number) => void) | undefined) { opts.onAnnotationClick = fn; },
   };

@@ -854,25 +854,31 @@ function renderContent() {
     // Load persisted translations for this file
     loadTranslations(filePath);
 
-    const refreshTranslationList = () => renderTranslationList(
-      filePath,
-      getTranslations,
-      (pageNum, startItemIdx) => {
-        removeTranslation(filePath, pageNum, startItemIdx);
-        refreshTranslationList();
-      },
-      (pageNum, startItemIdx, endItemIdx) => {
-        currentPdfViewer?.scrollToPage(pageNum);
-        if (currentPdfViewer) highlightTranslationBlock(currentPdfViewer, pageNum, startItemIdx, endItemIdx);
-      },
-      (pageNum, startItemIdx) => {
-        const entry = getTranslations().find(
-          (t) => t.pageNum === pageNum && t.startItemIdx === startItemIdx
-        );
-        if (!entry) return;
-        retryTranslation(entry, filePath, translationProvider, refreshTranslationList);
-      }
-    );
+    const refreshTranslationList = () => {
+      renderTranslationList(
+        filePath,
+        getTranslations,
+        (pageNum, startItemIdx) => {
+          removeTranslation(filePath, pageNum, startItemIdx);
+          refreshTranslationList();
+        },
+        (pageNum, startItemIdx, endItemIdx) => {
+          currentPdfViewer?.scrollToPage(pageNum);
+          if (currentPdfViewer) highlightTranslationBlock(currentPdfViewer, pageNum, startItemIdx, endItemIdx);
+        },
+        (pageNum, startItemIdx) => {
+          const entry = getTranslations().find(
+            (t) => t.pageNum === pageNum && t.startItemIdx === startItemIdx
+          );
+          if (!entry) return;
+          retryTranslation(entry, filePath, translationProvider, refreshTranslationList);
+        }
+      );
+      const keys = new Set(getTranslations()
+        .filter(t => t.translatedText)
+        .map(t => `${t.pageNum}:${t.startItemIdx}`));
+      currentPdfViewer?.markTranslatedIcons(keys);
+    };
 
     const clearBtn = document.getElementById('translationClearBtn');
     if (clearBtn) {
@@ -911,6 +917,7 @@ function renderContent() {
       unmountScrollbar();
       mountScrollbar();
       mountPdfPageIndicator(existingEntry.viewer, container);
+      refreshTranslationList();
       updateToc(filePath);
       return;
     }
@@ -961,6 +968,13 @@ function renderContent() {
       unmountScrollbar();
       mountScrollbar();
       mountPdfPageIndicator(pdfViewerInstance, container);
+      // hover 「译」按钮 → 高亮右侧翻译列表对应条目
+      pdfViewerInstance.el.addEventListener('pdf-translate-hover', (e) => {
+        const { pageNum, startItemIdx, active } = (e as CustomEvent).detail;
+        const key = `${pageNum}:${startItemIdx}`;
+        document.querySelector<HTMLElement>(`.translation-item[data-key="${key}"]`)
+          ?.classList.toggle('is-highlighted', active);
+      });
       updateToc(filePath);
     });
     return; // don't fall through to markdown renderer

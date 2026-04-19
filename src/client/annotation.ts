@@ -1194,8 +1194,12 @@ function setActiveAnnotation(id: string | null, filePath: string | null): void {
       const ann = state.annotations.find((item) => item.id === id);
       const mark = document.querySelector(`[data-annotation-id="${id}"]`) as HTMLElement | null;
       if (!ann || !mark) return;
-      const rect = mark.getBoundingClientRect();
-      showPopover(ann, rect.right + 8, rect.top + 8);
+      if (mark.classList.contains('pdf-rect-anchor')) {
+        showPopoverBottomRight(ann);
+      } else {
+        const rect = mark.getBoundingClientRect();
+        showPopover(ann, rect.right + 8, rect.top + 8);
+      }
     });
   }
   renderAnnotationList(filePath);

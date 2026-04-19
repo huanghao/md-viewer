@@ -993,42 +993,6 @@ export const styles = `
       color: var(--color-text-secondary);
     }
 
-    /* 字体缩放菜单 */
-    .font-scale-menu {
-      position: absolute;
-      top: 48px;
-      right: 80px;
-      background: white;
-      border: 1px solid #e5e7eb;
-      border-radius: var(--radius-md);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-      padding: 4px 0;
-      min-width: 80px;
-      z-index: var(--z-dropdown);
-    }
-
-    .font-scale-option {
-      padding: 6px 16px;
-      font-size: var(--text-sm);
-      color: #374151;
-      cursor: pointer;
-      transition: background 0.15s ease;
-      font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Consolas', monospace;
-    }
-
-    .font-scale-option:hover {
-      background: #f3f4f6;
-    }
-
-    .font-scale-option.active {
-      color: #3b82f6;
-      font-weight: 500;
-    }
-
-    .font-scale-option.active::after {
-      content: ' ✓';
-      margin-left: 8px;
-    }
 
     /* 纯文本工具栏按钮 */
     .toolbar-text-button {

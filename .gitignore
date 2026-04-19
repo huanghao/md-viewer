@@ -195,3 +195,11 @@ src/client/embedded-client.ts
 .worktrees/
 models/
 dist-server/
+
+# Build artifacts
+mdv-server-arm64
+mdv-server-*
+
+# Vim swap files
+*.swp
+*.swo

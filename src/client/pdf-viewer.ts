@@ -72,7 +72,9 @@ export interface PdfViewerInstance {
   onAnnotationClick?: (annotationId: string, clientX: number, clientY: number) => void;
 }
 
-const SCALE_DEFAULT = 1.5;
+const SCALE_DEFAULT: number = (typeof window !== 'undefined' && (window as any).__pdfDefaultScale)
+  ? (window as any).__pdfDefaultScale
+  : 1.5;
 const LINE_HEIGHT_MULTIPLIER = 1.5;
 
 type ItemClass = 'h1' | 'h2' | 'body' | 'caption';

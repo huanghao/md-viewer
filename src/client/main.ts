@@ -1424,7 +1424,9 @@ async function acceptDiffUpdate(): Promise<void> {
   if (diffBtn) diffBtn.classList.remove('active');
   const banner = document.getElementById('diffBanner');
   if (banner) banner.remove();
+  document.getElementById('content')?.classList.remove('diff-active');
   currentDiffBlockIndex = -1;
+  clearDiffMarkers();
   renderContent();
   syncAnnotationsForCurrentFile(false);
   flashContentUpdated();

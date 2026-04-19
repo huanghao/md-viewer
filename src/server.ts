@@ -34,6 +34,7 @@ import {
   handleClearAllAnnotations,
   handleGetSessionState,
   handleUpdateSessionState,
+  handleWriteFile,
   handleGetClientConfig,
 } from "./handlers.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
@@ -86,6 +87,9 @@ app.get("/favicon.svg", (c) => {
 app.get("/api/file", handleGetFile);
 app.get("/api/file-asset", handleGetFileAsset);
 app.get("/api/pdf-asset", handleGetPdfAsset);
+
+// API: 写入 sidecar 文件
+app.post("/api/file-write", handleWriteFile);
 
 // API: 获取目录下的 Markdown 文件列表
 app.get("/api/files", handleGetFiles);

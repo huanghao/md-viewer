@@ -180,6 +180,11 @@ export function generateClientHTML(): string {
         <div class="doc-scrollbar-markers"></div>
         <div class="doc-scrollbar-thumb"></div>
       </div>
+      <!-- PDF 页码指示器 -->
+      <div id="pdfPageIndicator" class="pdf-page-indicator" style="display:none">
+        <span class="pdf-page-indicator-label"></span>
+        <input class="pdf-page-indicator-input" type="number" min="1" style="display:none" />
+      </div>
     </main>
 
     <!-- 评论侧边栏 -->

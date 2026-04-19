@@ -662,14 +662,37 @@ export function renderTranslationList(
       </div>`;
   }).join('');
 
-  // 点击条目跳转
+  function findTranslateIcon(pageNum: number, startItemIdx: number): HTMLElement | null {
+    return document.querySelector<HTMLElement>(
+      `.pdf-translate-icon[data-page="${pageNum}"][data-start="${startItemIdx}"]`
+    );
+  }
+
+  // 点击条目跳转，并短暂高亮对应「译」按钮
   el.querySelectorAll<HTMLElement>('.translation-item[data-page]').forEach((item) => {
     item.addEventListener('click', (e) => {
       if ((e.target as HTMLElement).closest('.translation-item-del')) return;
       const pageNum = Number(item.dataset.page);
       const startItemIdx = Number(item.dataset.start);
       const endItemIdx = Number(item.dataset.end);
-      if (Number.isFinite(pageNum)) onJump(pageNum, startItemIdx, endItemIdx);
+      if (Number.isFinite(pageNum)) {
+        onJump(pageNum, startItemIdx, endItemIdx);
+        const icon = findTranslateIcon(pageNum, startItemIdx);
+        if (icon) {
+          icon.classList.add('is-highlighted');
+          setTimeout(() => icon.classList.remove('is-highlighted'), 1500);
+        }
+      }
+    });
+
+    // hover 条目 → 高亮对应「译」按钮
+    item.addEventListener('mouseenter', () => {
+      const icon = findTranslateIcon(Number(item.dataset.page), Number(item.dataset.start));
+      icon?.classList.add('is-highlighted');
+    });
+    item.addEventListener('mouseleave', () => {
+      const icon = findTranslateIcon(Number(item.dataset.page), Number(item.dataset.start));
+      icon?.classList.remove('is-highlighted');
     });
   });
 

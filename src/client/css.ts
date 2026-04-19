@@ -711,17 +711,22 @@ export const styles = `
     }
 
     .toc-item {
-      display: block;
+      display: flex;
+      align-items: center;
       padding: 4px 8px;
       font-size: var(--text-sm);
       color: #1f2328;
       cursor: pointer;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
       border-radius: var(--radius-sm);
       text-decoration: none;
       margin-bottom: 2px;
+      overflow: hidden;
+    }
+    .toc-item-title {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
     }
 
     .toc-item:hover {
@@ -736,6 +741,18 @@ export const styles = `
     .toc-item[data-level="1"] { padding-left: 8px; font-weight: 500; }
     .toc-item[data-level="2"] { padding-left: 20px; font-weight: 400; }
     .toc-item[data-level="3"] { padding-left: 32px; font-size: var(--text-xs); color: var(--color-text-secondary, #57606a); }
+    .toc-level-badge {
+      display: none;
+      font-size: 10px;
+      font-weight: 400;
+      color: var(--color-text-muted, #8b949e);
+      margin-right: 5px;
+      flex-shrink: 0;
+      font-variant-numeric: tabular-nums;
+    }
+    .toc-item.active .toc-level-badge {
+      display: inline;
+    }
 
     .file-item {
       display: flex;

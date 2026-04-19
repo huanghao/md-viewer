@@ -11,7 +11,7 @@ function renderItems(items: TocItem[], startIdx: { v: number }): string {
        data-page="${item.pageNum ?? ''}"
        data-anchor="${item.anchor ?? ''}"
        data-idx="${idx}"
-       title="${item.title}">${item.title}</a>${renderItems(item.children, startIdx)}`;
+       title="${item.title}"><span class="toc-level-badge">#${item.level}</span><span class="toc-item-title">${item.title}</span></a>${renderItems(item.children, startIdx)}`;
   }).join('');
 }
 

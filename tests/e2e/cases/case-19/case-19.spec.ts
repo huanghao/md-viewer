@@ -25,7 +25,7 @@ test('case-19: 轮询重扫后仍保持目录折叠状态', async ({ page }) => 
   const docsNode = docsDirectory.locator('xpath=ancestor::div[contains(@class,"tree-node")][1]');
   const docsToggle = docsDirectory.locator('.tree-toggle').first();
 
-  await expect(docsToggle).toHaveText('▼');
+  await expect(docsToggle).toHaveText('▶');
   await expect(docsNode.locator(':scope > .file-tree')).toHaveCount(1);
 
   await docsToggle.click();

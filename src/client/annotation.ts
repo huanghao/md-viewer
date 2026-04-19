@@ -1194,8 +1194,15 @@ function setActiveAnnotation(id: string | null, filePath: string | null): void {
       const ann = state.annotations.find((item) => item.id === id);
       const mark = document.querySelector(`[data-annotation-id="${id}"]`) as HTMLElement | null;
       if (!ann || !mark) return;
-      if (mark.classList.contains('pdf-rect-anchor')) {
-        showPopoverBottomRight(ann);
+      if (mark.classList.contains('pdf-rect-anchor') && mark.dataset.rectX2) {
+        // Compute screen position of rect bottom-right corner
+        const x2 = parseFloat(mark.dataset.rectX2);
+        const y2 = parseFloat(mark.dataset.rectY2 || '0');
+        const s = parseFloat(mark.dataset.rectScale || '1.5');
+        const wrapperRect = (mark.parentElement as HTMLElement).getBoundingClientRect();
+        const screenX = wrapperRect.left + x2 * s;
+        const screenY = wrapperRect.top + y2 * s;
+        showPopover(ann, screenX + 8, screenY + 8);
       } else {
         const rect = mark.getBoundingClientRect();
         showPopover(ann, rect.right + 8, rect.top + 8);

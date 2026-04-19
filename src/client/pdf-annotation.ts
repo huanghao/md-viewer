@@ -92,7 +92,8 @@ export function createPdfAnnotationBridge(opts: PdfAnnotationBridgeOptions): Pdf
   function handleAnnotationClick(annotationId: string, clientX: number, clientY: number) {
     const ann = opts.getAnnotations().find(a => a.id === annotationId);
     if (!ann) return;
-    showPopoverBottomRight(ann);
+    // clientX/clientY is already the bottom-right corner of the rect (set by pdf-viewer.ts)
+    showPopover(ann, clientX + 8, clientY + 8);
   }
 
   return { handleTextSelected, handleAnnotationClick, renderHighlights };

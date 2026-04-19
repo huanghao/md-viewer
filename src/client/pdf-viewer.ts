@@ -324,29 +324,27 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     textBlocksByPage.set(pageNum, blocks);
 
     // Event handlers
+    // 悬停「译」按钮：每个 pageWrapper 最多一个，复用移动
+    let translateBtn: HTMLButtonElement | null = null;
+    let translateBtnBlock: PdfTextBlock | null = null;
+
+    const getOrCreateTranslateBtn = (): HTMLButtonElement => {
+      if (!translateBtn) {
+        translateBtn = document.createElement("button");
+        translateBtn.className = "pdf-translate-btn";
+        translateBtn.textContent = "译";
+        translateBtn.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          if (translateBtnBlock) opts.onParagraphClick!(translateBtnBlock);
+        });
+        wrapper.appendChild(translateBtn);
+      }
+      return translateBtn;
+    };
+
     if (opts.onParagraphClick) {
-      // 悬停「译」按钮：每个 pageWrapper 最多一个，复用移动
-      let translateBtn: HTMLButtonElement | null = null;
-      let translateBtnBlock: PdfTextBlock | null = null;
-
-      const getOrCreateTranslateBtn = (): HTMLButtonElement => {
-        if (!translateBtn) {
-          translateBtn = document.createElement("button");
-          translateBtn.className = "pdf-translate-btn";
-          translateBtn.textContent = "译";
-          translateBtn.addEventListener("click", (ev) => {
-            ev.stopPropagation();
-            if (translateBtnBlock) opts.onParagraphClick!(translateBtnBlock);
-          });
-          wrapper.appendChild(translateBtn);
-        }
-        return translateBtn;
-      };
-
       textLayerDiv.addEventListener("mousemove", (e) => {
         const me = e as MouseEvent;
-        // offsetY 是相对 textLayerDiv 的，但 block.y 是相对 pageWrapper 的。
-        // 用 clientY 减去 wrapper 的 top 得到相对 wrapper 的 Y，再除以 scale。
         const wrapperRect = wrapper.getBoundingClientRect();
         const hoverY = (me.clientY - wrapperRect.top) / scale;
         const block = findBlockAtY(blocks, hoverY);
@@ -362,12 +360,10 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
       });
 
       textLayerDiv.addEventListener("mouseleave", (e) => {
-        // 鼠标移到「译」按钮上时不隐藏
         if (translateBtn && e.relatedTarget === translateBtn) return;
         if (translateBtn) translateBtn.style.display = "none";
       });
 
-      // 鼠标离开按钮时也隐藏（除非移回了 textLayerDiv）
       wrapper.addEventListener("mouseleave", (e) => {
         if (!translateBtn) return;
         const related = e.relatedTarget as Node | null;
@@ -396,16 +392,41 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
       });
 
       overlayCanvas.addEventListener('mousemove', (e) => {
-        if (!dragging) return;
         const rect = wrapper.getBoundingClientRect();
         const curX = (e.clientX - rect.left) / scale;
         const curY = (e.clientY - rect.top) / scale;
-        tempRects.set(pageNum, {
-          x1: Math.min(downPdfX, curX), y1: Math.min(downPdfY, curY),
-          x2: Math.max(downPdfX, curX), y2: Math.max(downPdfY, curY),
-          style: 'blue'
-        });
-        redrawOverlay(pageNum);
+        if (dragging) {
+          tempRects.set(pageNum, {
+            x1: Math.min(downPdfX, curX), y1: Math.min(downPdfY, curY),
+            x2: Math.max(downPdfX, curX), y2: Math.max(downPdfY, curY),
+            style: 'blue'
+          });
+          redrawOverlay(pageNum);
+        }
+        // 非拖拽时驱动译按钮显示
+        if (opts.onParagraphClick && !dragging) {
+          const hoverY = curY;
+          const block = findBlockAtY(blocks, hoverY);
+          if (!block) {
+            const btn = wrapper.querySelector<HTMLButtonElement>('.pdf-translate-btn');
+            if (btn) btn.style.display = 'none';
+          } else {
+            const btn = wrapper.querySelector<HTMLButtonElement>('.pdf-translate-btn');
+            if (btn && btn.style.display !== 'none' && (btn as any).__block === block) return;
+            const realBtn = getOrCreateTranslateBtn();
+            (realBtn as any).__block = block;
+            translateBtnBlock = block;
+            realBtn.style.display = 'block';
+            realBtn.style.top = `${block.y * scale}px`;
+          }
+        }
+      });
+
+      overlayCanvas.addEventListener('mouseleave', () => {
+        if (opts.onParagraphClick) {
+          const btn = wrapper.querySelector<HTMLButtonElement>('.pdf-translate-btn');
+          if (btn) btn.style.display = 'none';
+        }
       });
 
       overlayCanvas.addEventListener('mouseup', (e) => {
@@ -461,7 +482,10 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
         const perPage = persistentRects.get(pageNum) || [];
         for (const r of perPage) {
           if (clickX >= r.x1 && clickX <= r.x2 && clickY >= r.y1 && clickY <= r.y2) {
-            opts.onAnnotationClick(r.annotationId, e.clientX, e.clientY);
+            // Pass bottom-right corner of the rect as screen coords for popover placement
+            const rectScreenX = rect.left + r.x2 * scale;
+            const rectScreenY = rect.top + r.y2 * scale;
+            opts.onAnnotationClick(r.annotationId, rectScreenX, rectScreenY);
             break;
           }
         }
@@ -649,6 +673,10 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     const anchor = document.createElement('div');
     anchor.className = 'pdf-rect-anchor';
     anchor.dataset.annotationId = annotationId;
+    // Store rect bottom-right in PDF coords so annotation.ts can compute screen position
+    anchor.dataset.rectX2 = String(x2);
+    anchor.dataset.rectY2 = String(y2);
+    anchor.dataset.rectScale = String(scale);
     anchor.style.cssText = `position:absolute;top:${y1 * scale}px;left:${x1 * scale}px;width:0;height:0;pointer-events:none;`;
     wrapper.appendChild(anchor);
   }

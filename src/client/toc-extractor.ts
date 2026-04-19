@@ -74,16 +74,16 @@ function convertOutlineNodes(nodes: PdfOutlineNode[], level: number): TocItem[] 
 
 export async function resolvePdfOutlinePageNums(
   items: TocItem[],
-  dests: unknown[],
-  pdfDoc: { getPageIndex(ref: unknown): Promise<number> }
+  dests: ({ num: number; gen: number } | null)[],
+  pdfDoc: { getPageIndex(ref: { num: number; gen: number }): Promise<number> }
 ): Promise<void> {
   let idx = 0;
   async function walk(nodes: TocItem[]) {
     for (const node of nodes) {
-      const dest = dests[idx++] as any;
-      if (dest?.ref) {
+      const dest = dests[idx++];
+      if (dest != null && typeof dest === 'object' && 'num' in dest) {
         try {
-          node.pageNum = (await pdfDoc.getPageIndex(dest.ref)) + 1;
+          node.pageNum = (await pdfDoc.getPageIndex(dest as { num: number; gen: number })) + 1;
         } catch { /* dest 无法解析，保持 undefined */ }
       }
       await walk(node.children);

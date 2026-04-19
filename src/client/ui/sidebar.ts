@@ -298,8 +298,17 @@ function renderViewTabs(): void {
         <button class="view-tab${tab === t.key ? ' active' : ''}"
                 onclick="setSidebarTab('${t.key}')">${t.label}</button>
       `).join('')}
+      <button class="view-tab-toc-btn" id="tocToggleTabBtn" title="切换目录面板" aria-label="切换目录面板">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+          <path d="M2 4h12M2 8h8M2 12h10"/>
+        </svg>
+      </button>
     </div>
   `;
+  document.getElementById('tocToggleTabBtn')?.addEventListener('click', () => {
+    const sidebar = document.querySelector('.sidebar') as HTMLElement | null;
+    if (sidebar) sidebar.classList.toggle('toc-visible');
+  });
 }
 
 // 渲染文件列表

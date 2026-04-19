@@ -2,16 +2,17 @@ import type { TocItem } from '../toc-extractor';
 
 export type TocJumpFn = (item: TocItem) => void;
 
-function renderItems(items: TocItem[], onJump: TocJumpFn): string {
-  return items.map(item => `
-    <a class="toc-item" data-level="${item.level}"
+let _flatItems: TocItem[] = [];
+
+function renderItems(items: TocItem[], startIdx: { v: number }): string {
+  return items.map(item => {
+    const idx = startIdx.v++;
+    return `<a class="toc-item" data-level="${item.level}"
        data-page="${item.pageNum ?? ''}"
        data-anchor="${item.anchor ?? ''}"
-       title="${item.title}">
-      ${item.title}
-    </a>
-    ${renderItems(item.children, onJump)}
-  `).join('');
+       data-idx="${idx}"
+       title="${item.title}">${item.title}</a>${renderItems(item.children, startIdx)}`;
+  }).join('');
 }
 
 export function renderTocPanel(
@@ -20,6 +21,7 @@ export function renderTocPanel(
   onJump: TocJumpFn,
   loading = false
 ): void {
+  const pane = container.closest('.toc-pane') as HTMLElement | null;
   const sidebar = container.closest('.sidebar') as HTMLElement | null;
 
   if (loading) {
@@ -34,13 +36,33 @@ export function renderTocPanel(
     return;
   }
 
-  container.innerHTML = renderItems(toc, onJump);
+  _flatItems = flattenToc(toc);
+  const startIdx = { v: 0 };
+  container.innerHTML = renderItems(toc, startIdx);
   sidebar?.classList.add('toc-visible');
 
-  container.querySelectorAll<HTMLElement>('.toc-item').forEach((el, i) => {
+  // Ensure header exists in toc-pane
+  if (pane && !pane.querySelector('.toc-header')) {
+    const header = document.createElement('div');
+    header.className = 'toc-header';
+    header.innerHTML = `
+      <span class="toc-header-label">目录</span>
+      <button class="toc-toggle-btn" id="tocToggleBtn" title="关闭目录" aria-label="关闭目录">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 4l8 8M12 4l-8 8"/>
+        </svg>
+      </button>`;
+    pane.insertBefore(header, pane.firstChild);
+    header.querySelector('#tocToggleBtn')?.addEventListener('click', () => {
+      sidebar?.classList.remove('toc-visible');
+    });
+  }
+
+  container.querySelectorAll<HTMLElement>('.toc-item').forEach(el => {
     el.addEventListener('click', () => {
-      const flat = flattenToc(toc);
-      if (flat[i]) onJump(flat[i]);
+      const idx = parseInt(el.dataset.idx ?? '0', 10);
+      const item = _flatItems[idx];
+      if (item) onJump(item);
     });
   });
 }

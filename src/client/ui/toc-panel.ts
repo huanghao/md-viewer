@@ -25,21 +25,22 @@ export function renderTocPanel(
   const sidebar = container.closest('.sidebar') as HTMLElement | null;
 
   if (loading) {
-    container.innerHTML = '<div class="toc-empty">扫描中…</div>';
-    sidebar?.classList.remove('toc-visible');
+    container.innerHTML = '<div class="toc-empty">加载中…</div>';
+    sidebar?.classList.remove('toc-has-content', 'toc-visible');
     return;
   }
 
   if (toc.length === 0) {
     container.innerHTML = '<div class="toc-empty">无目录</div>';
-    sidebar?.classList.remove('toc-visible');
+    sidebar?.classList.remove('toc-has-content', 'toc-visible');
     return;
   }
 
   _flatItems = flattenToc(toc);
   const startIdx = { v: 0 };
   container.innerHTML = renderItems(toc, startIdx);
-  sidebar?.classList.add('toc-visible');
+  sidebar?.classList.add('toc-has-content');
+  // toc-visible is managed by caller (per-file preference)
 
   // Ensure header exists in toc-pane (created once, persists across re-renders)
   if (pane && !pane.querySelector('.toc-header')) {
@@ -55,6 +56,8 @@ export function renderTocPanel(
     pane.insertBefore(header, pane.firstChild);
     header.querySelector('.toc-toggle-btn')?.addEventListener('click', () => {
       sidebar?.classList.remove('toc-visible');
+      // Persist close for current file
+      (window as any).__onTocClose?.();
     });
   }
 

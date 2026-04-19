@@ -245,6 +245,54 @@ function setupSidebarResize(): void {
 }
 
 const TOC_PANE_HEIGHT_KEY = 'md-viewer:toc-pane-height';
+const TOC_OPEN_BY_FILE_KEY = 'md-viewer:toc-open-by-file';
+
+function loadTocOpenByFile(): Record<string, boolean> {
+  try {
+    const raw = localStorage.getItem(TOC_OPEN_BY_FILE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function saveTocOpenForFile(filePath: string, open: boolean): void {
+  const map = loadTocOpenByFile();
+  map[filePath] = open;
+  localStorage.setItem(TOC_OPEN_BY_FILE_KEY, JSON.stringify(map));
+}
+
+function applyTocVisibility(filePath: string): void {
+  const sidebar = document.querySelector('.sidebar') as HTMLElement | null;
+  if (!sidebar) return;
+  const map = loadTocOpenByFile();
+  // Default: closed (only open if explicitly saved as open)
+  if (map[filePath] === true) {
+    sidebar.classList.add('toc-visible');
+  } else {
+    sidebar.classList.remove('toc-visible');
+  }
+}
+
+function setupTocOpenBtn(): void {
+  document.getElementById('tocOpenBtn')?.addEventListener('click', () => {
+    const sidebar = document.querySelector('.sidebar') as HTMLElement | null;
+    if (!sidebar) return;
+    sidebar.classList.add('toc-visible');
+    if (state.currentFile) saveTocOpenForFile(state.currentFile, true);
+  });
+  // Wire close callback for toc-panel.ts
+  (window as any).__onTocClose = () => {
+    if (state.currentFile) saveTocOpenForFile(state.currentFile, false);
+  };
+  // view-tabs toggle button
+  document.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement)?.closest('#tocToggleTabBtn');
+    if (!btn) return;
+    const sidebar = document.querySelector('.sidebar') as HTMLElement | null;
+    if (!sidebar) return;
+    const isVisible = sidebar.classList.toggle('toc-visible');
+    if (state.currentFile) saveTocOpenForFile(state.currentFile, isVisible);
+  });
+}
 const TOC_PANE_DEFAULT_HEIGHT = 240;
 const TOC_PANE_MIN_HEIGHT = 80;
 const TOC_PANE_MAX_HEIGHT = 600;
@@ -347,14 +395,15 @@ async function updateToc(filePath: string): Promise<void> {
       if (target) {
         const contentEl = document.getElementById('content');
         if (contentEl) {
-          contentEl.scrollTo({ top: target.offsetTop - 8, behavior: 'smooth' });
+          contentEl.scrollTo({ top: target.offsetTop - 8, behavior: 'instant' });
         } else {
-          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          target.scrollIntoView({ behavior: 'instant', block: 'start' });
         }
       }
     };
 
     renderTocPanel(panel, toc, item => jumpToMdHeading(item.title));
+    applyTocVisibility(filePath);
 
     // Highlight active TOC item on scroll
     const contentEl = document.getElementById('content');
@@ -382,12 +431,15 @@ async function updateToc(filePath: string): Promise<void> {
     return;
   }
 
+  const pdfJump = (item: TocItem) => {
+    if (item.pageNum) pdfViewerRegistry.get(filePath)?.viewer?.scrollToPage(item.pageNum);
+  };
+
   // PDF: try sidecar first
   const sidecar = await loadSidecar(filePath);
   if (sidecar) {
-    renderTocPanel(panel, sidecar, item => {
-      if (item.pageNum) pdfViewerRegistry.get(filePath)?.viewer?.scrollToPage(item.pageNum);
-    });
+    renderTocPanel(panel, sidecar, pdfJump);
+    applyTocVisibility(filePath);
     return;
   }
 
@@ -404,9 +456,8 @@ async function updateToc(filePath: string): Promise<void> {
       const toc = extractPdfOutline(outline);
       const dests = flattenOutlineDests(outline);
       await resolvePdfOutlinePageNums(toc, dests, pdfDoc);
-      renderTocPanel(panel, toc, item => {
-        if (item.pageNum) pdfViewerRegistry.get(filePath)?.viewer?.scrollToPage(item.pageNum);
-      });
+      renderTocPanel(panel, toc, pdfJump);
+      applyTocVisibility(filePath);
       return;
     }
   } catch { /* outline read failed, fall through to scan */ }
@@ -416,9 +467,10 @@ async function updateToc(filePath: string): Promise<void> {
     filePath,
     page => viewer.getTextBlocks(page),
     viewer.getTotalPages(),
-    toc => renderTocPanel(panel, toc, item => {
-      if (item.pageNum) pdfViewerRegistry.get(filePath)?.viewer?.scrollToPage(item.pageNum);
-    })
+    toc => {
+      renderTocPanel(panel, toc, pdfJump);
+      applyTocVisibility(filePath);
+    }
   );
 }
 
@@ -2448,6 +2500,7 @@ function startWorkspacePolling() {
   setupSidebarResize();
   initTocPaneHeight();
   setupTocResize();
+  setupTocOpenBtn();
   document.addEventListener('click', (e) => {
     if (!isAddConfirmVisible()) return;
     const target = e.target as HTMLElement | null;

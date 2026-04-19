@@ -42,6 +42,29 @@ let watcher: FSWatcher | null = null;
 const watchedPaths = new Set<string>();
 const watchedWorkspaceRoots = new Set<string>();
 
+// vi/vim 等编辑器用 rename 原子保存时，chokidar 的 add 事件在 macOS 上可能延迟数分钟。
+// 对已监听文件，unlink 后主动 poll 等文件重新出现，最多等 2 秒，每 50ms 检查一次。
+async function pollForFileReturn(path: string): Promise<void> {
+  const deadline = Date.now() + 2000;
+  const interval = 50;
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, interval));
+    try {
+      const stats = await stat(path);
+      // 文件重新出现，重新加入监听并广播变更
+      watchedPaths.add(path);
+      watcher?.add(path);
+      broadcastFileChanged(path, stats.mtimeMs);
+      return;
+    } catch {
+      // 文件还没回来，继续等
+    }
+  }
+  // 超时仍未出现，认为是真正删除
+  broadcastFileDeleted(path);
+  watchedPaths.delete(path);
+}
+
 function ensureWatcher() {
   if (watcher) return;
 
@@ -101,7 +124,12 @@ function ensureWatcher() {
     for (const root of watchedWorkspaceRoots) {
       if (path.startsWith(root)) invalidateFileListCache(root);
     }
-    atomicDetector.onUnlink(path);
+    // 对已监听文件（如 vi/vim 的 rename 式原子保存），主动 poll 等文件重新出现
+    if (watchedPaths.has(path)) {
+      pollForFileReturn(path);
+    } else {
+      atomicDetector.onUnlink(path);
+    }
   });
 }
 

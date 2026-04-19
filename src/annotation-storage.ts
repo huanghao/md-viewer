@@ -11,6 +11,8 @@ export interface StoredAnnotationThreadItem {
   createdAt: number;
 }
 
+type PdfRectCoords = { x1: number; y1: number; x2: number; y2: number };
+
 export interface StoredAnnotation {
   id: string;
   serial?: number;
@@ -27,6 +29,7 @@ export interface StoredAnnotation {
   // PDF-specific fields
   page?: number;
   fileType?: "md" | "pdf";
+  rectCoords?: PdfRectCoords;
 }
 
 export interface AnnotationDocSummary {
@@ -114,6 +117,10 @@ function parseThreadFromRow(rawThreadJson: unknown, note: string, createdAt: num
 
 function mapRowToAnnotation(row: any): StoredAnnotation {
   const thread = parseThreadFromRow(row.thread_json, row.note, row.created_at, row.id);
+  let rectCoords: PdfRectCoords | undefined;
+  if (row.rect_coords_json) {
+    try { rectCoords = JSON.parse(row.rect_coords_json); } catch {}
+  }
   return {
     id: row.id,
     serial: Number.isFinite(Number(row.serial)) && Number(row.serial) > 0 ? Number(row.serial) : undefined,
@@ -129,6 +136,7 @@ function mapRowToAnnotation(row: any): StoredAnnotation {
     confidence: typeof row.confidence === "number" ? row.confidence : undefined,
     page: row.page ?? undefined,
     fileType: (row.file_type as "md" | "pdf") ?? "md",
+    rectCoords,
   };
 }
 
@@ -184,6 +192,10 @@ function getDb(): Database {
     // TODO: file_type 列已冗余，文件类型可直接从 doc_path 后缀推断。
     //       SQLite 不支持 DROP COLUMN（旧版本），需重建表时一并删除。
   }
+  const hasRectCoords = columns.some((col) => col.name === "rect_coords_json");
+  if (!hasRectCoords) {
+    db.exec(`ALTER TABLE annotations ADD COLUMN rect_coords_json TEXT`);
+  }
 
   return db;
 }
@@ -219,6 +231,19 @@ function normalizeAnnotation(input: any): StoredAnnotation | null {
     ? Math.floor(Number(input.page))
     : undefined;
   const fileType: "md" | "pdf" = input.fileType === "pdf" ? "pdf" : "md";
+  const rectCoords = input.rectCoords
+    && typeof input.rectCoords === "object"
+    && Number.isFinite(Number(input.rectCoords.x1))
+    && Number.isFinite(Number(input.rectCoords.y1))
+    && Number.isFinite(Number(input.rectCoords.x2))
+    && Number.isFinite(Number(input.rectCoords.y2))
+    ? {
+        x1: Number(input.rectCoords.x1),
+        y1: Number(input.rectCoords.y1),
+        x2: Number(input.rectCoords.x2),
+        y2: Number(input.rectCoords.y2),
+      }
+    : undefined;
 
   return {
     id,
@@ -235,6 +260,7 @@ function normalizeAnnotation(input: any): StoredAnnotation | null {
     confidence,
     page,
     fileType,
+    rectCoords,
   };
 }
 
@@ -242,6 +268,7 @@ function getAnnotationRowById(id: string): any | null {
   return getDb()
     .query(
       `SELECT id, serial, doc_path, start, length, quote, note, thread_json, created_at, updated_at, quote_prefix, quote_suffix, status, confidence, page, file_type
+       , rect_coords_json
        FROM annotations WHERE id = ?`
     )
     .get(id) as any | null;
@@ -252,6 +279,7 @@ function getAnnotationRowByRef(path: string, annotationRef: { id?: string; seria
     return getDb()
       .query(
         `SELECT id, serial, doc_path, start, length, quote, note, thread_json, created_at, updated_at, quote_prefix, quote_suffix, status, confidence, page, file_type
+         , rect_coords_json
          FROM annotations WHERE doc_path = ? AND id = ?`
       )
       .get(path, annotationRef.id) as any | null;
@@ -264,6 +292,7 @@ function getAnnotationRowByRef(path: string, annotationRef: { id?: string; seria
     return getDb()
       .query(
         `SELECT id, serial, doc_path, start, length, quote, note, thread_json, created_at, updated_at, quote_prefix, quote_suffix, status, confidence, page, file_type
+         , rect_coords_json
          FROM annotations WHERE doc_path = ? AND serial = ?`
       )
       .get(path, Math.floor(annotationRef.serial)) as any | null;
@@ -296,8 +325,8 @@ function writeAnnotationRow(path: string, ann: StoredAnnotation, updatedAt = Dat
 
   database.prepare(`
     INSERT OR REPLACE INTO annotations
-      (id, serial, doc_path, start, length, quote, note, thread_json, created_at, updated_at, quote_prefix, quote_suffix, status, confidence, page, file_type)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, serial, doc_path, start, length, quote, note, thread_json, created_at, updated_at, quote_prefix, quote_suffix, status, confidence, page, file_type, rect_coords_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     ann.id,
     serial,
@@ -314,7 +343,8 @@ function writeAnnotationRow(path: string, ann: StoredAnnotation, updatedAt = Dat
     ann.status || "anchored",
     ann.confidence ?? null,
     ann.page ?? null,
-    ann.fileType ?? "md"
+    ann.fileType ?? "md",
+    ann.rectCoords ? JSON.stringify(ann.rectCoords) : null
   );
 
   const row = getAnnotationRowById(ann.id);
@@ -327,6 +357,7 @@ export function listAnnotations(docPath: string): StoredAnnotation[] {
   const rows = getDb()
     .query(
       `SELECT id, start, length, quote, note, thread_json, created_at, quote_prefix, quote_suffix, status, confidence, serial, page, file_type
+       , rect_coords_json
        FROM annotations WHERE doc_path = ? ORDER BY created_at ASC`
     )
     .all(path) as any[];
@@ -480,7 +511,7 @@ export function getAnnotationsByDocument(
   const rows = getDb()
     .query(
       `SELECT id, start, length, quote, note, thread_json, created_at, quote_prefix, quote_suffix, status, confidence
-       , serial, page, file_type
+       , serial, page, file_type, rect_coords_json
        FROM annotations
        WHERE doc_path = ? ${whereStatus}
        ORDER BY start ASC, created_at ASC

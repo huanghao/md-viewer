@@ -92,8 +92,19 @@ export function generateClientHTML(): string {
         <div id="currentPath"></div>
       </div>
 
+      <!-- 文件列表区（上半部分） -->
       <div class="file-list" id="fileList">
         <div class="empty-tip">暂无文件</div>
+      </div>
+
+      <!-- TOC 分隔条 -->
+      <div class="toc-resizer" id="tocResizer"></div>
+
+      <!-- TOC 面板（下半部分） -->
+      <div class="toc-pane" id="tocPane">
+        <div class="toc-panel" id="tocPanel">
+          <div class="toc-empty">无目录</div>
+        </div>
       </div>
     </aside>
     <div class="sidebar-resizer" id="sidebarResizer" title="拖拽调整侧边栏宽度"></div>

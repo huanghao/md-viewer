@@ -387,10 +387,10 @@ async function openFile(filePath: string, focus: boolean = true): Promise<void> 
     }
     targetPath = absolutePath;
 
-    // 只允许 md/markdown/txt/html/htm
+    // 只允许 md/markdown/txt/html/htm/pdf
     const ext = targetPath.match(/\.([^.]+)$/)?.[1]?.toLowerCase();
-    if (ext && !["md", "markdown", "txt", "html", "htm"].includes(ext)) {
-      console.error(`❌ 不支持的文件类型: .${ext}（CLI 仅支持 md/markdown/txt/html/htm）`);
+    if (ext && !["md", "markdown", "txt", "html", "htm", "pdf"].includes(ext)) {
+      console.error(`❌ 不支持的文件类型: .${ext}（CLI 仅支持 md/markdown/txt/html/htm/pdf）`);
       process.exit(1);
     }
   }

@@ -10,9 +10,11 @@
 1）PDF 页面滚动时没有显式滚动条
 2）PDF 页面内没有当前页数/总页数提示，也没有跳转到指定页的快捷方式
 
+## PDF TOC 跳转精度
+当前 PDF TOC 点击只能跳到对应页顶（scrollToPage），无法跳到章节在页内的具体位置。
+根本原因：PDF outline 条目包含 dest（destination）对象，其中有页内 y 坐标，但目前 resolvePdfOutlinePageNums 只提取了 pageNum，没有提取 y 偏移。
+修复方向：在 resolvePdfOutlinePageNums 里同时提取 dest 的 y 坐标，存入 TocItem，然后 pdfJump 改用 scrollToBlockY(pageNum, y)。
 
-## 翻译 hover 按钮开关
-在设置页面加一个开关，控制 PDF 页面 hover 时是否显示「译」按钮。
 
 ## 翻译服务重启，后台服务重启
 
@@ -24,10 +26,8 @@
 bun run build.ts && bun run scripts/embed-client.ts
 我需要一个一键watch的命令，现在just里的命令太多了，需要整理一下
 
-## 给PDF生成目录
-
 ## PDF 整页翻译 + 译文嵌入渲染（探索性）
-一次翻译一整页 PDF，把每段中文译文插入对应英文段落下方，视觉上双语并排。
+一次翻译一整页 PDF，把每段中文译文插入对应英文段落下方
 
 可行路径：在 PDF.js canvas 上方用绝对定位 HTML overlay 插入译文块，不修改 canvas 本身（text layer 坐标保持不变）。每段译文 div 定位到对应英文段落的 bottom 坐标处，后续段落视觉上会被遮挡（不 reflow）。
 

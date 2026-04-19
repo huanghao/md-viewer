@@ -16,6 +16,7 @@ const localStorageMock = {
 // Import after polyfill so module-level code sees localStorage
 const {
   loadTranslations,
+  unloadTranslations,
   getTranslations,
   translateBlock,
   retryTranslation,
@@ -214,6 +215,34 @@ describe('loadTranslations', () => {
     loadTranslations(FILE);
     const entries = getTranslations();
     expect(entries.map(e => `${e.pageNum}:${e.startItemIdx}`)).toEqual(['1:5', '1:20', '2:10']);
+  });
+});
+
+describe('unloadTranslations', () => {
+  it('clears in-memory list without touching localStorage', async () => {
+    const block = makeBlock(70);
+    const startItemIdx = Math.round(block.y * 10);
+    await translateBlock(block, FILE, makeProvider('unload test'), () => {});
+    expect(getTranslations().length).toBeGreaterThan(0);
+
+    const key = `md-viewer:translation:${FILE}:${block.pageNum}:${startItemIdx}`;
+    expect(localStorage.getItem(key)).not.toBeNull();
+
+    unloadTranslations();
+
+    expect(getTranslations().length).toBe(0);
+    // localStorage still has the entry
+    expect(localStorage.getItem(key)).not.toBeNull();
+  });
+
+  it('loadTranslations after unload restores entries from localStorage', async () => {
+    const block = makeBlock(80);
+    await translateBlock(block, FILE, makeProvider('restore test'), () => {});
+    unloadTranslations();
+    expect(getTranslations().length).toBe(0);
+
+    loadTranslations(FILE);
+    expect(getTranslations().some(e => e.originalText === block.text)).toBe(true);
   });
 });
 

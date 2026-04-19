@@ -3,6 +3,7 @@ export const styles = `
       --font-scale: 1.0;
       --sidebar-width: 260px;
       --annotation-sidebar-width: 320px;
+      --z-menu: 20;
       --z-scrollbar: 50;
       --z-sidebar: 80;
       --z-sidebar-resizer: 81;
@@ -2273,7 +2274,7 @@ export const styles = `
       padding: 2px 8px;
       cursor: pointer;
       white-space: nowrap;
-      z-index: 20;
+      z-index: var(--z-menu);
       pointer-events: auto;
       line-height: 1.6;
       box-shadow: 0 1px 4px rgba(0,0,0,0.25);
@@ -2365,7 +2366,7 @@ export const styles = `
       border: 1px solid #d0d7de;
       border-radius: 8px;
       box-shadow: 0 8px 18px rgba(15, 23, 42, 0.16);
-      z-index: 20;
+      z-index: var(--z-menu);
       min-width: 112px;
     }
     .annotation-filter-menu.hidden {

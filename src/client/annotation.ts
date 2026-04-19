@@ -1055,8 +1055,7 @@ export function showPopover(ann: Annotation, x: number, y: number): void {
     el.popoverResolveBtn.innerHTML = resolved ? iconSvg('reopen') : iconSvg('check');
     el.popoverResolveBtn.classList.toggle('is-resolved', resolved);
   }
-  el.popover.style.left = `${Math.round(x)}px`;
-  el.popover.style.top = `${Math.round(y)}px`;
+  placeFloating(el.popover, x, y);
   el.popover.classList.remove('hidden');
 }
 

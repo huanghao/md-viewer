@@ -93,7 +93,7 @@ export const styles = `
       justify-content: center;
       padding: 0;
       box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1);
-      z-index: 100;
+      z-index: var(--z-floating-btn);
     }
     body.sidebar-collapsed .sidebar-floating-open-btn {
       display: inline-flex;
@@ -264,7 +264,7 @@ export const styles = `
     .quick-action-confirm-host {
       margin-top: 0;
       position: relative;
-      z-index: 2601;
+      z-index: var(--z-quick-action);
     }
     body.quick-action-confirm-visible .quick-action-confirm-host {
       margin-top: 6px;
@@ -514,7 +514,7 @@ export const styles = `
     }
     .path-autocomplete-panel {
       position: absolute;
-      z-index: 2500;
+      z-index: var(--z-autocomplete);
       max-height: 260px;
       overflow-y: auto;
       background: #ffffff;
@@ -806,7 +806,7 @@ export const styles = `
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
       padding: 4px 0;
       min-width: 80px;
-      z-index: 1000;
+      z-index: var(--z-dropdown);
     }
 
     .font-scale-option {
@@ -938,7 +938,7 @@ export const styles = `
       border-radius: 8px;
       background: #fff;
       box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
-      z-index: 2100;
+      z-index: var(--z-tab-manager);
       overflow: hidden;
     }
     .tab-manager-panel.show {
@@ -1479,7 +1479,7 @@ export const styles = `
       position: fixed;
       top: 20px;
       right: 20px;
-      z-index: 10000;
+      z-index: var(--z-find-bar);
       display: flex;
       flex-direction: column;
       gap: 10px;
@@ -2297,7 +2297,7 @@ export const styles = `
       right: 0;
       top: 84px;
       height: calc(100vh - 84px);
-      z-index: 80;
+      z-index: var(--z-sidebar);
     }
     .annotation-sidebar.collapsed {
       opacity: 0;
@@ -2312,7 +2312,7 @@ export const styles = `
       height: calc(100vh - 84px);
       cursor: col-resize;
       background: transparent;
-      z-index: 81;
+      z-index: var(--z-sidebar-resizer);
       transition: background-color 0.15s ease;
     }
     .annotation-sidebar-resizer:hover {
@@ -2749,7 +2749,7 @@ export const styles = `
       background: #fff;
       color: #57606a;
       cursor: pointer;
-      z-index: 90;
+      z-index: var(--z-floating-btn);
       display: none;
       align-items: center;
       justify-content: center;
@@ -2799,7 +2799,7 @@ export const styles = `
     .annotation-composer,
     .annotation-popover {
       position: fixed;
-      z-index: 9999;
+      z-index: var(--z-quick-add);
       width: 340px;
       background: #fff;
       border: 1px solid #d0d7de;
@@ -2831,7 +2831,7 @@ export const styles = `
     }
     .annotation-quick-add {
       position: fixed;
-      z-index: 9998;
+      z-index: var(--z-popover);
       width: 32px;
       height: 32px;
       border: 1px solid #d0d7de;
@@ -2881,7 +2881,7 @@ export const styles = `
       position: fixed;
       top: 12px;
       right: 16px;
-      z-index: 10000;
+      z-index: var(--z-find-bar);
       align-items: center;
       gap: 4px;
       background: var(--bg-primary, #fff);
@@ -3217,7 +3217,7 @@ export const styles = `
       position: fixed;
       inset: 0;
       background: rgba(0, 0, 0, 0.4);
-      z-index: 9000;
+      z-index: var(--z-overlay);
       align-items: center;
       justify-content: center;
     }
@@ -3394,7 +3394,7 @@ export const styles = `
       box-shadow: 0 4px 12px rgba(0,0,0,0.12);
       min-width: 340px;
       max-width: 480px;
-      z-index: 1000;
+      z-index: var(--z-dropdown);
       font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Consolas', monospace;
       font-size: 13px;
       overflow: hidden;
@@ -3549,7 +3549,7 @@ export const styles = `
       top: 0;
       bottom: 0;
       width: 14px;
-      z-index: 50;
+      z-index: var(--z-scrollbar);
       cursor: pointer;
       background: rgba(100,100,100,0.08);
     }

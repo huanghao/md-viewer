@@ -199,6 +199,7 @@ export function addOrUpdateFile(fileData: FileData, switchTo: boolean = false): 
     isRemote: fileData.isRemote || false,
     isMissing: false,
     lastAccessed: Date.now(),
+    savedScrollTop: existing?.savedScrollTop,
   });
 
   if (switchTo) {
@@ -310,6 +311,12 @@ export function isWorkspaceLoading(id: string): boolean {
 
 export function isWorkspaceFailed(id: string): boolean {
   return state.workspaceFailedIds.has(id);
+}
+
+export function saveScrollPosition(path: string, scrollTop: number): void {
+  const file = state.sessionFiles.get(path);
+  if (!file) return;
+  file.savedScrollTop = scrollTop;
 }
 
 export function getFilteredFiles(): FileInfo[] {

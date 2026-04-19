@@ -52,21 +52,51 @@ PDF canvas 是位图，无法 reflow。所有"译文插入原文之间"的方案
 
 真正干净的解决方案需要放弃 canvas，但放弃 canvas 就意味着放弃原文的视觉还原（字体、排版、图片）。
 
-## 可能的后续方向
+## pdf2zh 方案（已验证可行）
 
-1. **接受段落流的格式损失**，做一个"阅读模式"——点击按钮切换到纯文字双语视图，不再尝试还原 PDF 排版。适合快速浏览，不适合需要对照图表的场景。
+**结论：放弃自研，直接用 pdf2zh 生成双语 PDF，效果最好。**
 
-2. **整页翻译 + 段落流**，一次翻译一整页（上下文更完整，翻译质量更好），显示纯文字双语对照。译文和原文各占一半屏幕宽度（side-by-side），但都是流式文字而不是 canvas。
+[pdf2zh](https://github.com/Byaidu/PDFMathTranslate)（33k stars）专门做双语 PDF 生成，原生保留公式/图表/排版，输出 `dual.pdf`（双语）和 `mono.pdf`（纯译文）。
 
-3. **等待更好的 PDF 渲染 API**，如果 PDF.js 未来暴露字体提取接口，绝对定位方案才真正可行。
+### 已验证
 
-4. **维持现状**，侧边栏翻译列表已经可用，当前体验够用，不做大改。
+- 安装：`pip install pdf2zh`
+- Google 翻译（免费，无需 key）：3 页约 9 秒，质量可用
+- LongCat-Flash-Chat-Eco（美团内部）：3 页约 80 秒（有限速重试），质量更好
+- 翻译脚本：`scripts/pdf-translate/translate.py`
 
-## 当前主程序状态
+### 调用方式
+
+```bash
+# Google 翻译（快速验证）
+pdf2zh foo.pdf -p 1-3 --output /tmp/out
+
+# LongCat（质量更好）
+source ~/.zshrc
+OPENAI_MODEL=LongCat-Flash-Chat-Eco \
+pdf2zh foo.pdf -s openai -p 1-3 --output /tmp/out
+
+# 封装脚本
+python3 scripts/pdf-translate/translate.py foo.pdf --pages 1-3
+```
+
+### 成本估算（50 页论文）
+
+- Token 消耗：约 15 万 tokens
+- 费用：< 0.3 元（LongCat 内部定价可能更低）
+- 时间：Google 约 3 分钟，LongCat 约 20-30 分钟（限速）
+
+### 待决策
+
+- **集成方式**：是在 mdv 里加"生成双语 PDF"按钮触发 pdf2zh，还是作为独立命令行工具使用？
+- **翻译服务**：Google（快）还是 LongCat（质量好但慢）？
+- **触发时机**：打开 PDF 时自动翻译，还是手动触发？
+
+## 当前主程序状态（未修改）
 
 侧边栏翻译功能已完整实现（`src/client/pdf-translation.ts`、`src/client/annotation.ts`）：
 - 每段左侧固定「译」图标，点击翻译
 - 译文显示在右侧翻译 tab，最近 10 条，带时间戳
 - 支持跳转、删除、重试
 
-如果后续要改成双语视图，入口在 `src/client/main.ts` 的 `onParagraphClick` 回调和 `renderTranslationList`。
+如果后续要集成 pdf2zh，入口在 server 端新增一个 `/api/translate-pdf` 接口，前端加按钮触发，不需要动现有翻译逻辑。

@@ -6,10 +6,6 @@
 ## PDF 懒渲染性能基准测试
 建立基准测试，记录以下指标在不同 PDF 大小/页数下的表现：白屏率、首页可见时间、内存峰值（通过 getRenderedCount() 监控）、渲染抖动。可顺带考虑在 debug 模式下直接在页面上可视化 TextLayer overlay。
 
-## PDF 阅读体验改进
-1）PDF 页面滚动时没有显式滚动条
-2）PDF 页面内没有当前页数/总页数提示，也没有跳转到指定页的快捷方式
-
 ## PDF TOC 跳转精度
 当前 PDF TOC 点击只能跳到对应页顶（scrollToPage），无法跳到章节在页内的具体位置。
 根本原因：PDF outline 条目包含 dest（destination）对象，其中有页内 y 坐标，但目前 resolvePdfOutlinePageNums 只提取了 pageNum，没有提取 y 偏移。

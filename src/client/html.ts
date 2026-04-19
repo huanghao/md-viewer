@@ -136,7 +136,7 @@ export function generateClientHTML(): string {
         <button class="toolbar-text-button" id="monitorButton" onclick="toggleMonitorPanel()" title="系统监控">
           <span>[▦ 监控]</span>
         </button>
-        <button class="font-scale-button" id="fontScaleButton" onclick="toggleFontScaleMenu()" title="调整字体大小">
+        <button class="font-scale-button" id="fontScaleButton" onclick="zoomReset()" title="缩放 (⌘+ / ⌘−)，点击重置">
           <span id="fontScaleText">100%</span>
         </button>
         <span class="connection-status" id="connectionStatus" title="连接状态">
@@ -161,15 +161,6 @@ export function generateClientHTML(): string {
         </div>
       </div>
 
-      <!-- 字体缩放菜单 -->
-      <div class="font-scale-menu" id="fontScaleMenu" style="display: none;">
-        <div class="font-scale-option" onclick="setFontScale(0.5)">50%</div>
-        <div class="font-scale-option" onclick="setFontScale(0.75)">75%</div>
-        <div class="font-scale-option" onclick="setFontScale(1.0)">100%</div>
-        <div class="font-scale-option" onclick="setFontScale(1.25)">125%</div>
-        <div class="font-scale-option" onclick="setFontScale(1.5)">150%</div>
-        <div class="font-scale-option" onclick="setFontScale(2.0)">200%</div>
-      </div>
 
       <!-- 标签页 -->
       <div class="tabs" id="tabs"></div>

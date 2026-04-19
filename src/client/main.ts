@@ -530,6 +530,7 @@ async function renderMermaidDiagrams(container: HTMLElement): Promise<void> {
 function renderContent() {
   const container = document.getElementById('content');
   if (!container) return;
+  if (!diffViewActive) container.classList.remove('diff-active');
 
   // Detach all PDF viewer elements from container so innerHTML resets don't destroy them.
   // Save scroll position before detaching so we can restore it when switching back.

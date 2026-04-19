@@ -2116,6 +2116,17 @@ function startWorkspacePolling() {
 
 // ==================== 初始化 ====================
 (async () => {
+  // 拉取服务端客户端配置
+  try {
+    const res = await fetch('/api/config');
+    if (res.ok) {
+      const cfg = await res.json();
+      if (cfg?.pdf?.defaultScale) {
+        (window as any).__pdfDefaultScale = cfg.pdf.defaultScale;
+      }
+    }
+  } catch {}
+
   initSidebarWidth();
   initSidebarCollapsed();
   setupSidebarCollapse();

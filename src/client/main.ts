@@ -425,7 +425,7 @@ async function updateToc(filePath: string): Promise<void> {
         const scrollTop = contentEl.scrollTop;
         let current = headings[0];
         for (const h of headings) {
-          if (h.offsetTop <= scrollTop + 80) current = h;
+          if (h.offsetTop <= scrollTop + HEADER_OFFSET) current = h;
         }
         const title = current?.textContent?.trim() ?? '';
         if (title) setActiveTocItem(panel, undefined, title);

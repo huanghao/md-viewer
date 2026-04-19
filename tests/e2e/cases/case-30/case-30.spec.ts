@@ -10,8 +10,8 @@ test('case-30: 设置面板打开并显示主题选项', async ({ page }) => {
   const dialog = page.locator('#settingsDialogOverlay');
   await expect(dialog).toBeVisible();
 
-  // Theme section should be present
-  await expect(dialog.locator('.settings-section-title', { hasText: '主题' })).toBeVisible();
+  // Appearance section should be present
+  await expect(dialog.locator('.settings-group-title', { hasText: '外观' })).toBeVisible();
 
   // Both dropdowns should exist
   await expect(dialog.locator('#markdownThemeSelect')).toBeVisible();

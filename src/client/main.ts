@@ -49,7 +49,7 @@ import {
 import { createPdfViewer, type PdfViewerInstance } from "./pdf-viewer.js";
 import { createPdfAnnotationBridge } from "./pdf-annotation.js";
 import { extractMdToc, extractPdfOutline, resolvePdfOutlinePageNums, loadSidecar, scanPdfHeadings } from './toc-extractor.js';
-import { renderTocPanel } from './ui/toc-panel.js';
+import { renderTocPanel, setActiveTocItem } from './ui/toc-panel.js';
 import {
   LocalTranslationProvider,
   getTranslationStats,
@@ -342,7 +342,7 @@ async function updateToc(filePath: string): Promise<void> {
   const sidecar = await loadSidecar(filePath);
   if (sidecar) {
     renderTocPanel(panel, sidecar, item => {
-      if (item.pageNum) getActivePdfViewer()?.scrollToPage(item.pageNum);
+      if (item.pageNum) pdfViewerRegistry.get(filePath)?.viewer?.scrollToPage(item.pageNum);
     });
     return;
   }
@@ -361,7 +361,7 @@ async function updateToc(filePath: string): Promise<void> {
       const dests = flattenOutlineDests(outline);
       await resolvePdfOutlinePageNums(toc, dests, pdfDoc);
       renderTocPanel(panel, toc, item => {
-        if (item.pageNum) getActivePdfViewer()?.scrollToPage(item.pageNum);
+        if (item.pageNum) pdfViewerRegistry.get(filePath)?.viewer?.scrollToPage(item.pageNum);
       });
       return;
     }
@@ -373,7 +373,7 @@ async function updateToc(filePath: string): Promise<void> {
     page => viewer.getTextBlocks(page),
     viewer.getTotalPages(),
     toc => renderTocPanel(panel, toc, item => {
-      if (item.pageNum) getActivePdfViewer()?.scrollToPage(item.pageNum);
+      if (item.pageNum) pdfViewerRegistry.get(filePath)?.viewer?.scrollToPage(item.pageNum);
     })
   );
 }
@@ -855,6 +855,7 @@ function renderContent() {
           currentPdfBridge?.renderHighlights(getAnnotations());
         },
       });
+      updateToc(filePath);
     });
     return; // don't fall through to markdown renderer
   }
@@ -1200,7 +1201,7 @@ async function switchFile(path: string) {
   renderSidebar();
 
   renderContent();
-  updateToc(path);
+  if (!path.endsWith('.pdf')) updateToc(path);
   syncAnnotationsForCurrentFile(true);
   await updateToolbarButtons();
 }

@@ -173,15 +173,50 @@
 
 ---
 
-## 十一、批注 UI 组件详解
-
-> 另见 `annotation-naming-dict.md` 获取批注系统完整字典
+## 十一、批注 UI 组件
 
 | 中文名 | 代号 | HTML id / class | 说明 |
 |--------|------|-----------------|------|
-| 快速添加按钮 | quick-add | `#annotationQuickAdd` | 选中文字后出现的 [+] 按钮 |
-| composer | composer | `#annotationComposer` | 点 [+] 后弹出的**写评论输入框** |
-| popover | popover | `#annotationPopover` | 点击高亮/矩形后弹出的**只读评论浮窗** |
+| 快速添加按钮 | quick-add | `#annotationQuickAdd` / `.annotation-quick-add` | 选中文字/拉框后出现的 [+] 圆形按钮 |
+| **composer** | composer | `#annotationComposer` / `.annotation-composer` | 点 [+] 后弹出的**写评论输入框** |
+| **popover** | popover | `#annotationPopover` / `.annotation-popover` | 点击高亮/矩形后弹出的**只读评论浮窗** |
+| 批注条目 | annotation item | `.annotation-item` | 列表里的单条批注 |
+| 评论线程 | thread | `.annotation-thread` | 一条批注下的所有评论（含回复） |
+
+### 高亮标记
+
+| 中文名 | CSS class | 说明 |
+|--------|-----------|------|
+| MD 高亮 | `.annotation-mark` | MD 文件里的黄色背景高亮 span |
+| MD 临时高亮 | `.annotation-mark-temp` | 点 [+] 后、保存前的黄色下划线 span |
+| PDF 选中矩形（蓝） | `.pdf-selection-mark` | 拉框时的蓝色临时矩形 |
+| PDF 临时矩形（黄） | `.pdf-selection-mark-temp` | 点 [+] 后变黄色的临时矩形 |
+
+### 批注状态
+
+| 状态值 | CSS class | 说明 |
+|--------|-----------|------|
+| `anchored` | `.status-exact`（置信度≥0.95）/ `.status-reanchored`（<0.95） | 已定位，高亮正常显示 |
+| `unanchored` | `.status-orphan` | 失位，文本已改变，无法定位 |
+| `resolved` | `.is-resolved` | 用户标记为已解决 |
+
+### 交互流程
+
+**MD 批注：**
+```
+选中文字 → [+] 出现（蓝色 selection）
+→ 点 [+] → composer 出现（黄色下划线）
+→ 保存 → applyAnnotations（持久黄色背景高亮）
+→ 点高亮 / 侧边栏点条目 → popover
+```
+
+**PDF 批注：**
+```
+拉框 → 蓝色矩形 + [+] 出现
+→ 点 [+] → 矩形变黄 + composer 出现
+→ 保存 → 持久黄色矩形（canvas）+ 锚点 div
+→ 点矩形 / 侧边栏点条目 → popover（矩形右下角）
+```
 
 ---
 
@@ -200,6 +235,24 @@
 ---
 
 ## 十三、数据结构关键字段
+
+### Annotation（批注）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | string | UUID，批注唯一标识 |
+| `serial` | number | 序号，显示为 #1、#2 |
+| `start` | number | MD：全局文本 offset；PDF：TextItem 数组索引 |
+| `length` | number | MD：字符数；PDF：item 数量 |
+| `quote` | string | 被批注的原始文本 |
+| `quotePrefix` | string | 前文上下文（用于重新定位） |
+| `quoteSuffix` | string | 后文上下文（用于重新定位） |
+| `status` | `'anchored'` \| `'unanchored'` \| `'resolved'` | 批注状态 |
+| `confidence` | number | 定位置信度 0–1 |
+| `thread` | `AnnotationThreadItem[]` | 评论线程（首条 type='comment'，后续 type='reply'） |
+| `rectCoords` | `{x1,y1,x2,y2}` | PDF 专属：矩形坐标（PDF 坐标系，pt，未乘 scale） |
+| `page` | number | PDF 专属：页码（从 1 开始） |
+| `fileType` | `'md'` \| `'pdf'` | 文件类型 |
 
 ### FileInfo（会话文件）
 
@@ -220,11 +273,41 @@
 | `name` | 工作区名称 |
 | `path` | 工作区根路径 |
 
-### Annotation（批注）→ 见 `annotation-naming-dict.md`
+---
+
+## 十四、关键函数速查
+
+| 函数 | 文件 | 说明 |
+|------|------|------|
+| `showQuickAdd(x, y, pending)` | annotation.ts | 显示 [+] 按钮 |
+| `hideQuickAdd(clearPending?)` | annotation.ts | 隐藏 [+] 按钮 |
+| `openComposerFromPending()` | annotation.ts | 点 [+] 后打开 composer |
+| `savePendingAnnotation(filePath)` | annotation.ts | 保存 composer 里的评论 |
+| `showPopover(ann, x, y)` | annotation.ts | 在指定坐标显示 popover |
+| `setActiveAnnotation(id, filePath)` | annotation.ts | 侧边栏点条目，跳转 + 显示 popover |
+| `applyAnnotations()` | annotation.ts | 重新渲染所有高亮（MD） |
+| `renderAnnotationList(filePath)` | annotation.ts | 刷新侧边栏列表 |
+| `renderHighlights(annotations)` | pdf-annotation.ts | 渲染所有 PDF 矩形高亮 |
+| `drawTempRect(page, x1,y1,x2,y2, style)` | pdf-viewer.ts | 绘制临时矩形（'blue' 或 'yellow'） |
+| `clearTempRect(page?)` | pdf-viewer.ts | 清除临时矩形 |
+| `renderRectHighlight(page, x1,y1,x2,y2, id)` | pdf-viewer.ts | 绘制持久矩形 + 插入锚点 div |
 
 ---
 
-## 十四、LocalStorage 键名
+## 十五、状态变量（`AnnotationState`）
+
+| 变量 | 说明 |
+|------|------|
+| `state.pendingAnnotation` | 当前正在编辑的批注（选中后、保存前） |
+| `state.pinnedAnnotationId` | 当前 popover 显示的批注 id |
+| `state.activeAnnotationId` | 侧边栏当前选中的批注 id |
+| `state.annotations` | 当前文件的所有批注数组 |
+| `state.filter` | 侧边栏筛选器：`'all'` / `'open'` / `'resolved'` / `'orphan'` |
+| `state.density` | 列表密度：`'default'`（定位模式）/ `'simple'`（极简列表） |
+
+---
+
+## 十六、LocalStorage 键名
 
 | 键名 | 说明 |
 |------|------|
@@ -240,7 +323,7 @@
 
 ---
 
-## 十五、SSE 事件类型
+## 十七、SSE 事件类型
 
 | 事件 | 说明 |
 |------|------|
@@ -252,7 +335,7 @@
 
 ---
 
-## 十六、API 路由速查
+## 十八、API 路由速查
 
 | 路由 | 方法 | 说明 |
 |------|------|------|
@@ -270,7 +353,7 @@
 
 ---
 
-## 十七、键盘快捷键
+## 十九、键盘快捷键
 
 | 快捷键 | 说明 |
 |--------|------|
@@ -284,7 +367,7 @@
 
 ---
 
-## 十八、Z-index 层级
+## 二十、Z-index 层级
 
 | 变量 | 值 | 用途 |
 |------|----|------|

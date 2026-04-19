@@ -472,14 +472,22 @@ async function updateToc(filePath: string): Promise<void> {
       showPdfToc(toc);
       return;
     }
-  } catch { /* outline read failed, fall through to scan */ }
+  } catch (err) {
+    console.error('[TOC] outline read failed:', err);
+    // fall through to scan
+  }
 
   // PDF: lazy scan via pdfjs doc (works on all pages, not just rendered ones)
-  await scanPdfHeadings(
-    filePath,
-    viewer.getPdfDoc(),
-    toc => showPdfToc(toc)
-  );
+  try {
+    await scanPdfHeadings(
+      filePath,
+      viewer.getPdfDoc(),
+      toc => showPdfToc(toc)
+    );
+  } catch (err) {
+    console.error('[TOC] scan failed:', err);
+    panel.innerHTML = `<div class="toc-error">目录加载失败<br><span class="toc-error-detail">${String(err)}</span></div>`;
+  }
 }
 
 function attachPdfScrollHighlight(panel: HTMLElement): void {

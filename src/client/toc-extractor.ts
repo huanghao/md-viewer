@@ -103,8 +103,14 @@ export async function loadSidecar(pdfPath: string): Promise<TocItem[] | null> {
   try {
     const res = await fetch(`/api/file?path=${encodeURIComponent(sidecarPath(pdfPath))}`);
     if (!res.ok) return null;
-    return JSON.parse(await res.text()) as TocItem[];
-  } catch { return null; }
+    const text = await res.text();
+    const parsed = JSON.parse(text) as TocItem[];
+    if (!Array.isArray(parsed)) { console.warn('[TOC] sidecar not an array:', pdfPath); return null; }
+    return parsed;
+  } catch (err) {
+    console.warn('[TOC] loadSidecar failed:', pdfPath, err);
+    return null;
+  }
 }
 
 export async function saveSidecar(pdfPath: string, toc: TocItem[]): Promise<void> {
@@ -149,7 +155,7 @@ export async function scanPdfHeadings(
         const level = h >= median * 1.6 ? 1 : 2;
         flat.push({ title: text, level, pageNum, children: [] });
       }
-    } catch { /* skip unreadable page */ }
+    } catch (err) { console.warn(`[TOC] page ${pageNum} unreadable:`, err); }
 
     onProgress(buildTree([...flat]));
   }

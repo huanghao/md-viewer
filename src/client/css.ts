@@ -1033,7 +1033,7 @@ export const styles = `
       padding-right: 24px;
     }
     .content.diff-active {
-      padding: 0;
+      padding: 24px;
     }
     .markdown-wrapper {
       max-width: 900px;
@@ -1320,9 +1320,9 @@ export const styles = `
 
     /* Inline diff 内容区 */
     .diff-inline-body {
-      padding: 32px 32px;
-      max-width: 1000px;
+      max-width: 900px;
       margin: 0 auto;
+      padding: 32px;
     }
 
     /* 每个 diff block 的容器 */

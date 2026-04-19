@@ -693,6 +693,19 @@ export const styles = `
       color: var(--color-text-muted, #8b949e);
       font-size: var(--text-sm);
     }
+    .toc-error {
+      padding: 8px 0;
+      color: #cf222e;
+      font-size: var(--text-sm);
+      line-height: 1.5;
+    }
+    .toc-error-detail {
+      display: block;
+      margin-top: 4px;
+      font-size: var(--text-xs);
+      color: var(--color-text-muted, #8b949e);
+      word-break: break-all;
+    }
 
     .toc-item {
       display: flex;

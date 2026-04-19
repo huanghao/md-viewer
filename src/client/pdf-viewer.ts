@@ -1,6 +1,4 @@
 // PDF.js loaded via ES module in html.ts, exposed as window.pdfjsLib after 'pdfjslib-ready' event
-// TODO: add zoom controls for PDF (the font-scale button in toolbar doesn't affect PDF rendering,
-//       which uses a fixed scale=1.5 via pdf.js; needs a separate PDF-specific zoom UI)
 
 function getPdfjsLib(): Promise<any> {
   if ((window as any).pdfjsLib) return Promise.resolve((window as any).pdfjsLib);

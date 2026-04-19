@@ -147,6 +147,10 @@ export const styles = `
     body.sidebar-resizing .sidebar-resizer {
       background: rgba(9, 105, 218, 0.12);
     }
+    body.toc-resizing {
+      cursor: row-resize;
+      user-select: none;
+    }
     .sidebar-header {
       padding: 0;
       border-bottom: none;
@@ -3525,6 +3529,41 @@ export const styles = `
       box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     }
 
+    /* PDF 页码指示器 */
+    .pdf-page-indicator {
+      position: fixed;
+      bottom: 20px;
+      right: calc(var(--annotation-sidebar-width) + 20px);
+      background: rgba(30, 30, 30, 0.75);
+      color: #fff;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: var(--text-sm);
+      z-index: var(--z-scrollbar);
+      cursor: pointer;
+      user-select: none;
+      backdrop-filter: blur(4px);
+      transition: opacity 0.15s;
+    }
+    body.annotation-sidebar-collapsed .pdf-page-indicator {
+      right: 20px;
+    }
+    .pdf-page-indicator:hover { opacity: 0.9; }
+    .pdf-page-indicator-input {
+      width: 3em;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid rgba(255,255,255,0.6);
+      color: #fff;
+      font-size: var(--text-sm);
+      text-align: center;
+      outline: none;
+      padding: 0;
+      -moz-appearance: textfield;
+    }
+    .pdf-page-indicator-input::-webkit-outer-spin-button,
+    .pdf-page-indicator-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+
     /* 系统监控浮窗 */
     .monitor-panel {
       position: absolute;
@@ -3693,26 +3732,26 @@ export const styles = `
       width: 14px;
       z-index: var(--z-scrollbar);
       cursor: pointer;
-      background: rgba(100,100,100,0.08);
+      background: transparent;
     }
     body.annotation-sidebar-collapsed .doc-scrollbar {
       right: 0;
     }
     .doc-scrollbar-thumb {
       position: absolute;
-      left: 2px;
-      right: 2px;
-      background: rgba(100,100,100,0.35);
-      border-radius: var(--radius-sm);
+      left: 3px;
+      right: 3px;
+      background: rgba(0,0,0,0.45);
+      border-radius: 4px;
       min-height: 20px;
       cursor: grab;
     }
     .doc-scrollbar-thumb:hover {
-      background: rgba(100,100,100,0.5);
+      background: rgba(0,0,0,0.6);
     }
     .doc-scrollbar-thumb:active {
       cursor: grabbing;
-      background: rgba(100,100,100,0.6);
+      background: rgba(0,0,0,0.7);
     }
     .doc-scrollbar-markers {
       position: absolute;

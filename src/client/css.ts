@@ -191,7 +191,7 @@ export const styles = `
       border: none;
       border-radius: 6px;
       background: transparent;
-      color: #6b7280;
+      color: #57606a;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -720,7 +720,7 @@ export const styles = `
     }
     .file-meta {
       font-size: 12px;
-      color: #9ca3af;
+      color: #8b949e;
       font-weight: 400;
       white-space: nowrap;
     }
@@ -731,7 +731,7 @@ export const styles = `
       align-items: center;
       gap: 6px;
       font-size: 11px;
-      color: #6b7280;
+      color: #57606a;
       padding: 2px 6px;
       border-radius: 4px;
       transition: all 0.2s ease;
@@ -772,7 +772,7 @@ export const styles = `
       cursor: pointer;
       border: none;
       background: transparent;
-      color: #9ca3af;
+      color: #8b949e;
       transition: all 0.15s ease;
       white-space: nowrap;
       position: relative;
@@ -780,7 +780,7 @@ export const styles = `
 
     .font-scale-button:hover {
       background: rgba(0, 0, 0, 0.04);
-      color: #6b7280;
+      color: #57606a;
     }
 
     /* 字体缩放菜单 */
@@ -830,7 +830,7 @@ export const styles = `
       cursor: pointer;
       border: none;
       background: transparent;
-      color: #6b7280;
+      color: #57606a;
       transition: all 0.15s ease;
       white-space: nowrap;
     }
@@ -997,7 +997,7 @@ export const styles = `
     }
     .tab-manager-empty {
       padding: 12px;
-      color: #6b7280;
+      color: #57606a;
       font-size: 12px;
       text-align: center;
     }
@@ -1052,7 +1052,7 @@ export const styles = `
       border: 1px solid #d1d5da;
       border-radius: 4px;
       background: #fff;
-      color: #6b7280;
+      color: #57606a;
       line-height: 1;
       cursor: pointer;
       padding: 0;
@@ -1064,7 +1064,7 @@ export const styles = `
     .file-type-badge {
       display: inline-block;
       background: #f3f4f6;
-      color: #6b7280;
+      color: #57606a;
       font-size: 11px;
       padding: 2px 6px;
       border-radius: 4px;
@@ -1136,7 +1136,7 @@ export const styles = `
       cursor: pointer;
     }
     .markdown-body .mermaid-source-toggle:hover {
-      border-color: #9ca3af;
+      border-color: #8b949e;
       color: #374151;
     }
     .markdown-body .mermaid {
@@ -1190,7 +1190,7 @@ export const styles = `
       cursor: pointer;
     }
     .markdown-body .mermaid-source-copy:hover {
-      border-color: #9ca3af;
+      border-color: #8b949e;
       color: #374151;
     }
     .markdown-body .mermaid-source-copy.copied {
@@ -2083,7 +2083,7 @@ export const styles = `
       margin-bottom: 10px;
     }
     .settings-kv-grid > div:nth-child(2n + 1) {
-      color: #6b7280;
+      color: #57606a;
     }
     .settings-key-list {
       display: flex;
@@ -2478,7 +2478,7 @@ export const styles = `
       border: 1px solid transparent;
       border-radius: 5px;
       background: transparent;
-      color: #6b7280;
+      color: #57606a;
       cursor: pointer;
       padding: 0;
       display: inline-flex;
@@ -2560,7 +2560,7 @@ export const styles = `
       border: none;
       background: transparent;
       cursor: pointer;
-      color: #6b7280;
+      color: #57606a;
       border-radius: 3px;
       line-height: 1;
     }
@@ -2602,7 +2602,7 @@ export const styles = `
     }
     .annotation-reply-count {
       font-size: 12px;
-      color: #6b7280;
+      color: #57606a;
     }
     .annotation-reply-entry {
       margin-top: 6px;
@@ -2825,7 +2825,7 @@ export const styles = `
       border: 1px solid #d0d7de;
       border-radius: 999px;
       background: #fff;
-      color: #6b7280;
+      color: #57606a;
       box-shadow: 0 3px 10px rgba(31, 41, 55, 0.12);
       display: inline-flex;
       align-items: center;
@@ -3406,7 +3406,7 @@ export const styles = `
       padding: 8px 14px;
       font-size: 12px;
       font-family: inherit;
-      color: #6b7280;
+      color: #57606a;
       cursor: pointer;
       white-space: nowrap;
       transition: color 0.1s, border-color 0.1s;
@@ -3422,7 +3422,7 @@ export const styles = `
       border: none;
       cursor: pointer;
       font-size: 16px;
-      color: #9ca3af;
+      color: #8b949e;
       line-height: 1;
       padding: 0 4px;
       flex-shrink: 0;
@@ -3443,7 +3443,7 @@ export const styles = `
       color: #374151;
     }
     .pdf-mem-row.pdf-mem-empty {
-      color: #9ca3af;
+      color: #8b949e;
       font-style: italic;
     }
     .pdf-mem-name {
@@ -3452,7 +3452,7 @@ export const styles = `
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .pdf-mem-pages { color: #6b7280; white-space: nowrap; }
+    .pdf-mem-pages { color: #57606a; white-space: nowrap; }
     .pdf-mem-mb { color: #0b64c0; white-space: nowrap; min-width: 52px; text-align: right; }
     .pdf-mem-idle { color: #f59e0b; white-space: nowrap; font-size: 11px; }
     .pdf-mem-total {
@@ -3467,7 +3467,7 @@ export const styles = `
     /* 翻译 tab */
     .monitor-stat-section {
       padding: 6px 12px 2px;
-      color: #6b7280;
+      color: #57606a;
       font-size: 11px;
       font-weight: 600;
       text-transform: uppercase;
@@ -3479,7 +3479,7 @@ export const styles = `
       padding: 3px 12px;
       color: #374151;
     }
-    .monitor-stat-key { color: #6b7280; }
+    .monitor-stat-key { color: #57606a; }
     .monitor-stat-val { color: #111827; font-weight: 500; }
     .monitor-stat-val.is-error { color: #dc2626; }
     .monitor-stat-val.is-ok { color: #16a34a; }
@@ -3492,7 +3492,7 @@ export const styles = `
       margin-top: 4px;
     }
     .monitor-calls-title {
-      color: #6b7280;
+      color: #57606a;
       font-size: 11px;
       font-weight: 600;
       text-transform: uppercase;
@@ -3505,7 +3505,7 @@ export const styles = `
       padding: 1px 6px;
       font-size: 11px;
       font-family: inherit;
-      color: #6b7280;
+      color: #57606a;
       cursor: pointer;
     }
     .monitor-clear-btn:hover { background: #f3f4f6; color: #374151; }
@@ -3518,7 +3518,7 @@ export const styles = `
       font-size: 11px;
     }
     .monitor-call-row.is-error { color: #dc2626; }
-    .monitor-call-time { color: #9ca3af; white-space: nowrap; flex-shrink: 0; }
+    .monitor-call-time { color: #8b949e; white-space: nowrap; flex-shrink: 0; }
     .monitor-call-dur { white-space: nowrap; flex-shrink: 0; min-width: 44px; text-align: right; }
     .monitor-call-status { flex-shrink: 0; }
     .monitor-call-text {
@@ -3526,7 +3526,7 @@ export const styles = `
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      color: #6b7280;
+      color: #57606a;
     }
     .monitor-call-row.is-error .monitor-call-text { color: #dc2626; }
 

@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-04-19
+
+### Added
+
+- **目录面板 (TOC)**: 左侧边栏新增目录面板，支持 Markdown 标题和 PDF 书签，点击跳转，滚动时自动高亮当前章节
+- **PDF 翻译**: 段落级翻译，点击段落旁「译」图标触发，译文显示在右侧翻译列表，支持重试和删除
+- **翻译双向联动**: 鼠标悬停译文列表条目高亮对应段落图标，点击跳转到原文位置；「译」图标变绿表示已翻译
+- **翻译序号**: 译文列表每条显示 `P{页} #{序号}` 标识，按页码顺序编号
+- **PDF 滚动条**: PDF 阅读区显示自定义滚动条，与 Markdown 阅读区风格统一
+- **PDF 页码指示器**: 固定在右下角显示当前页/总页数，点击可输入页码直接跳转
+
+### Changed
+
+- **PDF 空闲释放**: 超时时间从 10 分钟延长至 30 分钟
+- **PDF 跳转行为统一**: 所有 PDF 内跳转（TOC、翻译、批注）统一使用 smooth 动画 + 顶部 100px 留白
+- **开发命令**: `just dev` 同时启动前端 watch 和后端 watch，Ctrl+C 一起退出
+
+### Fixed
+
+- TOC 当前项高亮在点击跳转后落到错误条目
+- 翻译记录刷新后不显示（改为文件加载时立即从 localStorage 恢复）
+- 切换文件时翻译列表未清空
+- 翻译跳转位置不准（之前只跳到页顶，现在精确到段落 y 坐标）
+
 ## [0.2.0] - 2026-03-19
 
 ### Added
@@ -65,6 +89,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial development versions (not released via Homebrew).
 
-[Unreleased]: https://github.com/huanghao/md-viewer/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/huanghao/md-viewer/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/huanghao/md-viewer/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/huanghao/md-viewer/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/huanghao/md-viewer/releases/tag/v0.1.0

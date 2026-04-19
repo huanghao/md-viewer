@@ -1320,9 +1320,7 @@ export const styles = `
 
     /* Inline diff 内容区 */
     .diff-inline-body {
-      padding: 32px 48px;
-      max-width: 860px;
-      margin: 0 auto;
+      padding: 32px 48px 32px 32px;
     }
 
     /* 每个 diff block 的容器 */

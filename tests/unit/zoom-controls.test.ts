@@ -1,6 +1,6 @@
 // tests/unit/zoom-controls.test.ts
 import { describe, expect, it } from 'bun:test';
-import { clampZoom, zoomStep, PDF_ZOOM_KEY } from '../../src/client/zoom';
+import { clampZoom, zoomStep, pdfZoomKey } from '../../src/client/zoom';
 
 describe('clampZoom', () => {
   it('clamps below min', () => expect(clampZoom(0.3, 0.5, 3.0)).toBe(0.5));
@@ -15,8 +15,8 @@ describe('zoomStep', () => {
   it('rounds correctly at float boundary', () => expect(zoomStep(0.9, +1)).toBe(1.0));
 });
 
-describe('PDF_ZOOM_KEY', () => {
+describe('pdfZoomKey', () => {
   it('generates correct localStorage key', () => {
-    expect(PDF_ZOOM_KEY('/docs/report.pdf')).toBe('md-viewer:pdf-zoom:/docs/report.pdf');
+    expect(pdfZoomKey('/docs/report.pdf')).toBe('md-viewer:pdf-zoom:/docs/report.pdf');
   });
 });

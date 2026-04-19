@@ -404,6 +404,39 @@ const quote = item.str.slice(range.startOffset, range.endOffset);
 
 ---
 
+**路径3（坐标映射）：更优的选中方案（2026-04-19 实测，23 条样本）**
+
+通过交互测试工具收集了 23 条跨 6 个 PDF、8 种区域类型的样本，发现了一种比上述三种方法都更可靠的方案：**直接用鼠标坐标在 TextItem 列表里找命中的 item，不依赖浏览器 DOM 选中**。
+
+**核心思路**：
+- mousedown/mouseup 坐标 → 转换为 PDF 坐标系
+- 构建选区矩形 `[selLeft, selRight, selTop, selBottom]`
+- 遍历 TextItem 列表，找所有包围盒与选区矩形有交叉的 item
+- 对起始 item 用 X 坐标估算字符偏移（`startChar = (x - item.x) / item.width * str.length`）
+- 对结束 item 同理估算 endChar
+- 拼接所有命中 item 的 str 子串
+
+**实测成绩（23 条样本）**：
+
+| 区域类型 | 浏览器拖拽 | 路径3 坐标映射 |
+|---------|-----------|--------------|
+| 正文（整行 item） | 截断词边界 | 准确，差 0-1 字符 |
+| 标题/小标题 | 扩展到大段落 | ✓ 精准命中 item |
+| 摘要 | 扩展到大段落 | ✓ 精准命中 item |
+| 页眉/页脚 | 跑偏 | ✓ 精准命中 |
+| 图注/图表标签 | 跑偏到相邻标签 | ✓ 精准命中 |
+| 公式（单字符 item） | 完全失控 | ✓ 收集所有符号 |
+| 跨行选中 | 取决于 span 布局 | ✓ 多 item 拼接 |
+
+**路径3 的优势**：完全绕过了 TextLayer span 布局问题（span 连续排列导致浏览器选中扩展到大范围），直接用 PDF 坐标系操作，不受 DOM 结构影响。
+
+**路径3 的局限**：
+- 字符偏移用均匀分布估算，差 1 字符的概率较高（约 20%）
+- 多栏布局时，不同栏的 item 按 Y 排序会混合（但整体文字仍然正确）
+- 样本文件：`scripts/pdf-select-lab/samples/selection-samples.json`
+
+---
+
 ### 11. 拖拽选中时的视觉高亮
 
 **文件：`src/client/pdf-viewer.ts`**（`markSelectionSpans`、`clearSelectionMark`）

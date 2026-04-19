@@ -23,7 +23,10 @@ Bun.serve({
       try {
         const html = readFileSync(HTML_PATH, "utf-8");
         return new Response(html, {
-          headers: { "Content-Type": "text/html; charset=utf-8" },
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store",
+          },
         });
       } catch {
         return new Response("index.html not found", { status: 404 });
@@ -51,6 +54,22 @@ Bun.serve({
           headers: { "Content-Type": "application/json" },
         });
       }
+    }
+
+    // 保存样本
+    if (url.pathname === "/save-sample" && req.method === "POST") {
+      const entry = await req.json();
+      const samplesPath = resolve(import.meta.dir, "samples/selection-samples.json");
+      let samples: any[] = [];
+      try {
+        const raw = await Bun.file(samplesPath).text();
+        samples = JSON.parse(raw);
+      } catch {}
+      const id = `s${String(samples.length + 1).padStart(3, "0")}`;
+      samples.push({ id, ...entry });
+      await Bun.write(samplesPath, JSON.stringify(samples, null, 2));
+      console.log(`SAMPLE_SAVED id=${id} wanted="${entry.userWanted}" path3="${entry.path3}"`);
+      return new Response("ok", { headers: { "Content-Type": "text/plain" } });
     }
 
     // 接收选中结果并打印到 stdout

@@ -1,0 +1,1761 @@
+[
+  {
+    "id": "s001",
+    "pdf": "quiet-star-2403.09629.pdf",
+    "pageNum": 1,
+    "region": "body",
+    "frozenText": "refully curated dat",
+    "path1": "refully curated dat",
+    "path2": "carefully curated datasets",
+    "path3": "arefully curated",
+    "userWanted": "carefully curated",
+    "fb": {
+      "visual": true,
+      "path1": null,
+      "path2": null,
+      "path3": true
+    },
+    "note": "第三条路径的首字母缺了，但看上去是最对的一种",
+    "rangeInfo": {
+      "startOffset": 22,
+      "endOffset": 41,
+      "sameContainer": true
+    },
+    "coords": {
+      "downPdf": [
+        250.67,
+        682.67
+      ],
+      "upPdf": [
+        312,
+        682.67
+      ]
+    },
+    "path3Detail": [
+      {
+        "idx": 86,
+        "str": "These works rely on carefully curated da",
+        "startChar": 21,
+        "endChar": 38,
+        "slice": "arefully curated",
+        "itemX": "172.0",
+        "itemWidth": "332.0"
+      }
+    ]
+  },
+  {
+    "id": "s002",
+    "pdf": "quiet-star-2403.09629.pdf",
+    "pageNum": 3,
+    "region": "body",
+    "frozenText": "provided with some sc",
+    "path1": "provided with some sc",
+    "path2": "provided with some",
+    "path3": "rovided with some sc",
+    "userWanted": "provided with some",
+    "fb": {
+      "visual": true,
+      "path1": null,
+      "path2": true,
+      "path3": null
+    },
+    "note": "路径2左扩右收正确，路径3少了开头p",
+    "rangeInfo": {
+      "startOffset": 5,
+      "endOffset": 26,
+      "sameContainer": true
+    },
+    "coords": {
+      "downPdf": [
+        133.33,
+        420.67
+      ],
+      "upPdf": [
+        222.67,
+        419.33
+      ]
+    },
+    "path3Detail": [
+      {
+        "idx": 131,
+        "str": "when provided with some scaffolding, can",
+        "startChar": 6,
+        "endChar": 26,
+        "slice": "rovided with some sc",
+        "itemX": "107.6",
+        "itemWidth": "396.4"
+      }
+    ]
+  },
+  {
+    "id": "s003",
+    "pdf": "quiet-star-2403.09629.pdf",
+    "pageNum": 1,
+    "region": "body",
+    "frozenText": "owing LMs to l",
+    "path1": "owing LMs to l",
+    "path2": "allowing LMs to",
+    "path3": "allowing LMs",
+    "userWanted": "allowing LMs",
+    "fb": {
+      "visual": true,
+      "path1": null,
+      "path2": null,
+      "path3": true
+    },
+    "note": "路径3完全准确，路径2多了to",
+    "rangeInfo": {
+      "startOffset": 37,
+      "endOffset": 51,
+      "sameContainer": true
+    },
+    "coords": {
+      "downPdf": [
+        250.67,
+        682.67
+      ],
+      "upPdf": [
+        312,
+        682.67
+      ]
+    },
+    "path3Detail": [
+      {
+        "idx": 82,
+        "str": "variety of tasks, but methods for allowi",
+        "startChar": 33,
+        "endChar": 47,
+        "slice": "allowing LMs",
+        "itemX": "107.7",
+        "itemWidth": "396.3"
+      }
+    ]
+  },
+  {
+    "id": "s004",
+    "pdf": "quiet-star-2403.09629.pdf",
+    "pageNum": 2,
+    "region": "body",
+    "frozenText": "houghts. Lastly, w",
+    "path1": "houghts. Lastly, w",
+    "path2": "thoughts. Lastly",
+    "path3": "thoughts. Lastly,",
+    "userWanted": "thoughts. Lastly,",
+    "fb": {
+      "visual": true,
+      "path1": null,
+      "path2": null,
+      "path3": true
+    },
+    "note": "路径3准确，路径2少了逗号（标点被当分隔符）",
+    "rangeInfo": {
+      "startOffset": 10,
+      "endOffset": 28,
+      "sameContainer": true
+    },
+    "coords": {
+      "downPdf": [
+        144,
+        544
+      ],
+      "upPdf": [
+        220,
+        546
+      ]
+    },
+    "path3Detail": [
+      {
+        "idx": 166,
+        "str": "internal thoughts. Lastly, we qualitativ",
+        "startChar": 8,
+        "endChar": 26,
+        "slice": "thoughts. Lastly,",
+        "itemX": "108.0",
+        "itemWidth": "394.9"
+      }
+    ]
+  },
+  {
+    "id": "s005",
+    "pdf": "quiet-star-2403.09629.pdf",
+    "pageNum": 1,
+    "region": "body",
+    "frozenText": "eader has onl",
+    "path1": "eader has onl",
+    "path2": "reader has",
+    "path3": "a reader has",
+    "userWanted": "a reader has",
+    "fb": {
+      "visual": true,
+      "path1": false,
+      "path2": false,
+      "path3": true
+    },
+    "note": "路径3准确，路径2左扩时跳过了单字母词a",
+    "rangeInfo": {
+      "startOffset": 36,
+      "endOffset": 49,
+      "sameContainer": true
+    },
+    "coords": {
+      "downPdf": [
+        261.33,
+        627.33
+      ],
+      "upPdf": [
+        317.33,
+        629.33
+      ]
+    },
+    "path3Detail": [
+      {
+        "idx": 77,
+        "str": "statements appear in a document, a reade",
+        "startChar": 33,
+        "endChar": 45,
+        "slice": "a reader has",
+        "itemX": "108.0",
+        "itemWidth": "397.2"
+      }
+    ]
+  },
+  {
+    "id": 1776569417208,
+    "pdf": "quiet-star-2403.09629.pdf",
+    "pageNum": 1,
+    "region": "body",
+    "coords": {
+      "downScreen": [
+        541,
+        482
+      ],
+      "upScreen": [
+        685,
+        482
+      ],
+      "downPdf": [
+        250,
+        684.67
+      ],
+      "upPdf": [
+        346,
+        684.67
+      ]
+    },
+    "path1": "owing LMs to learn from",
+    "path2": "allowing LMs to learn from",
+    "path3": "allowing LMs to learn",
+    "path3Detail": [
+      {
+        "idx": 82,
+        "str": "variety of tasks, but methods for allowi",
+        "startChar": 33,
+        "endChar": 55,
+        "slice": "allowing LMs to learn",
+        "itemX": "107.7",
+        "itemWidth": "396.3"
+      }
+    ],
+    "frozenText": "owing LMs to learn from",
+    "rangeInfo": {
+      "startOffset": 37,
+      "endOffset": 60,
+      "sameContainer": true,
+      "nodeText": "variety of tasks, but methods for allowing LMs to learn from their reasoning (e."
+    },
+    "userWanted": "allowing LMs to learn",
+    "note": "",
+    "fb": {
+      "path1": null,
+      "path2": null,
+      "path3": null,
+      "visual": true
+    }
+  },
+  {
+    "id": 1776569460989,
+    "pdf": "quiet-star-2403.09629.pdf",
+    "pageNum": 1,
+    "region": "body",
+    "coords": {
+      "downScreen": [
+        459,
+        351
+      ],
+      "upScreen": [
+        358,
+        336
+      ],
+      "downPdf": [
+        195.33,
+        597.33
+      ],
+      "upPdf": [
+        128,
+        587.33
+      ]
+    },
+    "path1": "ntroduction Much of the meaning of text is hidden between the lines: without understanding why statements appear in a document, a reader has only a shallow understanding. Moreover, this has been repeatedly shown to be true for LMs as well, in the contexts of tasks ranging from commonsense reasoning to theorem proving to programming (Wei et al., 2022b; Nye et al., 2021; Zelikman et al., 2022; 2023a; Kojima et al., 2022). Reasoning about implications of text to predict later text has consistently been shown to improve LM performance on a variety of tasks, but methods for allowing LMs to learn from their reasoning (e.g., Zelikman et al. 2022) have focused on solving individual tasks or predefined sets of tasks (e.g., Wei et al. 2021b). These works rely on carefully curated datasets to provide either specific reasoning tasks or in some cases, the reasoning itself. We instead ask, if reasoning is implicit in all text, why shouldn’t we leverage the task of language modeling to teach reasoning? 1",
+    "path2": null,
+    "path3": "Introduction",
+    "path3Detail": [
+      {
+        "idx": 74,
+        "str": "Introduction",
+        "startChar": 0,
+        "endChar": 12,
+        "slice": "Introduction",
+        "itemX": "125.9",
+        "itemWidth": "69.1"
+      }
+    ],
+    "frozenText": "ntroduction",
+    "rangeInfo": {
+      "startOffset": 1,
+      "endOffset": 128,
+      "sameContainer": false,
+      "nodeText": "Introduction"
+    },
+    "userWanted": "Introduction",
+    "note": "视觉上没有完全一致。是因为原生拖拽的时候，蓝色高亮不能很好的覆盖我要选的地方。",
+    "fb": {
+      "path1": false,
+      "path2": false,
+      "path3": true,
+      "visual": false
+    }
+  },
+  {
+    "id": 1776569662615,
+    "pdf": "quiet-star-2403.09629.pdf",
+    "pageNum": 1,
+    "region": "heading",
+    "coords": {
+      "downScreen": [
+        672,
+        121
+      ],
+      "upScreen": [
+        593,
+        105
+      ],
+      "downPdf": [
+        337.33,
+        239.33
+      ],
+      "upPdf": [
+        284.67,
+        228.67
+      ]
+    },
+    "path1": "Abstract When writing and talking, people sometimes pause to think. Although reasoning-focused works have often framed reasoning as a method of answering questions or completing agentic tasks, reasoning is implicit in almost all written text. For example, this applies to the steps not stated between the lines of a proof or to the theory of mind underlying a conversation. In the Self-Taught Reasoner (STaR, Zelikman et al. 2022), useful thinking is learned by inferring rationales from few-shot examples in question-answering and learning from those that lead to a correct answer. This is a highly constrained setting – ideally, a language model could instead learn to infer unstated rationales in arbitrary text. We present Quiet-STaR, a generalization of STaR in which LMs learn to generate rationales at each token to explain future text, improving their predictions. We address key challenges, including 1) the computational cost",
+    "path2": null,
+    "path3": "Abstract",
+    "path3Detail": [
+      {
+        "idx": 27,
+        "str": "Abstract",
+        "startChar": 0,
+        "endChar": 8,
+        "slice": "Abstract",
+        "itemX": "283.1",
+        "itemWidth": "45.8"
+      }
+    ],
+    "frozenText": "Abstract",
+    "rangeInfo": {
+      "startOffset": 0,
+      "endOffset": 62,
+      "sameContainer": false,
+      "nodeText": "Abstract"
+    },
+    "userWanted": "",
+    "note": "摘要的标题，也是因为拖拽无法完美选中",
+    "fb": {
+      "path1": false,
+      "path2": false,
+      "path3": true,
+      "visual": false
+    }
+  },
+  {
+    "id": 1776569886056,
+    "pdf": "llama-3-herd-2407.21783.pdf",
+    "pageNum": 1,
+    "region": "heading",
+    "coords": {
+      "downScreen": [
+        368,
+        570
+      ],
+      "upScreen": [
+        484,
+        568
+      ],
+      "downPdf": [
+        134.67,
+        659.33
+      ],
+      "upPdf": [
+        212,
+        658
+      ]
+    },
+    "path1": "uality assurance a",
+    "path2": "quality assurance",
+    "path3": null,
+    "path3Detail": [
+      {
+        "idx": 64,
+        "str": "rigorous quality assurance and filtering",
+        "startChar": 26,
+        "endChar": 9,
+        "slice": "",
+        "itemX": "95.8",
+        "itemWidth": "445.4"
+      }
+    ],
+    "frozenText": "uality assurance a",
+    "rangeInfo": {
+      "startOffset": 10,
+      "endOffset": 28,
+      "sameContainer": true,
+      "nodeText": "rigorous quality assurance and filtering approaches for post-training data. We p"
+    },
+    "userWanted": "quality assurance",
+    "note": "",
+    "fb": {
+      "path1": false,
+      "path2": true,
+      "path3": false,
+      "visual": true
+    }
+  },
+  {
+    "id": 1776570061625,
+    "pdf": "llama-3-herd-2407.21783.pdf",
+    "pageNum": 1,
+    "region": "body",
+    "coords": {
+      "downScreen": [
+        366,
+        601
+      ],
+      "upScreen": [
+        483,
+        601
+      ],
+      "downPdf": [
+        133.33,
+        656.67
+      ],
+      "upPdf": [
+        211.33,
+        656.67
+      ]
+    },
+    "path1": "quality assurance a",
+    "path2": "quality assurance",
+    "path3": "quality assurance",
+    "path3Detail": [
+      {
+        "idx": 64,
+        "str": "rigorous quality assurance and filtering",
+        "startChar": 9,
+        "endChar": 26,
+        "slice": "quality assurance",
+        "itemX": "95.8",
+        "itemWidth": "445.4"
+      }
+    ],
+    "frozenText": "quality assurance a",
+    "rangeInfo": {
+      "startOffset": 9,
+      "endOffset": 28,
+      "sameContainer": true,
+      "nodeText": "rigorous quality assurance and filtering approaches for post-training data. We p"
+    },
+    "userWanted": "",
+    "note": "",
+    "fb": {
+      "path1": false,
+      "path2": true,
+      "path3": true,
+      "visual": true
+    }
+  },
+  {
+    "id": 1776570131690,
+    "pdf": "llama-3-herd-2407.21783.pdf",
+    "pageNum": 1,
+    "region": "body",
+    "coords": {
+      "downScreen": [
+        421,
+        357
+      ],
+      "upScreen": [
+        302,
+        335
+      ],
+      "downPdf": [
+        170,
+        427.33
+      ],
+      "upPdf": [
+        90.67,
+        412.67
+      ]
+    },
+    "path1": "ntroduction Foundation models are general models of language, vision, speech, and/or other modalities that are designed to support a large variety of AI tasks. They form the basis of many modern AI systems. The development of modern foundation models consists of two main stages: (1) a pre-training stage in which the model is trained at massive scale using straightforward tasks such as next-word prediction or captioning and (2) a post-training stage in which the model is tuned to follow instructions, align with human preferences, and improve specific capabilities (for example, coding and reasoning). In this paper, we present a new set of foundation models for language, called Llama 3. The Llama 3 Herd of models natively supports multilinguality, coding, reasoning, and tool usage. Our largest model is dense Transformer with 405B parameters, processing information in a context window of up to 128K tokens. Each member of the herd is listed in Table 1. All the results presented in this paper are for the Llama 3.1 models, which we will refer to as Llama 3 throughout for brevity. We believe there are three key levers in the development of high-quality foundation models: data, scale, and managing complexity. We seek to optimize for these three levers in our development process: • Data. Compared to prior versions of Llama (Touvron et al., 2023a,b), we improved both the quantity and quality of the data we use for pre-training and post-training. These improvements include the development of more careful pre-processing and curation pipelines for pre-training data and the development of more rigorous quality assurance and filtering approaches for post-training data. We pre-train Llama 3 on a corpus of about 15T multilingual tokens, compared to 1.8T tokens for Llama 2. • Scale. We train a model at far larger scale than previous Llama models: our flagship language model was pre-trained using 3.8 × 1025 FLOPs, almost 50× more than the largest version of Llama 2. Specifically, we pre-trained a flagship model with 405B trainable parameters on 15.6T text tokens. As expected per 1",
+    "path2": null,
+    "path3": "Introduction",
+    "path3Detail": [
+      {
+        "idx": 30,
+        "str": "Introduction",
+        "startChar": 0,
+        "endChar": 12,
+        "slice": "Introduction",
+        "itemX": "89.8",
+        "itemWidth": "75.7"
+      }
+    ],
+    "frozenText": "ntroduction",
+    "rangeInfo": {
+      "startOffset": 1,
+      "endOffset": 122,
+      "sameContainer": false,
+      "nodeText": "Introduction"
+    },
+    "userWanted": "",
+    "note": "",
+    "fb": {
+      "path1": false,
+      "path2": false,
+      "path3": true,
+      "visual": false
+    }
+  },
+  {
+    "id": 1776570206231,
+    "pdf": "deepseek-v3-2412.19437.pdf",
+    "pageNum": 5,
+    "region": "heading",
+    "coords": {
+      "downScreen": [
+        534,
+        321
+      ],
+      "upScreen": [
+        796,
+        320
+      ],
+      "downPdf": [
+        236.97,
+        208.46
+      ],
+      "upPdf": [
+        411.64,
+        207.79
+      ]
+    },
+    "path1": "rehensive array of benchmarks. Despite its e",
+    "path2": "comprehensive array of benchmarks. Despite its",
+    "path3": "comprehensive array of benchmarks.",
+    "path3Detail": [
+      {
+        "idx": 34,
+        "str": "We evaluate DeepSeek-V3 on a comprehensi",
+        "startChar": 29,
+        "endChar": 64,
+        "slice": "comprehensive array of benchmarks.",
+        "itemX": "87.8",
+        "itemWidth": "436.6"
+      }
+    ],
+    "frozenText": "rehensive array of benchmarks. Despite its e",
+    "rangeInfo": {
+      "startOffset": 33,
+      "endOffset": 77,
+      "sameContainer": true,
+      "nodeText": "We evaluate DeepSeek-V3 on a comprehensive array of benchmarks. Despite its econ"
+    },
+    "userWanted": "",
+    "note": "",
+    "fb": {
+      "path1": null,
+      "path2": null,
+      "path3": true,
+      "visual": true
+    }
+  },
+  {
+    "id": 1776570412056,
+    "pdf": "tulu-3-2411.15124.pdf",
+    "pageNum": 5,
+    "region": "body",
+    "coords": {
+      "downScreen": [
+        351,
+        427
+      ],
+      "upScreen": [
+        535,
+        431
+      ],
+      "downPdf": [
+        123.33,
+        441.33
+      ],
+      "upPdf": [
+        246,
+        444
+      ]
+    },
+    "path1": "m proprietary methods with novel techniques and established academic research, Tülu 3 pushes the boundaries of research in post-training. The advancements of Tülu 3 are attributed to Tülu 3 Data, new permissively licensed training datasets targeting core skills, Tülu 3 Eval, an evaluation suite and tools to establish clear performance goals and guide improvement through training stages, and Tülu 3 Recipe, an advanced multi-stage training pipeline incorporating new algorithmic advancements in reinforcement learning, cutting-edge infrastructure, and rigorous experimentation to optimize data mixes, methods, and parameters across various training stages. In order to build Tülu 3, we identify a set of core skills to improve after training (e.g., reasoning, math, coding, safety, precise instruction following, knowledge recall, etc.) and build an evaluation framework to establish clear performance goals and guide model improvement over a selection of development and unseen tasks. Tülu 3 benefits significantly from leveraging publicly available open data, generating diverse, skill-specific synthetic data at various training stages, and aggressively decontaminating them against our evaluation suite. The Tülu 3 training recipe involves multiple stages, with each stage building upon the previous model and focusing on different types of data — namely, prompt-completion instances for supervised finetuning, preferences for preference tuning, or verifiable rewards for reinforcement learning. Our methodology facilitates identifying skill deficiencies and refining the data mix, methods and parameters, ensuring a balanced performance of core skills across the training process. Through rigorous, principled experimentation, we determine the best data mix for supervised finetuning, resulting in the Tülu 3 SFT checkpoint. Leveraging recent advances in preference tuning, we then train a model over carefully curated on-policy preference data from comparing Tülu 3 SFT completions against outputs from other language models. Furthermore, we introduce a new",
+    "path2": null,
+    "path3": "Integrating partial detail",
+    "path3Detail": [
+      {
+        "idx": 106,
+        "str": "Integrating partial details from proprie",
+        "startChar": 0,
+        "endChar": 26,
+        "slice": "Integrating partial detail",
+        "itemX": "127.9",
+        "itemWidth": "413.3"
+      }
+    ],
+    "frozenText": "m proprietary methods with novel techniques and established",
+    "rangeInfo": {
+      "startOffset": 31,
+      "endOffset": 211,
+      "sameContainer": false,
+      "nodeText": "Integrating partial details from proprietary methods with novel techniques and e"
+    },
+    "userWanted": "",
+    "note": "",
+    "fb": {
+      "path1": false,
+      "path2": false,
+      "path3": true,
+      "visual": false
+    }
+  },
+  {
+    "id": 1776570526836,
+    "pdf": "tulu-3-2411.15124.pdf",
+    "pageNum": 1,
+    "region": "abstract",
+    "coords": {
+      "downScreen": [
+        566,
+        303
+      ],
+      "upScreen": [
+        809,
+        306
+      ],
+      "downPdf": [
+        266.67,
+        480.33
+      ],
+      "upPdf": [
+        428.67,
+        482.33
+      ]
+    },
+    "path1": "modern post-training techniques.",
+    "path2": null,
+    "path3": "for modern post-training techniques.",
+    "path3Detail": [
+      {
+        "idx": 148,
+        "str": "recipes, serving as a comprehensive guid",
+        "startChar": 41,
+        "endChar": 78,
+        "slice": "for modern post-training techniques.",
+        "itemX": "87.8",
+        "itemWidth": "338.9"
+      }
+    ],
+    "frozenText": "modern post-training techniques.",
+    "rangeInfo": {
+      "startOffset": 46,
+      "endOffset": 0,
+      "sameContainer": false,
+      "nodeText": "recipes, serving as a comprehensive guide for modern post-training techniques."
+    },
+    "userWanted": "",
+    "note": "虽然鼠标在同一行上往右，到training这个位置的时候蓝色视觉还是对的，到了techniques就不对了。蓝色就选了一大片。反而通过视觉位图反推找回去的文本是对的。视觉高亮最后也没有覆盖全，但也没有错的离谱",
+    "fb": {
+      "path1": false,
+      "path2": false,
+      "path3": true,
+      "visual": false
+    }
+  },
+  {
+    "id": 1776570800965,
+    "pdf": "tulu-3-2411.15124.pdf",
+    "pageNum": 1,
+    "region": "abstract",
+    "coords": {
+      "downScreen": [
+        250,
+        109
+      ],
+      "upScreen": [
+        956,
+        183
+      ],
+      "downPdf": [
+        56,
+        62
+      ],
+      "upPdf": [
+        526.67,
+        111.33
+      ]
+    },
+    "path1": "∗Tülu 3 was a team effort. ♥ marks core contributors. See full author contributions here. Contact tulu@allenai.org. Tulu 3 8B: Llama-3.1-Tulu-3-8B Tulu 3 70B: Llama-3.1-Tulu-3-70B Tulu 3 405B: Llama-3.1-Tulu-3-405B",
+    "path2": null,
+    "path3": "Tülu 3: Pushing Frontiers in Open Language Model Post-Training",
+    "path3Detail": [
+      {
+        "idx": 0,
+        "str": "Tülu 3: Pushing Frontiers in",
+        "startChar": 0,
+        "endChar": 28,
+        "slice": "Tülu 3: Pushing Frontiers in",
+        "itemX": "70.1",
+        "itemWidth": "325.6"
+      },
+      {
+        "idx": 1,
+        "str": "Open Language Model Post-Training",
+        "startChar": 0,
+        "endChar": 33,
+        "slice": "Open Language Model Post-Training",
+        "itemX": "70.9",
+        "itemWidth": "436.0"
+      }
+    ],
+    "frozenText": "∗Tülu 3 was a team effort. ♥ marks core contributors. See full author contributions here. Contact tulu@allenai.org. Tulu 3 8B: Llama-3.1-Tulu-3-8B Tulu 3 70B: Llama-3.1-Tulu-3-70B Tulu 3 405B: Llama-3.1-Tulu-3-405B",
+    "rangeInfo": {
+      "startOffset": 97,
+      "endOffset": 123,
+      "sameContainer": true,
+      "nodeText": null
+    },
+    "userWanted": "",
+    "note": "",
+    "fb": {
+      "path1": false,
+      "path2": false,
+      "path3": true,
+      "visual": false
+    }
+  },
+  {
+    "id": 1776570946916,
+    "pdf": "tulu-3-2411.15124.pdf",
+    "pageNum": 5,
+    "region": "title",
+    "coords": {
+      "downScreen": [
+        261,
+        384
+      ],
+      "upScreen": [
+        727,
+        541
+      ],
+      "downPdf": [
+        63.33,
+        412.67
+      ],
+      "upPdf": [
+        374,
+        517.33
+      ]
+    },
+    "path1": "data mix for supervised finetuning, resulting in the Tülu 3 SFT checkpoint. Leveraging recent advances in preference tuning, we then train a model over carefully curated on-policy preference data from comparing Tülu 3 SFT completions against outputs from other language models. Furthermore, we introduce a new final finetuning stage – Reinforcement Learning with Verifiable Rewards (RLVR) - which employs a novel 1A tülu is a hybrid camel bred between Bactrian camel and dromedary: https://en.wikipedia.org/wiki/Hybrid_camel.",
+    "path2": null,
+    "path3": "To close the gap between open and closed post training, we introduce the-art post-trained models, alongside all of the data, training recipes, code, infrastructure, and evaluation framework. Integrating partial details from proprietary methods with novel techniques and established academic research, Tülu 3 pushes the boundaries of research in post-training. The advancements of are attributed to Tülu 3 Data , new permissively licensed training datasets targeting core skills, Eval , an evaluation suite and tools to establish clear performance goals and guide improvement through training stages, and Tülu 3 Recipe , an advanced multi-stage training pipeline incorporating new algorithmic advancements in reinforcement learning, cutting-edge infrastructure, and rigorous experimentation to optimize data mixes, methods, and parameters across various training stages.",
+    "path3Detail": [
+      {
+        "idx": 96,
+        "str": "To close the gap between open and closed",
+        "startChar": 0,
+        "endChar": 68,
+        "slice": "To close the gap between open and closed post training, we introduce",
+        "itemX": "70.5",
+        "itemWidth": "308.3"
+      },
+      {
+        "idx": 103,
+        "str": "the-art post-trained models, alongside a",
+        "startChar": 0,
+        "endChar": 110,
+        "slice": "the-art post-trained models, alongside all of the data, training recipes, code, infrastructure, and evaluation",
+        "itemX": "70.9",
+        "itemWidth": "470.3"
+      },
+      {
+        "idx": 104,
+        "str": "framework.",
+        "startChar": 0,
+        "endChar": 10,
+        "slice": "framework.",
+        "itemX": "70.9",
+        "itemWidth": "49.5"
+      },
+      {
+        "idx": 106,
+        "str": "Integrating partial details from proprie",
+        "startChar": 0,
+        "endChar": 90,
+        "slice": "Integrating partial details from proprietary methods with novel techniques and established",
+        "itemX": "127.9",
+        "itemWidth": "413.3"
+      },
+      {
+        "idx": 107,
+        "str": "academic research,",
+        "startChar": 0,
+        "endChar": 18,
+        "slice": "academic research,",
+        "itemX": "70.9",
+        "itemWidth": "80.2"
+      },
+      {
+        "idx": 109,
+        "str": "Tülu",
+        "startChar": 0,
+        "endChar": 4,
+        "slice": "Tülu",
+        "itemX": "154.3",
+        "itemWidth": "24.8"
+      },
+      {
+        "idx": 111,
+        "str": "3 pushes the boundaries of research in p",
+        "startChar": 0,
+        "endChar": 73,
+        "slice": "3 pushes the boundaries of research in post-training. The advancements of",
+        "itemX": "182.5",
+        "itemWidth": "321.7"
+      },
+      {
+        "idx": 116,
+        "str": "are attributed to",
+        "startChar": 0,
+        "endChar": 17,
+        "slice": "are attributed to",
+        "itemX": "70.9",
+        "itemWidth": "74.7"
+      },
+      {
+        "idx": 118,
+        "str": "Tülu",
+        "startChar": 0,
+        "endChar": 4,
+        "slice": "Tülu",
+        "itemX": "149.1",
+        "itemWidth": "25.7"
+      },
+      {
+        "idx": 120,
+        "str": "3",
+        "startChar": 0,
+        "endChar": 1,
+        "slice": "3",
+        "itemX": "178.2",
+        "itemWidth": "5.1"
+      },
+      {
+        "idx": 122,
+        "str": "Data",
+        "startChar": 0,
+        "endChar": 4,
+        "slice": "Data",
+        "itemX": "186.8",
+        "itemWidth": "24.9"
+      },
+      {
+        "idx": 123,
+        "str": ", new permissively licensed training dat",
+        "startChar": 0,
+        "endChar": 68,
+        "slice": ", new permissively licensed training datasets targeting core skills,",
+        "itemX": "211.6",
+        "itemWidth": "291.1"
+      },
+      {
+        "idx": 126,
+        "str": "Eval",
+        "startChar": 0,
+        "endChar": 4,
+        "slice": "Eval",
+        "itemX": "70.9",
+        "itemWidth": "24.1"
+      },
+      {
+        "idx": 127,
+        "str": ", an evaluation suite and tools to estab",
+        "startChar": 0,
+        "endChar": 98,
+        "slice": ", an evaluation suite and tools to establish clear performance goals and guide improvement through",
+        "itemX": "94.9",
+        "itemWidth": "446.2"
+      },
+      {
+        "idx": 128,
+        "str": "training stages, and",
+        "startChar": 0,
+        "endChar": 20,
+        "slice": "training stages, and",
+        "itemX": "70.9",
+        "itemWidth": "84.0"
+      },
+      {
+        "idx": 130,
+        "str": "Tülu",
+        "startChar": 0,
+        "endChar": 4,
+        "slice": "Tülu",
+        "itemX": "158.0",
+        "itemWidth": "24.7"
+      },
+      {
+        "idx": 132,
+        "str": "3",
+        "startChar": 0,
+        "endChar": 1,
+        "slice": "3",
+        "itemX": "185.8",
+        "itemWidth": "4.9"
+      },
+      {
+        "idx": 134,
+        "str": "Recipe",
+        "startChar": 0,
+        "endChar": 6,
+        "slice": "Recipe",
+        "itemX": "193.9",
+        "itemWidth": "32.9"
+      },
+      {
+        "idx": 135,
+        "str": ", an advanced multi-stage training pipel",
+        "startChar": 0,
+        "endChar": 73,
+        "slice": ", an advanced multi-stage training pipeline incorporating new algorithmic",
+        "itemX": "226.7",
+        "itemWidth": "314.4"
+      },
+      {
+        "idx": 136,
+        "str": "advancements in reinforcement learning, ",
+        "startChar": 0,
+        "endChar": 109,
+        "slice": "advancements in reinforcement learning, cutting-edge infrastructure, and rigorous experimentation to optimize",
+        "itemX": "70.9",
+        "itemWidth": "470.3"
+      },
+      {
+        "idx": 137,
+        "str": "data mixes, methods, and parameters acro",
+        "startChar": 0,
+        "endChar": 67,
+        "slice": "data mixes, methods, and parameters across various training stages.",
+        "itemX": "70.9",
+        "itemWidth": "297.5"
+      }
+    ],
+    "frozenText": "data mix for supervised finetuning, resulting in the Tülu 3 SFT checkpoint. Leveraging recent advances in preference tuning, we then train a model over carefully curated on-policy preference data from comparing Tülu 3 SFT completions against outputs from other language models. Furthermore, we introduce a new final finetuning stage – Reinforcement Learning with Verifiable Rewards (RLVR) - which employs a novel 1A tülu is a hybrid camel bred between Bactrian camel and dromedary: https://en.wikipedia.org/wiki/Hybrid_camel.",
+    "rangeInfo": {
+      "startOffset": 195,
+      "endOffset": 219,
+      "sameContainer": true,
+      "nodeText": null
+    },
+    "userWanted": "",
+    "note": "",
+    "fb": {
+      "path1": false,
+      "path2": false,
+      "path3": true,
+      "visual": false
+    }
+  },
+  {
+    "id": 1776571008278,
+    "pdf": "gemini-1.5-2403.05530.pdf",
+    "pageNum": 1,
+    "region": "header",
+    "coords": {
+      "downScreen": [
+        475,
+        511
+      ],
+      "upScreen": [
+        272,
+        492
+      ],
+      "downPdf": [
+        197.64,
+        802
+      ],
+      "upPdf": [
+        62.3,
+        789.33
+      ]
+    },
+    "path1": "© 2024 Google. All rights reserved",
+    "path2": null,
+    "path3": "© 2024 Google. All rights reserved",
+    "path3Detail": [
+      {
+        "idx": 47,
+        "str": "©",
+        "startChar": 0,
+        "endChar": 1,
+        "slice": "©",
+        "itemX": "61.6",
+        "itemWidth": "7.2"
+      },
+      {
+        "idx": 49,
+        "str": "2024 Google. All rights reserved",
+        "startChar": 0,
+        "endChar": 32,
+        "slice": "2024 Google. All rights reserved",
+        "itemX": "72.4",
+        "itemWidth": "112.2"
+      }
+    ],
+    "frozenText": "©",
+    "rangeInfo": {
+      "startOffset": 0,
+      "endOffset": 83,
+      "sameContainer": false,
+      "nodeText": "©"
+    },
+    "userWanted": "",
+    "note": "拖拽的时候，从左到右不好操作，会打击一大片。但是从右到左就可以（蓝色高亮是对的），但是你的橙色高亮后来展示不对了",
+    "fb": {
+      "path1": true,
+      "path2": false,
+      "path3": true,
+      "visual": false
+    }
+  },
+  {
+    "id": 1776571143528,
+    "pdf": "gemini-1.5-2403.05530.pdf",
+    "pageNum": 3,
+    "region": "header",
+    "coords": {
+      "downScreen": [
+        458,
+        360
+      ],
+      "upScreen": [
+        593,
+        379
+      ],
+      "downPdf": [
+        186.3,
+        176.9
+      ],
+      "upPdf": [
+        276.3,
+        189.56
+      ]
+    },
+    "path1": "Vision Win-rate: 92.3%",
+    "path2": null,
+    "path3": "Win-rate: 78.1%",
+    "path3Detail": [
+      {
+        "idx": 25,
+        "str": "Win-rate: 78.1%",
+        "startChar": 0,
+        "endChar": 15,
+        "slice": "Win-rate: 78.1%",
+        "itemX": "193.0",
+        "itemWidth": "78.9"
+      }
+    ],
+    "frozenText": "Vision Win-rate: 92.3%",
+    "rangeInfo": {
+      "startOffset": 55,
+      "endOffset": 59,
+      "sameContainer": true,
+      "nodeText": null
+    },
+    "userWanted": "",
+    "note": "",
+    "fb": {
+      "path1": false,
+      "path2": false,
+      "path3": true,
+      "visual": false
+    }
+  },
+  {
+    "id": 1776571197512,
+    "pdf": "gemini-1.5-2403.05530.pdf",
+    "pageNum": 3,
+    "region": "caption",
+    "coords": {
+      "downScreen": [
+        711,
+        736
+      ],
+      "upScreen": [
+        884,
+        758
+      ],
+      "downPdf": [
+        354.97,
+        406.9
+      ],
+      "upPdf": [
+        470.3,
+        421.56
+      ]
+    },
+    "path1": "(18/19 benchmarks) Win-rate: 42.1%",
+    "path2": null,
+    "path3": "Relative to 1.0 Ultra",
+    "path3Detail": [
+      {
+        "idx": 101,
+        "str": "Relative to 1.0 Ultra",
+        "startChar": 0,
+        "endChar": 21,
+        "slice": "Relative to 1.0 Ultra",
+        "itemX": "363.5",
+        "itemWidth": "101.1"
+      }
+    ],
+    "frozenText": "(18/19 benchmarks) Win-rate: 42.1%",
+    "rangeInfo": {
+      "startOffset": 134,
+      "endOffset": 138,
+      "sameContainer": true,
+      "nodeText": null
+    },
+    "userWanted": "",
+    "note": "",
+    "fb": {
+      "path1": false,
+      "path2": false,
+      "path3": true,
+      "visual": false
+    }
+  },
+  {
+    "id": 1776571229645,
+    "pdf": "swe-lancer-2502.12115.pdf",
+    "pageNum": 1,
+    "region": "caption",
+    "coords": {
+      "downScreen": [
+        241,
+        584
+      ],
+      "upScreen": [
+        347,
+        640
+      ],
+      "downPdf": [
+        50,
+        680.67
+      ],
+      "upPdf": [
+        120.67,
+        718
+      ]
+    },
+    "path1": "job postings, and select the best one. They are then assessed against the choices of the original engineer- ing managers. These tasks require a deep technical understanding of both the issue and the proposals; it is",
+    "path2": null,
+    "path3": "Proceedings of the Learning , Vancouver, Canada. PMLR 267, 2025. Copyright 2025 by the author(s).",
+    "path3Detail": [
+      {
+        "idx": 88,
+        "str": "Proceedings of the",
+        "startChar": 0,
+        "endChar": 18,
+        "slice": "Proceedings of the",
+        "itemX": "55.2",
+        "itemWidth": "69.3"
+      },
+      {
+        "idx": 95,
+        "str": "Learning",
+        "startChar": 0,
+        "endChar": 8,
+        "slice": "Learning",
+        "itemX": "55.2",
+        "itemWidth": "32.7"
+      },
+      {
+        "idx": 96,
+        "str": ", Vancouver, Canada. PMLR 267, 2025. Cop",
+        "startChar": 0,
+        "endChar": 51,
+        "slice": ", Vancouver, Canada. PMLR 267, 2025. Copyright 2025",
+        "itemX": "87.9",
+        "itemWidth": "201.6"
+      },
+      {
+        "idx": 97,
+        "str": "by the author(s).",
+        "startChar": 0,
+        "endChar": 17,
+        "slice": "by the author(s).",
+        "itemX": "55.4",
+        "itemWidth": "59.0"
+      }
+    ],
+    "frozenText": "job postings, and select the best one. They are then assessed against the choices of the original engineer- ing managers. These tasks require a deep technical understanding of both the issue and the proposals; it is",
+    "rangeInfo": {
+      "startOffset": 229,
+      "endOffset": 237,
+      "sameContainer": true,
+      "nodeText": null
+    },
+    "userWanted": "",
+    "note": "",
+    "fb": {
+      "path1": false,
+      "path2": false,
+      "path3": true,
+      "visual": false
+    }
+  },
+  {
+    "id": 1776571254653,
+    "pdf": "s1-simple-test-time-scaling-2501.19393.pdf",
+    "pageNum": 1,
+    "region": "header",
+    "coords": {
+      "downScreen": [
+        619,
+        326
+      ],
+      "upScreen": [
+        949,
+        363
+      ],
+      "downPdf": [
+        302,
+        306
+      ],
+      "upPdf": [
+        522,
+        330.67
+      ]
+    },
+    "path1": "these powerful models has set the stage for a new scaling paradigm built on top of them: test-time scaling. The aim *Equal contribution. ZY and NM started the project. WS, NM",
+    "path2": null,
+    "path3": "Figure 1. Test-time scaling with s1-32B. We benchmark s1-32B on reasoning-intensive tasks and vary test-time compute.",
+    "path3Detail": [
+      {
+        "idx": 184,
+        "str": "Figure 1.",
+        "startChar": 0,
+        "endChar": 9,
+        "slice": "Figure 1.",
+        "itemX": "306.9",
+        "itemWidth": "32.8"
+      },
+      {
+        "idx": 186,
+        "str": "Test-time scaling with s1-32B.",
+        "startChar": 0,
+        "endChar": 30,
+        "slice": "Test-time scaling with s1-32B.",
+        "itemX": "342.7",
+        "itemWidth": "114.3"
+      },
+      {
+        "idx": 188,
+        "str": "We benchmark",
+        "startChar": 0,
+        "endChar": 12,
+        "slice": "We benchmark",
+        "itemX": "459.2",
+        "itemWidth": "54.0"
+      },
+      {
+        "idx": 190,
+        "str": "s1-32B",
+        "startChar": 0,
+        "endChar": 6,
+        "slice": "s1-32B",
+        "itemX": "515.4",
+        "itemWidth": "26.0"
+      },
+      {
+        "idx": 192,
+        "str": "on reasoning-intensive tasks and vary te",
+        "startChar": 0,
+        "endChar": 56,
+        "slice": "on reasoning-intensive tasks and vary test-time compute.",
+        "itemX": "307.4",
+        "itemWidth": "203.8"
+      }
+    ],
+    "frozenText": "these powerful models has set the stage for a new scaling paradigm built on top of them: test-time scaling. The aim *Equal contribution. ZY and NM started the project. WS, NM",
+    "rangeInfo": {
+      "startOffset": 126,
+      "endOffset": 136,
+      "sameContainer": true,
+      "nodeText": null
+    },
+    "userWanted": "",
+    "note": "",
+    "fb": {
+      "path1": false,
+      "path2": false,
+      "path3": true,
+      "visual": null
+    }
+  },
+  {
+    "id": 1776571275557,
+    "pdf": "s1-simple-test-time-scaling-2501.19393.pdf",
+    "pageNum": 4,
+    "region": "caption",
+    "coords": {
+      "downScreen": [
+        670,
+        554
+      ],
+      "upScreen": [
+        945,
+        608
+      ],
+      "downPdf": [
+        336,
+        80.67
+      ],
+      "upPdf": [
+        519.33,
+        116.67
+      ]
+    },
+    "path1": "in raspberry?\" ... * r - a - s - p - b - e - r - r - y ... * First 'r' ... * Second 'r' ... * Third 'r' ... Count = 3 ... Wait My initial answer of 2 was incorrect due to a quick reading of",
+    "path2": null,
+    "path3": "∑ 1 Control = 𝕀 ( 𝑎 ≤ 𝑎 ≤ 𝑎 ) min max |  | 𝑎 ∈ ",
+    "path3Detail": [
+      {
+        "idx": 107,
+        "str": "∑",
+        "startChar": 0,
+        "endChar": 1,
+        "slice": "∑",
+        "itemX": "410.5",
+        "itemWidth": "12.9"
+      },
+      {
+        "idx": 102,
+        "str": "1",
+        "startChar": 0,
+        "endChar": 1,
+        "slice": "1",
+        "itemX": "396.5",
+        "itemWidth": "5.0"
+      },
+      {
+        "idx": 98,
+        "str": "Control",
+        "startChar": 0,
+        "endChar": 7,
+        "slice": "Control",
+        "itemX": "347.6",
+        "itemWidth": "30.4"
+      },
+      {
+        "idx": 100,
+        "str": "=",
+        "startChar": 0,
+        "endChar": 1,
+        "slice": "=",
+        "itemX": "380.8",
+        "itemWidth": "6.8"
+      },
+      {
+        "idx": 113,
+        "str": "𝕀",
+        "startChar": 0,
+        "endChar": 2,
+        "slice": "𝕀",
+        "itemX": "426.2",
+        "itemWidth": "3.2"
+      },
+      {
+        "idx": 114,
+        "str": "(",
+        "startChar": 0,
+        "endChar": 1,
+        "slice": "(",
+        "itemX": "429.4",
+        "itemWidth": "3.3"
+      },
+      {
+        "idx": 115,
+        "str": "𝑎",
+        "startChar": 0,
+        "endChar": 2,
+        "slice": "𝑎",
+        "itemX": "432.7",
+        "itemWidth": "5.0"
+      },
+      {
+        "idx": 118,
+        "str": "≤",
+        "startChar": 0,
+        "endChar": 1,
+        "slice": "≤",
+        "itemX": "452.6",
+        "itemWidth": "6.8"
+      },
+      {
+        "idx": 120,
+        "str": "𝑎",
+        "startChar": 0,
+        "endChar": 2,
+        "slice": "𝑎",
+        "itemX": "462.2",
+        "itemWidth": "5.0"
+      },
+      {
+        "idx": 122,
+        "str": "≤",
+        "startChar": 0,
+        "endChar": 1,
+        "slice": "≤",
+        "itemX": "470.0",
+        "itemWidth": "6.8"
+      },
+      {
+        "idx": 124,
+        "str": "𝑎",
+        "startChar": 0,
+        "endChar": 2,
+        "slice": "𝑎",
+        "itemX": "479.6",
+        "itemWidth": "5.0"
+      },
+      {
+        "idx": 126,
+        "str": ")",
+        "startChar": 0,
+        "endChar": 1,
+        "slice": ")",
+        "itemX": "497.9",
+        "itemWidth": "3.3"
+      },
+      {
+        "idx": 116,
+        "str": "min",
+        "startChar": 0,
+        "endChar": 3,
+        "slice": "min",
+        "itemX": "437.7",
+        "itemWidth": "11.6"
+      },
+      {
+        "idx": 125,
+        "str": "max",
+        "startChar": 0,
+        "endChar": 3,
+        "slice": "max",
+        "itemX": "484.6",
+        "itemWidth": "12.9"
+      },
+      {
+        "idx": 104,
+        "str": "|",
+        "startChar": 0,
+        "endChar": 1,
+        "slice": "|",
+        "itemX": "391.6",
+        "itemWidth": "3.2"
+      },
+      {
+        "idx": 105,
+        "str": "",
+        "startChar": 0,
+        "endChar": 1,
+        "slice": "",
+        "itemX": "394.8",
+        "itemWidth": "8.5"
+      },
+      {
+        "idx": 106,
+        "str": "|",
+        "startChar": 0,
+        "endChar": 1,
+        "slice": "|",
+        "itemX": "403.3",
+        "itemWidth": "3.2"
+      },
+      {
+        "idx": 109,
+        "str": "𝑎",
+        "startChar": 0,
+        "endChar": 2,
+        "slice": "𝑎",
+        "itemX": "409.3",
+        "itemWidth": "3.8"
+      },
+      {
+        "idx": 110,
+        "str": "∈",
+        "startChar": 0,
+        "endChar": 1,
+        "slice": "∈",
+        "itemX": "413.0",
+        "itemWidth": "5.1"
+      },
+      {
+        "idx": 111,
+        "str": "",
+        "startChar": 0,
+        "endChar": 1,
+        "slice": "",
+        "itemX": "418.2",
+        "itemWidth": "6.4"
+      }
+    ],
+    "frozenText": "in raspberry?\" ... * r - a - s - p - b - e - r - r - y ... * First 'r' ... * Second 'r' ... * Third 'r' ... Count = 3 ... Wait My initial answer of 2 was incorrect due to a quick reading of",
+    "rangeInfo": {
+      "startOffset": 20,
+      "endOffset": 28,
+      "sameContainer": true,
+      "nodeText": null
+    },
+    "userWanted": "",
+    "note": "",
+    "fb": {
+      "path1": false,
+      "path2": false,
+      "path3": true,
+      "visual": null
+    }
+  },
+  {
+    "id": 1776571294332,
+    "pdf": "s1-simple-test-time-scaling-2501.19393.pdf",
+    "pageNum": 4,
+    "region": "formula",
+    "coords": {
+      "downScreen": [
+        607,
+        809
+      ],
+      "upScreen": [
+        249,
+        538
+      ],
+      "downPdf": [
+        294,
+        242.67
+      ],
+      "upPdf": [
+        55.33,
+        62
+      ]
+    },
+    "path1": "The number of 'r's in \"raspberry\" is 2.  , let's re-read the question carefully. It asks \"How many r in raspberry?\" ... * r - a - s - p - b - e - r - r - y ... * First 'r' ... * Second 'r' ... * Third 'r' ... Count = 3 ... Wait My initial answer of 2 was incorrect due to a quick reading of the word. Final Answer: The final answer is Question Reasoning trace Response  Figure 3. Budget forcing with s1-32B. The model tries to stop after “...is 2.”, but we suppress the end-of-thinking token delimiter instead appending “Wait” leading s1-32B to self-correct its answer. the thinking stage and make the model provide its current best answer. To enforce a minimum, we suppress the gener- ation of the end-of-thinking token delimiter and optionally append the string “Wait” to the model’s current reasoning trace to encourage the model to reflect on its current gen- eration. Figure 3 contains an example of how this simple approach can lead the model to arrive at a better answer. Baselines We benchmark budget forcing with: (I) Con-",
+    "path2": null,
+    "path3": "Question How many r in raspberry? Let's break down the process of counting the letter 'r' in the word \"raspberry\" ... * First letter: 'r' - This is an 'r', count = 1. * Second letter: 'a' - Not an 'r', count remains 1 ... * Sixth letter: 'e' - Not an 'r', count remains 1. * Seventh letter: 'r' - This is an 'r', count = 2. * Eighth letter: 'y' - Not an 'r', count remains 2 ... The number of 'r's in \"raspberry\" is 2. Wait , let's re-read the question carefully. It asks \"How many r in raspberry?\" ... * r - a - s - p - b - e - r - r - y ... * First 'r' ... * Reasoning trace Second 'r' ... * Third 'r' ... Count = 3 ... My initial answer of 2 was incorrect due to a quick reading of the word. Final Answer: The final answer is Response",
+    "path3Detail": [
+      {
+        "idx": 20,
+        "str": "Question",
+        "startChar": 0,
+        "endChar": 8,
+        "slice": "Question",
+        "itemX": "244.8",
+        "itemWidth": "35.9"
+      },
+      {
+        "idx": 1,
+        "str": "How many r in raspberry?",
+        "startChar": 0,
+        "endChar": 24,
+        "slice": "How many r in raspberry?",
+        "itemX": "62.7",
+        "itemWidth": "93.5"
+      },
+      {
+        "idx": 3,
+        "str": "Let's break down the process of counting",
+        "startChar": 0,
+        "endChar": 62,
+        "slice": "Let's break down the process of counting the letter 'r' in the",
+        "itemX": "62.7",
+        "itemWidth": "216.0"
+      },
+      {
+        "idx": 4,
+        "str": "word \"raspberry\" ...\n",
+        "startChar": 0,
+        "endChar": 21,
+        "slice": "word \"raspberry\" ...",
+        "itemX": "62.7",
+        "itemWidth": "70.5"
+      },
+      {
+        "idx": 5,
+        "str": "* First letter: 'r' - This is an 'r', co",
+        "startChar": 0,
+        "endChar": 49,
+        "slice": "* First letter: 'r' - This is an 'r', count = 1.",
+        "itemX": "62.7",
+        "itemWidth": "143.1"
+      },
+      {
+        "idx": 6,
+        "str": "* Second letter: 'a' - Not an 'r', count",
+        "startChar": 0,
+        "endChar": 55,
+        "slice": "* Second letter: 'a' - Not an 'r', count remains 1 ...",
+        "itemX": "62.7",
+        "itemWidth": "176.7"
+      },
+      {
+        "idx": 7,
+        "str": "* Sixth letter: 'e' - Not an 'r', count ",
+        "startChar": 0,
+        "endChar": 51,
+        "slice": "* Sixth letter: 'e' - Not an 'r', count remains 1.",
+        "itemX": "62.7",
+        "itemWidth": "161.7"
+      },
+      {
+        "idx": 8,
+        "str": "* Seventh letter: 'r' - This is an 'r', ",
+        "startChar": 0,
+        "endChar": 51,
+        "slice": "* Seventh letter: 'r' - This is an 'r', count = 2.",
+        "itemX": "62.7",
+        "itemWidth": "156.5"
+      },
+      {
+        "idx": 9,
+        "str": "* Eighth letter: 'y' - Not an 'r', count",
+        "startChar": 0,
+        "endChar": 55,
+        "slice": "* Eighth letter: 'y' - Not an 'r', count remains 2 ...",
+        "itemX": "62.7",
+        "itemWidth": "173.8"
+      },
+      {
+        "idx": 10,
+        "str": "The number of 'r's in \"raspberry\" is 2.\n",
+        "startChar": 0,
+        "endChar": 40,
+        "slice": "The number of 'r's in \"raspberry\" is 2.",
+        "itemX": "62.7",
+        "itemWidth": "134.9"
+      },
+      {
+        "idx": 15,
+        "str": "Wait",
+        "startChar": 0,
+        "endChar": 4,
+        "slice": "Wait",
+        "itemX": "62.7",
+        "itemWidth": "16.2"
+      },
+      {
+        "idx": 11,
+        "str": ", let's re-read the question carefully. ",
+        "startChar": 0,
+        "endChar": 59,
+        "slice": ", let's re-read the question carefully. It asks \"How many r",
+        "itemX": "78.8",
+        "itemWidth": "203.9"
+      },
+      {
+        "idx": 12,
+        "str": "in raspberry?\" ... * r - a - s - p - b -",
+        "startChar": 0,
+        "endChar": 76,
+        "slice": "in raspberry?\" ... * r - a - s - p - b - e - r - r - y ... * First 'r' ... *",
+        "itemX": "62.7",
+        "itemWidth": "210.4"
+      },
+      {
+        "idx": 22,
+        "str": "Reasoning trace",
+        "startChar": 0,
+        "endChar": 15,
+        "slice": "Reasoning trace",
+        "itemX": "217.7",
+        "itemWidth": "63.6"
+      },
+      {
+        "idx": 13,
+        "str": "Second 'r' ... * Third 'r' ... Count = 3",
+        "startChar": 0,
+        "endChar": 44,
+        "slice": "Second 'r' ... * Third 'r' ... Count = 3 ...",
+        "itemX": "62.7",
+        "itemWidth": "132.8"
+      },
+      {
+        "idx": 17,
+        "str": "My initial answer of 2 was incorrect due",
+        "startChar": 0,
+        "endChar": 62,
+        "slice": "My initial answer of 2 was incorrect due to a quick reading of",
+        "itemX": "62.7",
+        "itemWidth": "220.2"
+      },
+      {
+        "idx": 18,
+        "str": "the word. Final Answer: The final answer",
+        "startChar": 0,
+        "endChar": 43,
+        "slice": "the word. Final Answer: The final answer is",
+        "itemX": "62.7",
+        "itemWidth": "155.7"
+      },
+      {
+        "idx": 24,
+        "str": "Response\n",
+        "startChar": 0,
+        "endChar": 9,
+        "slice": "Response",
+        "itemX": "244.3",
+        "itemWidth": "37.4"
+      }
+    ],
+    "frozenText": "The number of 'r's in \"raspberry\" is 2.  , let's re-read the question carefully. It asks \"How many r in raspberry?\" ... * r - a - s - p - b - e - r - r - y ... * First 'r' ... * Second 'r' ... * Third 'r' ... Count = 3 ... Wait My initial answer of 2 was incorrect due to a quick reading of the word. Final Answer: The final answer is Question Reasoning trace Response  Figure 3. Budget forcing with s1-32B. The model tries to stop after “...is 2.”, but we suppress the end-of-thinking token delimiter instead appending “Wait” leading s1-32B to self-correct its answer. the thinking stage and make the model provide its current best answer. To enforce a minimum, we suppress the gener- ation of the end-of-thinking token delimiter and optionally append the string “Wait” to the model’s current reasoning trace to encourage the model to reflect on its current gen- eration. Figure 3 contains an example of how this simple approach can lead the model to arrive at a better answer. Baselines We benchmark budget forcing with: (I) Con-",
+    "rangeInfo": {
+      "startOffset": 16,
+      "endOffset": 70,
+      "sameContainer": true,
+      "nodeText": null
+    },
+    "userWanted": "",
+    "note": "",
+    "fb": {
+      "path1": false,
+      "path2": false,
+      "path3": true,
+      "visual": false
+    }
+  }
+]

@@ -2,14 +2,13 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<title>PDF 批注流程测试</title>
+<title>PDF 选中测试</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/web/pdf_viewer.css">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, sans-serif; font-size: 13px; background: #f5f5f5; }
 #app { display: flex; height: 100vh; }
 
-/* ── 左侧 PDF ── */
 #pdf-area {
   flex: 1; overflow-y: auto;
   background: #525659; padding: 16px;
@@ -18,128 +17,153 @@ body { font-family: -apple-system, sans-serif; font-size: 13px; background: #f5f
 .page-wrapper { position: relative; box-shadow: 0 2px 8px rgba(0,0,0,.4); background: white; cursor: crosshair; }
 .page-wrapper canvas { display: block; }
 .pdf-text-layer { position: absolute; top:0; left:0; pointer-events:auto; user-select:text; }
-.bbox-overlay   { position: absolute; top:0; left:0; pointer-events:none; }
 
-/* ── 右侧面板 ── */
+mark.frozen-sel {
+  background: rgba(255,120,0,0.45);
+  border-radius:2px; padding:0; margin:0;
+  display:inline; vertical-align:baseline;
+  line-height:inherit; color:inherit;
+  outline:1px solid rgba(255,120,0,0.8);
+}
+
 #panel {
-  width: 400px; min-width: 400px;
-  background: white; border-left: 1px solid #e0e0e0;
-  display: flex; flex-direction: column; overflow: hidden;
+  width:400px; min-width:400px;
+  background:white; border-left:1px solid #e0e0e0;
+  overflow-y:auto;
 }
-#panel-header {
-  padding: 10px 14px; background: #1a1a2e; color: white; flex-shrink: 0;
-}
-#panel-header h2 { font-size: 13px; font-weight: 600; }
-#panel-header p  { font-size: 11px; color: #aaa; margin-top: 2px; }
+#panel-header { padding:10px 14px; background:#1a1a2e; color:white; position:sticky; top:0; z-index:10; }
+#panel-header h2 { font-size:13px; font-weight:600; }
+#panel-header p  { font-size:11px; color:#aaa; margin-top:2px; }
 
 #controls {
-  padding: 10px 14px; border-bottom: 1px solid #e0e0e0;
-  display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;
+  padding:10px 14px; border-bottom:1px solid #e0e0e0;
+  display:flex; flex-direction:column; gap:6px;
+  position:sticky; top:52px; z-index:9; background:white;
 }
-select#pdf-select { width:100%; padding:5px 8px; border:1px solid #ccc; border-radius:4px; font-size:12px; }
+select { width:100%; padding:5px 8px; border:1px solid #ccc; border-radius:4px; font-size:12px; }
 .row { display:flex; gap:8px; align-items:center; }
 button.primary { padding:5px 12px; background:#1a73e8; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px; }
-button.primary:hover { background:#1557b0; }
+button.region-btn { padding:3px 8px; border:1px solid #ccc; border-radius:3px; cursor:pointer; font-size:11px; background:white; }
+button.region-btn.selected { background:#1a73e8; color:white; border-color:#1a73e8; }
 
-/* ── 步骤面板（唯一，覆盖式） ── */
-#step-panel {
-  flex: 1; overflow-y: auto; padding: 10px 14px;
-  display: flex; flex-direction: column; gap: 8px;
+#main { padding:12px 14px; display:flex; flex-direction:column; gap:8px; }
+.hint { color:#aaa; font-size:12px; text-align:center; padding:24px 0; }
+
+.block { border:1px solid #e0e0e0; border-radius:6px; overflow:hidden; }
+.block-hd {
+  font-size:11px; font-weight:600; color:#555;
+  padding:6px 10px; background:#fafafa; border-bottom:1px solid #f0f0f0;
+  display:flex; justify-content:space-between;
+}
+.block-bd { padding:8px 10px; }
+
+/* 三条路径 */
+.path-row {
+  padding:6px 10px; border-bottom:1px solid #f5f5f5; font-size:12px;
+}
+.path-row:last-of-type { border-bottom:none; }
+.path-row-top {
+  display:flex; justify-content:space-between; align-items:center;
+  gap:6px; margin-bottom:3px;
+}
+.path-label { font-size:10px; color:#888; flex-shrink:0; }
+.path-value {
+  font-family:monospace; font-size:11px;
+  word-break:break-all; color:#333;
+  line-height:1.4;
+}
+.path-fb { display:flex; gap:4px; flex-shrink:0; }
+.path-fb button {
+  padding:2px 7px; border:1px solid #ccc; border-radius:3px;
+  cursor:pointer; font-size:11px; background:white;
+}
+.path-fb button.ok  { background:#e6f4ea; color:#188038; border-color:#a8d5b5; }
+.path-fb button.bad { background:#fce8e6; color:#c5221f; border-color:#f5b7b1; }
+
+/* 你想要的 */
+.text-input {
+  width:100%; padding:7px 10px; border:none; border-top:1px solid #f0f0f0;
+  font-size:13px; font-family:monospace; outline:none;
+}
+.note-input {
+  width:100%; padding:7px 10px; border:none;
+  font-size:12px; outline:none; resize:vertical; min-height:48px;
+  font-family:-apple-system,sans-serif;
 }
 
-/* 步骤标题 */
-.step-title {
-  font-size: 11px; font-weight: 600; color: #555;
-  padding: 4px 0; border-bottom: 1px solid #e8e8e8; margin-bottom: 4px;
-  display: flex; justify-content: space-between; align-items: center;
+/* 技术数据 */
+.data-row { display:flex; gap:6px; padding:4px 10px; border-bottom:1px solid #f8f8f8; font-size:11px; }
+.data-row:last-child { border-bottom:none; }
+.dk { color:#aaa; min-width:80px; flex-shrink:0; }
+.dv { font-family:monospace; word-break:break-all; color:#333; }
+.dv.ok   { color:#188038; }
+.dv.warn { color:#e65100; }
+.dv.bad  { color:#c5221f; }
+
+button.submit-btn {
+  width:100%; padding:9px; background:#1a73e8; color:white;
+  border:none; border-radius:4px; cursor:pointer; font-size:13px; font-weight:600;
 }
-.step-badge {
-  font-size: 10px; padding: 1px 6px; border-radius: 10px;
-  background: #e8f0fe; color: #1a73e8;
+button.submit-btn.done { background:#188038; }
+
+#output-area { border-top:1px solid #e0e0e0; }
+#output-area .out-label {
+  font-size:10px; color:#888; padding:4px 10px 2px;
+  display:flex; justify-content:space-between;
 }
-.step-badge.ok  { background: #e6f4ea; color: #188038; }
-.step-badge.bad { background: #fce8e6; color: #c5221f; }
-.step-badge.warn { background: #fff3e0; color: #e65100; }
-
-/* 数据行 */
-.kv { display:flex; gap:6px; margin-bottom:3px; font-size:12px; }
-.k  { color:#888; min-width:80px; font-size:11px; flex-shrink:0; }
-.v  { font-family:monospace; word-break:break-all; }
-.v.hi   { color:#1a73e8; font-weight:600; }
-.v.warn { color:#e65100; }
-.v.ok   { color:#188038; }
-.v.bad  { color:#c5221f; }
-
-/* 反馈按钮 */
-.fb-row { display:flex; gap:6px; align-items:center; margin-top:6px; padding-top:6px; border-top:1px solid #f0f0f0; }
-.fb-label { font-size:11px; color:#888; }
-button.fb-ok  { padding:2px 10px; background:#e6f4ea; color:#188038; border:1px solid #c8e6c9; border-radius:3px; cursor:pointer; font-size:11px; }
-button.fb-bad { padding:2px 10px; background:#fce8e6; color:#c5221f; border:1px solid #ffcdd2; border-radius:3px; cursor:pointer; font-size:11px; }
-button.fb-ok:hover  { background:#c8e6c9; }
-button.fb-bad:hover { background:#ffcdd2; }
-.fb-done { font-size:11px; padding:2px 8px; border-radius:3px; }
-.fb-done.ok  { background:#e6f4ea; color:#188038; }
-.fb-done.bad { background:#fce8e6; color:#c5221f; }
-
-/* section 分隔 */
-.section { padding:6px 8px; border-radius:4px; margin-bottom:4px; }
-.section.blue  { background:#e8f0fe; }
-.section.green { background:#e6f4ea; }
-.section.amber { background:#fff3e0; }
-.section.red   { background:#fce8e6; }
-.section.gray  { background:#f5f5f5; }
-.section-label { font-size:10px; font-weight:600; color:#555; margin-bottom:4px; }
-
-/* 空状态 */
-.empty { color:#aaa; font-size:12px; text-align:center; padding:24px; }
-
-/* 日志 */
-#log {
-  border-top:1px solid #e0e0e0; height:80px; overflow-y:auto;
-  padding:4px 10px; font-family:monospace; font-size:10px; color:#777;
-  background:#fafafa; flex-shrink:0;
+#output-text {
+  width:100%; height:90px; padding:4px 10px; border:none; outline:none;
+  font-family:monospace; font-size:10px; color:#333; resize:none;
+  background:#fafafa; border-top:1px solid #f0f0f0;
 }
-.log-line { line-height:1.6; }
-.log-line.error { color:#c5221f; }
-
-/* 底部 */
-#footer { padding:8px 14px; border-top:1px solid #e0e0e0; display:flex; gap:8px; flex-shrink:0; }
-button.export { flex:1; padding:5px; background:#f5f5f5; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-size:11px; }
-button.danger { padding:5px 10px; background:#fce8e6; border:1px solid #ffcdd2; border-radius:4px; cursor:pointer; font-size:11px; color:#c5221f; }
 </style>
 </head>
 <body>
 <div id="app">
   <div id="pdf-area">
-    <div class="empty" style="margin-top:60px">← 选择 PDF 并加载</div>
+    <div class="hint" style="margin-top:60px">← 选择 PDF 并加载</div>
   </div>
 
   <div id="panel">
     <div id="panel-header">
-      <h2>PDF 批注流程测试</h2>
-      <p>每次操作只显示当前步骤，不累积</p>
+      <h2>PDF 选中测试</h2>
+      <p>选区域 → 拖拽 → 三条路径各评价 → 提交</p>
     </div>
 
     <div id="controls">
       <select id="pdf-select"><option value="">加载中...</option></select>
       <div class="row">
-        <button class="primary" onclick="loadPdf()">加载 PDF</button>
+        <button class="primary" onclick="loadPdf()">加载</button>
         <label style="display:flex;align-items:center;gap:4px;font-size:11px">
           <input type="number" id="page-count" value="3" min="1" max="20"
             style="width:36px;padding:2px 4px;border:1px solid #ccc;border-radius:3px;font-size:11px"> 页
         </label>
       </div>
+      <div>
+        <div style="font-size:10px;color:#888;margin-bottom:4px">区域（先选再拖）：</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">
+          <button class="region-btn selected" data-region="body" onclick="setRegion(this)">正文</button>
+          <button class="region-btn" data-region="title" onclick="setRegion(this)">大标题</button>
+          <button class="region-btn" data-region="heading" onclick="setRegion(this)">小标题</button>
+          <button class="region-btn" data-region="abstract" onclick="setRegion(this)">摘要</button>
+          <button class="region-btn" data-region="header" onclick="setRegion(this)">页眉页脚</button>
+          <button class="region-btn" data-region="formula" onclick="setRegion(this)">公式</button>
+          <button class="region-btn" data-region="caption" onclick="setRegion(this)">图注表注</button>
+          <button class="region-btn" data-region="other" onclick="setRegion(this)">其他</button>
+        </div>
+        <input id="region-other" type="text" placeholder="其他区域说明"
+          style="display:none;width:100%;margin-top:4px;padding:4px 8px;border:1px solid #ccc;border-radius:3px;font-size:11px">
+      </div>
     </div>
 
-    <div id="step-panel">
-      <div class="empty">加载 PDF 后拖拽选中文字</div>
-    </div>
+    <div id="main"><div class="hint">加载 PDF 后拖拽选中文字</div></div>
 
-    <div id="log"></div>
-
-    <div id="footer">
-      <button class="export" onclick="exportJSON()">导出数据</button>
-      <button class="danger" onclick="clearAll()">清空</button>
+    <div id="output-area">
+      <div class="out-label">
+        <span>提交内容（复制给 Claude）</span>
+        <button onclick="copyOutput()" style="font-size:10px;padding:1px 6px;border:1px solid #ccc;border-radius:3px;cursor:pointer;background:white">复制</button>
+      </div>
+      <textarea id="output-text" readonly placeholder="点「提交」后内容出现在这里"></textarea>
     </div>
   </div>
 </div>
@@ -151,50 +175,42 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 
 const SCALE = 1.5;
 let pdfDoc = null;
-const textContents = {}, viewports = {}, bboxCanvases = {};
-let sessionData = [];
-let currentEntry = null; // 当前步骤的数据，每次选中覆盖
+const textContents = {}, viewports = {};
+let currentEntry = null;
+let currentRegion = 'body';
 
-// ── 日志 ─────────────────────────────────────────────────
-function log(msg, level = '') {
-  const el = document.getElementById('log');
-  const d = document.createElement('div');
-  d.className = 'log-line' + (level ? ' ' + level : '');
-  d.textContent = `[${new Date().toTimeString().slice(0,8)}] ${msg}`;
-  el.appendChild(d);
-  el.scrollTop = el.scrollHeight;
-}
+window.setRegion = function(btn) {
+  currentRegion = btn.dataset.region;
+  document.querySelectorAll('.region-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  document.getElementById('region-other').style.display = currentRegion === 'other' ? 'block' : 'none';
+};
 
-// ── 填充下拉 ─────────────────────────────────────────────
 fetch('/pdfs').then(r => r.json()).then(list => {
-  const sel = document.getElementById('pdf-select');
-  sel.innerHTML = list.map(f => `<option value="${f.path}">${f.name}</option>`).join('');
+  document.getElementById('pdf-select').innerHTML =
+    list.map(f => `<option value="${f.path}">${f.name}</option>`).join('');
 }).catch(() => {
   document.getElementById('pdf-select').innerHTML = '<option value="">获取列表失败</option>';
 });
 
-// ── 加载 PDF ─────────────────────────────────────────────
 window.loadPdf = async function() {
   const path = document.getElementById('pdf-select').value.trim();
   const n = parseInt(document.getElementById('page-count').value) || 3;
   if (!path) return;
+  clearFrozenMarks();
   Object.keys(textContents).forEach(k => delete textContents[k]);
-  Object.keys(viewports).forEach(k => delete viewports[k]);
   pdfDoc = null;
-  document.getElementById('pdf-area').innerHTML = '<div class="empty" style="margin-top:60px">加载中…</div>';
-  log(`加载: ${path.split('/').pop()}`);
+  document.getElementById('pdf-area').innerHTML = '<div class="hint" style="margin-top:60px">加载中…</div>';
   try {
     pdfDoc = await pdfjsLib.getDocument(`/pdf?path=${encodeURIComponent(path)}`).promise;
     document.getElementById('pdf-area').innerHTML = '';
     for (let p = 1; p <= Math.min(n, pdfDoc.numPages); p++) await renderPage(p);
-    log(`共 ${pdfDoc.numPages} 页，渲染前 ${n} 页`);
   } catch(e) {
-    log(`加载失败: ${e.message}`, 'error');
-    document.getElementById('pdf-area').innerHTML = `<div class="empty" style="color:#c5221f;margin-top:60px">失败: ${e.message}</div>`;
+    document.getElementById('pdf-area').innerHTML =
+      `<div class="hint" style="color:#c5221f;margin-top:60px">失败: ${e.message}</div>`;
   }
 };
 
-// ── 渲染单页 ─────────────────────────────────────────────
 async function renderPage(pageNum) {
   const page = await pdfDoc.getPage(pageNum);
   const vp = page.getViewport({ scale: SCALE });
@@ -226,200 +242,495 @@ async function renderPage(pageNum) {
 
   attachEvents(wrapper, tlDiv, pageNum, vp);
   document.getElementById('pdf-area').appendChild(wrapper);
-  log(`第 ${pageNum} 页完成（${tc.items.length} items）`);
 }
 
-// ── 选中事件 ─────────────────────────────────────────────
-function attachEvents(wrapper, tlDiv, pageNum, vp) {
-  wrapper.addEventListener('mouseup', () => {
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed) return;
+// ── 冻结高亮 ─────────────────────────────────────────────
+function freezeSelection(sel) {
+  if (!sel || sel.rangeCount === 0) return { frozen: null, actual: null };
+  const range = sel.getRangeAt(0);
+  if (range.collapsed) return { frozen: null, actual: null };
 
-    const items = textContents[pageNum]?.items || [];
+  const sc = range.startContainer;
+  const ec = range.endContainer;
+  const so = range.startOffset;
+  const eo = range.endOffset;
 
-    // 1. sel.toString()
-    const rawToString = sel.toString();
+  if (sc.nodeType !== 3) {
+    sel.removeAllRanges();
+    return { frozen: sel.toString().replace(/\n/g,' ').trim(), actual: null };
+  }
 
-    // 2. Range 信息
-    let rangeInfo = null;
-    if (sel.rangeCount > 0) {
-      const range = sel.getRangeAt(0);
-      const startNode = range.startContainer;
-      const endNode = range.endContainer;
-      rangeInfo = {
-        startOffset: range.startOffset,
-        endOffset: range.endOffset,
-        sameContainer: startNode === endNode,
-        startText: startNode.nodeType === 3 ? (startNode.textContent || '').slice(0, 60) : '[非文本节点]',
-      };
-      // 用 Range 精确截取
-      if (startNode.nodeType === 3 && startNode === endNode) {
-        rangeInfo.preciseQuote = (startNode.textContent || '').slice(range.startOffset, range.endOffset);
-      } else if (startNode.nodeType === 3) {
-        rangeInfo.preciseQuote = (startNode.textContent || '').slice(range.startOffset);
+  let actualFrozen = null;
+  try {
+    if (sc === ec) {
+      const text = sc.textContent || '';
+      actualFrozen = text.slice(so, eo);
+      const parent = sc.parentNode;
+      if (parent) {
+        const mark = document.createElement('mark');
+        mark.className = 'frozen-sel';
+        mark.textContent = actualFrozen;
+        const frag = document.createDocumentFragment();
+        if (so > 0) frag.appendChild(document.createTextNode(text.slice(0, so)));
+        frag.appendChild(mark);
+        if (eo < text.length) frag.appendChild(document.createTextNode(text.slice(eo)));
+        parent.replaceChild(frag, sc);
+      }
+    } else {
+      const text = sc.textContent || '';
+      actualFrozen = text.slice(so);
+      const parent = sc.parentNode;
+      if (parent) {
+        const mark = document.createElement('mark');
+        mark.className = 'frozen-sel';
+        mark.textContent = actualFrozen;
+        const frag = document.createDocumentFragment();
+        if (so > 0) frag.appendChild(document.createTextNode(text.slice(0, so)));
+        frag.appendChild(mark);
+        parent.replaceChild(frag, sc);
       }
     }
+  } catch(e) {
+    actualFrozen = sel.toString().replace(/\n/g,' ').trim();
+    console.log('[freeze] failed:', e.message);
+  }
 
-    // 3. 命中的 span
-    const leafSpans = Array.from(tlDiv.querySelectorAll('span')).filter(s => !s.querySelector('span'));
-    const range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
-    const hitSpans = range ? leafSpans.filter(s => {
-      try { return range.intersectsNode(s); } catch { return false; }
-    }) : [];
-    const spanDetails = hitSpans.map(s => {
-      const spanText = s.textContent || '';
-      const itemIdx = items.findIndex(it => it.str === spanText);
-      return {
-        spanText: spanText.slice(0, 80),
-        itemIdx,
-        itemStr: itemIdx >= 0 ? items[itemIdx].str.slice(0, 80) : null,
-        match: itemIdx >= 0 && items[itemIdx].str === spanText,
-      };
-    });
+  sel.removeAllRanges();
+  return { frozen: actualFrozen, actual: actualFrozen };
+}
 
-    // 4. item 定位（当前代码逻辑：选区中心）
-    const pageH = vp.height / SCALE;
-    const wrapperRect = wrapper.getBoundingClientRect();
-    // 用第一个命中 span 的位置估算选区中心（工具里简化）
-    let closestItemIdx = -1;
-    if (hitSpans.length > 0) {
-      const firstSpan = hitSpans[0];
-      const r = firstSpan.getBoundingClientRect();
-      const centerX = (r.left + r.right) / 2 - wrapperRect.left;
-      const centerY = (r.top + r.bottom) / 2 - wrapperRect.top;
-      const pageX = centerX / SCALE;
-      const pageY = centerY / SCALE;
-      let bestDist = Infinity;
-      for (let i = 0; i < items.length; i++) {
-        const it = items[i];
-        const fontH = it.height || Math.abs(it.transform[3]) || 12;
-        const bsY = pageH - it.transform[5];
-        const cx = it.transform[4] + Math.abs(it.width) / 2;
-        const cy = bsY - fontH * 0.5;
-        const d = Math.hypot(cx - pageX, cy - pageY);
-        if (d < bestDist) { bestDist = d; closestItemIdx = i; }
-      }
-    }
-
-    // 不清除 Selection，保留蓝色
-    // sel.removeAllRanges();
-
-    const eId = Date.now();
-    currentEntry = {
-      id: eId, pageNum,
-      rawToString,
-      rangeInfo,
-      spanCount: hitSpans.length,
-      spanDetails,
-      closestItemIdx,
-      closestItemStr: closestItemIdx >= 0 ? items[closestItemIdx].str.slice(0, 80) : null,
-      feedback: {},
-    };
-    sessionData.push(currentEntry);
-
-    renderStepPanel(currentEntry);
-
-    fetch('/report', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(currentEntry),
-    }).catch(() => {});
-
-    log(`page=${pageNum} toString="${rawToString.slice(0,30).replace(/\n/g,'↵')}" spans=${hitSpans.length} item=${closestItemIdx}`);
+function clearFrozenMarks() {
+  document.querySelectorAll('mark.frozen-sel').forEach(m => {
+    const p = m.parentNode;
+    if (!p) return;
+    while (m.firstChild) p.insertBefore(m.firstChild, m);
+    p.removeChild(m);
   });
 }
 
-// ── 渲染步骤面板（覆盖式，不累积） ───────────────────────
-function renderStepPanel(entry) {
-  const panel = document.getElementById('step-panel');
-  panel.innerHTML = ''; // 每次清空，只显示最新一次
+// ── 路径 2：左扩右收 ─────────────────────────────────────
+// 左边：往左扩展到词起始（补全开头被截断的字符）
+// 右边：往左收缩到词末尾（去掉结尾被截断的字符）
+function expandLeftShrinkRight(str, start, end) {
+  const sep = /[\s\(\)\[\]\{\},;:.。，、；：""''!?！？]/;
+  // 左扩：找词起始
+  let lo = start;
+  while (lo > 0 && !sep.test(str[lo - 1])) lo--;
+  // 右收：从 end 往左找，直到遇到空格/标点，取其前一个词的末尾
+  let hi = end;
+  // 如果 end 正好在词末尾（下一个字符是分隔符或结尾），不收缩
+  // 如果 end 在词中间，往左退到该词的起始，取上一个词的末尾
+  if (hi < str.length && !sep.test(str[hi])) {
+    // end 在词中间：往左退到词起始
+    while (hi > lo && !sep.test(str[hi - 1])) hi--;
+    // hi 现在在词起始，再往左跳过分隔符
+    while (hi > lo && sep.test(str[hi - 1])) hi--;
+  }
+  return str.slice(lo, hi).trim();
+}
 
-  const { rawToString, rangeInfo, spanDetails, closestItemIdx, closestItemStr, pageNum } = entry;
+// ── 路径 3：坐标映射 ─────────────────────────────────────
+function coordPath(items, pageH, downX, downY, upX, upY) {
+  // 判断是否跨行：Y 差超过 5pt 才认为是跨行
+  const deltaY = Math.abs(downY - upY);
+  const isMultiLine = deltaY > 5;
 
-  // ── 步骤 2 验证：selectedText ──────────────────────────
-  const s2 = document.createElement('div');
+  // 规范化：跨行时按 Y 排序，同行时按 X 排序
+  let startX, startY, endX, endY;
+  if (isMultiLine) {
+    // 跨行：Y 小的是起点
+    const reversed = downY > upY;
+    startX = reversed ? upX   : downX;
+    startY = reversed ? upY   : downY;
+    endX   = reversed ? downX : upX;
+    endY   = reversed ? downY : upY;
+  } else {
+    // 同行：X 小的是起点
+    const reversed = downX > upX;
+    startX = reversed ? upX   : downX;
+    startY = reversed ? upY   : downY;
+    endX   = reversed ? downX : upX;
+    endY   = reversed ? downY : upY;
+  }
 
-  // sel.toString()
-  const toStringOk = rawToString && !rawToString.includes('\n') && rawToString.trim().length > 0;
-  s2.innerHTML = `
-    <div class="step-title">
-      步骤 2：mouseup — selectedText 提取
-      <span class="step-badge ${toStringOk ? '' : 'warn'}">${toStringOk ? '待确认' : '可疑'}</span>
+  // 选区矩形（PDF 坐标系）
+  const selLeft   = Math.min(startX, endX);
+  const selRight  = Math.max(startX, endX);
+  const selTop    = Math.min(startY, endY);
+  const selBottom = Math.max(startY, endY);
+
+  // 用规范化后的坐标做字符偏移估算
+  const normDownX = startX;
+  const normUpX   = endX;
+
+  // 找所有与选区矩形有交叉的 item
+  const hits = [];
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    if (!it.str.trim()) continue;
+    const fontH = it.height || Math.abs(it.transform[3]) || 12;
+    const baselineY = pageH - it.transform[5];  // 屏幕 Y（PDF 坐标系单位）
+    const ix  = it.transform[4];
+    const iy  = baselineY - fontH;
+    const ix2 = ix + Math.abs(it.width);
+    const iy2 = baselineY + fontH * 0.3;
+
+    const hOverlap = ix < selRight && ix2 > selLeft;
+    const vOverlap = iy < selBottom && iy2 > selTop;
+    if (hOverlap && vOverlap) {
+      hits.push({ idx: i, it, ix, iy, ix2, iy2, fontH });
+    }
+  }
+
+  if (hits.length === 0) return { text: null, hits: [], detail: '无命中 item' };
+
+  // 按 Y 排序（从上到下），同行按 X 排序
+  hits.sort((a, b) => (a.iy - b.iy) || (a.ix - b.ix));
+
+  // 对首尾 item 用 X 坐标估算字符偏移
+  const parts = [];
+  const detail = [];
+
+  for (let i = 0; i < hits.length; i++) {
+    const { it, ix, ix2 } = hits[i];
+    const str = it.str;
+    const strLen = str.length;
+
+    let startChar = 0;
+    let endChar = strLen;
+
+    if (i === 0) {
+      // 起始 item：用规范化后的起点 X 估算起始字符
+      const xInItem = Math.max(0, Math.min(normDownX - ix, ix2 - ix));
+      startChar = Math.round((xInItem / (ix2 - ix)) * strLen);
+    }
+    if (i === hits.length - 1) {
+      // 结束 item：用规范化后的终点 X 估算结束字符
+      const xInItem = Math.max(0, Math.min(normUpX - ix, ix2 - ix));
+      endChar = Math.round((xInItem / (ix2 - ix)) * strLen);
+    }
+
+    const slice = str.slice(startChar, endChar).trim();
+    if (slice) parts.push(slice);
+
+    detail.push({
+      idx: hits[i].idx,
+      str: str.slice(0, 40),
+      startChar, endChar,
+      slice,
+      itemX: ix.toFixed(1), itemWidth: (ix2 - ix).toFixed(1),
+    });
+  }
+
+  return {
+    text: parts.join(' ').trim(),
+    hits: hits.map(h => h.idx),
+    detail,
+  };
+}
+
+// ── 事件绑定 ─────────────────────────────────────────────
+function attachEvents(wrapper, tlDiv, pageNum, vp) {
+  const pageH = vp.height / SCALE;
+  let downScreenX = 0, downScreenY = 0;
+  let downPdfX = 0, downPdfY = 0;
+
+  wrapper.addEventListener('mousedown', (e) => {
+    const rect = wrapper.getBoundingClientRect();
+    downScreenX = e.clientX;
+    downScreenY = e.clientY;
+    downPdfX = (e.clientX - rect.left) / SCALE;
+    downPdfY = (e.clientY - rect.top)  / SCALE;
+  });
+
+  wrapper.addEventListener('mouseup', (e) => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) return;
+
+    const rect = wrapper.getBoundingClientRect();
+    const upScreenX = e.clientX;
+    const upScreenY = e.clientY;
+    const upPdfX = (e.clientX - rect.left) / SCALE;
+    const upPdfY = (e.clientY - rect.top)  / SCALE;
+
+    const items = textContents[pageNum]?.items || [];
+
+    // 路径 1：sel.toString()
+    const path1 = sel.toString().replace(/\n/g,' ').trim();
+
+    // Range 信息（冻结前读）
+    let rangeInfo = null;
+    let path2 = null;
+    if (sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0);
+      const sc = range.startContainer;
+      rangeInfo = {
+        startOffset: range.startOffset,
+        endOffset: range.endOffset,
+        sameContainer: sc === range.endContainer,
+        nodeText: sc.nodeType === 3 ? (sc.textContent || '').slice(0, 80) : null,
+      };
+      if (sc === range.endContainer && sc.nodeType === 3) {
+        path2 = expandLeftShrinkRight(sc.textContent || '', range.startOffset, range.endOffset);
+      }
+    }
+
+    // 路径 3：坐标映射
+    const path3Result = coordPath(items, pageH, downPdfX, downPdfY, upPdfX, upPdfY);
+
+    // 冻结橙色高亮
+    clearFrozenMarks();
+    const { frozen: frozenText } = freezeSelection(sel);
+
+    const pdfName = document.getElementById('pdf-select').value.split('/').pop() || '?';
+    const regionOther = document.getElementById('region-other').value.trim();
+    const region = currentRegion === 'other' && regionOther ? regionOther : currentRegion;
+
+    currentEntry = {
+      id: Date.now(),
+      pdf: pdfName, pageNum, region,
+      // 坐标原始数据
+      coords: {
+        downScreen: [downScreenX, downScreenY],
+        upScreen:   [upScreenX,   upScreenY],
+        downPdf:    [+downPdfX.toFixed(2), +downPdfY.toFixed(2)],
+        upPdf:      [+upPdfX.toFixed(2),   +upPdfY.toFixed(2)],
+      },
+      // 三条路径
+      path1,                              // sel.toString()
+      path2: path2 || null,               // 词边界扩展
+      path3: path3Result.text || null,    // 坐标映射
+      path3Detail: path3Result.detail,    // 坐标映射详情
+      // 冻结高亮
+      frozenText: frozenText || path1,
+      // Range 信息
+      rangeInfo,
+      // 用户输入
+      userWanted: '',
+      note: '',
+      // 反馈：每条路径各自评价
+      fb: { path1: null, path2: null, path3: null },
+    };
+
+    renderPanel(currentEntry);
+  });
+}
+
+// ── 面板渲染 ─────────────────────────────────────────────
+const regionLabels = {body:'正文',title:'大标题',heading:'小标题',abstract:'摘要',header:'页眉页脚',formula:'公式',caption:'图注表注',other:'其他'};
+
+function renderPanel(entry) {
+  const main = document.getElementById('main');
+  main.innerHTML = '';
+
+  const { frozenText, path1, path2, path3, rangeInfo, region, pdf, pageNum, coords } = entry;
+
+  // ── 橙色高亮展示 ──
+  const b0 = document.createElement('div');
+  b0.className = 'block';
+  b0.innerHTML = `
+    <div class="block-hd">
+      <span>橙色高亮（工具冻结）</span>
+      <span style="font-size:10px;color:#888">${regionLabels[region]||region} · p${pageNum}</span>
     </div>
+    <div class="block-bd" style="font-family:monospace;font-size:13px;word-break:break-all">"${esc(frozenText||'—')}"</div>
+  `;
+  main.appendChild(b0);
 
-    <div class="section blue">
-      <div class="section-label">sel.toString()</div>
-      <div class="kv"><span class="k">原始值</span><span class="v hi">"${esc(rawToString)}"</span></div>
-      <div class="kv"><span class="k">含换行</span><span class="v ${rawToString.includes('\\n') ? 'warn' : 'ok'}">${rawToString.includes('\n') ? '是（跨行选中）' : '否'}</span></div>
-    </div>
-
-    <div class="section green">
-      <div class="section-label">Range 精确截取</div>
-      ${rangeInfo ? `
-        <div class="kv"><span class="k">startOffset</span><span class="v">${rangeInfo.startOffset}</span></div>
-        <div class="kv"><span class="k">endOffset</span><span class="v">${rangeInfo.endOffset}</span></div>
-        <div class="kv"><span class="k">同一节点</span><span class="v ${rangeInfo.sameContainer ? 'ok' : 'warn'}">${rangeInfo.sameContainer ? '是' : '否（跨 span）'}</span></div>
-        ${rangeInfo.preciseQuote !== undefined ? `<div class="kv"><span class="k">精确截取</span><span class="v hi">"${esc(rangeInfo.preciseQuote)}"</span></div>` : ''}
-      ` : '<div class="kv"><span class="v warn">无 Range 信息</span></div>'}
-    </div>
-
-    <div class="section gray">
-      <div class="section-label">命中 item（定位）</div>
-      <div class="kv"><span class="k">item idx</span><span class="v">${closestItemIdx >= 0 ? closestItemIdx : '未命中'}</span></div>
-      <div class="kv"><span class="k">item.str</span><span class="v">${closestItemStr ? '"' + esc(closestItemStr) + '"' : '—'}</span></div>
-    </div>
-
-    <div class="section ${spanDetails.length > 0 ? (spanDetails.every(d => d.match) ? 'green' : 'amber') : 'red'}">
-      <div class="section-label">命中 span（${spanDetails.length} 个）</div>
-      ${spanDetails.slice(0, 3).map((d, i) => `
-        <div class="kv">
-          <span class="k">span ${i+1}</span>
-          <span class="v ${d.match ? 'ok' : 'warn'}">"${esc(d.spanText)}" ${d.match ? '✓' : '≠item'}</span>
-        </div>
-      `).join('')}
-      ${spanDetails.length > 3 ? `<div class="kv"><span class="k"></span><span class="v" style="color:#aaa">...共 ${spanDetails.length} 个</span></div>` : ''}
-    </div>
-
-    <div class="fb-row">
-      <span class="fb-label">selectedText 和你看到的蓝色一致吗？</span>
-      <button class="fb-ok"  onclick="fb('step2', true,  this)">✓ 一致</button>
-      <button class="fb-bad" onclick="fb('step2', false, this)">✗ 不一致</button>
+  // ── 橙色视觉反馈 ──
+  const bv = document.createElement('div');
+  bv.className = 'block';
+  bv.innerHTML = `
+    <div class="block-hd">① 橙色视觉范围 = 你拖选的范围？</div>
+    <div class="path-row" style="padding:6px 10px">
+      <span class="path-label" style="color:#555">视觉上</span>
+      <span class="path-value" style="color:#888;font-size:11px">橙色覆盖的字符是否就是你拖选的</span>
+      <div class="path-fb">
+        <button onclick="fbPath('visual',true,this)">✓</button>
+        <button onclick="fbPath('visual',false,this)">✗</button>
+      </div>
     </div>
   `;
-  panel.appendChild(s2);
+  main.appendChild(bv);
+  currentEntry.fb.visual = null;
+
+  // ── 三条路径对比 ──
+  const b1 = document.createElement('div');
+  b1.className = 'block';
+  b1.innerHTML = `
+    <div class="block-hd">三条路径对比 — 每条各自评价</div>
+    <div class="block-bd" style="padding:0">
+      ${pathRow('path1', '路径1 sel.toString()', path1)}
+      ${pathRow('path2', '路径2 词边界扩展', path2)}
+      ${pathRow('path3', '路径3 坐标映射', path3)}
+    </div>
+  `;
+  main.appendChild(b1);
+
+  // ── 你想要的 ──
+  const b2 = document.createElement('div');
+  b2.className = 'block';
+  b2.innerHTML = `
+    <div class="block-hd">你实际想选的文字</div>
+    <input class="text-input" id="user-wanted" type="text" placeholder="填写你想要的文字"
+      onblur="updateWanted(this.value)"
+      onkeydown="if(event.key==='Enter')updateWanted(this.value)">
+  `;
+  main.appendChild(b2);
+
+  // ── 技术数据 ──
+  const b3 = document.createElement('div');
+  b3.className = 'block';
+  const p3d = entry.path3Detail?.[0];
+  b3.innerHTML = `
+    <div class="block-hd">技术数据</div>
+    <div class="data-row"><span class="dk">down PDF</span><span class="dv">(${coords.downPdf[0]}, ${coords.downPdf[1]})</span></div>
+    <div class="data-row"><span class="dk">up PDF</span><span class="dv">(${coords.upPdf[0]}, ${coords.upPdf[1]})</span></div>
+    <div class="data-row"><span class="dk">sameContainer</span><span class="dv ${rangeInfo?.sameContainer?'ok':'warn'}">${rangeInfo?.sameContainer?'是':'否'}</span></div>
+    <div class="data-row"><span class="dk">range offset</span><span class="dv">${rangeInfo?.startOffset??'?'} → ${rangeInfo?.endOffset??'?'}</span></div>
+    ${p3d ? `<div class="data-row"><span class="dk">路径3命中</span><span class="dv">item#${p3d.idx} x=${p3d.itemX} w=${p3d.itemWidth}<br>charOffset ${p3d.startChar}→${p3d.endChar} → "${esc(p3d.slice)}"</span></div>` : ''}
+    <div class="data-row"><span class="dk">路径3命中数</span><span class="dv">${entry.path3Detail?.length??0} 个 item</span></div>
+  `;
+  main.appendChild(b3);
+
+  // ── 备注 ──
+  const b4 = document.createElement('div');
+  b4.className = 'block';
+  b4.innerHTML = `
+    <div class="block-hd">备注</div>
+    <textarea class="note-input" id="note-input" placeholder="任何想说的（例外情况、异常现象等）"
+      onblur="updateNote(this.value)"
+      onkeydown="if(event.key==='Enter'&&(event.metaKey||event.ctrlKey))updateNote(this.value)"></textarea>
+  `;
+  main.appendChild(b4);
+
+  // ── 按钮行 ──
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:8px;';
+
+  const btn = document.createElement('button');
+  btn.className = 'submit-btn';
+  btn.id = 'submit-btn';
+  btn.style.flex = '1';
+  btn.textContent = '提交给 Claude';
+  btn.onclick = submitEntry;
+  btnRow.appendChild(btn);
+
+  const saveBtn = document.createElement('button');
+  saveBtn.id = 'save-btn';
+  saveBtn.style.cssText = 'padding:9px 12px;background:#188038;color:white;border:none;border-radius:4px;cursor:pointer;font-size:12px;white-space:nowrap;';
+  saveBtn.textContent = '★ 保存样本';
+  saveBtn.onclick = saveSample;
+  btnRow.appendChild(saveBtn);
+
+  main.appendChild(btnRow);
 }
 
-function esc(str) {
-  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'↵');
+function pathRow(key, label, value) {
+  const display = value
+    ? `<span class="path-value" title="${esc(value)}">"${esc(value)}"</span>`
+    : `<span class="path-value" style="color:#aaa">—</span>`;
+  return `
+    <div class="path-row">
+      <div class="path-row-top">
+        <span class="path-label">${label}</span>
+        <div class="path-fb">
+          <button onclick="fbPath('${key}',true,this)">✓</button>
+          <button onclick="fbPath('${key}',false,this)">✗</button>
+        </div>
+      </div>
+      ${display}
+    </div>
+  `;
 }
 
-window.fb = function(key, ok, btn) {
-  if (currentEntry) currentEntry.feedback[key] = ok;
-  const row = btn.closest('.fb-row');
-  row.innerHTML = `<span class="fb-done ${ok?'ok':'bad'}">${ok ? '✓ 一致' : '✗ 不一致'}</span>`;
-  log(`反馈 ${key}=${ok}`);
-  if (currentEntry) {
-    fetch('/report', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(currentEntry),
-    }).catch(() => {});
-  }
+window.fbPath = function(key, ok, btn) {
+  if (!currentEntry) return;
+  currentEntry.fb[key] = ok;
+  const row = btn.closest('.path-fb');
+  row.querySelectorAll('button').forEach(b => { b.className = ''; });
+  btn.className = ok ? 'ok' : 'bad';
 };
 
-window.exportJSON = function() {
-  const blob = new Blob([JSON.stringify(sessionData, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `pdf-test-${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.json`;
-  a.click();
+window.updateWanted = function(val) {
+  if (currentEntry) currentEntry.userWanted = val;
 };
+
+window.updateNote = function(val) {
+  if (currentEntry) currentEntry.note = val;
+};
+
+function submitEntry() {
+  if (!currentEntry) return;
+  const wantedEl = document.getElementById('user-wanted');
+  const noteEl   = document.getElementById('note-input');
+  if (wantedEl) currentEntry.userWanted = wantedEl.value.trim();
+  if (noteEl)   currentEntry.note = noteEl.value.trim();
+
+  const { pdf, pageNum, region, frozenText, path1, path2, path3, userWanted, note, fb, coords, rangeInfo, path3Detail } = currentEntry;
+  const rl = regionLabels;
+
+  const lines = [
+    `PDF: ${pdf}  页: ${pageNum}  区域: ${rl[region]||region}`,
+    ``,
+    `橙色高亮（工具冻结）: "${frozenText||'—'}"  视觉准确: ${fb.visual===true?'✓ 是':fb.visual===false?'✗ 否':'未评价'}`,
+    `路径1 sel.toString():  "${path1||'—'}"  → ${fb.path1===true?'✓ 对':fb.path1===false?'✗ 错':'未评价'}`,
+    `路径2 词边界扩展:      "${path2||'—'}"  → ${fb.path2===true?'✓ 对':fb.path2===false?'✗ 错':'未评价'}`,
+    `路径3 坐标映射:        "${path3||'—'}"  → ${fb.path3===true?'✓ 对':fb.path3===false?'✗ 错':'未评价'}`,
+    `你想要的:              "${userWanted||'（未填）'}"`,
+    `备注: ${note||'（无）'}`,
+    ``,
+    `--- 技术数据 ---`,
+    `down PDF: (${coords.downPdf})  up PDF: (${coords.upPdf})`,
+    `sameContainer: ${rangeInfo?.sameContainer}  offset: ${rangeInfo?.startOffset}→${rangeInfo?.endOffset}`,
+    `路径3 命中 ${path3Detail?.length||0} 个 item${path3Detail?.[0] ? `: item#${path3Detail[0].idx} charOffset ${path3Detail[0].startChar}→${path3Detail[0].endChar}` : ''}`,
+  ].join('\n');
+
+  document.getElementById('output-text').value = lines;
+  console.log('[submit]', currentEntry);
+
+  fetch('/report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(currentEntry),
+  }).catch(() => {});
+
+  const btn = document.getElementById('submit-btn');
+  if (btn) { btn.textContent = '✓ 已提交'; btn.className = 'submit-btn done'; }
+}
+
+window.saveSample = function() {
+  if (!currentEntry) return;
+  const wantedEl = document.getElementById('user-wanted');
+  const noteEl   = document.getElementById('note-input');
+  if (wantedEl) currentEntry.userWanted = wantedEl.value.trim();
+  if (noteEl)   currentEntry.note = noteEl.value.trim();
+
+  fetch('/save-sample', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(currentEntry),
+  }).then(() => {
+    const btn = document.getElementById('save-btn');
+    if (btn) { btn.textContent = '✓ 已保存'; btn.style.background = '#1557b0'; }
+  }).catch(() => {});
+};
+
+window.copyOutput = function() {
+  const ta = document.getElementById('output-text');
+  ta.select();
+  document.execCommand('copy');
+};
+
+function esc(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 
 window.clearAll = function() {
-  sessionData = [];
+  clearFrozenMarks();
   currentEntry = null;
-  document.getElementById('step-panel').innerHTML = '<div class="empty">已清空</div>';
-  document.getElementById('log').innerHTML = '';
+  document.getElementById('main').innerHTML = '<div class="hint">已清空</div>';
+  document.getElementById('output-text').value = '';
 };
 </script>
 </body>

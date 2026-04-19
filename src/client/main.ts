@@ -2,7 +2,7 @@
 import type { FileData } from './types';
 
 // 导入状态管理
-import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFileFromState, switchToFile, setSearchQuery, markFileMissing, getSessionFile, saveScrollPosition } from './state';
+import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFileFromState, switchToFile, setSearchQuery, markFileMissing, getSessionFile, saveScrollPosition, markWorkspaceFailed } from './state';
 import { clearListDiff, markWorkspaceModified, clearWorkspaceModified, markWorkspacePathMissing, clearWorkspacePathMissing } from './workspace-state';
 import { addWorkspace, hydrateExpandedWorkspaces, scanWorkspace, revealFileInWorkspace } from './workspace';
 
@@ -99,6 +99,9 @@ function evictPdfViewer(filePath: string): void {
   if (!entry) return;
   if (entry.idleTimer) clearTimeout(entry.idleTimer);
   entry.viewer.destroy();
+  if ((window as any).__currentPdfViewer === entry.viewer) {
+    (window as any).__currentPdfViewer = null;
+  }
   pdfViewerRegistry.delete(filePath);
 }
 
@@ -170,6 +173,27 @@ function initSidebarWidth(): void {
   applySidebarWidth(width);
 }
 
+const SIDEBAR_COLLAPSED_KEY = 'md-viewer:sidebar-collapsed';
+
+function setSidebarCollapsed(collapsed: boolean): void {
+  document.body.classList.toggle('sidebar-collapsed', collapsed);
+  localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
+}
+
+function initSidebarCollapsed(): void {
+  const saved = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+  if (saved === '1') setSidebarCollapsed(true);
+}
+
+function setupSidebarCollapse(): void {
+  document.getElementById('sidebarCollapseBtn')?.addEventListener('click', () => {
+    setSidebarCollapsed(true);
+  });
+  document.getElementById('sidebarFloatingOpenBtn')?.addEventListener('click', () => {
+    setSidebarCollapsed(false);
+  });
+}
+
 function setupSidebarResize(): void {
   const resizer = document.getElementById('sidebarResizer');
   if (!resizer) return;
@@ -200,11 +224,6 @@ function setupSidebarResize(): void {
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
     event.preventDefault();
-  });
-
-  resizer.addEventListener('dblclick', () => {
-    applySidebarWidth(SIDEBAR_DEFAULT_WIDTH);
-    localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(SIDEBAR_DEFAULT_WIDTH));
   });
 
   window.addEventListener('resize', () => {
@@ -638,6 +657,10 @@ function renderContent() {
           currentPdfBridge?.renderHighlights(getAnnotations());
         },
       });
+      (window as any).__currentPdfViewer = existingEntry.viewer;
+      existingEntry.viewer.onAnnotationClick = (annotationId: string, clientX: number, clientY: number) => {
+        currentPdfBridge?.handleAnnotationClick(annotationId, clientX, clientY);
+      };
       container.innerHTML = '';
       container.appendChild(existingEntry.viewer.el);
       if (existingEntry.savedScrollTop !== undefined) {
@@ -667,20 +690,24 @@ function renderContent() {
         // Page just became visible — replay annotation highlights for it
         currentPdfBridge?.renderHighlights(getAnnotations());
       },
-    }).then((viewer) => {
-      currentPdfViewer = viewer;
+    }).then((pdfViewerInstance) => {
+      currentPdfViewer = pdfViewerInstance;
       container.setAttribute('data-current-file', filePath);
       const savedScroll = Number(localStorage.getItem(`md-viewer:pdf-scroll:${filePath}`));
       pdfViewerRegistry.set(filePath, {
-        viewer,
+        viewer: pdfViewerInstance,
         lastActiveAt: Date.now(),
         idleTimer: null,
         savedScrollTop: Number.isFinite(savedScroll) && savedScroll > 0 ? savedScroll : undefined,
       });
       if (savedScroll > 0) container.scrollTop = savedScroll;
+      (window as any).__currentPdfViewer = pdfViewerInstance;
+      pdfViewerInstance.onAnnotationClick = (annotationId: string, clientX: number, clientY: number) => {
+        currentPdfBridge?.handleAnnotationClick(annotationId, clientX, clientY);
+      };
       currentPdfBridge = createPdfAnnotationBridge({
         filePath,
-        viewer,
+        viewer: pdfViewerInstance,
         getAnnotations: () => getAnnotations(),
         onAnnotationCreated: (_ann) => {
           currentPdfBridge?.renderHighlights(getAnnotations());
@@ -971,7 +998,7 @@ async function handleSmartAddInput(path: string): Promise<void> {
   const result = await detectPathType(trimmed);
   const detectedPath = result.path || trimmed;
 
-  if (result.kind === 'md_file' || result.kind === 'html_file' || result.kind === 'pdf_file') {
+  if (result.kind === 'md_file' || result.kind === 'html_file' || String(result.kind) === 'pdf_file') {
     clearAddConfirm();
     await addFileByPath(detectedPath, true);
     return;
@@ -2085,6 +2112,8 @@ function startWorkspacePolling() {
 // ==================== 初始化 ====================
 (async () => {
   initSidebarWidth();
+  initSidebarCollapsed();
+  setupSidebarCollapse();
 
   // 初始化字体缩放
   initFontScale();
@@ -2101,7 +2130,6 @@ function startWorkspacePolling() {
   applyTheme();  // apply saved theme preference
   const failedWorkspaceIds = await hydrateExpandedWorkspaces();
   if (failedWorkspaceIds.length > 0) {
-    const { markWorkspaceFailed } = await import('./ui/sidebar-workspace');
     failedWorkspaceIds.forEach(markWorkspaceFailed);
   }
   startWorkspacePolling();

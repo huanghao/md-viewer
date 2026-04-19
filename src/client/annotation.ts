@@ -749,6 +749,8 @@ function hideQuickAdd(clearPending = false): void {
   if (clearPending) {
     clearTempSelectionMark();
     state.pendingAnnotation = null;
+    const pdfViewer = (window as any).__currentPdfViewer as import('./pdf-viewer.js').PdfViewerInstance | undefined;
+    pdfViewer?.clearTempRect();
     state.pendingAnnotationFilePath = null;
   }
 }
@@ -757,38 +759,14 @@ export function openComposerFromPending(x?: number, y?: number): void {
   const el = getElements();
   if (!state.pendingAnnotation || !el.composer || !el.composerNote) return;
   applyTempSelectionMark();
-  // PDF side: insert yellow underline using the stored Range from mouseup
-  const pdfPending = (window as any).__pdfPendingSelectionRange;
-  if (pdfPending) {
-    (window as any).__pdfPendingSelectionRange = null;
-    try {
-      const { range, textLayerDiv } = pdfPending as { range: Range; textLayerDiv: HTMLElement };
-      if (range && textLayerDiv) {
-        const wrapNode = (r: Range) => {
-          const m = document.createElement('mark');
-          m.className = 'pdf-selection-mark-temp';
-          try { r.surroundContents(m); return; } catch {}
-          // multi-node fallback
-          const walker = document.createTreeWalker(textLayerDiv, NodeFilter.SHOW_TEXT, null);
-          const toWrap: { node: Text; start: number; end: number }[] = [];
-          let node: Node | null;
-          while ((node = walker.nextNode())) {
-            const t = node as Text;
-            const nr = document.createRange(); nr.selectNode(t);
-            if (nr.compareBoundaryPoints(Range.START_TO_END, r) > 0 &&
-                nr.compareBoundaryPoints(Range.END_TO_START, r) < 0) {
-              toWrap.push({ node: t, start: t === r.startContainer ? r.startOffset : 0, end: t === r.endContainer ? r.endOffset : t.length });
-            }
-          }
-          for (const { node: t, start, end } of toWrap) {
-            const pr = document.createRange(); pr.setStart(t, start); pr.setEnd(t, end);
-            const mk = document.createElement('mark'); mk.className = 'pdf-selection-mark-temp';
-            try { pr.surroundContents(mk); } catch {}
-          }
-        };
-        wrapNode(range);
-      }
-    } catch {}
+  const pdfViewer = (window as any).__currentPdfViewer as import('./pdf-viewer.js').PdfViewerInstance | undefined;
+  const pendingAnn = state.pendingAnnotation as Annotation & {
+    page?: number;
+    rectCoords?: { x1: number; y1: number; x2: number; y2: number };
+  };
+  if (pdfViewer && pendingAnn?.page !== undefined && pendingAnn?.rectCoords) {
+    const { x1, y1, x2, y2 } = pendingAnn.rectCoords;
+    pdfViewer.drawTempRect(pendingAnn.page, x1, y1, x2, y2, 'yellow');
   }
   el.composerNote.value = '';
   autoResizeComposerInput(el.composerNote);
@@ -879,7 +857,7 @@ function applyTempSelectionMark(): void {
 
   try {
     const textNodes: Array<{ node: Text; start: number; end: number }> = [];
-    const walker = document.createTreeWalker(el.reader, NodeFilter.SHOW_TEXT, null, false);
+    const walker = document.createTreeWalker(el.reader, NodeFilter.SHOW_TEXT, null);
     let node: Node | null;
     while ((node = walker.nextNode())) {
       const nodeRange = document.createRange();
@@ -1058,7 +1036,7 @@ function autoResizeComposerInput(input: HTMLTextAreaElement): void {
   input.style.overflowY = input.scrollHeight > maxHeight ? 'auto' : 'hidden';
 }
 
-function showPopover(ann: Annotation, x: number, y: number): void {
+export function showPopover(ann: Annotation, x: number, y: number): void {
   const el = getElements();
   if (!el.popover || !el.popoverTitle || !el.popoverNote) return;
   const snippet = ann.quote.substring(0, 22);
@@ -1127,6 +1105,8 @@ export function savePendingAnnotation(filePath: string): void {
 
   state.annotations.push(ann);
   persistAnnotation(filePath, ann, '创建评论失败');
+  const pdfViewer = (window as any).__currentPdfViewer as import('./pdf-viewer.js').PdfViewerInstance | undefined;
+  pdfViewer?.clearTempRect();
   adjustAnnotationCount(filePath, +1);
   import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
   // For PDF: keep pdf-selection-mark-temp alive until renderHighlights replaces it with permanent highlight
@@ -1314,7 +1294,7 @@ function applySingleAnnotation(ann: Annotation, index?: TextNodeIndex): void {
   // 跨文本节点
   try {
     const textNodes: Array<{ node: Text; start: number; end: number }> = [];
-    const walker = document.createTreeWalker(el.reader, NodeFilter.SHOW_TEXT, null, false);
+    const walker = document.createTreeWalker(el.reader, NodeFilter.SHOW_TEXT, null);
 
     let node: Node | null;
     while ((node = walker.nextNode())) {
@@ -1600,7 +1580,7 @@ export function renderAnnotationList(filePath: string | null): void {
       autoResizeReplyInput(input);
       input.focus();
     });
-    entry.addEventListener('keydown', (event) => {
+    entry.addEventListener('keydown', (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
       if (target instanceof HTMLTextAreaElement) return;
       if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -1634,7 +1614,7 @@ export function renderAnnotationList(filePath: string | null): void {
     const input = inputEl as HTMLTextAreaElement;
     input.addEventListener('input', () => autoResizeReplyInput(input));
     input.addEventListener('click', (event) => event.stopPropagation());
-    inputEl.addEventListener('keydown', (event) => {
+    inputEl.addEventListener('keydown', (event: KeyboardEvent) => {
       if (handleEmacsKeys(event, event.currentTarget as HTMLTextAreaElement)) {
         event.preventDefault();
         return;

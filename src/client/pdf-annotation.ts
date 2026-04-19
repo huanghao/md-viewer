@@ -92,8 +92,15 @@ export function createPdfAnnotationBridge(opts: PdfAnnotationBridgeOptions): Pdf
   function handleAnnotationClick(annotationId: string, clientX: number, clientY: number) {
     const ann = opts.getAnnotations().find(a => a.id === annotationId);
     if (!ann) return;
-    // Place popover at bottom-right corner of viewport
-    showPopover(ann, window.innerWidth, window.innerHeight);
+    // showPopover with dummy coords, then reposition to bottom-right via right/bottom
+    showPopover(ann, 0, 0);
+    const popover = document.getElementById('annotationPopover');
+    if (popover) {
+      popover.style.left = '';
+      popover.style.top = '';
+      popover.style.right = '12px';
+      popover.style.bottom = '12px';
+    }
   }
 
   return { handleTextSelected, handleAnnotationClick, renderHighlights };

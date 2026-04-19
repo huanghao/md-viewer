@@ -13,7 +13,7 @@ test('case-2: 工作区展开状态刷新后保持，并加载目录树', async 
 
   const wsHeader = page.locator('.workspace-header', { hasText: 'md-viewer' });
   await expect(wsHeader).toBeVisible();
-  await expect(wsHeader.locator('.workspace-toggle')).toHaveText('▼');
+  await expect(wsHeader.locator('.workspace-toggle')).toHaveText('▶');
   await expect(page.locator('.tree-loading')).toHaveCount(0);
 
   const docsNode = page.locator('.tree-item .tree-name', { hasText: 'docs' }).first();
@@ -22,7 +22,7 @@ test('case-2: 工作区展开状态刷新后保持，并加载目录树', async 
   await page.reload();
 
   await expect(page.locator('.workspace-header', { hasText: 'md-viewer' })).toBeVisible();
-  await expect(page.locator('.workspace-header .workspace-toggle').first()).toHaveText('▼');
+  await expect(page.locator('.workspace-header .workspace-toggle').first()).toHaveText('▶');
   await expect(page.locator('.tree-loading')).toHaveCount(0);
   await expect(page.locator('.tree-item .tree-name', { hasText: 'docs' }).first()).toBeVisible();
 });

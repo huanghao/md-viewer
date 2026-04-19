@@ -55,6 +55,7 @@ export interface PdfViewerInstance {
   el: HTMLElement;
   destroy(): void;
   scrollToPage(pageNum: number): void;
+  scrollToBlockY(pageNum: number, blockY: number): void;
   highlightQuote(pageNum: number, quote: string, annotationId?: string): void;
   highlightByItemRange(pageNum: number, startItemIdx: number, endItemIdx: number, annotationId?: string, preciseQuote?: string): void;
   clearHighlights(): void;
@@ -491,7 +492,16 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
   // Public API
   function scrollToPage(pageNum: number) {
     const wrapper = pageWrappers[pageNum - 1];
-    if (wrapper) wrapper.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!wrapper) return;
+    const targetTop = wrapper.offsetTop - 100;
+    container.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+  }
+
+  function scrollToBlockY(pageNum: number, blockY: number) {
+    const wrapper = pageWrappers[pageNum - 1];
+    if (!wrapper) return;
+    const targetTop = wrapper.offsetTop + blockY * scale - 100;
+    container.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
   }
 
   function highlightQuote(pageNum: number, quote: string, annotationId?: string) {
@@ -722,7 +732,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
   }
 
   return {
-    el, destroy, scrollToPage,
+    el, destroy, scrollToPage, scrollToBlockY,
     highlightQuote, highlightByItemRange, clearHighlights, clearSelectionMark,
     renderRectHighlight,
     getTextBlocks, getRenderedCount, getTotalPages,

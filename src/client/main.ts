@@ -959,7 +959,8 @@ function renderContent() {
           refreshTranslationList();
         },
         (pageNum, startItemIdx, endItemIdx) => {
-          currentPdfViewer?.scrollToPage(pageNum);
+          const blockY = startItemIdx / 10;
+          currentPdfViewer?.scrollToBlockY(pageNum, blockY);
           if (currentPdfViewer) highlightTranslationBlock(currentPdfViewer, pageNum, startItemIdx, endItemIdx);
         },
         (pageNum, startItemIdx) => {

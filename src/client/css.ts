@@ -2447,11 +2447,26 @@ export const styles = `
     }
     .translation-item:hover { background: #f0f3f6; }
     .translation-item.is-highlighted { background: #fff8c5; }
+    .translation-item-header {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin-bottom: 5px;
+    }
+    .translation-item-serial {
+      flex-shrink: 0;
+      font-size: var(--text-xs);
+      font-weight: 600;
+      color: var(--color-accent);
+      background: rgba(9,105,218,0.08);
+      border-radius: 3px;
+      padding: 1px 5px;
+      letter-spacing: 0.2px;
+    }
     .translation-item-original {
       font-size: var(--text-xs);
       color: var(--color-text-muted);
       line-height: 1.4;
-      margin-bottom: 5px;
     }
     .translation-item-text {
       font-size: var(--text-sm);

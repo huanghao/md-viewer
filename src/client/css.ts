@@ -1975,6 +1975,56 @@ export const styles = `
       margin-bottom: 12px;
     }
 
+    .settings-group {
+      padding: 16px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .settings-group:last-child { border-bottom: none; }
+    .settings-group-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #57606a;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 10px;
+    }
+    .settings-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 4px 0;
+    }
+    .settings-label {
+      font-size: 13px;
+      color: #24292f;
+      flex-shrink: 0;
+    }
+    .settings-select {
+      font-size: 12px;
+      padding: 3px 8px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      background: #fff;
+      color: #24292f;
+      cursor: pointer;
+    }
+    .settings-select:focus {
+      outline: none;
+      border-color: #0969da;
+      box-shadow: 0 0 0 3px rgba(9,105,218,0.1);
+    }
+    .settings-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .settings-toggle-label {
+      font-size: 12px;
+      color: #57606a;
+    }
+
     /* 单选按钮组 */
     .settings-radio-group {
       display: flex;

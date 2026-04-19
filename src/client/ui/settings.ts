@@ -72,57 +72,54 @@ function renderSettingsDialog(): void {
 
   const snapshot = getClientStateSnapshot();
   body.innerHTML = `
-    <div class="settings-section">
-      <div class="settings-section-title">主题</div>
+    <div class="settings-group">
+      <div class="settings-group-title">外观</div>
       <div class="settings-section-desc">切换 Markdown 正文样式和代码高亮配色。</div>
-      <div class="settings-kv-grid">
-        <div>正文样式</div>
-        <div>
-          <select id="markdownThemeSelect" style="font-size:12px;padding:2px 6px;border:1px solid #ddd;border-radius:3px">
-            ${MD_THEMES.map(t =>
-              `<option value="${t.key}"${state.config.markdownTheme === t.key ? ' selected' : ''}>${t.label}</option>`
-            ).join('')}
-          </select>
-        </div>
-        <div>代码高亮</div>
-        <div>
-          <select id="codeThemeSelect" style="font-size:12px;padding:2px 6px;border:1px solid #ddd;border-radius:3px">
-            ${HL_THEMES.map(t =>
-              `<option value="${t.key}"${state.config.codeTheme === t.key ? ' selected' : ''}>${t.label}</option>`
-            ).join('')}
-          </select>
-        </div>
+      <div class="settings-row">
+        <label class="settings-label">正文样式</label>
+        <select id="markdownThemeSelect" class="settings-select">
+          ${MD_THEMES.map(t =>
+            `<option value="${t.key}"${state.config.markdownTheme === t.key ? ' selected' : ''}>${t.label}</option>`
+          ).join('')}
+        </select>
+      </div>
+      <div class="settings-row">
+        <label class="settings-label">代码高亮</label>
+        <select id="codeThemeSelect" class="settings-select">
+          ${HL_THEMES.map(t =>
+            `<option value="${t.key}"${state.config.codeTheme === t.key ? ' selected' : ''}>${t.label}</option>`
+          ).join('')}
+        </select>
       </div>
     </div>
-    <div class="settings-section">
-      <div class="settings-section-title">数学公式</div>
-      <div class="settings-section-desc">使用 KaTeX 渲染 LaTeX 公式。<code style="font-size:11px">$$...$$</code> 块级公式始终启用。</div>
-      <div class="settings-kv-grid">
-        <div>行内公式 <code style="font-size:11px">$...$</code></div>
-        <div>
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-            <input type="checkbox" id="mathInlineCheckbox"${state.config.mathInline !== false ? ' checked' : ''}>
-            <span style="font-size:12px">启用（关闭可避免 <code>$</code> 货币符号误触发）</span>
-          </label>
-        </div>
+
+    <div class="settings-group">
+      <div class="settings-group-title">数学公式</div>
+      <div class="settings-section-desc">使用 KaTeX 渲染 LaTeX 公式。<code>$$...$$</code> 块级公式始终启用。</div>
+      <div class="settings-row">
+        <label class="settings-label">行内公式 <code>$...$</code></label>
+        <label class="settings-toggle">
+          <input type="checkbox" id="mathInlineCheckbox"${state.config.mathInline !== false ? ' checked' : ''}>
+          <span class="settings-toggle-label">启用（关闭可避免 <code>$</code> 货币符号误触发）</span>
+        </label>
       </div>
     </div>
-    <div class="settings-section">
-      <div class="settings-section-title">工作区</div>
+
+    <div class="settings-group">
+      <div class="settings-group-title">工作区</div>
       <div class="settings-section-desc">工作区文件树的轮询间隔，用于感知新增/删除文件。文件内容变化由 SSE 实时推送，不受此设置影响。修改后刷新页面生效。</div>
-      <div class="settings-kv-grid">
-        <div>轮询间隔（毫秒）</div>
-        <div>
-          <select id="pollIntervalSelect" style="font-size:12px;padding:2px 6px;border:1px solid #ddd;border-radius:3px">
-            ${[2000, 5000, 10000, 30000].map(v =>
-              `<option value="${v}"${(state.config.workspacePollInterval ?? 5000) === v ? ' selected' : ''}>${v / 1000}s</option>`
-            ).join('')}
-          </select>
-        </div>
+      <div class="settings-row">
+        <label class="settings-label">轮询间隔</label>
+        <select id="pollIntervalSelect" class="settings-select">
+          ${[2000, 5000, 10000, 30000].map(v =>
+            `<option value="${v}"${(state.config.workspacePollInterval ?? 5000) === v ? ' selected' : ''}>${v / 1000}s</option>`
+          ).join('')}
+        </select>
       </div>
     </div>
-    <div class="settings-section">
-      <div class="settings-section-title">客户端状态</div>
+
+    <div class="settings-group">
+      <div class="settings-group-title">客户端状态</div>
       <div class="settings-section-desc">用于排查本地缓存是否脏数据，可直接清理。</div>
       <div class="settings-kv-grid">
         <div>当前文件</div><div>${escapeHtml(snapshot.currentFile || '无')}</div>
@@ -136,8 +133,9 @@ function renderSettingsDialog(): void {
         ${snapshot.mdvKeys.map((key) => `<span class="settings-key-chip">${escapeHtml(key)}</span>`).join('')}
       </div>
     </div>
-    <div class="settings-section">
-      <div class="settings-section-title">数据清理</div>
+
+    <div class="settings-group">
+      <div class="settings-group-title">数据清理</div>
       <div class="settings-section-desc">评论状态清理会同时删除服务端 SQLite 评论数据和客户端评论相关状态，随后自动刷新页面。</div>
       <div class="settings-actions-row">
         <button class="sync-dialog-button" id="clearAllCommentsBtn">清空评论状态</button>

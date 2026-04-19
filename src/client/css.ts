@@ -1032,6 +1032,9 @@ export const styles = `
     body.annotation-sidebar-collapsed .content {
       padding-right: 24px;
     }
+    .content.diff-active {
+      padding: 0;
+    }
     .markdown-wrapper {
       max-width: 900px;
       margin: 0 auto;

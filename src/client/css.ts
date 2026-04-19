@@ -325,7 +325,7 @@ export const styles = `
       content: '';
       position: absolute;
       border: 1.5px solid currentColor;
-      border-radius: 3px;
+      border-radius: 4px;
       background: white;
     }
     .current-path-copy .copy-icon::before {
@@ -1271,7 +1271,7 @@ export const styles = `
       background: transparent;
       color: #586069;
       cursor: pointer;
-      border-radius: 3px;
+      border-radius: 4px;
       transition: all 0.2s;
       position: relative;
       display: inline-flex;
@@ -1362,7 +1362,7 @@ export const styles = `
     }
     .diff-nav-btn {
       padding: 3px 9px;
-      border-radius: 5px;
+      border-radius: 4px;
       border: 1px solid #d4a72c;
       background: #fff;
       color: #633c01;
@@ -1866,14 +1866,14 @@ export const styles = `
       color: #57606a;
       background: #f6f8fa;
       padding: 2px 6px;
-      border-radius: 10px;
+      border-radius: 6px;
       margin-left: 2px;
     }
 
     .annotation-count-badge {
       background: #e05252;
       color: white;
-      border-radius: 10px;
+      border-radius: 6px;
       padding: 1px 6px;
       font-size: 11px;
       font-weight: 600;
@@ -2236,7 +2236,7 @@ export const styles = `
     .translation-item-retry {
       background: none;
       border: 1px solid #0969da;
-      border-radius: 3px;
+      border-radius: 4px;
       cursor: pointer;
       font-size: 11px;
       color: #0969da;
@@ -2456,7 +2456,7 @@ export const styles = `
       color: #fff;
       font-size: 11px;
       font-weight: 600;
-      border-radius: 10px;
+      border-radius: 6px;
       line-height: 1;
     }
     .annotation-quote {
@@ -2488,7 +2488,7 @@ export const styles = `
       width: 26px;
       height: 26px;
       border: 1px solid transparent;
-      border-radius: 5px;
+      border-radius: 4px;
       background: transparent;
       color: #57606a;
       cursor: pointer;
@@ -2573,7 +2573,7 @@ export const styles = `
       background: transparent;
       cursor: pointer;
       color: #57606a;
-      border-radius: 3px;
+      border-radius: 4px;
       line-height: 1;
     }
     .annotation-thread-edit-btn svg {
@@ -2735,7 +2735,7 @@ export const styles = `
       top: 7px;
       bottom: 7px;
       width: 3px;
-      border-radius: 3px;
+      border-radius: 4px;
       background: #0969da;
     }
     .annotation-floating-open-btn {
@@ -2803,7 +2803,7 @@ export const styles = `
       width: 340px;
       background: #fff;
       border: 1px solid #d0d7de;
-      border-radius: 10px;
+      border-radius: 6px;
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
       padding: 10px;
     }
@@ -2970,7 +2970,7 @@ export const styles = `
     }
     .json-node-expandable:hover {
       background: rgba(0,0,0,0.04);
-      border-radius: 3px;
+      border-radius: 4px;
     }
     .json-toggle {
       display: inline-block;
@@ -3080,7 +3080,7 @@ export const styles = `
     .focus-time-pill {
       font-size: 10px;
       padding: 1px 7px;
-      border-radius: 10px;
+      border-radius: 6px;
       border: 1px solid #e0e0e0;
       background: #fff;
       color: #666;
@@ -3106,7 +3106,7 @@ export const styles = `
     .focus-type-pill {
       font-size: 10px;
       padding: 1px 7px;
-      border-radius: 10px;
+      border-radius: 6px;
       border: 1px solid #e0e0e0;
       background: #fff;
       color: #bbb;
@@ -3513,7 +3513,7 @@ export const styles = `
     .monitor-clear-btn {
       background: none;
       border: 1px solid #e5e7eb;
-      border-radius: 3px;
+      border-radius: 4px;
       padding: 1px 6px;
       font-size: 11px;
       font-family: inherit;
@@ -3561,7 +3561,7 @@ export const styles = `
       left: 2px;
       right: 2px;
       background: rgba(100,100,100,0.35);
-      border-radius: 3px;
+      border-radius: 4px;
       min-height: 20px;
       cursor: grab;
     }

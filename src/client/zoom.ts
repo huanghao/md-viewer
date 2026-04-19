@@ -5,6 +5,7 @@ export const MD_ZOOM_MAX = 2.0;
 export const PDF_ZOOM_MIN = 0.5;
 export const PDF_ZOOM_MAX = 3.0;
 export const ZOOM_STEP = 0.1;
+export const PDF_ZOOM_DEFAULT = 1.5;
 
 export function clampZoom(value: number, min: number, max: number): number {
   return Math.round(Math.min(Math.max(value, min), max) * 100) / 100;

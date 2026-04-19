@@ -45,29 +45,31 @@ export interface PdfViewerOptions {
     endItemIdx: number
   ) => void;
   onParagraphClick?: (block: PdfTextBlock) => void;
+  /** Called when user clicks a persistent annotation rect on the overlay canvas */
+  onAnnotationClick?: (annotationId: string, clientX: number, clientY: number) => void;
   /** Called after a page finishes rendering (canvas + text layer ready) */
   onPageRendered?: (pageNum: number) => void;
 }
 
 export interface PdfViewerInstance {
-  /** The root DOM element owned by this viewer — attach/detach from #content to show/hide */
   el: HTMLElement;
   destroy(): void;
   scrollToPage(pageNum: number): void;
-  /**
-   * Highlight quote text. If annotationId is provided, creates clickable annotation-mark.
-   */
   highlightQuote(pageNum: number, quote: string, annotationId?: string): void;
-  /**
-   * Highlight by item index range — O(1) precise anchor.
-   * pageItemStart/End are indices into textContent.items for that page.
-   */
   highlightByItemRange(pageNum: number, startItemIdx: number, endItemIdx: number, annotationId?: string, preciseQuote?: string): void;
   clearHighlights(): void;
   clearSelectionMark(): void;
   getTextBlocks(pageNum: number): PdfTextBlock[];
   getRenderedCount(): number;
   getTotalPages(): number;
+  /** Draw a temporary selection rect on the overlay canvas for the given page */
+  drawTempRect(pageNum: number, x1: number, y1: number, x2: number, y2: number, style: 'blue' | 'yellow'): void;
+  /** Clear the temporary selection rect (all pages if pageNum omitted) */
+  clearTempRect(pageNum?: number): void;
+  /** Draw a persistent annotation rect on the overlay canvas */
+  renderRectHighlight(pageNum: number, x1: number, y1: number, x2: number, y2: number, annotationId: string): void;
+  /** Called when user clicks a persistent annotation rect */
+  onAnnotationClick?: (annotationId: string, clientX: number, clientY: number) => void;
 }
 
 const SCALE_DEFAULT = 1.5;
@@ -187,6 +189,9 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
 
   // Per-page state
   const pageWrappers: HTMLElement[] = [];
+  const overlayCanvases: Map<number, HTMLCanvasElement> = new Map();
+  const persistentRects: Map<number, Array<{ annotationId: string; x1: number; y1: number; x2: number; y2: number }>> = new Map();
+  const tempRects: Map<number, { x1: number; y1: number; x2: number; y2: number; style: 'blue' | 'yellow' } | null> = new Map();
   const textBlocksByPage: Map<number, PdfTextBlock[]> = new Map();
   const textContentCache: Map<number, any> = new Map(); // Cache textContent for item-based highlighting
   const rendered = new Set<number>(); // pages already rendered
@@ -213,6 +218,40 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     wrapper.style.background = "white";
     el.appendChild(wrapper);
     pageWrappers.push(wrapper);
+  }
+
+  function redrawOverlay(pageNum: number) {
+    const canvas = overlayCanvases.get(pageNum);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+
+    const perPage = persistentRects.get(pageNum) || [];
+    for (const r of perPage) {
+      const s = scale;
+      ctx.fillStyle = 'rgba(255,200,0,0.35)';
+      ctx.strokeStyle = 'rgba(255,160,0,0.85)';
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(r.x1 * s, r.y1 * s, (r.x2 - r.x1) * s, (r.y2 - r.y1) * s);
+      ctx.strokeRect(r.x1 * s, r.y1 * s, (r.x2 - r.x1) * s, (r.y2 - r.y1) * s);
+    }
+
+    const tmp = tempRects.get(pageNum);
+    if (tmp) {
+      const s = scale;
+      const w = (tmp.x2 - tmp.x1) * s;
+      const h = (tmp.y2 - tmp.y1) * s;
+      if (tmp.style === 'blue') {
+        ctx.fillStyle = 'rgba(66,133,244,0.18)';
+        ctx.strokeStyle = 'rgba(66,133,244,0.9)';
+      } else {
+        ctx.fillStyle = 'rgba(255,200,0,0.30)';
+        ctx.strokeStyle = 'rgba(255,160,0,0.75)';
+      }
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(tmp.x1 * s, tmp.y1 * s, w, h);
+      ctx.strokeRect(tmp.x1 * s, tmp.y1 * s, w, h);
+    }
   }
 
   // Step 3: render a page (canvas + text layer)
@@ -245,9 +284,25 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     textLayerDiv.className = "pdf-text-layer textLayer";
     textLayerDiv.style.cssText = `
       width: ${viewport.width}px; height: ${viewport.height}px;
-      pointer-events: auto; user-select: text;
+      pointer-events: none; user-select: none;
     `;
     wrapper.appendChild(textLayerDiv);
+
+    const overlayCanvas = document.createElement('canvas');
+    overlayCanvas.className = 'pdf-select-overlay';
+    overlayCanvas.width = Math.floor(viewport.width * dpr);
+    overlayCanvas.height = Math.floor(viewport.height * dpr);
+    overlayCanvas.style.cssText = `
+      position: absolute; top: 0; left: 0;
+      width: ${viewport.width}px; height: ${viewport.height}px;
+      pointer-events: auto; cursor: crosshair;
+    `;
+    const overlayCtx = overlayCanvas.getContext('2d')!;
+    overlayCtx.scale(dpr, dpr);
+    wrapper.appendChild(overlayCanvas);
+    overlayCanvases.set(pageNum, overlayCanvas);
+    persistentRects.set(pageNum, []);
+    tempRects.set(pageNum, null);
 
     const textContent = await page.getTextContent();
     textContentCache.set(pageNum, textContent);
@@ -271,7 +326,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
       let translateBtn: HTMLButtonElement | null = null;
       let translateBtnBlock: PdfTextBlock | null = null;
 
-      function getOrCreateTranslateBtn(): HTMLButtonElement {
+      const getOrCreateTranslateBtn = (): HTMLButtonElement => {
         if (!translateBtn) {
           translateBtn = document.createElement("button");
           translateBtn.className = "pdf-translate-btn";
@@ -283,7 +338,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
           wrapper.appendChild(translateBtn);
         }
         return translateBtn;
-      }
+      };
 
       textLayerDiv.addEventListener("mousemove", (e) => {
         const me = e as MouseEvent;
@@ -318,183 +373,94 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
       });
     }
     if (opts.onTextSelected) {
-      let mouseDownPageX = 0, mouseDownPageY = 0;
-      let lastMouseUpTime = 0;
-      textLayerDiv.addEventListener("mousedown", (e) => {
-        const me = e as MouseEvent;
-        const wrapperRect = wrapper.getBoundingClientRect();
-        mouseDownPageX = (me.clientX - wrapperRect.left) / scale;
-        mouseDownPageY = (me.clientY - wrapperRect.top) / scale;
-        console.log('[pdf] mousedown on textLayer page', pageNum);
+      const pageH = viewport.height / scale;
+      let dragging = false;
+      let downPdfX = 0, downPdfY = 0;
+      let downScreenX = 0, downScreenY = 0;
+
+      overlayCanvas.addEventListener('mousedown', (e) => {
+        if (tempRects.get(pageNum)) {
+          tempRects.set(pageNum, null);
+          redrawOverlay(pageNum);
+        }
+        dragging = true;
+        const rect = wrapper.getBoundingClientRect();
+        downScreenX = e.clientX;
+        downScreenY = e.clientY;
+        downPdfX = (e.clientX - rect.left) / scale;
+        downPdfY = (e.clientY - rect.top) / scale;
+        e.preventDefault();
       });
 
-      textLayerDiv.addEventListener("dblclick", (e) => {
-        const me = e as MouseEvent;
-        const wrapperRect = wrapper.getBoundingClientRect();
-        const clickPageX = (me.clientX - wrapperRect.left) / scale;
-        const clickPageY = (me.clientY - wrapperRect.top) / scale;
-        const pageH = viewport.height / scale;
-        const allItems = textContent.items as PdfPageTextItem[];
-
-        // Find closest item (same logic as mouseup)
-        let closestIdx = -1;
-        let closestDist = Infinity;
-        for (let i = 0; i < allItems.length; i++) {
-          const item = allItems[i];
-          const fontH = item.height || Math.abs(item.transform[3]) || 12;
-          const baselineScreenY = pageH - item.transform[5];
-          const ix = item.transform[4];
-          const iRight = ix + Math.abs(item.width);
-          const iy = baselineScreenY - fontH;
-          const iBottom = baselineScreenY + fontH * 0.3;
-          const cx = ix + Math.abs(item.width) / 2;
-          const cy = baselineScreenY - fontH * 0.5;
-          const hOverlap = ix < clickPageX + 20 && iRight > clickPageX - 20;
-          const vOverlap = clickPageY >= iy && clickPageY <= iBottom;
-          if (hOverlap && vOverlap) {
-            const dist = Math.sqrt((cx - clickPageX) ** 2 + (cy - clickPageY) ** 2);
-            if (dist < closestDist) { closestDist = dist; closestIdx = i; }
-          }
-        }
-        if (closestIdx === -1) {
-          for (let i = 0; i < allItems.length; i++) {
-            const item = allItems[i];
-            const fontH = item.height || Math.abs(item.transform[3]) || 12;
-            const baselineScreenY = pageH - item.transform[5];
-            const ix = item.transform[4];
-            const iRight = ix + Math.abs(item.width);
-            const cy = baselineScreenY - fontH * 0.5;
-            if (ix < clickPageX + 20 && iRight > clickPageX - 20) {
-              const dy = Math.abs(cy - clickPageY);
-              if (dy < closestDist) { closestDist = dy; closestIdx = i; }
-            }
-          }
-        }
-        if (closestIdx === -1) return;
-
-        const classifications = classifyPageItems(allItems);
-        const [startIdx, endIdx] = expandDblClick(allItems, classifications, closestIdx);
-        const selectedText = allItems.slice(startIdx, endIdx + 1).map(it => it.str).join(' ').trim();
-        const CONTEXT_ITEMS = 10;
-        const prefix = allItems.slice(Math.max(0, startIdx - CONTEXT_ITEMS), startIdx).map(it => it.str).join(' ').trim();
-        const suffix = allItems.slice(endIdx + 1, Math.min(allItems.length, endIdx + 1 + CONTEXT_ITEMS)).map(it => it.str).join(' ').trim();
-        console.log('[pdf] dblclick expand:', { pageNum, startIdx, endIdx, cls: classifications[closestIdx] });
-        opts.onTextSelected!(pageNum, selectedText, prefix, suffix, me.clientX, me.clientY, startIdx, endIdx);
+      overlayCanvas.addEventListener('mousemove', (e) => {
+        if (!dragging) return;
+        const rect = wrapper.getBoundingClientRect();
+        const curX = (e.clientX - rect.left) / scale;
+        const curY = (e.clientY - rect.top) / scale;
+        tempRects.set(pageNum, {
+          x1: Math.min(downPdfX, curX), y1: Math.min(downPdfY, curY),
+          x2: Math.max(downPdfX, curX), y2: Math.max(downPdfY, curY),
+          style: 'blue'
+        });
+        redrawOverlay(pageNum);
       });
 
-      textLayerDiv.addEventListener("mouseup", (e) => {
-        // Suppress if two mouseups came within 300ms — this is a double-click, let dblclick handler take over
-        const now = Date.now();
-        const isDoubleClick = now - lastMouseUpTime < 300;
-        lastMouseUpTime = now;
-        if (isDoubleClick) return;
-        const sel = window.getSelection();
-        console.log('[pdf] mouseup on textLayer page', pageNum, 'collapsed:', sel?.isCollapsed);
-        if (!sel || sel.isCollapsed) return;
-        const me = e as MouseEvent;
-        const wrapperRect = wrapper.getBoundingClientRect();
-        const mouseUpPageX = (me.clientX - wrapperRect.left) / scale;
-        const mouseUpPageY = (me.clientY - wrapperRect.top) / scale;
-        const pageH = viewport.height / scale;
-        // Build rect from mousedown→mouseup in page coords
-        const selLeft = Math.min(mouseDownPageX, mouseUpPageX);
-        const selRight = Math.max(mouseDownPageX, mouseUpPageX);
-        const selTop = Math.min(mouseDownPageY, mouseUpPageY);
-        const selBottom = Math.max(mouseDownPageY, mouseUpPageY);
-        const allItems = textContent.items as PdfPageTextItem[];
-        const selectedIndices: number[] = [];
-
-        // Simplest robust approach: use the single item at selection center.
-        // This gives stable anchor (single item index) and avoids partial-word issues.
-
-        function itemVisualBounds(item: PdfPageTextItem) {
-          const fontH = item.height || Math.abs(item.transform[3]) || 12;
-          // PDF Y: 0 at bottom, grows upward. Screen Y: 0 at top, grows downward.
-          // transform[5] is baseline in PDF coords. Convert to screen Y:
-          const baselineScreenY = pageH - item.transform[5];
-          // Text extends from (baseline - ascent) to (baseline + descent)
-          // Approximate ascent ≈ fontH, descent ≈ fontH * 0.3
-          return {
-            ix: item.transform[4],
-            iy: baselineScreenY - fontH,          // top of text
-            iRight: item.transform[4] + Math.abs(item.width),
-            iBottom: baselineScreenY + fontH * 0.3, // bottom of text (descenders)
-            cx: item.transform[4] + Math.abs(item.width) / 2,
-            cy: baselineScreenY - fontH * 0.5,      // visual center
-          };
+      overlayCanvas.addEventListener('mouseup', (e) => {
+        if (!dragging) return;
+        dragging = false;
+        const dx = Math.abs(e.clientX - downScreenX);
+        const dy = Math.abs(e.clientY - downScreenY);
+        if (dx < 5 && dy < 5) {
+          tempRects.set(pageNum, null);
+          redrawOverlay(pageNum);
+          return;
         }
+        const rect = wrapper.getBoundingClientRect();
+        const upPdfX = (e.clientX - rect.left) / scale;
+        const upPdfY = (e.clientY - rect.top) / scale;
 
-        // Find item closest to selection center that horizontally overlaps
-        const selCenterX = (selLeft + selRight) / 2;
-        const selCenterY = (selTop + selBottom) / 2;
+        tempRects.set(pageNum, {
+          x1: Math.min(downPdfX, upPdfX), y1: Math.min(downPdfY, upPdfY),
+          x2: Math.max(downPdfX, upPdfX), y2: Math.max(downPdfY, upPdfY),
+          style: 'blue'
+        });
+        redrawOverlay(pageNum);
 
-        let closestIdx = -1;
-        let closestDist = Infinity;
+        const allItems = (textContentCache.get(pageNum)?.items || []) as PdfPageTextItem[];
+        const result = coordPath(allItems, pageH, downPdfX, downPdfY, upPdfX, upPdfY);
+        if (!result.text || result.hits.length === 0) return;
 
-        for (let i = 0; i < allItems.length; i++) {
-          const bounds = itemVisualBounds(allItems[i]);
-          // Must horizontally overlap the selection
-          const hOverlap = bounds.ix < selRight && bounds.iRight > selLeft;
-          // Selection center Y must be within item's vertical bounds
-          const vOverlap = selCenterY >= bounds.iy && selCenterY <= bounds.iBottom;
+        const startItemIdx = result.hits[0];
+        const endItemIdx = result.hits[result.hits.length - 1];
 
-          if (hOverlap && vOverlap) {
-            const dx = bounds.cx - selCenterX;
-            const dy = bounds.cy - selCenterY;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < closestDist) {
-              closestDist = dist;
-              closestIdx = i;
-            }
-          }
-        }
+        (window as any).__pdfPendingRectCoords = {
+          pageNum,
+          x1: Math.min(downPdfX, upPdfX),
+          y1: Math.min(downPdfY, upPdfY),
+          x2: Math.max(downPdfX, upPdfX),
+          y2: Math.max(downPdfY, upPdfY),
+        };
 
-        // Fallback: if no item matches vOverlap, just find closest by Y distance
-        if (closestIdx === -1) {
-          for (let i = 0; i < allItems.length; i++) {
-            const bounds = itemVisualBounds(allItems[i]);
-            const hOverlap = bounds.ix < selRight && bounds.iRight > selLeft;
-            if (hOverlap) {
-              const dy = Math.abs(bounds.cy - selCenterY);
-              if (dy < closestDist) {
-                closestDist = dy;
-                closestIdx = i;
-              }
-            }
-          }
-        }
-
-        if (closestIdx === -1) return;
-
-        const startItemIdx = closestIdx;
-        const endItemIdx = closestIdx;
-
-        // sel.toString() is reliable regardless of span granularity
-        const extracted = sel.toString().trim();
-        const selectedText = extracted || allItems[closestIdx].str;
-
-        // Store cloned Range so openComposerFromPending can insert yellow underline mark
-        if (sel.rangeCount > 0) {
-          (window as any).__pdfPendingSelectionRange = { range: sel.getRangeAt(0).cloneRange(), textLayerDiv };
-        }
-
-        console.log('[pdf] selectedText:', selectedText);
-        console.log('[pdf] item anchor:', { pageNum, startItemIdx, endItemIdx });
-
-        // Context: items before and after
         const CONTEXT_ITEMS = 10;
-        const prefix = allItems
-          .slice(Math.max(0, startItemIdx - CONTEXT_ITEMS), startItemIdx)
-          .map(it => it.str)
-          .join(" ")
-          .trim();
-        const suffix = allItems
-          .slice(endItemIdx + 1, Math.min(allItems.length, endItemIdx + 1 + CONTEXT_ITEMS))
-          .map(it => it.str)
-          .join(" ")
-          .trim();
+        const prefix = allItems.slice(Math.max(0, startItemIdx - CONTEXT_ITEMS), startItemIdx).map(it => it.str).join(' ').trim();
+        const suffix = allItems.slice(endItemIdx + 1, Math.min(allItems.length, endItemIdx + 1 + CONTEXT_ITEMS)).map(it => it.str).join(' ').trim();
 
-        opts.onTextSelected!(pageNum, selectedText, prefix, suffix, me.clientX, me.clientY, startItemIdx, endItemIdx);
+        opts.onTextSelected!(pageNum, result.text, prefix, suffix, e.clientX, e.clientY, startItemIdx, endItemIdx);
+      });
+
+      overlayCanvas.addEventListener('click', (e) => {
+        if (opts.onAnnotationClick) {
+          const rect = wrapper.getBoundingClientRect();
+          const clickX = (e.clientX - rect.left) / scale;
+          const clickY = (e.clientY - rect.top) / scale;
+          const perPage = persistentRects.get(pageNum) || [];
+          for (const r of perPage) {
+            if (clickX >= r.x1 && clickX <= r.x2 && clickY >= r.y1 && clickY <= r.y2) {
+              opts.onAnnotationClick(r.annotationId, e.clientX, e.clientY);
+              break;
+            }
+          }
+        }
       });
     }
 
@@ -666,8 +632,47 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     }
   }
 
+  function renderRectHighlight(pageNum: number, x1: number, y1: number, x2: number, y2: number, annotationId: string) {
+    if (!rendered.has(pageNum)) return;
+    const wrapper = pageWrappers[pageNum - 1];
+    if (!wrapper) return;
+
+    const perPage = persistentRects.get(pageNum) || [];
+    perPage.push({ annotationId, x1, y1, x2, y2 });
+    persistentRects.set(pageNum, perPage);
+    redrawOverlay(pageNum);
+
+    const anchor = document.createElement('div');
+    anchor.className = 'pdf-rect-anchor';
+    anchor.dataset.annotationId = annotationId;
+    anchor.style.cssText = `position:absolute;top:${y1 * scale}px;left:${x1 * scale}px;width:0;height:0;pointer-events:none;`;
+    wrapper.appendChild(anchor);
+  }
+
+  function drawTempRect(pageNum: number, x1: number, y1: number, x2: number, y2: number, style: 'blue' | 'yellow') {
+    tempRects.set(pageNum, { x1, y1, x2, y2, style });
+    redrawOverlay(pageNum);
+  }
+
+  function clearTempRect(pageNum?: number) {
+    if (pageNum !== undefined) {
+      tempRects.set(pageNum, null);
+      redrawOverlay(pageNum);
+    } else {
+      tempRects.forEach((_, pn) => {
+        tempRects.set(pn, null);
+        redrawOverlay(pn);
+      });
+    }
+  }
+
   function clearHighlights() {
-    // Unwrap <mark> elements inserted by sub-word highlighting
+    persistentRects.forEach((_, pageNum) => {
+      persistentRects.set(pageNum, []);
+      redrawOverlay(pageNum);
+    });
+    el.querySelectorAll('.pdf-rect-anchor').forEach(node => node.remove());
+
     el.querySelectorAll("mark.pdf-highlight").forEach((mark) => {
       const parent = mark.parentNode;
       if (!parent) return;
@@ -707,7 +712,15 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
   function getRenderedCount(): number { return rendered.size; }
   function getTotalPages(): number { return numPages; }
 
-  return { el, destroy, scrollToPage, highlightQuote, highlightByItemRange, clearHighlights, clearSelectionMark, getTextBlocks, getRenderedCount, getTotalPages };
+  return {
+    el, destroy, scrollToPage,
+    highlightQuote, highlightByItemRange, clearHighlights, clearSelectionMark,
+    renderRectHighlight,
+    getTextBlocks, getRenderedCount, getTotalPages,
+    drawTempRect, clearTempRect,
+    get onAnnotationClick() { return opts.onAnnotationClick; },
+    set onAnnotationClick(fn: ((annotationId: string, clientX: number, clientY: number) => void) | undefined) { opts.onAnnotationClick = fn; },
+  };
 }
 
 function buildTextBlocks(pageNum: number, items: PdfPageTextItem[], viewport: any, scale: number): PdfTextBlock[] {
@@ -748,6 +761,99 @@ function itemsToBlock(pageNum: number, items: PdfPageTextItem[], viewport: any, 
 
 function findBlockAtY(blocks: PdfTextBlock[], clickY: number): PdfTextBlock | null {
   return blocks.find(b => clickY >= b.y - 2 && clickY <= b.y + b.height + 4) ?? null;
+}
+
+interface CoordHitDetail {
+  idx: number;
+  str: string;
+  startChar: number;
+  endChar: number;
+  slice: string;
+  itemX: string;
+  itemWidth: string;
+}
+
+interface CoordPathResult {
+  text: string | null;
+  hits: number[];
+  detail: CoordHitDetail[];
+}
+
+function coordPath(
+  items: PdfPageTextItem[],
+  pageH: number,
+  downX: number,
+  downY: number,
+  upX: number,
+  upY: number
+): CoordPathResult {
+  const deltaY = Math.abs(downY - upY);
+  const isMultiLine = deltaY > 5;
+
+  let startX: number, startY: number, endX: number, endY: number;
+  if (isMultiLine) {
+    const reversed = downY > upY;
+    startX = reversed ? upX : downX; startY = reversed ? upY : downY;
+    endX = reversed ? downX : upX;   endY = reversed ? downY : upY;
+  } else {
+    const reversed = downX > upX;
+    startX = reversed ? upX : downX; startY = reversed ? upY : downY;
+    endX = reversed ? downX : upX;   endY = reversed ? downY : upY;
+  }
+
+  const selLeft = Math.min(startX, endX);
+  const selRight = Math.max(startX, endX);
+  const selTop = Math.min(startY, endY);
+  const selBottom = Math.max(startY, endY);
+  const normDownX = startX;
+  const normUpX = endX;
+
+  const hits: Array<{ idx: number; it: PdfPageTextItem; ix: number; iy: number; ix2: number; iy2: number; fontH: number }> = [];
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    if (!it.str.trim()) continue;
+    const fontH = it.height || Math.abs(it.transform[3]) || 12;
+    const baselineY = pageH - it.transform[5];
+    const ix = it.transform[4];
+    const iy = baselineY - fontH;
+    const ix2 = ix + Math.abs(it.width);
+    const iy2 = baselineY + fontH * 0.3;
+    if (ix < selRight && ix2 > selLeft && iy < selBottom && iy2 > selTop) {
+      hits.push({ idx: i, it, ix, iy, ix2, iy2, fontH });
+    }
+  }
+
+  if (hits.length === 0) return { text: null, hits: [], detail: [] };
+
+  hits.sort((a, b) => (a.iy - b.iy) || (a.ix - b.ix));
+
+  const parts: string[] = [];
+  const detail: CoordHitDetail[] = [];
+
+  for (let i = 0; i < hits.length; i++) {
+    const { it, ix, ix2 } = hits[i];
+    const str = it.str;
+    const strLen = str.length;
+    let startChar = 0;
+    let endChar = strLen;
+    if (i === 0) {
+      const xInItem = Math.max(0, Math.min(normDownX - ix, ix2 - ix));
+      startChar = Math.round((xInItem / (ix2 - ix)) * strLen);
+    }
+    if (i === hits.length - 1) {
+      const xInItem = Math.max(0, Math.min(normUpX - ix, ix2 - ix));
+      endChar = Math.round((xInItem / (ix2 - ix)) * strLen);
+    }
+    const slice = str.slice(startChar, endChar).trim();
+    if (slice) parts.push(slice);
+    detail.push({
+      idx: hits[i].idx, str: str.slice(0, 40),
+      startChar, endChar, slice,
+      itemX: ix.toFixed(1), itemWidth: (ix2 - ix).toFixed(1)
+    });
+  }
+
+  return { text: parts.join(' ').trim() || null, hits: hits.map(h => h.idx), detail };
 }
 
 function getSelectionContext(items: PdfPageTextItem[], selectedText: string): { prefix: string; suffix: string } {

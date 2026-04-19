@@ -46,3 +46,27 @@ describe('extractMdToc', () => {
     ]);
   });
 });
+
+import { extractPdfOutline } from '../../src/client/toc-extractor';
+
+describe('extractPdfOutline', () => {
+  it('converts flat pdf outline to TocItem tree', () => {
+    const pdfOutline = [
+      { title: 'Chapter 1', dest: null, items: [
+        { title: '1.1 Intro', dest: null, items: [] }
+      ]},
+      { title: 'Chapter 2', dest: null, items: [] }
+    ];
+    const toc = extractPdfOutline(pdfOutline);
+    expect(toc).toEqual([
+      { title: 'Chapter 1', level: 1, pageNum: undefined, children: [
+        { title: '1.1 Intro', level: 2, pageNum: undefined, children: [] }
+      ]},
+      { title: 'Chapter 2', level: 1, pageNum: undefined, children: [] }
+    ]);
+  });
+
+  it('returns empty array for null outline', () => {
+    expect(extractPdfOutline(null)).toEqual([]);
+  });
+});

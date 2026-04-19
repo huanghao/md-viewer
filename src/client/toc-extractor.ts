@@ -51,3 +51,23 @@ function buildTree(flat: TocItem[]): TocItem[] {
 
   return root;
 }
+
+interface PdfOutlineNode {
+  title: string;
+  dest: unknown;
+  items: PdfOutlineNode[];
+}
+
+export function extractPdfOutline(outline: PdfOutlineNode[] | null): TocItem[] {
+  if (!outline) return [];
+  return convertOutlineNodes(outline, 1);
+}
+
+function convertOutlineNodes(nodes: PdfOutlineNode[], level: number): TocItem[] {
+  return nodes.map(node => ({
+    title: node.title || '',
+    level,
+    pageNum: undefined,  // dest 解析在 Task 3 完成
+    children: convertOutlineNodes(node.items || [], level + 1),
+  }));
+}

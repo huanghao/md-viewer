@@ -41,19 +41,19 @@ export function renderTocPanel(
   container.innerHTML = renderItems(toc, startIdx);
   sidebar?.classList.add('toc-visible');
 
-  // Ensure header exists in toc-pane
+  // Ensure header exists in toc-pane (created once, persists across re-renders)
   if (pane && !pane.querySelector('.toc-header')) {
     const header = document.createElement('div');
     header.className = 'toc-header';
     header.innerHTML = `
       <span class="toc-header-label">目录</span>
-      <button class="toc-toggle-btn" id="tocToggleBtn" title="关闭目录" aria-label="关闭目录">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 4l8 8M12 4l-8 8"/>
+      <button class="toc-toggle-btn" title="收起目录" aria-label="收起目录">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 10l4 4 4-4"/>
         </svg>
       </button>`;
     pane.insertBefore(header, pane.firstChild);
-    header.querySelector('#tocToggleBtn')?.addEventListener('click', () => {
+    header.querySelector('.toc-toggle-btn')?.addEventListener('click', () => {
       sidebar?.classList.remove('toc-visible');
     });
   }
@@ -67,13 +67,16 @@ export function renderTocPanel(
   });
 }
 
-export function setActiveTocItem(container: HTMLElement, pageNum?: number, anchor?: string): void {
+export function setActiveTocItem(container: HTMLElement, pageNum?: number, titleOrAnchor?: string): void {
   container.querySelectorAll('.toc-item').forEach(el => el.classList.remove('active'));
   if (pageNum !== undefined) {
     const el = container.querySelector<HTMLElement>(`.toc-item[data-page="${pageNum}"]`);
     el?.classList.add('active');
-  } else if (anchor) {
-    const el = container.querySelector<HTMLElement>(`.toc-item[data-anchor="${anchor}"]`);
+  } else if (titleOrAnchor) {
+    // Try title match first (MD), then anchor match (fallback)
+    let el = Array.from(container.querySelectorAll<HTMLElement>('.toc-item'))
+      .find(e => e.textContent?.trim() === titleOrAnchor);
+    if (!el) el = container.querySelector<HTMLElement>(`.toc-item[data-anchor="${titleOrAnchor}"]`) ?? undefined;
     el?.classList.add('active');
   }
 }

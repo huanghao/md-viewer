@@ -151,6 +151,7 @@ async function onFileLoaded(data: FileData, focus: boolean = false) {
   renderSidebar();
   renderContent();
   syncAnnotationsForCurrentFile(shouldFocus && previousFile !== data.path);
+  if (shouldFocus) updateToc(data.path);
 }
 
 export function scrollContentToTop(): void {
@@ -338,16 +339,29 @@ async function updateToc(filePath: string): Promise<void> {
     const file = state.sessionFiles.get(filePath);
     const content = file?.content ?? '';
     const toc = extractMdToc(content);
-    renderTocPanel(panel, toc, item => {
-      if (item.anchor) {
-        const el = document.getElementById(item.anchor);
-        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // Jump by matching heading text, since marked doesn't generate ids by default
+    const jumpToMdHeading = (title: string) => {
+      const headings = Array.from(document.querySelectorAll<HTMLElement>('#reader h1, #reader h2, #reader h3'));
+      const target = headings.find(h => h.textContent?.trim() === title);
+      if (target) {
+        const contentEl = document.getElementById('content');
+        if (contentEl) {
+          contentEl.scrollTo({ top: target.offsetTop - 8, behavior: 'smooth' });
+        } else {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
       }
-    });
+    };
+
+    renderTocPanel(panel, toc, item => jumpToMdHeading(item.title));
 
     // Highlight active TOC item on scroll
     const contentEl = document.getElementById('content');
     if (contentEl && panel) {
+      const headingTitles = toc.length > 0
+        ? Array.from(document.querySelectorAll<HTMLElement>('#reader h1, #reader h2, #reader h3'))
+        : [];
       const onScroll = () => {
         const headings = Array.from(document.querySelectorAll<HTMLElement>('#reader h1, #reader h2, #reader h3'));
         if (!headings.length) return;
@@ -356,7 +370,8 @@ async function updateToc(filePath: string): Promise<void> {
         for (const h of headings) {
           if (h.offsetTop <= scrollTop + 80) current = h;
         }
-        if (current?.id) setActiveTocItem(panel, undefined, current.id);
+        const title = current?.textContent?.trim() ?? '';
+        if (title) setActiveTocItem(panel, undefined, title);
       };
       // Remove previous listener if any
       const prev = (contentEl as any).__tocScrollHandler;
@@ -1321,6 +1336,10 @@ async function switchFile(path: string) {
   switchToFile(path);
   renderSidebar();
 
+  // Immediately clear TOC to avoid showing stale content during transition
+  const tocPanel = document.getElementById('tocPanel');
+  if (tocPanel) tocPanel.innerHTML = '<div class="toc-empty">加载中…</div>';
+
   renderContent();
   if (!path.endsWith('.pdf')) updateToc(path);
   syncAnnotationsForCurrentFile(true);
@@ -1335,6 +1354,9 @@ function removeFileHandler(path: string) {
   renderSidebar();
   renderContent();
   syncAnnotationsForCurrentFile(true);
+  // Clear TOC when file is closed
+  const panel = document.getElementById('tocPanel');
+  if (panel) renderTocPanel(panel, [], () => {});
 }
 
 // 搜索文件

@@ -2,17 +2,13 @@ import type { TocItem } from '../toc-extractor';
 
 export type TocJumpFn = (item: TocItem) => void;
 
-let _flatItems: TocItem[] = [];
-
-function renderItems(items: TocItem[], startIdx: { v: number }): string {
+function renderItems(items: TocItem[]): string {
   return items.map(item => {
-    const idx = startIdx.v++;
     const pageBadge = item.pageNum ? `<span class="toc-page-badge">${item.pageNum}</span>` : '';
     return `<a class="toc-item" data-level="${item.level}"
        data-page="${item.pageNum ?? ''}"
        data-anchor="${item.anchor ?? ''}"
-       data-idx="${idx}"
-       title="${item.title}"><span class="toc-level-badge">#${item.level}</span><span class="toc-item-title">${item.title}</span>${pageBadge}</a>${renderItems(item.children, startIdx)}`;
+       title="${item.title}"><span class="toc-level-badge">#${item.level}</span><span class="toc-item-title">${item.title}</span>${pageBadge}</a>${renderItems(item.children)}`;
   }).join('');
 }
 
@@ -47,9 +43,8 @@ export function renderTocPanel(
     return;
   }
 
-  _flatItems = flattenToc(toc);
-  const startIdx = { v: 0 };
-  container.innerHTML = renderItems(toc, startIdx);
+  const flatItems = flattenToc(toc);
+  container.innerHTML = renderItems(toc);
   sidebar?.classList.add('toc-has-content');
   // toc-visible is managed by caller (per-file preference)
 
@@ -74,8 +69,12 @@ export function renderTocPanel(
 
   container.querySelectorAll<HTMLElement>('.toc-item').forEach(el => {
     el.addEventListener('click', () => {
-      const idx = parseInt(el.dataset.idx ?? '0', 10);
-      const item = _flatItems[idx];
+      // Match by title attribute (unique enough for navigation)
+      const title = el.title;
+      const pageNum = el.dataset.page ? parseInt(el.dataset.page, 10) : undefined;
+      const item = flatItems.find(t =>
+        t.title === title && (pageNum === undefined || t.pageNum === pageNum)
+      );
       if (item) onJump(item);
     });
   });

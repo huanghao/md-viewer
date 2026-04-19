@@ -16,7 +16,10 @@ body { font-family: -apple-system, sans-serif; font-size: 13px; background: #f5f
 }
 .page-wrapper { position: relative; box-shadow: 0 2px 8px rgba(0,0,0,.4); background: white; cursor: crosshair; }
 .page-wrapper canvas { display: block; }
-.pdf-text-layer { position: absolute; top:0; left:0; pointer-events:auto; user-select:text; }
+/* Canvas 拉框模式：TextLayer 不再捕获鼠标，也不允许文本选中 */
+.pdf-text-layer { position: absolute; top:0; left:0; pointer-events:none; user-select:none; }
+/* 拉框 overlay canvas：覆盖在最上层，捕获所有鼠标事件 */
+.select-overlay { position: absolute; top:0; left:0; pointer-events:auto; cursor:crosshair; }
 
 mark.frozen-sel {
   background: rgba(255,120,0,0.45);
@@ -127,7 +130,7 @@ button.submit-btn.done { background:#188038; }
   <div id="panel">
     <div id="panel-header">
       <h2>PDF 选中测试</h2>
-      <p>选区域 → 拖拽 → 三条路径各评价 → 提交</p>
+      <p id="mode-desc">Canvas 拉框模式：拖拽画矩形框选文字</p>
     </div>
 
     <div id="controls">
@@ -375,9 +378,9 @@ function coordPath(items, pageH, downX, downY, upX, upY) {
     const ix2 = ix + Math.abs(it.width);
     const iy2 = baselineY + fontH * 0.3;
 
-    const hOverlap = ix < selRight && ix2 > selLeft;
-    const vOverlap = iy < selBottom && iy2 > selTop;
-    if (hOverlap && vOverlap) {
+    const cx = (ix + ix2) / 2;
+    const cy = (iy + iy2) / 2;
+    if (cx >= selLeft && cx <= selRight && cy >= selTop && cy <= selBottom) {
       hits.push({ idx: i, it, ix, iy, ix2, iy2, fontH });
     }
   }
@@ -429,23 +432,67 @@ function coordPath(items, pageH, downX, downY, upX, upY) {
   };
 }
 
-// ── 事件绑定 ─────────────────────────────────────────────
+// ── 事件绑定（Canvas 拉框模式）─────────────────────────────
 function attachEvents(wrapper, tlDiv, pageNum, vp) {
   const pageH = vp.height / SCALE;
+
+  // 创建 overlay canvas（与 PDF canvas 同尺寸）
+  const dpr = window.devicePixelRatio || 1;
+  const overlay = document.createElement('canvas');
+  overlay.className = 'select-overlay';
+  overlay.width  = Math.floor(vp.width  * dpr);
+  overlay.height = Math.floor(vp.height * dpr);
+  overlay.style.cssText = `width:${vp.width}px;height:${vp.height}px`;
+  wrapper.appendChild(overlay);
+  const ctx = overlay.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  let dragging = false;
   let downScreenX = 0, downScreenY = 0;
   let downPdfX = 0, downPdfY = 0;
+  let curPdfX = 0, curPdfY = 0;
 
-  wrapper.addEventListener('mousedown', (e) => {
+  function clearOverlay() {
+    ctx.clearRect(0, 0, vp.width, vp.height);
+  }
+
+  function drawRect(x1, y1, x2, y2) {
+    clearOverlay();
+    const rx = Math.min(x1, x2) * SCALE;
+    const ry = Math.min(y1, y2) * SCALE;
+    const rw = Math.abs(x2 - x1) * SCALE;
+    const rh = Math.abs(y2 - y1) * SCALE;
+    ctx.fillStyle   = 'rgba(66,133,244,0.18)';
+    ctx.strokeStyle = 'rgba(66,133,244,0.9)';
+    ctx.lineWidth   = 1.5;
+    ctx.fillRect(rx, ry, rw, rh);
+    ctx.strokeRect(rx, ry, rw, rh);
+  }
+
+  overlay.addEventListener('mousedown', (e) => {
+    dragging = true;
     const rect = wrapper.getBoundingClientRect();
     downScreenX = e.clientX;
     downScreenY = e.clientY;
     downPdfX = (e.clientX - rect.left) / SCALE;
     downPdfY = (e.clientY - rect.top)  / SCALE;
+    curPdfX = downPdfX;
+    curPdfY = downPdfY;
+    clearOverlay();
+    e.preventDefault();
   });
 
-  wrapper.addEventListener('mouseup', (e) => {
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed) return;
+  overlay.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const rect = wrapper.getBoundingClientRect();
+    curPdfX = (e.clientX - rect.left) / SCALE;
+    curPdfY = (e.clientY - rect.top)  / SCALE;
+    drawRect(downPdfX, downPdfY, curPdfX, curPdfY);
+  });
+
+  overlay.addEventListener('mouseup', (e) => {
+    if (!dragging) return;
+    dragging = false;
 
     const rect = wrapper.getBoundingClientRect();
     const upScreenX = e.clientX;
@@ -453,34 +500,18 @@ function attachEvents(wrapper, tlDiv, pageNum, vp) {
     const upPdfX = (e.clientX - rect.left) / SCALE;
     const upPdfY = (e.clientY - rect.top)  / SCALE;
 
+    // 忽略点击（拖拽距离 < 4px）
+    const dx = Math.abs(upScreenX - downScreenX);
+    const dy = Math.abs(upScreenY - downScreenY);
+    if (dx < 4 && dy < 4) { clearOverlay(); return; }
+
+    // 保留矩形框（视觉反馈）
+    drawRect(downPdfX, downPdfY, upPdfX, upPdfY);
+
     const items = textContents[pageNum]?.items || [];
 
-    // 路径 1：sel.toString()
-    const path1 = sel.toString().replace(/\n/g,' ').trim();
-
-    // Range 信息（冻结前读）
-    let rangeInfo = null;
-    let path2 = null;
-    if (sel.rangeCount > 0) {
-      const range = sel.getRangeAt(0);
-      const sc = range.startContainer;
-      rangeInfo = {
-        startOffset: range.startOffset,
-        endOffset: range.endOffset,
-        sameContainer: sc === range.endContainer,
-        nodeText: sc.nodeType === 3 ? (sc.textContent || '').slice(0, 80) : null,
-      };
-      if (sc === range.endContainer && sc.nodeType === 3) {
-        path2 = expandLeftShrinkRight(sc.textContent || '', range.startOffset, range.endOffset);
-      }
-    }
-
-    // 路径 3：坐标映射
+    // 路径 3：坐标映射（唯一路径）
     const path3Result = coordPath(items, pageH, downPdfX, downPdfY, upPdfX, upPdfY);
-
-    // 冻结橙色高亮
-    clearFrozenMarks();
-    const { frozen: frozenText } = freezeSelection(sel);
 
     const pdfName = document.getElementById('pdf-select').value.split('/').pop() || '?';
     const regionOther = document.getElementById('region-other').value.trim();
@@ -489,6 +520,7 @@ function attachEvents(wrapper, tlDiv, pageNum, vp) {
     currentEntry = {
       id: Date.now(),
       pdf: pdfName, pageNum, region,
+      mode: 'canvas-rect',
       // 坐标原始数据
       coords: {
         downScreen: [downScreenX, downScreenY],
@@ -496,20 +528,14 @@ function attachEvents(wrapper, tlDiv, pageNum, vp) {
         downPdf:    [+downPdfX.toFixed(2), +downPdfY.toFixed(2)],
         upPdf:      [+upPdfX.toFixed(2),   +upPdfY.toFixed(2)],
       },
-      // 三条路径
-      path1,                              // sel.toString()
-      path2: path2 || null,               // 词边界扩展
-      path3: path3Result.text || null,    // 坐标映射
-      path3Detail: path3Result.detail,    // 坐标映射详情
-      // 冻结高亮
-      frozenText: frozenText || path1,
-      // Range 信息
-      rangeInfo,
+      // 路径3（坐标映射，唯一路径）
+      path3: path3Result.text || null,
+      path3Detail: path3Result.detail,
       // 用户输入
       userWanted: '',
       note: '',
-      // 反馈：每条路径各自评价
-      fb: { path1: null, path2: null, path3: null },
+      // 反馈
+      fb: { path3: null },
     };
 
     renderPanel(currentEntry);
@@ -523,56 +549,49 @@ function renderPanel(entry) {
   const main = document.getElementById('main');
   main.innerHTML = '';
 
-  const { frozenText, path1, path2, path3, rangeInfo, region, pdf, pageNum, coords } = entry;
+  const { path3, region, pageNum, coords } = entry;
 
-  // ── 橙色高亮展示 ──
-  const b0 = document.createElement('div');
-  b0.className = 'block';
-  b0.innerHTML = `
-    <div class="block-hd">
-      <span>橙色高亮（工具冻结）</span>
-      <span style="font-size:10px;color:#888">${regionLabels[region]||region} · p${pageNum}</span>
-    </div>
-    <div class="block-bd" style="font-family:monospace;font-size:13px;word-break:break-all">"${esc(frozenText||'—')}"</div>
-  `;
-  main.appendChild(b0);
-
-  // ── 橙色视觉反馈 ──
-  const bv = document.createElement('div');
-  bv.className = 'block';
-  bv.innerHTML = `
-    <div class="block-hd">① 橙色视觉范围 = 你拖选的范围？</div>
-    <div class="path-row" style="padding:6px 10px">
-      <span class="path-label" style="color:#555">视觉上</span>
-      <span class="path-value" style="color:#888;font-size:11px">橙色覆盖的字符是否就是你拖选的</span>
-      <div class="path-fb">
-        <button onclick="fbPath('visual',true,this)">✓</button>
-        <button onclick="fbPath('visual',false,this)">✗</button>
-      </div>
-    </div>
-  `;
-  main.appendChild(bv);
-  currentEntry.fb.visual = null;
-
-  // ── 三条路径对比 ──
+  // ── 坐标映射结果 ──
   const b1 = document.createElement('div');
   b1.className = 'block';
+  const resultColor = path3 ? '#333' : '#aaa';
   b1.innerHTML = `
-    <div class="block-hd">三条路径对比 — 每条各自评价</div>
-    <div class="block-bd" style="padding:0">
-      ${pathRow('path1', '路径1 sel.toString()', path1)}
-      ${pathRow('path2', '路径2 词边界扩展', path2)}
-      ${pathRow('path3', '路径3 坐标映射', path3)}
+    <div class="block-hd">
+      <span>坐标映射结果</span>
+      <span style="font-size:10px;color:#888">${regionLabels[region]||region} · p${pageNum}</span>
+    </div>
+    <div class="path-row">
+      <div class="path-row-top">
+        <span class="path-label">路径3 Canvas 拉框</span>
+        <div class="path-fb">
+          <button onclick="fbPath('path3',true,this)">✓ 准确</button>
+          <button onclick="fbPath('path3',false,this)">✗ 偏差</button>
+        </div>
+      </div>
+      <span class="path-value" style="color:${resultColor}">${path3 ? `"${esc(path3)}"` : '— 无命中'}</span>
     </div>
   `;
   main.appendChild(b1);
+
+  // ── 命中 item 列表 ──
+  if (entry.path3Detail?.length > 0) {
+    const bd = document.createElement('div');
+    bd.className = 'block';
+    const rows = entry.path3Detail.map(d => `
+      <div class="data-row">
+        <span class="dk">item#${d.idx}</span>
+        <span class="dv">"${esc(d.str.slice(0,40))}" → <b>"${esc(d.slice)}"</b> (char ${d.startChar}→${d.endChar})</span>
+      </div>`).join('');
+    bd.innerHTML = `<div class="block-hd">命中 ${entry.path3Detail.length} 个 item</div>${rows}`;
+    main.appendChild(bd);
+  }
 
   // ── 你想要的 ──
   const b2 = document.createElement('div');
   b2.className = 'block';
   b2.innerHTML = `
     <div class="block-hd">你实际想选的文字</div>
-    <input class="text-input" id="user-wanted" type="text" placeholder="填写你想要的文字"
+    <input class="text-input" id="user-wanted" type="text" placeholder="填写你想要的文字（如有偏差）"
       onblur="updateWanted(this.value)"
       onkeydown="if(event.key==='Enter')updateWanted(this.value)">
   `;
@@ -581,15 +600,12 @@ function renderPanel(entry) {
   // ── 技术数据 ──
   const b3 = document.createElement('div');
   b3.className = 'block';
-  const p3d = entry.path3Detail?.[0];
   b3.innerHTML = `
     <div class="block-hd">技术数据</div>
     <div class="data-row"><span class="dk">down PDF</span><span class="dv">(${coords.downPdf[0]}, ${coords.downPdf[1]})</span></div>
     <div class="data-row"><span class="dk">up PDF</span><span class="dv">(${coords.upPdf[0]}, ${coords.upPdf[1]})</span></div>
-    <div class="data-row"><span class="dk">sameContainer</span><span class="dv ${rangeInfo?.sameContainer?'ok':'warn'}">${rangeInfo?.sameContainer?'是':'否'}</span></div>
-    <div class="data-row"><span class="dk">range offset</span><span class="dv">${rangeInfo?.startOffset??'?'} → ${rangeInfo?.endOffset??'?'}</span></div>
-    ${p3d ? `<div class="data-row"><span class="dk">路径3命中</span><span class="dv">item#${p3d.idx} x=${p3d.itemX} w=${p3d.itemWidth}<br>charOffset ${p3d.startChar}→${p3d.endChar} → "${esc(p3d.slice)}"</span></div>` : ''}
-    <div class="data-row"><span class="dk">路径3命中数</span><span class="dv">${entry.path3Detail?.length??0} 个 item</span></div>
+    <div class="data-row"><span class="dk">选区宽×高</span><span class="dv">${Math.abs(coords.upPdf[0]-coords.downPdf[0]).toFixed(1)} × ${Math.abs(coords.upPdf[1]-coords.downPdf[1]).toFixed(1)} pt</span></div>
+    <div class="data-row"><span class="dk">命中 item 数</span><span class="dv">${entry.path3Detail?.length??0}</span></div>
   `;
   main.appendChild(b3);
 
@@ -667,23 +683,20 @@ function submitEntry() {
   if (wantedEl) currentEntry.userWanted = wantedEl.value.trim();
   if (noteEl)   currentEntry.note = noteEl.value.trim();
 
-  const { pdf, pageNum, region, frozenText, path1, path2, path3, userWanted, note, fb, coords, rangeInfo, path3Detail } = currentEntry;
+  const { pdf, pageNum, region, path3, userWanted, note, fb, coords, path3Detail } = currentEntry;
   const rl = regionLabels;
 
   const lines = [
-    `PDF: ${pdf}  页: ${pageNum}  区域: ${rl[region]||region}`,
+    `[Canvas 拉框] PDF: ${pdf}  页: ${pageNum}  区域: ${rl[region]||region}`,
     ``,
-    `橙色高亮（工具冻结）: "${frozenText||'—'}"  视觉准确: ${fb.visual===true?'✓ 是':fb.visual===false?'✗ 否':'未评价'}`,
-    `路径1 sel.toString():  "${path1||'—'}"  → ${fb.path1===true?'✓ 对':fb.path1===false?'✗ 错':'未评价'}`,
-    `路径2 词边界扩展:      "${path2||'—'}"  → ${fb.path2===true?'✓ 对':fb.path2===false?'✗ 错':'未评价'}`,
-    `路径3 坐标映射:        "${path3||'—'}"  → ${fb.path3===true?'✓ 对':fb.path3===false?'✗ 错':'未评价'}`,
-    `你想要的:              "${userWanted||'（未填）'}"`,
+    `路径3 坐标映射: "${path3||'—'}"  → ${fb.path3===true?'✓ 准确':fb.path3===false?'✗ 偏差':'未评价'}`,
+    `你想要的:       "${userWanted||'（未填）'}"`,
     `备注: ${note||'（无）'}`,
     ``,
     `--- 技术数据 ---`,
     `down PDF: (${coords.downPdf})  up PDF: (${coords.upPdf})`,
-    `sameContainer: ${rangeInfo?.sameContainer}  offset: ${rangeInfo?.startOffset}→${rangeInfo?.endOffset}`,
-    `路径3 命中 ${path3Detail?.length||0} 个 item${path3Detail?.[0] ? `: item#${path3Detail[0].idx} charOffset ${path3Detail[0].startChar}→${path3Detail[0].endChar}` : ''}`,
+    `选区: ${Math.abs(coords.upPdf[0]-coords.downPdf[0]).toFixed(1)} × ${Math.abs(coords.upPdf[1]-coords.downPdf[1]).toFixed(1)} pt`,
+    `命中 ${path3Detail?.length||0} 个 item${path3Detail?.[0] ? `: item#${path3Detail[0].idx} charOffset ${path3Detail[0].startChar}→${path3Detail[0].endChar}` : ''}`,
   ].join('\n');
 
   document.getElementById('output-text').value = lines;
@@ -728,6 +741,11 @@ function esc(s) {
 
 window.clearAll = function() {
   clearFrozenMarks();
+  // 清除所有 overlay canvas 上的矩形框
+  document.querySelectorAll('canvas.select-overlay').forEach(c => {
+    const ctx2 = c.getContext('2d');
+    ctx2.clearRect(0, 0, c.width, c.height);
+  });
   currentEntry = null;
   document.getElementById('main').innerHTML = '<div class="hint">已清空</div>';
   document.getElementById('output-text').value = '';

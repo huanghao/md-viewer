@@ -824,7 +824,11 @@ function coordPath(
     const iy = baselineY - fontH;
     const ix2 = ix + Math.abs(it.width);
     const iy2 = baselineY + fontH * 0.3;
-    if (ix < selRight && ix2 > selLeft && iy < selBottom && iy2 > selTop) {
+    // Use item center point instead of bounding box overlap to avoid
+    // accidentally capturing adjacent lines that barely touch the selection rect
+    const cx = (ix + ix2) / 2;
+    const cy = (iy + iy2) / 2;
+    if (cx >= selLeft && cx <= selRight && cy >= selTop && cy <= selBottom) {
       hits.push({ idx: i, it, ix, iy, ix2, iy2, fontH });
     }
   }

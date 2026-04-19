@@ -92,12 +92,13 @@ export function createPdfAnnotationBridge(opts: PdfAnnotationBridgeOptions): Pdf
   function handleAnnotationClick(annotationId: string, clientX: number, clientY: number) {
     const ann = opts.getAnnotations().find(a => a.id === annotationId);
     if (!ann) return;
-    // showPopover with dummy coords, then reposition to bottom-right via right/bottom
+    // Show popover then pin to bottom-right corner
     showPopover(ann, 0, 0);
     const popover = document.getElementById('annotationPopover');
     if (popover) {
-      popover.style.left = '';
-      popover.style.top = '';
+      // Clear left/top set by placeFloating, use right/bottom instead
+      popover.style.removeProperty('left');
+      popover.style.removeProperty('top');
       popover.style.right = '12px';
       popover.style.bottom = '12px';
     }

@@ -2,7 +2,7 @@
 import type { FileData } from './types';
 
 // 导入状态管理
-import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFileFromState, switchToFile, setSearchQuery, markFileMissing, getSessionFile } from './state';
+import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFileFromState, switchToFile, setSearchQuery, markFileMissing, getSessionFile, saveScrollPosition } from './state';
 import { clearListDiff, markWorkspaceModified, clearWorkspaceModified, markWorkspacePathMissing, clearWorkspacePathMissing } from './workspace-state';
 import { addWorkspace, hydrateExpandedWorkspaces, scanWorkspace, revealFileInWorkspace } from './workspace';
 
@@ -142,12 +142,9 @@ async function onFileLoaded(data: FileData, focus: boolean = false) {
   renderSidebar();
   renderContent();
   syncAnnotationsForCurrentFile(shouldFocus && previousFile !== data.path);
-  if (shouldFocus && previousFile !== data.path && !isPdfPath(data.path)) {
-    scrollContentToTop();
-  }
 }
 
-function scrollContentToTop(): void {
+export function scrollContentToTop(): void {
   const container = document.getElementById('content');
   if (!container) return;
   container.scrollTo({ top: 0, behavior: 'auto' });
@@ -532,6 +529,12 @@ function renderContent() {
   if (!container) return;
   if (!diffViewActive) container.classList.remove('diff-active');
 
+  // Save scroll position of the outgoing MD file before switching content.
+  const outgoingFile = container.getAttribute('data-current-file');
+  if (outgoingFile && !isPdfPath(outgoingFile) && outgoingFile !== state.currentFile) {
+    saveScrollPosition(outgoingFile, container.scrollTop);
+  }
+
   // Detach all PDF viewer elements from container so innerHTML resets don't destroy them.
   // Save scroll position before detaching so we can restore it when switching back.
   // Schedule eviction for PDFs that are no longer current.
@@ -698,6 +701,7 @@ function renderContent() {
     : '';
   container.innerHTML = `${deletedNotice}<div class="markdown-body" id="reader">${html}</div>`;
   container.setAttribute('data-current-file', file.path);
+  container.scrollTop = file.savedScrollTop ?? 0;
   rewriteMarkdownAssetUrls(container, file.path);
   void renderMermaidDiagrams(container);
   renderMath(container);
@@ -1028,9 +1032,6 @@ async function switchFile(path: string) {
 
   renderContent();
   syncAnnotationsForCurrentFile(true);
-  if (previousFile !== path && !isPdfPath(path)) {
-    scrollContentToTop();
-  }
   await updateToolbarButtons();
 }
 

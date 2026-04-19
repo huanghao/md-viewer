@@ -1036,6 +1036,16 @@ function autoResizeComposerInput(input: HTMLTextAreaElement): void {
   input.style.overflowY = input.scrollHeight > maxHeight ? 'auto' : 'hidden';
 }
 
+export function showPopoverBottomRight(ann: Annotation): void {
+  const el = getElements();
+  if (!el.popover) return;
+  showPopover(ann, 0, 0);
+  el.popover.style.removeProperty('left');
+  el.popover.style.removeProperty('top');
+  el.popover.style.right = '12px';
+  el.popover.style.bottom = '12px';
+}
+
 export function showPopover(ann: Annotation, x: number, y: number): void {
   const el = getElements();
   if (!el.popover || !el.popoverTitle || !el.popoverNote) return;

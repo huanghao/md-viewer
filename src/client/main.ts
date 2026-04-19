@@ -153,7 +153,10 @@ async function onFileLoaded(data: FileData, focus: boolean = false) {
   renderSidebar();
   renderContent();
   syncAnnotationsForCurrentFile(shouldFocus && previousFile !== data.path);
-  if (shouldFocus) updateToc(data.path);
+  if (shouldFocus) {
+    updateToc(data.path);
+    updateZoomDisplay();
+  }
 }
 
 export function scrollContentToTop(): void {

@@ -55,6 +55,7 @@ import {
   getTranslationStats,
   clearTranslationStats,
   loadTranslations,
+  unloadTranslations,
   getTranslations,
   translateBlock,
   retryTranslation,
@@ -413,9 +414,6 @@ async function updateToc(filePath: string): Promise<void> {
     // Highlight active TOC item on scroll
     const contentEl = document.getElementById('content');
     if (contentEl && panel) {
-      const headingTitles = toc.length > 0
-        ? Array.from(document.querySelectorAll<HTMLElement>('#reader h1, #reader h2, #reader h3'))
-        : [];
       const onScroll = () => {
         const headings = Array.from(document.querySelectorAll<HTMLElement>('#reader h1, #reader h2, #reader h3'));
         if (!headings.length) return;
@@ -440,11 +438,16 @@ async function updateToc(filePath: string): Promise<void> {
     if (item.pageNum) pdfViewerRegistry.get(filePath)?.viewer?.scrollToPage(item.pageNum);
   };
 
+  const showPdfToc = (toc: TocItem[]) => {
+    renderTocPanel(panel, toc, pdfJump);
+    applyTocVisibility(filePath);
+    attachPdfScrollHighlight(panel);
+  };
+
   // PDF: try sidecar first
   const sidecar = await loadSidecar(filePath);
   if (sidecar) {
-    renderTocPanel(panel, sidecar, pdfJump);
-    applyTocVisibility(filePath);
+    showPdfToc(sidecar);
     return;
   }
 
@@ -460,10 +463,8 @@ async function updateToc(filePath: string): Promise<void> {
     if (outline && outline.length > 0) {
       const toc = extractPdfOutline(outline);
       await resolveOutlinePageNums(outline, pdfDoc, toc);
-      // Cache as sidecar so next open is instant
       saveSidecar(filePath, toc).catch(() => {});
-      renderTocPanel(panel, toc, pdfJump);
-      applyTocVisibility(filePath);
+      showPdfToc(toc);
       return;
     }
   } catch { /* outline read failed, fall through to scan */ }
@@ -472,11 +473,31 @@ async function updateToc(filePath: string): Promise<void> {
   await scanPdfHeadings(
     filePath,
     viewer.getPdfDoc(),
-    toc => {
-      renderTocPanel(panel, toc, pdfJump);
-      applyTocVisibility(filePath);
-    }
+    toc => showPdfToc(toc)
   );
+}
+
+function attachPdfScrollHighlight(panel: HTMLElement): void {
+  const contentEl = document.getElementById('content');
+  if (!contentEl) return;
+
+  const onScroll = () => {
+    const wrappers = contentEl.querySelectorAll<HTMLElement>('.pdf-page-wrapper');
+    if (!wrappers.length) return;
+    const mid = contentEl.scrollTop + contentEl.clientHeight / 2;
+    let currentPage = 1;
+    for (const w of wrappers) {
+      if (w.offsetTop <= mid) currentPage = parseInt(w.dataset.page || '1', 10);
+    }
+    setActiveTocItem(panel, currentPage);
+  };
+
+  const prev = (contentEl as any).__tocScrollHandler;
+  if (prev) contentEl.removeEventListener('scroll', prev);
+  (contentEl as any).__tocScrollHandler = onScroll;
+  contentEl.addEventListener('scroll', onScroll);
+  // Run once immediately to set initial state
+  onScroll();
 }
 
 // 刷新当前文件（页面加载时自动调用）
@@ -880,6 +901,12 @@ function renderContent() {
   currentPdfBridge = null;
   container.removeAttribute('data-pdf');
 
+  // If switching away from PDF, clear translation list
+  if (!state.currentFile || !isPdfPath(state.currentFile)) {
+    unloadTranslations();
+    renderTranslationList(null, getTranslations, () => {}, () => {});
+  }
+
   if (!state.currentFile) {
     container.removeAttribute('data-current-file');
     container.innerHTML = `
@@ -923,9 +950,6 @@ function renderContent() {
     // Mark container as PDF mode — CSS handles padding adjustments
     container.setAttribute('data-pdf', '1');
 
-    // Load persisted translations for this file
-    loadTranslations(filePath);
-
     const refreshTranslationList = () => {
       renderTranslationList(
         filePath,
@@ -951,6 +975,10 @@ function renderContent() {
         .map(t => `${t.pageNum}:${t.startItemIdx}`));
       currentPdfViewer?.markTranslatedIcons(keys);
     };
+
+    // Load persisted translations and render immediately
+    loadTranslations(filePath);
+    refreshTranslationList();
 
     const clearBtn = document.getElementById('translationClearBtn');
     if (clearBtn) {

@@ -335,6 +335,26 @@ async function updateToc(filePath: string): Promise<void> {
         el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     });
+
+    // Highlight active TOC item on scroll
+    const contentEl = document.getElementById('content');
+    if (contentEl && panel) {
+      const onScroll = () => {
+        const headings = Array.from(document.querySelectorAll<HTMLElement>('#reader h1, #reader h2, #reader h3'));
+        if (!headings.length) return;
+        const scrollTop = contentEl.scrollTop;
+        let current = headings[0];
+        for (const h of headings) {
+          if (h.offsetTop <= scrollTop + 80) current = h;
+        }
+        if (current?.id) setActiveTocItem(panel, undefined, current.id);
+      };
+      // Remove previous listener if any
+      const prev = (contentEl as any).__tocScrollHandler;
+      if (prev) contentEl.removeEventListener('scroll', prev);
+      (contentEl as any).__tocScrollHandler = onScroll;
+      contentEl.addEventListener('scroll', onScroll);
+    }
     return;
   }
 
@@ -684,6 +704,74 @@ async function renderMermaidDiagrams(container: HTMLElement): Promise<void> {
   }
 }
 
+// ── PDF page indicator ────────────────────────────────────────────────────
+let pdfPageIndicatorScrollHandler: (() => void) | null = null;
+
+function mountPdfPageIndicator(viewer: PdfViewerInstance, container: HTMLElement): void {
+  const indicator = document.getElementById('pdfPageIndicator');
+  if (!indicator) return;
+  const label = indicator.querySelector<HTMLElement>('.pdf-page-indicator-label')!;
+  const input = indicator.querySelector<HTMLInputElement>('.pdf-page-indicator-input')!;
+  const total = viewer.getTotalPages();
+
+  function currentVisiblePage(): number {
+    const wrappers = container.querySelectorAll<HTMLElement>('.pdf-page-wrapper');
+    const mid = container.scrollTop + container.clientHeight / 2;
+    let best = 1;
+    for (const w of wrappers) {
+      if (w.offsetTop <= mid) best = parseInt(w.dataset.page || '1', 10);
+    }
+    return best;
+  }
+
+  function showLabel(): void {
+    label.textContent = `${currentVisiblePage()} / ${total}`;
+    label.style.display = '';
+    input.style.display = 'none';
+  }
+
+  function showInput(): void {
+    input.max = String(total);
+    input.value = String(currentVisiblePage());
+    label.style.display = 'none';
+    input.style.display = '';
+    input.focus();
+    input.select();
+  }
+
+  showLabel();
+  indicator.style.display = 'block';
+
+  pdfPageIndicatorScrollHandler = () => { if (input.style.display === 'none') showLabel(); };
+  container.addEventListener('scroll', pdfPageIndicatorScrollHandler, { passive: true });
+
+  indicator.addEventListener('click', (e) => {
+    if (e.target === input) return;
+    if (input.style.display === 'none') showInput();
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const page = Math.min(total, Math.max(1, parseInt(input.value, 10) || 1));
+      viewer.scrollToPage(page);
+      showLabel();
+    } else if (e.key === 'Escape') {
+      showLabel();
+    }
+  });
+
+  input.addEventListener('blur', () => showLabel());
+}
+
+function unmountPdfPageIndicator(container: HTMLElement): void {
+  const indicator = document.getElementById('pdfPageIndicator');
+  if (indicator) indicator.style.display = 'none';
+  if (pdfPageIndicatorScrollHandler) {
+    container.removeEventListener('scroll', pdfPageIndicatorScrollHandler);
+    pdfPageIndicatorScrollHandler = null;
+  }
+}
+
 function renderContent() {
   const container = document.getElementById('content');
   if (!container) return;
@@ -811,6 +899,9 @@ function renderContent() {
       container.setAttribute('data-current-file', filePath);
       renderBreadcrumb();
       updateToolbarButtons();
+      unmountScrollbar();
+      mountScrollbar();
+      mountPdfPageIndicator(existingEntry.viewer, container);
       return;
     }
 
@@ -855,6 +946,9 @@ function renderContent() {
           currentPdfBridge?.renderHighlights(getAnnotations());
         },
       });
+      unmountScrollbar();
+      mountScrollbar();
+      mountPdfPageIndicator(pdfViewerInstance, container);
       updateToc(filePath);
     });
     return; // don't fall through to markdown renderer
@@ -882,9 +976,10 @@ function renderContent() {
   // 更新面包屑
   renderBreadcrumb();
 
-  // 挂载自定义滚动条（仅 markdown 页面）
+  // 挂载自定义滚动条
   unmountScrollbar();
   mountScrollbar();
+  unmountPdfPageIndicator(container);
 
   // 更新工具栏按钮
   updateToolbarButtons();

@@ -25,6 +25,75 @@ export const styles = `
       display: flex;
       flex-direction: column;
       min-height: 0;
+      transition: width 0.18s ease, min-width 0.18s ease;
+    }
+    body.sidebar-collapsed .sidebar {
+      width: 0 !important;
+      min-width: 0 !important;
+      overflow: hidden;
+      border-right: none;
+    }
+    body.sidebar-collapsed .sidebar-resizer {
+      display: none;
+    }
+    .sidebar-search-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 8px 8px 0;
+    }
+    .sidebar-collapse-btn {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: transparent;
+      color: #57606a;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .sidebar-collapse-btn:hover {
+      background: #f6f8fa;
+      border-color: #0969da;
+      color: #0969da;
+    }
+    .sidebar-collapse-btn svg {
+      width: 16px;
+      height: 16px;
+    }
+    .sidebar-floating-open-btn {
+      position: fixed;
+      left: 8px;
+      top: 90px;
+      width: 32px;
+      height: 32px;
+      border: 1px solid #d0d7de;
+      border-radius: 8px;
+      background: #fff;
+      color: #57606a;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1);
+      z-index: 100;
+    }
+    body.sidebar-collapsed .sidebar-floating-open-btn {
+      display: inline-flex;
+    }
+    .sidebar-floating-open-btn:hover {
+      border-color: #0969da;
+      color: #0969da;
+      background: #f6f8fa;
+    }
+    .sidebar-floating-open-btn svg {
+      width: 16px;
+      height: 16px;
     }
     .sidebar-resizer {
       width: 8px;
@@ -100,7 +169,7 @@ export const styles = `
 
     #searchBox {
       height: 34px;
-      padding: 0 12px;
+      padding: 0;
       display: flex;
       align-items: center;
     }
@@ -2050,8 +2119,25 @@ export const styles = `
     .annotation-tabs {
       display: flex;
       flex-shrink: 0;
+      align-items: center;
       border-bottom: 1px solid #e1e4e8;
       background: #f6f8fa;
+      position: relative;
+    }
+    .annotation-tab-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 0 4px;
+      flex-shrink: 0;
+    }
+    .annotation-tab-actions-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+    }
+    .annotation-tab-actions-group.hidden {
+      display: none;
     }
     .annotation-tab {
       flex: 1;
@@ -2093,17 +2179,6 @@ export const styles = `
     }
     .translation-status-dot.down {
       background: #ef4444;
-    }
-
-    .translation-toolbar {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      padding: 2px 6px;
-      border-bottom: 1px solid #e1e4e8;
-      background: #fff;
-      flex-shrink: 0;
-      min-height: 34px;
     }
 
     /* 翻译列表 */
@@ -2238,31 +2313,6 @@ export const styles = `
       cursor: col-resize;
       user-select: none;
     }
-    .annotation-sidebar-header {
-      padding: 8px 10px;
-      border-bottom: 1px solid #e1e4e8;
-      background: #fff;
-      transition: padding 0.2s ease;
-      position: relative;
-    }
-    .annotation-header-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .annotation-sidebar-header h3 {
-      font-size: 13px;
-      font-weight: 600;
-      color: #24292e;
-      margin: 0;
-      white-space: nowrap;
-      overflow: hidden;
-    }
-    .annotation-header-actions {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
     .annotation-icon-btn {
       width: 30px;
       height: 30px;
@@ -2293,8 +2343,8 @@ export const styles = `
     }
     .annotation-filter-menu {
       position: absolute;
-      top: 36px;
-      right: 8px;
+      top: 34px;
+      right: 4px;
       display: flex;
       flex-direction: column;
       gap: 2px;

@@ -75,7 +75,12 @@ export function generateClientHTML(): string {
     <aside class="sidebar">
       <div class="sidebar-header">
         <!-- 搜索框 -->
-        <div id="searchBox"></div>
+        <div class="sidebar-search-row">
+          <div id="searchBox" style="flex:1;min-width:0;"></div>
+          <button class="sidebar-collapse-btn" id="sidebarCollapseBtn" title="收起侧边栏" aria-label="收起侧边栏">
+            <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5" fill="none"/><path d="M6 2.5v11"/></svg>
+          </button>
+        </div>
         <div id="modeSwitchRow"></div>
         <div class="quick-action-confirm-host">
           <div class="add-file-confirm" id="quickActionConfirm" style="display: none;">
@@ -92,6 +97,9 @@ export function generateClientHTML(): string {
       </div>
     </aside>
     <div class="sidebar-resizer" id="sidebarResizer" title="拖拽调整侧边栏宽度"></div>
+    <button class="sidebar-floating-open-btn" id="sidebarFloatingOpenBtn" title="展开侧边栏" aria-label="展开侧边栏">
+      <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5" fill="none"/><path d="M6 2.5v11"/><path d="M9 6l2 2-2 2"/></svg>
+    </button>
 
     <!-- 主区域 -->
     <main class="main">
@@ -168,20 +176,23 @@ export function generateClientHTML(): string {
       <div class="annotation-tabs" id="annotationTabs">
         <button class="annotation-tab is-active" data-tab="comments" onclick="switchAnnotationTab('comments')">评论<span class="annotation-tab-count" id="annotationTabCount"></span></button>
         <button class="annotation-tab" data-tab="translation" onclick="switchAnnotationTab('translation')">翻译<span class="annotation-tab-count" id="translationTabCount"></span><span class="translation-status-dot" id="translationStatusDot" title="翻译服务未连接"></span></button>
-      </div>
-      <div class="annotation-sidebar-header" id="annotationCommentsPanel">
-        <div class="annotation-header-row">
-          <div class="annotation-header-actions">
+        <div class="annotation-tab-actions">
+          <div class="annotation-tab-actions-group" id="annotationCommentsActions">
             <button class="annotation-icon-btn" id="annotationDensityToggle" title="切换默认/极简" aria-label="切换默认/极简">
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h10v1H3zm0 4h10v1H3zm0 4h10v1H3z"/></svg>
             </button>
             <button class="annotation-icon-btn" id="annotationFilterToggle" title="筛选" aria-label="筛选">
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12L9.5 8v4.5l-3-1.5V8z"/></svg>
             </button>
-            <button class="annotation-icon-btn" id="annotationSidebarClose" title="收起评论" aria-label="收起评论">
-              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.2 4.2L8 8l3.8-3.8 1 1L9 9l3.8 3.8-1 1L8 10l-3.8 3.8-1-1L7 9 3.2 5.2z"/></svg>
+          </div>
+          <div class="annotation-tab-actions-group hidden" id="annotationTranslationActions">
+            <button class="annotation-icon-btn" id="translationClearBtn" title="清空全部翻译" aria-label="清空全部翻译">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2h4v1H6zM3 4h10v1H3zm1 1.5h8l-.8 8H4.8L4 5.5zm2 1.5v5h1V7H6zm3 0v5h1V7H9z"/></svg>
             </button>
           </div>
+          <button class="annotation-icon-btn" id="annotationSidebarClose" title="收起评论" aria-label="收起评论">
+            <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="fill:none"><rect x="2" y="2.5" width="12" height="11" rx="1.5" fill="none"/><path d="M10 2.5v11"/></svg>
+          </button>
         </div>
         <div class="annotation-filter-menu hidden" id="annotationFilterMenu">
           <button class="annotation-filter-item" data-filter="all">全部</button>
@@ -193,16 +204,11 @@ export function generateClientHTML(): string {
       <div class="annotation-list" id="annotationList">
         <div class="annotation-empty">无评论（选中文本即可添加）</div>
       </div>
-      <div class="translation-toolbar" id="translationToolbar" style="display:none;">
-        <button class="annotation-icon-btn" id="translationClearBtn" title="清空全部翻译" aria-label="清空全部翻译">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2h4v1H6zM3 4h10v1H3zm1 1.5h8l-.8 8H4.8L4 5.5zm2 1.5v5h1V7H6zm3 0v5h1V7H9z"/></svg>
-        </button>
-      </div>
       <div class="translation-list" id="translationList" style="display:none;"></div>
     </aside>
     <div class="annotation-sidebar-resizer" id="annotationSidebarResizer" title="拖拽调整评论栏宽度"></div>
     <button class="annotation-floating-open-btn" id="annotationFloatingOpenBtn" title="打开评论侧边栏" aria-label="打开评论侧边栏">
-      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h12v9H8l-3 3v-3H2z"/></svg>
+      <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5" fill="none"/><path d="M6 2.5v11"/><path d="M9 6l-2 2 2 2"/></svg>
     </button>
   </div>
 

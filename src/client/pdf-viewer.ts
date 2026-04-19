@@ -346,6 +346,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
       textLayerDiv.addEventListener("mousemove", (e) => {
         const me = e as MouseEvent;
         const wrapperRect = wrapper.getBoundingClientRect();
+        const hoverX = me.clientX - wrapperRect.left;
         const hoverY = (me.clientY - wrapperRect.top) / scale;
         const block = findBlockAtY(blocks, hoverY);
         if (!block) {
@@ -406,17 +407,13 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
         }
         // 非拖拽时驱动译按钮显示
         if (opts.onParagraphClick && !dragging) {
-          const hoverY = curY;
-          const block = findBlockAtY(blocks, hoverY);
+          const block = findBlockAtY(blocks, curY);
           if (!block) {
-            const btn = wrapper.querySelector<HTMLButtonElement>('.pdf-translate-btn');
-            if (btn) btn.style.display = 'none';
+            if (translateBtn) translateBtn.style.display = 'none';
           } else {
-            const btn = wrapper.querySelector<HTMLButtonElement>('.pdf-translate-btn');
-            if (btn && btn.style.display !== 'none' && (btn as any).__block === block) return;
-            const realBtn = getOrCreateTranslateBtn();
-            (realBtn as any).__block = block;
+            if (translateBtn && translateBtn.style.display !== 'none' && translateBtnBlock === block) return;
             translateBtnBlock = block;
+            const realBtn = getOrCreateTranslateBtn();
             realBtn.style.display = 'block';
             realBtn.style.top = `${block.y * scale}px`;
           }
@@ -817,7 +814,7 @@ interface CoordPathResult {
   detail: CoordHitDetail[];
 }
 
-function coordPath(
+export function coordPath(
   items: PdfPageTextItem[],
   pageH: number,
   downX: number,
@@ -900,7 +897,7 @@ function coordPath(
 // Build context string up to a sentence boundary, with a hard char cap.
 // direction 'before': collect items before anchorIdx, stop at sentence end (. ! ?)
 // direction 'after':  collect items after anchorIdx, stop at sentence end
-function buildPdfContext(items: PdfPageTextItem[], anchorIdx: number, direction: 'before' | 'after'): string {
+export function buildPdfContext(items: PdfPageTextItem[], anchorIdx: number, direction: 'before' | 'after'): string {
   const ITEM_LIMIT = 10;
   const CHAR_LIMIT = 120;
   const SENTENCE_END = /[.!?。！？]\s*$/;

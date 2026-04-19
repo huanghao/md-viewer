@@ -149,3 +149,52 @@ describe('upsertAnnotation — PDF annotations', () => {
     expect(pages).toEqual([1, 2, 3]);
   });
 });
+
+// ── rectCoords field ───────────────────────────────────────────────────────
+
+describe('upsertAnnotation — rectCoords field', () => {
+  it('stores and retrieves valid rectCoords', () => {
+    const coords = { x1: 10.5, y1: 20.0, x2: 200.5, y2: 40.0 };
+    const ann = makePdfAnnotation({ rectCoords: coords });
+    upsertAnnotation('/papers/rect.pdf', ann);
+    const list = listAnnotations('/papers/rect.pdf');
+    const stored = list.find(a => a.id === ann.id);
+    expect(stored?.rectCoords).toEqual(coords);
+  });
+
+  it('round-trips fractional coordinates', () => {
+    const coords = { x1: 72.123, y1: 100.456, x2: 300.789, y2: 120.001 };
+    const ann = makePdfAnnotation({ rectCoords: coords });
+    upsertAnnotation('/papers/rect2.pdf', ann);
+    const list = listAnnotations('/papers/rect2.pdf');
+    const stored = list.find(a => a.id === ann.id);
+    expect(stored?.rectCoords?.x1).toBeCloseTo(72.123, 2);
+    expect(stored?.rectCoords?.y2).toBeCloseTo(120.001, 2);
+  });
+
+  it('stores annotation without rectCoords (undefined)', () => {
+    const ann = makePdfAnnotation();  // no rectCoords
+    upsertAnnotation('/papers/norect.pdf', ann);
+    const list = listAnnotations('/papers/norect.pdf');
+    const stored = list.find(a => a.id === ann.id);
+    expect(stored?.rectCoords).toBeUndefined();
+  });
+
+  it('ignores rectCoords with non-finite values', () => {
+    const ann = makePdfAnnotation({ rectCoords: { x1: NaN, y1: 0, x2: 100, y2: 50 } });
+    upsertAnnotation('/papers/badrect.pdf', ann);
+    const list = listAnnotations('/papers/badrect.pdf');
+    const stored = list.find(a => a.id === ann.id);
+    expect(stored?.rectCoords).toBeUndefined();
+  });
+
+  it('preserves rectCoords on note update', () => {
+    const coords = { x1: 50, y1: 60, x2: 150, y2: 80 };
+    const ann = makePdfAnnotation({ rectCoords: coords });
+    upsertAnnotation('/papers/rectupdate.pdf', ann);
+    upsertAnnotation('/papers/rectupdate.pdf', { ...ann, note: 'updated' });
+    const list = listAnnotations('/papers/rectupdate.pdf');
+    const stored = list.find(a => a.id === ann.id);
+    expect(stored?.rectCoords).toEqual(coords);
+  });
+});

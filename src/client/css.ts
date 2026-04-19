@@ -582,6 +582,73 @@ export const styles = `
       padding: 6px 8px 8px;
       min-height: 0;
     }
+
+    /* TOC 上下分栏 */
+    .toc-resizer {
+      height: 5px;
+      cursor: row-resize;
+      background: var(--border-color, #333);
+      flex-shrink: 0;
+      display: none;
+    }
+
+    .toc-resizer:hover, .toc-resizer.dragging {
+      background: var(--accent-color, #3a7bd5);
+    }
+
+    .sidebar.toc-visible .toc-resizer {
+      display: block;
+    }
+
+    .toc-pane {
+      overflow-y: auto;
+      flex-shrink: 0;
+      height: var(--toc-pane-height, 240px);
+      display: none;
+      border-top: 1px solid var(--border-color, #333);
+    }
+
+    .sidebar.toc-visible .toc-pane {
+      display: block;
+    }
+
+    .toc-panel {
+      padding: 6px 0;
+    }
+
+    .toc-empty {
+      padding: 12px 16px;
+      color: var(--text-muted, #888);
+      font-size: 12px;
+    }
+
+    .toc-item {
+      display: block;
+      padding: 3px 8px;
+      font-size: 12px;
+      color: var(--text-secondary, #ccc);
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      border-left: 2px solid transparent;
+      text-decoration: none;
+    }
+
+    .toc-item:hover {
+      background: var(--hover-bg, #2a2a2a);
+      color: var(--text-primary, #fff);
+    }
+
+    .toc-item.active {
+      color: var(--accent-color, #3a7bd5);
+      border-left-color: var(--accent-color, #3a7bd5);
+    }
+
+    .toc-item[data-level="1"] { padding-left: 8px; font-weight: 500; }
+    .toc-item[data-level="2"] { padding-left: 20px; }
+    .toc-item[data-level="3"] { padding-left: 32px; font-size: 11px; }
+
     .file-item {
       display: flex;
       align-items: center;
@@ -2317,8 +2384,15 @@ export const styles = `
     .translation-item-retry:hover { background: var(--color-accent); color: #fff; }
     .translation-item-footer {
       display: flex;
+      align-items: center;
       justify-content: flex-end;
+      gap: 6px;
       margin-top: 4px;
+    }
+    .translation-item-time {
+      font-size: var(--text-xs);
+      color: var(--color-text-muted);
+      margin-right: auto;
     }
     .translation-item-del {
       background: none;
@@ -2330,20 +2404,7 @@ export const styles = `
     }
     .translation-item-del:hover { color: #cf222e; }
 
-    /* PDF 悬停「译」按钮 */
-    /* hover-hotkey 模式：段落高亮背景 */
-    .pdf-para-highlight {
-      position: absolute;
-      left: 0;
-      right: 0;
-      background: rgba(9, 105, 218, 0.07);
-      border-radius: 3px;
-      pointer-events: none;
-      display: none;
-      z-index: 5;
-    }
-
-    /* hover-icon 模式：每段固定「译」图标 */
+    /* PDF 每段固定「译」图标 */
     .pdf-translate-icon {
       position: absolute;
       left: 4px;
@@ -2363,29 +2424,6 @@ export const styles = `
       opacity: 0.7;
     }
     .pdf-translate-icon:hover { background: #0969da; color: #fff; border-color: #0969da; opacity: 1; }
-
-    .pdf-translate-btn {
-      position: absolute;
-      left: 8px;
-      background: #0969da;
-      border: none;
-      border-radius: var(--radius-sm);
-      color: #fff;
-      font-size: var(--text-sm);
-      font-weight: 600;
-      font-family: inherit;
-      padding: 2px 8px;
-      cursor: pointer;
-      white-space: nowrap;
-      z-index: 100;
-      pointer-events: auto;
-      line-height: 1.6;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.25);
-      opacity: 0.9;
-    }
-    .pdf-translate-btn:hover { opacity: 1; background: #0550ae; }
-    .pdf-translate-btn.is-translated { background: #1a7f37; }
-    .pdf-translate-btn.is-loading { opacity: 0.6; cursor: wait; }
 
     /* 评论侧边栏 */
     .annotation-sidebar {

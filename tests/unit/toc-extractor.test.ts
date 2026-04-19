@@ -70,3 +70,30 @@ describe('extractPdfOutline', () => {
     expect(extractPdfOutline(null)).toEqual([]);
   });
 });
+
+import { resolvePdfOutlinePageNums } from '../../src/client/toc-extractor';
+
+describe('resolvePdfOutlinePageNums', () => {
+  it('resolves page numbers via pdfDoc.getPageIndex', async () => {
+    const toc: TocItem[] = [
+      { title: 'Ch1', level: 1, children: [] },
+      { title: 'Ch2', level: 1, children: [
+        { title: 'Ch2.1', level: 2, children: [] }
+      ]}
+    ];
+    const dests = [{ ref: 'ref0' }, { ref: 'ref1' }, { ref: 'ref2' }];
+    const mockPdfDoc = {
+      getPageIndex: async (ref: unknown) => {
+        if (ref === 'ref0') return 0;
+        if (ref === 'ref1') return 4;
+        if (ref === 'ref2') return 7;
+        return 0;
+      }
+    };
+    // toc items 按顺序对应 dests
+    await resolvePdfOutlinePageNums(toc, dests as any[], mockPdfDoc as any);
+    expect(toc[0].pageNum).toBe(1);
+    expect(toc[1].pageNum).toBe(5);
+    expect(toc[1].children[0].pageNum).toBe(8);
+  });
+});

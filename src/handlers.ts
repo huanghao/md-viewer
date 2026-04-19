@@ -888,3 +888,14 @@ function broadcastStateRequest(requestId: string) {
 function fileExists(path: string): boolean {
   return existsSync(path);
 }
+
+export function handleGetClientConfig(): Response {
+  const clientConfig = {
+    pdf: {
+      defaultScale: 1.5,
+    },
+  };
+  return new Response(JSON.stringify(clientConfig), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}

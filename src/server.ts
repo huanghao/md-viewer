@@ -34,6 +34,7 @@ import {
   handleClearAllAnnotations,
   handleGetSessionState,
   handleUpdateSessionState,
+  handleGetClientConfig,
 } from "./handlers.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
 
@@ -119,6 +120,9 @@ app.post("/api/annotations/clear", handleClearAllAnnotations);
 // API: 会话状态（标签页）
 app.get("/api/session-state", handleGetSessionState);
 app.post("/api/session-state", handleUpdateSessionState);
+
+// API: 客户端配置
+app.get("/api/config", (c) => handleGetClientConfig());
 
 // ==================== 翻译（内嵌 ONNX）====================
 

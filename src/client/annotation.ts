@@ -30,6 +30,8 @@ export interface Annotation {
   status?: 'anchored' | 'unanchored' | 'resolved';
   confidence?: number;
   thread?: AnnotationThreadItem[];
+  /** PDF only: bounding box in PDF coordinate system (pt, unscaled) */
+  rectCoords?: { x1: number; y1: number; x2: number; y2: number };
 }
 
 export interface AnnotationThreadItem {
@@ -584,20 +586,20 @@ let _currentAnnotationTab: 'comments' | 'translation' = 'comments';
 
 export function switchAnnotationTab(tab: 'comments' | 'translation'): void {
   _currentAnnotationTab = tab;
-  const commentsPanel = document.getElementById('annotationCommentsPanel');
   const commentsList = document.getElementById('annotationList');
   const translationList = document.getElementById('translationList');
+  const commentsActions = document.getElementById('annotationCommentsActions');
+  const translationActions = document.getElementById('annotationTranslationActions');
   const tabs = document.querySelectorAll('.annotation-tab');
 
   tabs.forEach((btn) => {
     btn.classList.toggle('is-active', (btn as HTMLElement).dataset.tab === tab);
   });
 
-  const translationToolbar = document.getElementById('translationToolbar');
-  if (commentsPanel) commentsPanel.style.display = tab === 'comments' ? '' : 'none';
   if (commentsList) commentsList.style.display = tab === 'comments' ? '' : 'none';
   if (translationList) translationList.style.display = tab === 'translation' ? '' : 'none';
-  if (translationToolbar) translationToolbar.style.display = tab === 'translation' ? '' : 'none';
+  if (commentsActions) commentsActions.classList.toggle('hidden', tab !== 'comments');
+  if (translationActions) translationActions.classList.toggle('hidden', tab !== 'translation');
 }
 
 export function openTranslationTab(): void {

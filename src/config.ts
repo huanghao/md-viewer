@@ -19,10 +19,6 @@ export interface Config {
     defaultFocus: boolean;
     theme: "light" | "dark" | "auto";
   };
-  editor: {
-    fontSize: number;
-    lineHeight: number;
-  };
   files: {
     autoRefresh: boolean;
     rememberOpenFiles: boolean;
@@ -37,10 +33,6 @@ const DEFAULT_CONFIG: Config = {
   client: {
     defaultFocus: true,
     theme: "light",
-  },
-  editor: {
-    fontSize: 14,
-    lineHeight: 1.6,
   },
   files: {
     autoRefresh: true,
@@ -85,7 +77,6 @@ function mergeConfig(defaults: Config, user: Partial<Config>): Config {
   return {
     server: { ...defaults.server, ...user.server },
     client: { ...defaults.client, ...user.client },
-    editor: { ...defaults.editor, ...user.editor },
     files: { ...defaults.files, ...user.files },
   };
 }

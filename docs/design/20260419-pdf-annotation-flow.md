@@ -96,6 +96,33 @@
 
 不依赖浏览器 DOM 选中，改用 mousedown/mouseup 的 PDF 坐标直接在 TextItem 列表里找命中的 item，用 X 坐标估算字符偏移截取精确子串。实测 23 条样本，22/23 准确，在标题/图表等布局复杂区域远优于浏览器拖拽。详见 `pdf-viewer-internals.md § 10`。
 
+---
+
+## 下一步设计方向：Canvas 拉框交互
+
+**背景**：原生 DOM 文本选中体验差（标题/摘要/图表区域扩展失控），而坐标映射方案已验证可以精准定位 TextItem。这两点合在一起，指向一个新的交互设计：
+
+**方案：Canvas 拉框选中（类似 PDF 阅读器的矩形选区）**
+
+用户不再依赖浏览器原生文本选中，而是像在 Canvas 上拉框一样操作：
+- mousedown → 记录起点，开始绘制半透明矩形框
+- mousemove → 实时更新矩形框（叠加在 PDF 上）
+- mouseup → 矩形框固定，用坐标映射找到框内所有 TextItem，拼接文字
+
+**优势**：
+- 完全绕过 TextLayer DOM 布局问题，任何区域都能精准框选
+- 视觉反馈直观（用户看到自己框了哪个区域）
+- 不依赖浏览器文本选中的 span 边界行为
+- 对标题、公式、图表标签等复杂区域效果最好
+
+**需要验证的问题**：
+1. 矩形框 UI 如何叠加在 PDF 上（bbox-overlay canvas 已有，可复用）
+2. 禁用 TextLayer 的 `user-select: text`，改为捕获 mousedown/mousemove/mouseup
+3. 字符偏移估算的精度是否足够（当前 ~20% 差1字符，是否可接受）
+4. 单击（不拖拽）时的行为（退化为点击最近 item）
+
+**实现参考**：`scripts/pdf-select-lab/` 测试工具里的路径3 逻辑已经验证了坐标映射的可行性，23 条样本 22/23 准确。样本文件：`scripts/pdf-select-lab/samples/selection-samples.json`。
+
 **双击特殊路径**：双击时走 `dblclick` 事件，通过 `expandDblClick` 自动扩展到词/句边界，其余逻辑相同。**已知 bug：双击目前不生效，会退化成普通单词选中后弹出评论框。**
 
 **不点 `[+]`，点其他地方**：

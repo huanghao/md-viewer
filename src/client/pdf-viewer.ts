@@ -74,7 +74,7 @@ export interface PdfViewerInstance {
   getPdfDoc(): any;
   /** Mark translate icons as translated/untranslated based on current translation list */
   markTranslatedIcons(keys: Set<string>): void;
-  /** Re-render all pages at a new scale. Returns after placeholders are resized (render is async). */
+  /** Re-render all pages at a new scale. Clears all annotation and temp rects — caller must replay them. Returns after placeholders are resized (actual render is async via IntersectionObserver). */
   setScale(scale: number): Promise<void>;
 }
 
@@ -747,17 +747,18 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     persistentRects.clear();
     tempRects.clear();
 
+    // Pass 1: resize all wrappers before re-arming observers
     for (let i = 0; i < pageWrappers.length; i++) {
-      const wrapper = pageWrappers[i];
-      // Re-fetch each page's viewport for accurate sizing
       const page = await pdfDoc.getPage(i + 1);
       const vp = page.getViewport({ scale: newScale });
+      const wrapper = pageWrappers[i];
       wrapper.style.width = `${vp.width}px`;
       wrapper.style.height = `${vp.height}px`;
-      // Remove all rendered content (canvas, text layer, overlay)
       wrapper.innerHTML = '';
       wrapper.classList.add('pdf-page-placeholder');
-      // Re-observe to trigger IntersectionObserver
+    }
+    // Pass 2: re-arm observers after all wrappers are sized
+    for (const wrapper of pageWrappers) {
       observer.unobserve(wrapper);
       observer.observe(wrapper);
     }

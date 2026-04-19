@@ -1997,8 +1997,7 @@ let pdfZoomDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 function adjustPdfZoom(direction: 1 | -1) {
   if (!state.currentFile) return;
-  const key = pdfZoomKey(state.currentFile);
-  const current = parseFloat(localStorage.getItem(key) ?? '1.5');
+  const current = getPdfZoom(state.currentFile);
   const next = clampZoom(zoomStep(current, direction), PDF_ZOOM_MIN, PDF_ZOOM_MAX);
   setPdfZoomValue(state.currentFile, next);
 }

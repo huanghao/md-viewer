@@ -8,22 +8,28 @@ export interface TocItem {
 
 function slugify(text: string): string {
   return text.toLowerCase()
-    .replace(/[^\w\s-]/g, '')
+    .replace(/[^\p{L}\p{N}\s-]/gu, '')
     .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
+    .replace(/-+/g, '-')
+    .trim();
 }
 
 export function extractMdToc(content: string): TocItem[] {
   const lines = content.split('\n');
   const flat: TocItem[] = [];
   let inCodeBlock = false;
+  const seen = new Map<string, number>();
 
   for (const line of lines) {
     if (line.startsWith('```')) { inCodeBlock = !inCodeBlock; continue; }
     if (inCodeBlock) continue;
     const m = line.match(/^(#{1,3})\s+(.+)/);
     if (!m) continue;
-    flat.push({ title: m[2].trim(), level: m[1].length, anchor: slugify(m[2].trim()), children: [] });
+    let anchor = slugify(m[2].trim());
+    const count = seen.get(anchor) ?? 0;
+    seen.set(anchor, count + 1);
+    if (count > 0) anchor = `${anchor}-${count}`;
+    flat.push({ title: m[2].trim(), level: m[1].length, anchor, children: [] });
   }
 
   return buildTree(flat);

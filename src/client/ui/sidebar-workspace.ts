@@ -88,6 +88,47 @@ function annotateDirectoryFileCount(node: FileTreeNode): number {
   return count;
 }
 
+type SegKind = 0 | 1 | 2; // 0=number, 1=ascii, 2=other(CJK etc.)
+
+function segKind(s: string): SegKind {
+  if (/^\d+$/.test(s)) return 0;
+  if (/^[\x00-\x7F]+$/.test(s)) return 1;
+  return 2;
+}
+
+function compareFileNames(a: string, b: string): number {
+  const re = /(\d+)|(\D+)/g;
+  const segsA = a.match(re) ?? [];
+  const segsB = b.match(re) ?? [];
+  const len = Math.max(segsA.length, segsB.length);
+  for (let i = 0; i < len; i++) {
+    if (i >= segsA.length) return -1;
+    if (i >= segsB.length) return 1;
+    const sa = segsA[i], sb = segsB[i];
+    const ka = segKind(sa), kb = segKind(sb);
+    if (ka !== kb) return ka - kb;
+    if (ka === 0) {
+      const diff = Number(sa) - Number(sb);
+      if (diff !== 0) return diff;
+      continue;
+    }
+    const cmp = sa.toLowerCase().localeCompare(sb.toLowerCase(), 'zh-CN', { sensitivity: 'base' });
+    if (cmp !== 0) return cmp;
+  }
+  return 0;
+}
+
+function sortTreeChildren(node: FileTreeNode): void {
+  if (!node.children) return;
+  node.children.sort((a, b) => {
+    const aDir = a.type === 'directory' ? 0 : 1;
+    const bDir = b.type === 'directory' ? 0 : 1;
+    if (aDir !== bDir) return aDir - bDir;
+    return compareFileNames(a.name, b.name);
+  });
+  for (const child of node.children) sortTreeChildren(child);
+}
+
 function buildTreeFromPaths(workspace: Workspace, filePaths: string[]): FileTreeNode {
   const workspacePath = workspace.path.replace(/\/+$/, '');
   const root: FileTreeNode = {
@@ -100,8 +141,8 @@ function buildTreeFromPaths(workspace: Workspace, filePaths: string[]): FileTree
 
   const directoryMap = new Map<string, FileTreeNode>([[workspacePath, root]]);
 
-  const sortedPaths = Array.from(new Set(filePaths)).sort((a, b) => a.localeCompare(b, 'zh-CN'));
-  for (const fullPath of sortedPaths) {
+  const dedupedPaths = Array.from(new Set(filePaths));
+  for (const fullPath of dedupedPaths) {
     if (!fullPath.startsWith(`${workspacePath}/`)) continue;
     const relative = fullPath.slice(workspacePath.length + 1);
     const parts = relative.split('/').filter(Boolean);
@@ -143,6 +184,7 @@ function buildTreeFromPaths(workspace: Workspace, filePaths: string[]): FileTree
   }
 
   annotateDirectoryFileCount(root);
+  sortTreeChildren(root);
   return root;
 }
 

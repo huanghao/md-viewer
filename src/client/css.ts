@@ -2334,7 +2334,7 @@ export const styles = `
     .pdf-translate-btn {
       position: absolute;
       right: 8px;
-      background: var(--color-accent);
+      background: #0969da;
       border: none;
       border-radius: var(--radius-sm);
       color: #fff;
@@ -2344,7 +2344,7 @@ export const styles = `
       padding: 2px 8px;
       cursor: pointer;
       white-space: nowrap;
-      z-index: var(--z-menu);
+      z-index: 100;
       pointer-events: auto;
       line-height: 1.6;
       box-shadow: 0 1px 4px rgba(0,0,0,0.25);

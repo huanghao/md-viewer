@@ -45,6 +45,19 @@ describe('extractMdToc', () => {
       { title: 'Usage', level: 2, anchor: 'usage-1', children: [] }
     ]);
   });
+
+  it('returns updated toc when called again with different content (stateless)', () => {
+    const v1 = '# Intro\n\n## Background\n';
+    const v2 = '# Overview\n\n## Details\n\n### Deep\n';
+    const toc1 = extractMdToc(v1);
+    const toc2 = extractMdToc(v2);
+    expect(toc1[0].title).toBe('Intro');
+    expect(toc2[0].title).toBe('Overview');
+    expect(toc2[0].children[0].children[0].title).toBe('Deep');
+    // toc1 must not be mutated by the second call
+    expect(toc1[0].children.length).toBe(1);
+    expect(toc1[0].children[0].title).toBe('Background');
+  });
 });
 
 import { extractPdfOutline } from '../../src/client/toc-extractor';

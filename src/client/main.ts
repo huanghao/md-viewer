@@ -1843,6 +1843,7 @@ async function acceptDiffUpdate(): Promise<void> {
   currentDiffBlockIndex = -1;
   clearDiffMarkers();
   renderContent();
+  updateToc(state.currentFile);
   syncAnnotationsForCurrentFile(false);
   flashContentUpdated();
   renderSidebar();

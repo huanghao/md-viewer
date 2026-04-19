@@ -47,6 +47,7 @@ import {
 } from './annotation';
 
 import { createPdfViewer, type PdfViewerInstance } from "./pdf-viewer.js";
+import { clampZoom, zoomStep, pdfZoomKey, MD_ZOOM_MIN, MD_ZOOM_MAX, PDF_ZOOM_MIN, PDF_ZOOM_MAX } from './zoom.js';
 import { createPdfAnnotationBridge } from "./pdf-annotation.js";
 import { extractMdToc, extractPdfOutline, loadSidecar, saveSidecar, scanPdfHeadings } from './toc-extractor.js';
 import { renderTocPanel, setActiveTocItem } from './ui/toc-panel.js';
@@ -955,7 +956,7 @@ function renderContent() {
 
   if (isPdfPath(file.path)) {
     const filePath = file.path;
-    const scale = 1.5;
+    const scale = getPdfZoom(filePath);
 
     // Cancel any pending eviction for this file (user came back)
     cancelEviction(filePath);
@@ -1433,6 +1434,7 @@ async function switchFile(path: string) {
   }
   const previousFile = state.currentFile;
   switchToFile(path);
+  updateZoomDisplay();
   renderSidebar();
 
   // Immediately show loading state to avoid stale TOC during transition
@@ -1948,57 +1950,82 @@ function copyFileName(fileName: string, event?: Event) {
 }
 
 
-// ==================== 字体缩放功能 ====================
+// ==================== 缩放功能 ====================
 let currentFontScale = 1.0;
 
-// 初始化字体缩放
 function initFontScale() {
-  // 从 localStorage 恢复
   const saved = localStorage.getItem('fontScale');
-  if (saved) {
-    currentFontScale = parseFloat(saved);
-  }
+  if (saved) currentFontScale = parseFloat(saved);
   applyFontScale();
 }
 
-// 应用字体缩放
 function applyFontScale() {
   document.documentElement.style.setProperty('--font-scale', currentFontScale.toString());
-  updateFontScaleDisplay();
-
-  // 保存到 localStorage
   localStorage.setItem('fontScale', currentFontScale.toString());
+  updateZoomDisplay();
 }
 
-// 更新显示
-function updateFontScaleDisplay() {
-  const button = document.getElementById('fontScaleText');
-  if (button) {
-    const percent = Math.round(currentFontScale * 100);
-    button.textContent = `${percent}%`;
+function zoomIn() {
+  if (isPdfPath(state.currentFile ?? '')) {
+    adjustPdfZoom(+1);
+  } else {
+    currentFontScale = clampZoom(zoomStep(currentFontScale, +1), MD_ZOOM_MIN, MD_ZOOM_MAX);
+    applyFontScale();
   }
-
-  // 更新菜单中的选中状态
-  const options = document.querySelectorAll('.font-scale-option');
-  options.forEach((option) => {
-    option.classList.remove('active');
-  });
-
-  // 标记当前选中的选项
-  const currentPercent = Math.round(currentFontScale * 100);
-  options.forEach((option) => {
-    const text = option.textContent?.trim();
-    if (text === `${currentPercent}%`) {
-      option.classList.add('active');
-    }
-  });
 }
 
-// 设置字体缩放
-function setFontScale(scale: number) {
-  currentFontScale = scale;
-  applyFontScale();
-  closeFontScaleMenu();
+function zoomOut() {
+  if (isPdfPath(state.currentFile ?? '')) {
+    adjustPdfZoom(-1);
+  } else {
+    currentFontScale = clampZoom(zoomStep(currentFontScale, -1), MD_ZOOM_MIN, MD_ZOOM_MAX);
+    applyFontScale();
+  }
+}
+
+function zoomReset() {
+  if (isPdfPath(state.currentFile ?? '')) {
+    setPdfZoomValue(state.currentFile!, 1.5);
+  } else {
+    currentFontScale = 1.0;
+    applyFontScale();
+  }
+}
+
+// PDF zoom — per-file, debounced re-render
+let pdfZoomDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+function adjustPdfZoom(direction: 1 | -1) {
+  if (!state.currentFile) return;
+  const key = pdfZoomKey(state.currentFile);
+  const current = parseFloat(localStorage.getItem(key) ?? '1.5');
+  const next = clampZoom(zoomStep(current, direction), PDF_ZOOM_MIN, PDF_ZOOM_MAX);
+  setPdfZoomValue(state.currentFile, next);
+}
+
+function setPdfZoomValue(filePath: string, scale: number) {
+  localStorage.setItem(pdfZoomKey(filePath), String(scale));
+  updateZoomDisplay();
+  if (pdfZoomDebounceTimer) clearTimeout(pdfZoomDebounceTimer);
+  pdfZoomDebounceTimer = setTimeout(async () => {
+    const viewer = pdfViewerRegistry.get(filePath)?.viewer;
+    if (viewer) await viewer.setScale(scale);
+  }, 300);
+}
+
+function getPdfZoom(filePath: string): number {
+  return parseFloat(localStorage.getItem(pdfZoomKey(filePath)) ?? '1.5');
+}
+
+function updateZoomDisplay() {
+  const btn = document.getElementById('fontScaleText');
+  if (!btn) return;
+  if (isPdfPath(state.currentFile ?? '')) {
+    const scale = getPdfZoom(state.currentFile!);
+    btn.textContent = `${Math.round(scale * 100)}%`;
+  } else {
+    btn.textContent = `${Math.round(currentFontScale * 100)}%`;
+  }
 }
 
 // ==================== 系统监控浮窗 ====================
@@ -2116,38 +2143,14 @@ function clearMonitorTranslationStats(): void {
   renderTranslationTab();
 }
 
-function toggleFontScaleMenu() {
-  const menu = document.getElementById('fontScaleMenu');
-  if (!menu) return;
-
-  const isVisible = menu.style.display !== 'none';
-  if (isVisible) {
-    closeFontScaleMenu();
-  } else {
-    menu.style.display = 'block';
-    updateFontScaleDisplay();
-  }
-}
-
-// 关闭菜单
-function closeFontScaleMenu() {
-  const menu = document.getElementById('fontScaleMenu');
-  if (menu) {
-    menu.style.display = 'none';
-  }
-}
-
-// 点击外部关闭菜单
-document.addEventListener('click', (e) => {
-  const menu = document.getElementById('fontScaleMenu');
-  const button = document.getElementById('fontScaleButton');
-
-  if (!menu || !button) return;
-
-  const target = e.target as HTMLElement;
-  if (!menu.contains(target) && !button.contains(target)) {
-    closeFontScaleMenu();
-  }
+// ==================== 键盘缩放快捷键 ====================
+document.addEventListener('keydown', (e: KeyboardEvent) => {
+  const isMac = navigator.platform.toUpperCase().includes('MAC');
+  const mod = isMac ? e.metaKey : e.ctrlKey;
+  if (!mod) return;
+  if (e.key === '=' || e.key === '+') { e.preventDefault(); zoomIn(); }
+  else if (e.key === '-') { e.preventDefault(); zoomOut(); }
+  else if (e.key === '0') { e.preventDefault(); zoomReset(); }
 });
 
 // ==================== SSE 连接状态 ====================
@@ -2409,12 +2412,11 @@ declare global {
     copyFilePath: (filePath: string, event?: Event) => void;
     showToast?: (message: string, type: string) => void;
     showSettingsDialog: () => void;
-    toggleFontScaleMenu: () => void;
     toggleMonitorPanel: () => void;
     switchMonitorTab: (tab: 'memory' | 'translation') => void;
     clearMonitorTranslationStats: () => void;
     switchAnnotationTab: (tab: 'comments' | 'translation') => void;
-    setFontScale: (scale: number) => void;
+    zoomReset: () => void;
     openExternalFile?: (path: string) => void | Promise<void>;
     renderContent?: () => void;
     applyTheme?: () => void;
@@ -2463,12 +2465,11 @@ window.copyFileName = copyFileName;
 window.copyFilePath = copyFilePath;
 window.showToast = showToast;
 window.showSettingsDialog = showSettingsDialog;
-window.toggleFontScaleMenu = toggleFontScaleMenu;
 window.toggleMonitorPanel = toggleMonitorPanel;
 window.switchMonitorTab = switchMonitorTab;
 window.clearMonitorTranslationStats = clearMonitorTranslationStats;
 window.switchAnnotationTab = switchAnnotationTab;
-window.setFontScale = setFontScale;
+window.zoomReset = zoomReset;
 window.openExternalFile = openFileInBrowser;
 window.renderContent = renderContent;
 (window as any).applyTheme = applyTheme;

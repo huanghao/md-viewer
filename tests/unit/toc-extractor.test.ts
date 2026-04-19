@@ -71,7 +71,7 @@ describe('extractPdfOutline', () => {
   });
 });
 
-import { resolvePdfOutlinePageNums } from '../../src/client/toc-extractor';
+import { resolvePdfOutlinePageNums, type TocItem } from '../../src/client/toc-extractor';
 
 describe('resolvePdfOutlinePageNums', () => {
   it('resolves page numbers via pdfDoc.getPageIndex', async () => {
@@ -81,19 +81,25 @@ describe('resolvePdfOutlinePageNums', () => {
         { title: 'Ch2.1', level: 2, children: [] }
       ]}
     ];
-    const dests = [{ ref: 'ref0' }, { ref: 'ref1' }, { ref: 'ref2' }];
+    const dests: ({ num: number; gen: number } | null)[] = [
+      { num: 0, gen: 0 },
+      { num: 4, gen: 0 },
+      { num: 7, gen: 0 },
+    ];
     const mockPdfDoc = {
-      getPageIndex: async (ref: unknown) => {
-        if (ref === 'ref0') return 0;
-        if (ref === 'ref1') return 4;
-        if (ref === 'ref2') return 7;
-        return 0;
-      }
+      getPageIndex: async (ref: { num: number; gen: number }) => ref.num,
     };
-    // toc items 按顺序对应 dests
-    await resolvePdfOutlinePageNums(toc, dests as any[], mockPdfDoc as any);
+    await resolvePdfOutlinePageNums(toc, dests, mockPdfDoc);
     expect(toc[0].pageNum).toBe(1);
     expect(toc[1].pageNum).toBe(5);
     expect(toc[1].children[0].pageNum).toBe(8);
+  });
+
+  it('keeps pageNum undefined when dest is null', async () => {
+    const toc: TocItem[] = [{ title: 'Ch1', level: 1, children: [] }];
+    const dests: null[] = [null];
+    const mockPdfDoc = { getPageIndex: async () => 0 };
+    await resolvePdfOutlinePageNums(toc, dests as any[], mockPdfDoc as any);
+    expect(toc[0].pageNum).toBeUndefined();
   });
 });

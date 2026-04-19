@@ -149,6 +149,53 @@ describe('renderTocPanel', () => {
   });
 });
 
+describe('renderTocPanel re-render after content change', () => {
+  it('updates jump target when re-rendered with new toc (diff accept scenario)', () => {
+    const { doc } = makeWindow();
+    const panel = makeContainer(doc);
+
+    const v1Toc: TocItem[] = [
+      { title: 'Old Heading', level: 1, anchor: 'old-heading', children: [] },
+    ];
+    const v2Toc: TocItem[] = [
+      { title: 'New Heading', level: 1, anchor: 'new-heading', children: [] },
+      { title: 'Added Section', level: 2, anchor: 'added-section', children: [] },
+    ];
+
+    const jumped1: TocItem[] = [];
+    renderTocPanel(panel, v1Toc, item => jumped1.push(item), false, doc);
+    panel.querySelector<HTMLElement>('.toc-item')?.click();
+    expect(jumped1[0]?.title).toBe('Old Heading');
+
+    // Simulate acceptDiffUpdate: re-render with new content
+    const jumped2: TocItem[] = [];
+    renderTocPanel(panel, v2Toc, item => jumped2.push(item), false, doc);
+    const items = panel.querySelectorAll<HTMLElement>('.toc-item');
+    expect(items.length).toBe(2);
+    items[1].click();
+    expect(jumped2[0]?.title).toBe('Added Section');
+  });
+
+  it('clears stale items after re-render with fewer headings', () => {
+    const { doc } = makeWindow();
+    const panel = makeContainer(doc);
+
+    const bigToc: TocItem[] = [
+      { title: 'A', level: 1, anchor: 'a', children: [] },
+      { title: 'B', level: 1, anchor: 'b', children: [] },
+      { title: 'C', level: 1, anchor: 'c', children: [] },
+    ];
+    renderTocPanel(panel, bigToc, () => {}, false, doc);
+    expect(panel.querySelectorAll('.toc-item').length).toBe(3);
+
+    const smallToc: TocItem[] = [
+      { title: 'A', level: 1, anchor: 'a', children: [] },
+    ];
+    renderTocPanel(panel, smallToc, () => {}, false, doc);
+    expect(panel.querySelectorAll('.toc-item').length).toBe(1);
+  });
+});
+
 describe('setActiveTocItem', () => {
   it('highlights item by pageNum', () => {
     const { doc } = makeWindow();

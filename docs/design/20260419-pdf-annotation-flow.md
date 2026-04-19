@@ -82,14 +82,19 @@
 > **设计疑问**：步骤 3~4 清除原生 Selection 后蓝色消失，所以项目用 `markSelectionSpans` 重新画一次蓝色。但两次蓝色之间有视觉跳变，体验奇怪。是否可以不清除原生 Selection，直接保留浏览器蓝色？待评估。
 
 **关键数据**：
-- `selectedText = sel.toString()`：从鼠标按下字符位置截取到抬起字符位置，**不对齐词边界**
-  - 例：用户想选 "individual tasks"，mousedown 落在 "i" 中间，实际得到 "ividual tasks"
-  - `toString()` 本身是准的，问题在于鼠标操作精度不到词边界
-  - **需要词边界扩展**：拿到 `startOffset` 后往左找最近空格，`endOffset` 往右找最近空格
-- `startItemIdx`：item 索引（如 `42`）
+- `selectedText = sel.toString()`：从鼠标按下字符位置截取，**不对齐词边界**（鼠标精度问题）
+- `startItemIdx`：item 索引
 - `state.pendingAnnotation = { quote: "ividual tasks", start: 42, length: 1, ... }` ← quote 不完整
 
-**标题/节标题区域的额外问题**：标题 span 和正文 span 在 DOM 里连续排列，浏览器把它们当成一个文本流，拖拽时会跨越多个 span 扩展选区，无法精确选一个词。这是 TextLayer 布局问题，独立于 `selectedText` 的问题。
+**已知问题（2026-04-19 实测，23 条样本）**：
+
+1. **正文**：`selectedText` 截断词边界，quote 不完整
+2. **标题/摘要/图注**：span 连续排列，浏览器拖拽扩展到大段落，`selectedText` 完全错误
+3. **图表标签**：密集布局，浏览器拖拽跑偏到相邻标签
+
+**改进方向（坐标映射方案）**：
+
+不依赖浏览器 DOM 选中，改用 mousedown/mouseup 的 PDF 坐标直接在 TextItem 列表里找命中的 item，用 X 坐标估算字符偏移截取精确子串。实测 23 条样本，22/23 准确，在标题/图表等布局复杂区域远优于浏览器拖拽。详见 `pdf-viewer-internals.md § 10`。
 
 **双击特殊路径**：双击时走 `dblclick` 事件，通过 `expandDblClick` 自动扩展到词/句边界，其余逻辑相同。**已知 bug：双击目前不生效，会退化成普通单词选中后弹出评论框。**
 

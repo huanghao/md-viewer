@@ -1,5 +1,5 @@
 import type { PdfViewerInstance } from "./pdf-viewer.js";
-import { nextAnnotationSerial, showQuickAdd, showPopover } from "./annotation.js";
+import { nextAnnotationSerial, showQuickAdd, showPopover, showPopoverBottomRight } from "./annotation.js";
 import type { Annotation } from "./annotation.js";
 
 export interface PdfAnnotationBridgeOptions {
@@ -92,16 +92,7 @@ export function createPdfAnnotationBridge(opts: PdfAnnotationBridgeOptions): Pdf
   function handleAnnotationClick(annotationId: string, clientX: number, clientY: number) {
     const ann = opts.getAnnotations().find(a => a.id === annotationId);
     if (!ann) return;
-    // Show popover then pin to bottom-right corner
-    showPopover(ann, 0, 0);
-    const popover = document.getElementById('annotationPopover');
-    if (popover) {
-      // Clear left/top set by placeFloating, use right/bottom instead
-      popover.style.removeProperty('left');
-      popover.style.removeProperty('top');
-      popover.style.right = '12px';
-      popover.style.bottom = '12px';
-    }
+    showPopoverBottomRight(ann);
   }
 
   return { handleTextSelected, handleAnnotationClick, renderHighlights };

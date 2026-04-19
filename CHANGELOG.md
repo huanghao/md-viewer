@@ -7,16 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.3.0] - 2026-04-19
+## [0.4.0] - 2026-04-19
 
 ### Added
 
 - **目录面板 (TOC)**: 左侧边栏新增目录面板，支持 Markdown 标题和 PDF 书签，点击跳转，滚动时自动高亮当前章节
-- **PDF 翻译**: 段落级翻译，点击段落旁「译」图标触发，译文显示在右侧翻译列表，支持重试和删除
-- **翻译双向联动**: 鼠标悬停译文列表条目高亮对应段落图标，点击跳转到原文位置；「译」图标变绿表示已翻译
-- **翻译序号**: 译文列表每条显示 `P{页} #{序号}` 标识，按页码顺序编号
-- **PDF 滚动条**: PDF 阅读区显示自定义滚动条，与 Markdown 阅读区风格统一
-- **PDF 页码指示器**: 固定在右下角显示当前页/总页数，点击可输入页码直接跳转
+- **PDF 翻译体验升级**: 翻译双向联动（悬停列表条目高亮对应段落），「译」图标变绿表示已翻译，译文列表显示 `P{页} #{序号}` 标识
+- **PDF 滚动条 + 页码指示器**: PDF 阅读区显示自定义滚动条，右下角固定显示当前页/总页数，点击可输入页码跳转
 
 ### Changed
 
@@ -30,6 +27,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 翻译记录刷新后不显示（改为文件加载时立即从 localStorage 恢复）
 - 切换文件时翻译列表未清空
 - 翻译跳转位置不准（之前只跳到页顶，现在精确到段落 y 坐标）
+
+## [0.3.0] - 2026-04-07
+
+### Added
+
+- **PDF 阅读**: PDF.js 渲染、文字层、懒加载（IntersectionObserver）、滚动位置持久化
+- **PDF 批注**: 文字选中创建批注，精确高亮，点击批注跳转
+- **PDF 翻译**: 段落级翻译，本地 ONNX opus-mt-en-zh 模型（离线可用），延迟约 1.5s
+- **目录面板 (TOC)**: Markdown 标题和 PDF 书签提取，左侧边栏展示，点击跳转
+- **Diff 视图**: 内联 diff，N/P 键块导航，滚动条标记
+- **JSON/JSONL 查看器**: 树形展开，搜索过滤
+- **焦点视图**: 按最近修改时间筛选文件，支持 pin 置顶
+- **主题系统**: Markdown 主题（GitHub/Notion/Bear）+ 代码高亮主题三选一，实时预览
+- **批注 badge**: 文件列表显示未解决批注数量
+- **页内查找**: Cmd+F 全文搜索高亮
+- **KaTeX 数学渲染**: 行内公式支持
+
+### Changed
+
+- **侧边栏重构**: 三 tab 设计（列表/树/焦点），统一文件行样式
+- **批注性能**: TextNodeIndex 将 applyAnnotations 从 O(N×M) 优化到 O(M+N·logM)
+- **CSS 设计 token**: 统一次要文字色、字号、圆角、z-index 为命名变量
+
+### Fixed
+
+- PDF 已解决批注仍高亮
+- diff 导航使用视口位置而非点击索引
+- 工作区文件修改实时显示 M 标记
 
 ## [0.2.0] - 2026-03-19
 
@@ -89,7 +114,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial development versions (not released via Homebrew).
 
-[Unreleased]: https://github.com/huanghao/md-viewer/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/huanghao/md-viewer/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/huanghao/md-viewer/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/huanghao/md-viewer/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/huanghao/md-viewer/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/huanghao/md-viewer/releases/tag/v0.1.0

@@ -1166,7 +1166,7 @@ export function removeAnnotation(id: string, filePath: string): void {
   });
 }
 
-function jumpToAnnotation(id: string): void {
+function jumpToAnnotation(id: string, behavior: ScrollBehavior = 'smooth'): void {
   const el = getElements();
   if (!el.content) return;
   const mark = document.querySelector(`[data-annotation-id="${id}"]`) as HTMLElement | null;
@@ -1181,36 +1181,42 @@ function jumpToAnnotation(id: string): void {
   const targetTop = currentTop + (markRect.top - contentRect.top);
   const topPadding = isPdf ? 100 : 56;
   const finalTop = Math.max(0, targetTop - topPadding);
-  el.content.scrollTo({ top: finalTop, behavior: 'smooth' });
+  el.content.scrollTo({ top: finalTop, behavior });
 }
 
 function setActiveAnnotation(id: string | null, filePath: string | null): void {
   state.activeAnnotationId = id;
   applyAnnotations();
   if (id) {
-    jumpToAnnotation(id);
     state.pinnedAnnotationId = id;
-    requestAnimationFrame(() => {
-      const ann = state.annotations.find((item) => item.id === id);
-      const mark = document.querySelector(`[data-annotation-id="${id}"]`) as HTMLElement | null;
-      if (!ann || !mark) return;
-      if (mark.classList.contains('pdf-rect-anchor') && mark.dataset.rectX2) {
-        // Anchor is at top-left of rect (y1*scale, x1*scale).
-        // Bottom-right = anchor screen pos + rect size in screen pixels.
-        const x2 = parseFloat(mark.dataset.rectX2);
-        const y2 = parseFloat(mark.dataset.rectY2 || '0');
-        const s = parseFloat(mark.dataset.rectScale || '1.5');
-        const x1 = parseFloat(mark.style.left) / s;  // recover x1 from inline style
-        const y1 = parseFloat(mark.style.top) / s;   // recover y1 from inline style
-        const anchorRect = mark.getBoundingClientRect();
+    // Show popover after scroll completes. For PDF rect anchors we need accurate
+    // getBoundingClientRect, so we use 'instant' scroll then rAF.
+    const ann = state.annotations.find((item) => item.id === id);
+    const mark = document.querySelector(`[data-annotation-id="${id}"]`) as HTMLElement | null;
+    const isPdfRect = mark?.classList.contains('pdf-rect-anchor') && mark.dataset.rectX2;
+    if (isPdfRect) {
+      jumpToAnnotation(id, 'instant');
+      requestAnimationFrame(() => {
+        const m = document.querySelector(`[data-annotation-id="${id}"]`) as HTMLElement | null;
+        if (!ann || !m) return;
+        const x2 = parseFloat(m.dataset.rectX2!);
+        const y2 = parseFloat(m.dataset.rectY2 || '0');
+        const s = parseFloat(m.dataset.rectScale || '1.5');
+        const x1 = parseFloat(m.style.left) / s;
+        const y1 = parseFloat(m.style.top) / s;
+        const anchorRect = m.getBoundingClientRect();
         const screenX = anchorRect.left + (x2 - x1) * s;
         const screenY = anchorRect.top + (y2 - y1) * s;
         showPopover(ann, screenX + 8, screenY + 8);
-      } else {
+      });
+    } else {
+      jumpToAnnotation(id, 'smooth');
+      requestAnimationFrame(() => {
+        if (!ann || !mark) return;
         const rect = mark.getBoundingClientRect();
         showPopover(ann, rect.right + 8, rect.top + 8);
-      }
-    });
+      });
+    }
   }
   renderAnnotationList(filePath);
 }

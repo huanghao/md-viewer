@@ -51,8 +51,9 @@ async function pollForFileReturn(path: string): Promise<void> {
     await new Promise(r => setTimeout(r, interval));
     try {
       const stats = await stat(path);
-      // 文件重新出现，重新加入监听并广播变更
+      // 文件重新出现，重新加入监听并广播变更（unwatch + re-add 确保新 inode 被监听）
       watchedPaths.add(path);
+      watcher?.unwatch(path);
       watcher?.add(path);
       broadcastFileChanged(path, stats.mtimeMs);
       return;

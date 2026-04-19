@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diff 模式原型</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #f6f8fa;
+    color: #24292f;
+  }
+
+  /* ── 整体布局 ── */
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  /* ── 工具栏 ── */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    height: 40px;
+    background: #fff;
+    border-bottom: 1px solid #e1e4e8;
+    flex-shrink: 0;
+  }
+  .toolbar-title {
+    font-size: 13px;
+    color: #57606a;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .toolbar-btn {
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid #d0d7de;
+    background: #fff;
+    color: #24292f;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .toolbar-btn:hover { background: #f6f8fa; }
+  .toolbar-btn.diff-active {
+    background: rgba(9,105,218,0.08);
+    border-color: rgba(9,105,218,0.3);
+    color: #0969da;
+    font-weight: 500;
+  }
+
+  /* ── diff 顶部提示条 ── */
+  .diff-banner {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 7px 16px;
+    background: #fff8c5;
+    border-bottom: 1px solid #d4a72c;
+    font-size: 12px;
+    color: #633c01;
+    flex-shrink: 0;
+  }
+  .diff-banner.visible { display: flex; }
+  .diff-banner-label { font-weight: 500; flex: 1; }
+  .diff-banner-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .diff-nav-btn {
+    padding: 3px 8px;
+    border-radius: 5px;
+    border: 1px solid #d4a72c;
+    background: #fff;
+    color: #633c01;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .diff-nav-btn:hover { background: #fff3cd; }
+  .diff-counter {
+    font-size: 11px;
+    color: #633c01;
+    min-width: 36px;
+    text-align: center;
+  }
+  .diff-accept-btn {
+    padding: 4px 12px;
+    border-radius: 6px;
+    border: 1px solid #2da44e;
+    background: #2da44e;
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  .diff-accept-btn:hover { background: #218a3e; }
+  .diff-close-btn {
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid #d0d7de;
+    background: #fff;
+    color: #57606a;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .diff-close-btn:hover { background: #f6f8fa; }
+
+  /* ── 内容区 ── */
+  .content-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px 0;
+  }
+  .markdown-body {
+    max-width: 740px;
+    margin: 0 auto;
+    padding: 0 24px 0 40px; /* 左侧留出 margin indicator 空间 */
+    font-size: 15px;
+    line-height: 1.7;
+    color: #24292f;
+    position: relative;
+  }
+
+  /* ── Markdown 基础样式 ── */
+  .markdown-body h1 { font-size: 1.8em; border-bottom: 1px solid #e1e4e8; padding-bottom: .3em; margin: 0 0 16px; }
+  .markdown-body h2 { font-size: 1.4em; border-bottom: 1px solid #e1e4e8; padding-bottom: .3em; margin: 24px 0 12px; }
+  .markdown-body h3 { font-size: 1.15em; margin: 20px 0 10px; }
+  .markdown-body p { margin: 0 0 12px; }
+  .markdown-body ul, .markdown-body ol { margin: 0 0 12px; padding-left: 24px; }
+  .markdown-body li { margin: 4px 0; }
+  .markdown-body code {
+    background: #f6f8fa;
+    border: 1px solid #e1e4e8;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: 'SFMono-Regular', Menlo, monospace;
+    font-size: 0.88em;
+  }
+  .markdown-body pre {
+    background: #f6f8fa;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    margin: 0 0 14px;
+  }
+  .markdown-body pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 13px;
+  }
+  .markdown-body blockquote {
+    border-left: 4px solid #d0d7de;
+    padding: 4px 16px;
+    color: #57606a;
+    margin: 0 0 12px;
+  }
+
+  /* ── Diff 标注：左侧竖条 ── */
+  .diff-block {
+    position: relative;
+    border-radius: 0 4px 4px 0;
+    margin-left: -40px;
+    padding-left: 40px;
+  }
+  .diff-block::before {
+    content: '';
+    position: absolute;
+    left: 16px;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    border-radius: 2px;
+  }
+
+  /* 新增 — GitHub: #e6ffec / 竖线 #2da44e */
+  .diff-insert {
+    background: #e6ffec;
+  }
+  .diff-insert::before { background: #2da44e; }
+
+  /* 删除 — GitHub: #ffebe9 / 竖线 #cf222e */
+  .diff-delete {
+    background: #ffebe9;
+  }
+  .diff-delete::before { background: #cf222e; }
+  .diff-delete .diff-deleted-text {
+    text-decoration: line-through;
+    color: #82071e;
+  }
+
+  /* 修改（先删后增） */
+  .diff-modify-del {
+    background: #ffebe9;
+  }
+  .diff-modify-del::before { background: #cf222e; }
+  .diff-modify-del .diff-deleted-text {
+    text-decoration: line-through;
+    color: #82071e;
+  }
+  .diff-modify-ins {
+    background: #e6ffec;
+  }
+  .diff-modify-ins::before { background: #2da44e; }
+
+  /* 当前高亮 block — GitHub focused: #abf2bc / #ffd7d5 */
+  .diff-block.diff-focused.diff-insert { background: #abf2bc; }
+  .diff-block.diff-focused.diff-delete { background: #ffd7d5; }
+  .diff-block.diff-focused.diff-modify-del { background: #ffd7d5; }
+  .diff-block.diff-focused.diff-modify-ins { background: #abf2bc; }
+
+  /* 普通段落（非 diff） */
+  .normal-block { margin-left: -40px; padding-left: 40px; }
+
+  /* acceptDiff 时移除 diff-tag 残留 */
+  .diff-tag { display: none; }
+
+  /* ── 状态切换演示按钮 ── */
+  .demo-controls {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 100;
+  }
+  .demo-btn {
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid #d0d7de;
+    background: #fff;
+    color: #24292f;
+    font-size: 12px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    text-align: left;
+  }
+  .demo-btn:hover { background: #f6f8fa; }
+  .demo-section-title {
+    font-size: 10px;
+    color: #57606a;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0 4px;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- 工具栏 -->
+  <div class="toolbar">
+    <span class="toolbar-title">pdf-viewer-internals.md</span>
+    <button class="toolbar-btn" onclick="toggleDiff()" id="diffBtn">± Diff</button>
+    <button class="toolbar-btn">⊕ 标注</button>
+    <button class="toolbar-btn">⋯</button>
+  </div>
+
+  <!-- Diff 提示条（diff 模式下显示） -->
+  <div class="diff-banner" id="diffBanner">
+    <span class="diff-banner-label">显示 diff：3 处变更（新版本 · 2 分钟前）</span>
+    <div class="diff-banner-nav">
+      <button class="diff-nav-btn" onclick="prevBlock()">↑ 上一处</button>
+      <span class="diff-counter" id="diffCounter">1 / 3</span>
+      <button class="diff-nav-btn" onclick="nextBlock()">↓ 下一处</button>
+    </div>
+    <button class="diff-accept-btn" onclick="acceptDiff()">✓ 采用新版本</button>
+    <button class="diff-close-btn" onclick="closeDiff()">✕ 关闭</button>
+  </div>
+
+  <!-- 内容区 -->
+  <div class="content-area">
+    <div class="markdown-body" id="markdownBody">
+
+      <!-- 普通段落 -->
+      <div class="normal-block">
+        <h1>PDF.js 原理与项目集成说明</h1>
+      </div>
+
+      <div class="normal-block">
+        <h2>第一部分：PDF.js 提供什么</h2>
+      </div>
+
+      <div class="normal-block">
+        <h3>1. 整体架构</h3>
+        <p>PDF.js 是 Mozilla 开发的开源 PDF 渲染引擎，完全用 JavaScript 实现。核心包 <code>pdfjs-dist</code> 包含三个文件：</p>
+      </div>
+
+      <!-- ① 新增段落 -->
+      <div class="diff-block diff-insert" data-diff-index="0">
+        <p>主线程通过 <code>postMessage</code> 把解析任务交给 Worker，解析完成后把结果传回主线程渲染，<strong>不阻塞 UI</strong>。这是 PDF.js 性能优势的核心设计。</p>
+      </div>
+
+      <div class="normal-block">
+        <h3>2. 渲染一页 PDF 的过程</h3>
+        <p>PDF.js 把一页 PDF 渲染成两个独立的层，叠加在一起：</p>
+      </div>
+
+      <!-- ② 修改段落（先删后增） -->
+      <div class="diff-block diff-modify-del" data-diff-index="1">
+        <p><span class="diff-deleted-text"><strong>Canvas 层</strong>：把 PDF 的矢量指令转成像素，用户看到的所有视觉内容都来自这里。</span></p>
+      </div>
+      <div class="diff-block diff-modify-ins" data-diff-index="1">
+        <p><strong>Canvas 层</strong>：把 PDF 的矢量指令（画线、填色、绘字形）转成像素，用户看到的所有视觉内容都来自这里。文字是像素，不可交互。</p>
+      </div>
+
+      <div class="normal-block">
+        <p><strong>TextLayer 层</strong>：用透明的 <code>&lt;span&gt;</code> 元素精确覆盖在 Canvas 上对应文字的位置，使文字可以被鼠标选中和复制。</p>
+      </div>
+
+      <div class="normal-block">
+        <h3>3. API 调用顺序</h3>
+        <pre><code>getDocument(url)                    → PDFDocumentProxy
+  └─ pdfDoc.getPage(n)              → PDFPageProxy
+       ├─ page.getViewport({scale}) → PageViewport
+       ├─ page.render({ctx,vp})     → RenderTask
+       └─ page.getTextContent()     → TextContent</code></pre>
+      </div>
+
+      <!-- ③ 删除段落 -->
+      <div class="diff-block diff-delete" data-diff-index="2">
+        <p><span class="diff-deleted-text"><code>scale</code> 控制缩放比例：1.0 = 72 DPI（PDF 原始分辨率），1.5 = 108 DPI。注意这个值越大渲染越慢。</span></p>
+      </div>
+
+      <div class="normal-block">
+        <h3>4. TextItem：文字数据的基本单元</h3>
+        <p><code>getTextContent()</code> 返回一个 <code>TextContent</code> 对象，其中 <code>items</code> 是 <code>TextItem[]</code>——页面上所有文字片段的扁平列表，没有行、段落、列的概念，只有坐标。</p>
+      </div>
+
+      <div class="normal-block" style="height: 80px;"></div>
+
+    </div>
+  </div>
+</div>
+
+<!-- 演示控制面板 -->
+<div class="demo-controls">
+  <span class="demo-section-title">演示状态</span>
+  <button class="demo-btn" onclick="showNormal()">① 正常阅读模式</button>
+  <button class="demo-btn" onclick="showDiff()">② 进入 Diff 模式</button>
+  <button class="demo-btn" onclick="focusBlock(0)">③ 高亮第 1 处（新增）</button>
+  <button class="demo-btn" onclick="focusBlock(1)">④ 高亮第 2 处（修改）</button>
+  <button class="demo-btn" onclick="focusBlock(2)">⑤ 高亮第 3 处（删除）</button>
+</div>
+
+<script>
+  let diffMode = false;
+  let currentBlock = -1;
+  const totalBlocks = 3;
+
+  function showNormal() {
+    diffMode = false;
+    document.getElementById('diffBtn').classList.remove('diff-active');
+    document.getElementById('diffBanner').classList.remove('visible');
+    document.querySelectorAll('.diff-block').forEach(el => {
+      el.style.display = 'none';
+    });
+    currentBlock = -1;
+  }
+
+  function showDiff() {
+    diffMode = true;
+    document.getElementById('diffBtn').classList.add('diff-active');
+    document.getElementById('diffBanner').classList.add('visible');
+    document.querySelectorAll('.diff-block').forEach(el => {
+      el.style.display = '';
+    });
+    focusBlock(0);
+  }
+
+  function toggleDiff() {
+    if (diffMode) { closeDiff(); } else { showDiff(); }
+  }
+
+  function focusBlock(index) {
+    if (!diffMode) return;
+    currentBlock = index;
+    document.querySelectorAll('.diff-block').forEach(el => {
+      el.classList.remove('diff-focused');
+    });
+    // 找到 data-diff-index 匹配的所有 block（修改有两个）
+    const targets = document.querySelectorAll(`[data-diff-index="${index}"]`);
+    targets.forEach(el => {
+      el.classList.add('diff-focused');
+      if (index === currentBlock) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+    document.getElementById('diffCounter').textContent = `${index + 1} / ${totalBlocks}`;
+  }
+
+  function nextBlock() {
+    focusBlock((currentBlock + 1) % totalBlocks);
+  }
+
+  function prevBlock() {
+    focusBlock((currentBlock - 1 + totalBlocks) % totalBlocks);
+  }
+
+  function acceptDiff() {
+    document.querySelectorAll('.diff-delete, .diff-modify-del').forEach(el => el.remove());
+    document.querySelectorAll('.diff-deleted-text').forEach(el => {
+      el.style.textDecoration = 'none';
+      el.style.color = 'inherit';
+    });
+    document.querySelectorAll('.diff-block').forEach(el => {
+      el.classList.remove('diff-block', 'diff-insert', 'diff-modify-ins', 'diff-focused');
+      el.classList.add('normal-block');
+    });
+    closeDiff();
+  }
+
+  function closeDiff() {
+    diffMode = false;
+    document.getElementById('diffBtn').classList.remove('diff-active');
+    document.getElementById('diffBanner').classList.remove('visible');
+    document.querySelectorAll('.diff-block').forEach(el => {
+      el.classList.remove('diff-focused');
+    });
+    currentBlock = -1;
+  }
+
+  // 键盘快捷键
+  document.addEventListener('keydown', e => {
+    if (!diffMode) return;
+    if (e.key === 'n') nextBlock();
+    if (e.key === 'p') prevBlock();
+  });
+
+  // 初始状态：隐藏 diff blocks
+  showNormal();
+</script>
+</body>
+</html>

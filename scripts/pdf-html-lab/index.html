@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>PDF → HTML 重建实验</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #1e1e1e; color: #cdd9e5; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+.toolbar {
+  display: flex; align-items: center; gap: 10px; padding: 8px 14px;
+  background: #2d333b; border-bottom: 1px solid #444c56; flex-shrink: 0; flex-wrap: wrap;
+}
+.toolbar select { background: #373e47; border: 1px solid #444c56; color: #cdd9e5; border-radius: 4px; padding: 4px 8px; font-size: 13px; max-width: 260px; }
+.toolbar button { background: #0969da; color: #fff; border: none; border-radius: 4px; padding: 5px 12px; font-size: 13px; cursor: pointer; }
+.toolbar button:hover { background: #0550ae; }
+.toolbar button:disabled { opacity: 0.5; cursor: default; }
+.toolbar label { font-size: 12px; color: #8b949e; display: flex; align-items: center; gap: 4px; cursor: pointer; }
+.sep { width: 1px; height: 22px; background: #444c56; flex-shrink: 0; }
+.page-nav { display: flex; align-items: center; gap: 5px; }
+.page-nav button { background: #373e47; border: 1px solid #444c56; color: #cdd9e5; border-radius: 4px; padding: 3px 9px; cursor: pointer; font-size: 13px; }
+.page-nav button:hover { background: #444c56; }
+.page-nav span { font-size: 13px; min-width: 64px; text-align: center; }
+
+.main { display: flex; flex: 1; min-height: 0; }
+
+/* 左：原始 PDF canvas */
+.pane {
+  flex: 1; overflow-y: auto; background: #525659;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 20px; gap: 0;
+}
+.pane-label {
+  font-size: 11px; font-weight: 600; color: #8b949e; text-transform: uppercase;
+  letter-spacing: 0.5px; margin-bottom: 8px; align-self: flex-start;
+}
+.divider { width: 2px; background: #444c56; flex-shrink: 0; }
+
+/* PDF canvas pane */
+.canvas-wrapper { position: relative; box-shadow: 0 2px 20px rgba(0,0,0,0.5); }
+.canvas-wrapper canvas { display: block; }
+
+/* HTML rebuild pane */
+.html-page {
+  background: #fff;
+  box-shadow: 0 2px 20px rgba(0,0,0,0.5);
+  color: #000;
+  position: relative;
+  overflow: hidden; /* 裁掉超出的内容 */
+}
+
+/* 每个 TextItem 绝对定位 */
+.t {
+  position: absolute;
+  white-space: pre;
+  transform-origin: left bottom;
+  line-height: 1;
+  cursor: text;
+  user-select: text;
+}
+
+/* 段落块（用于插入译文） */
+.para-block {
+  position: relative;
+}
+
+/* 译文段落 */
+.translation-block {
+  background: rgba(9, 105, 218, 0.05);
+  border-left: 2px solid rgba(9, 105, 218, 0.4);
+  padding-left: 6px;
+  color: #1a1a1a;
+}
+
+/* side-by-side 模式 */
+.sbs-wrapper {
+  display: flex;
+  gap: 0;
+  align-items: flex-start;
+  box-shadow: 0 2px 20px rgba(0,0,0,0.5);
+}
+.sbs-canvas-col {
+  position: relative;
+  flex-shrink: 0;
+}
+.sbs-canvas-col canvas { display: block; }
+.sbs-trans-col {
+  background: #fff;
+  position: relative;
+  flex-shrink: 0;
+  border-left: 1px solid #e8ecf0;
+}
+.sbs-trans-block {
+  position: absolute;
+  padding: 2px 8px;
+  font-size: 10.5px;
+  line-height: 1.65;
+  color: #1a1a1a;
+  width: 100%;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+.sbs-trans-block.is-heading {
+  font-weight: 600;
+}
+.sbs-trans-block.is-caption {
+  color: #555;
+  font-size: 9px;
+}
+.sbs-trans-placeholder {
+  position: absolute;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #d0d7de;
+  font-size: 10px;
+}
+
+/* flow 模式 */
+.html-page.flow-mode {
+  overflow: visible;
+  padding: 40px 52px;
+}
+.html-page.flow-mode .para-flow {
+  margin-bottom: 10px;
+  font-size: 10pt;
+  line-height: 1.6;
+  color: #1a1a1a;
+}
+.html-page.flow-mode .para-flow.heading {
+  font-size: 12pt;
+  font-weight: 600;
+  margin-top: 6px;
+}
+.html-page.flow-mode .para-flow.caption {
+  font-size: 8.5pt;
+  color: #555;
+}
+.html-page.flow-mode .translation-flow {
+  margin-bottom: 10px;
+  font-size: 10pt;
+  line-height: 1.6;
+  color: #1a1a1a;
+  padding-left: 8px;
+  border-left: 2px solid rgba(9,105,218,0.3);
+}
+
+/* 状态栏 */
+.status { font-size: 11px; color: #8b949e; }
+.status.loading { color: #58a6ff; }
+.status.ok { color: #56d364; }
+.status.err { color: #f85149; }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <select id="pdfSelect"><option value="">— 选择 PDF —</option></select>
+  <div class="sep"></div>
+  <div class="page-nav">
+    <button id="prevBtn">◀</button>
+    <span id="pageInfo">— / —</span>
+    <button id="nextBtn">▶</button>
+  </div>
+  <div class="sep"></div>
+  <label><input type="radio" name="mode" value="sbs" checked> Side-by-side</label>
+  <label><input type="radio" name="mode" value="flow"> 段落流</label>
+  <label><input type="radio" name="mode" value="absolute"> 绝对定位</label>
+  <div class="sep"></div>
+  <label><input type="checkbox" id="cbTranslation" checked> 显示译文占位</label>
+  <div class="sep"></div>
+  <button id="translateBtn">翻译本页（模拟）</button>
+  <div class="sep"></div>
+  <span class="status" id="status">选择 PDF 开始</span>
+</div>
+
+<div class="main">
+  <div class="pane" id="mainPane">
+    <div id="pageContainer"></div>
+  </div>
+</div>
+
+<script type="module">
+import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs';
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
+
+const SCALE = 1.5;
+const DPR = window.devicePixelRatio || 1;
+
+let pdfDoc = null;
+let currentPage = 1;
+let currentBlocks = [];
+let translatedPages = new Set(); // 已"翻译"的页
+
+// ── 段落拆分（和 pdf-para-lab 一致）────────────────────────────────────
+function buildBlocks(pageNum, items, viewport) {
+  const pageH = viewport.height / SCALE;
+  const pageW = viewport.width / SCALE;
+  const pts = items
+    .filter(it => it.str.trim())
+    .map(it => ({
+      ...it,
+      sx: it.transform[4],
+      sy: pageH - it.transform[5],
+      fontH: it.height || Math.abs(it.transform[3]) || 12,
+    }));
+  if (!pts.length) return [];
+
+  const margin = pageW * 0.08, mid = pageW / 2;
+  const left  = pts.filter(p => p.sx > margin && p.sx < mid - margin * 0.3).length;
+  const right = pts.filter(p => p.sx > mid + margin * 0.3 && p.sx < pageW - margin).length;
+  const isDual = left > 4 && right > 4 && Math.min(left,right)/Math.max(left,right) > 0.25;
+  const colSplit = isDual ? mid : null;
+
+  const byYX = (a, b) => a.sy - b.sy || a.sx - b.sx;
+  const LH = 1.5;
+
+  function splitGroup(pts, col) {
+    if (!pts.length) return [];
+    const blocks = []; let cur = [pts[0]];
+    for (let i = 1; i < pts.length; i++) {
+      if (Math.abs(pts[i].sy - pts[i-1].sy) < (pts[i-1].fontH || 12) * LH) cur.push(pts[i]);
+      else { blocks.push(makeBlock(pageNum, cur, col, pageH)); cur = [pts[i]]; }
+    }
+    blocks.push(makeBlock(pageNum, cur, col, pageH));
+    return blocks;
+  }
+
+  if (colSplit) {
+    const L = pts.filter(p => p.sx < colSplit).sort(byYX);
+    const R = pts.filter(p => p.sx >= colSplit).sort(byYX);
+    return [...splitGroup(L,'left'), ...splitGroup(R,'right')].sort((a,b) => a.y - b.y);
+  }
+  return splitGroup(pts.sort(byYX), null);
+}
+
+function makeBlock(pageNum, pts, col, pageH) {
+  const x  = Math.min(...pts.map(p => p.sx));
+  const y  = Math.min(...pts.map(p => p.sy));
+  const x2 = Math.max(...pts.map(p => p.sx + Math.abs(p.width)));
+  const y2 = Math.max(...pts.map(p => p.sy + p.fontH));
+  const maxFontH = Math.max(...pts.map(p => p.fontH));
+  const text = pts.map(p => p.str).join(' ').replace(/\s+/g, ' ').trim();
+  const inMargin = y < pageH * 0.06 || y2 > pageH * 0.94;
+  // 分类
+  return { pageNum, pts, text, x, y, w: x2-x, h: y2-y, maxFontH, col, inMargin };
+}
+
+function classifyBlocks(blocks) {
+  const hs = blocks.map(b => b.maxFontH).filter(h=>h>0).sort((a,b)=>a-b);
+  const median = hs[Math.floor(hs.length/2)] || 12;
+  return blocks.map(b => {
+    const r = b.maxFontH / median;
+    let type = 'body';
+    if (r < 0.88) type = 'caption';
+    else if (r > 1.1 && b.text.length < 150) type = 'heading';
+    const skip = b.inMargin || b.text.length < 4 || b.pts.length > 80;
+    return { ...b, type, skip };
+  });
+}
+
+// ── 模拟翻译（直接返回假译文用于测试布局）────────────────────────────
+function mockTranslate(text) {
+  // 返回中文占位，长度约为原文 60%
+  const len = Math.max(10, Math.round(text.length * 0.6));
+  const sample = '这是一段模拟的中文译文，用于测试段落插入后的布局效果和行高。';
+  let result = '';
+  while (result.length < len) result += sample;
+  return result.slice(0, len) + '。';
+}
+
+// ── 渲染主函数 ───────────────────────────────────────────────────────
+async function renderPage(num) {
+  setStatus('loading', '渲染中…');
+  const page = await pdfDoc.getPage(num);
+  const viewport = page.getViewport({ scale: SCALE });
+  const tc = await page.getTextContent();
+
+  const raw = buildBlocks(num, tc.items, viewport);
+  currentBlocks = classifyBlocks(raw);
+
+  const mode = document.querySelector('input[name=mode]:checked').value;
+  const showTrans = document.getElementById('cbTranslation').checked;
+  const translated = translatedPages.has(num)
+    ? new Map(currentBlocks.map((b, i) => b.skip ? null : [i, mockTranslate(b.text)]).filter(Boolean))
+    : new Map();
+
+  const container = document.getElementById('pageContainer');
+  container.innerHTML = '';
+
+  if (mode === 'sbs') {
+    await renderSideBySide(container, page, viewport, currentBlocks, showTrans, translated);
+  } else if (mode === 'flow') {
+    await renderWithCanvas(container, page, viewport);
+    const flowDiv = document.createElement('div');
+    flowDiv.className = 'html-page flow-mode';
+    flowDiv.style.cssText = `width:${viewport.width}px;margin-top:20px`;
+    renderFlowMode(flowDiv, currentBlocks, showTrans, translated);
+    container.appendChild(flowDiv);
+  } else {
+    await renderWithCanvas(container, page, viewport);
+  }
+
+  setStatus('ok', `第 ${num} 页 · ${currentBlocks.length} 段 · ${tc.items.length} items`);
+}
+
+// ── Side-by-side：canvas 左，译文列右 ────────────────────────────────
+async function renderSideBySide(container, page, viewport, blocks, showTrans, translated) {
+  const transColW = 320;
+  const pageH = viewport.height;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'sbs-wrapper';
+
+  // 左：canvas
+  const canvasCol = document.createElement('div');
+  canvasCol.className = 'sbs-canvas-col';
+  canvasCol.style.height = pageH + 'px';
+
+  const canvas = document.createElement('canvas');
+  canvas.width  = Math.round(viewport.width * DPR);
+  canvas.height = Math.round(pageH * DPR);
+  canvas.style.cssText = `width:${viewport.width}px;height:${pageH}px`;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(DPR, DPR);
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  canvasCol.appendChild(canvas);
+
+  // 右：译文列（绝对定位，Y 与左边对齐）
+  const transCol = document.createElement('div');
+  transCol.className = 'sbs-trans-col';
+  transCol.style.cssText = `width:${transColW}px;height:${pageH}px`;
+
+  blocks.forEach((b, i) => {
+    if (b.skip) return;
+    const topPx = b.y * SCALE;
+    const heightPx = b.h * SCALE;
+
+    if (showTrans && translated.has(i)) {
+      const div = document.createElement('div');
+      div.className = `sbs-trans-block is-${b.type}`;
+      div.style.cssText = `top:${topPx}px;min-height:${heightPx}px;font-size:${Math.max(9, b.maxFontH * SCALE * 0.88)}px`;
+      div.textContent = translated.get(i);
+      transCol.appendChild(div);
+    } else {
+      // 未翻译时显示淡色占位线，帮助对齐感知
+      const ph = document.createElement('div');
+      ph.className = 'sbs-trans-placeholder';
+      ph.style.cssText = `top:${topPx}px;height:${heightPx}px`;
+      ph.textContent = '·';
+      transCol.appendChild(ph);
+    }
+  });
+
+  wrapper.appendChild(canvasCol);
+  wrapper.appendChild(transCol);
+  container.appendChild(wrapper);
+}
+
+// ── 纯 canvas（用于 flow/absolute 模式的原文显示）────────────────────
+async function renderWithCanvas(container, page, viewport) {
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = `box-shadow:0 2px 20px rgba(0,0,0,0.5);display:inline-block`;
+  const canvas = document.createElement('canvas');
+  canvas.width  = Math.round(viewport.width  * DPR);
+  canvas.height = Math.round(viewport.height * DPR);
+  canvas.style.cssText = `width:${viewport.width}px;height:${viewport.height}px;display:block`;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(DPR, DPR);
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  wrapper.appendChild(canvas);
+  container.appendChild(wrapper);
+}
+
+// ── 段落流模式 ────────────────────────────────────────────────────────
+function renderFlowMode(container, blocks, showTranslation, translated) {
+  blocks.forEach((b, i) => {
+    if (b.skip) return;
+    const para = document.createElement('div');
+    para.className = `para-flow ${b.type}`;
+    para.textContent = b.text;
+    container.appendChild(para);
+    if (showTranslation && translated.has(i)) {
+      const trans = document.createElement('div');
+      trans.className = 'translation-flow';
+      trans.textContent = translated.get(i);
+      container.appendChild(trans);
+    }
+  });
+}
+
+// ── 事件 ─────────────────────────────────────────────────────────
+
+async function loadPdfList() {
+  const res = await fetch('/pdfs');
+  const list = await res.json();
+  const sel = document.getElementById('pdfSelect');
+  list.forEach(({ name, path }) => {
+    const opt = document.createElement('option');
+    opt.value = path; opt.textContent = name;
+    sel.appendChild(opt);
+  });
+}
+
+// estimateTextHeight 保留但 sbs 模式不需要
+function estimateTextHeight(text, widthPx, lineHeightPx) {
+  const charsPerLine = Math.max(1, Math.floor(widthPx / (lineHeightPx * 0.55)));
+  return Math.ceil(text.length / charsPerLine) * lineHeightPx * 1.6;
+}
+
+document.getElementById('pdfSelect').addEventListener('change', async e => {
+  const path = e.target.value;
+  if (!path) return;
+  setStatus('loading', '加载中…');
+  pdfDoc = await pdfjsLib.getDocument(`/pdf?path=${encodeURIComponent(path)}`).promise;
+  translatedPages.clear();
+  currentPage = 1;
+  document.getElementById('pageInfo').textContent = `1 / ${pdfDoc.numPages}`;
+  await renderPage(1);
+});
+
+document.getElementById('prevBtn').addEventListener('click', async () => {
+  if (!pdfDoc || currentPage <= 1) return;
+  currentPage--;
+  document.getElementById('pageInfo').textContent = `${currentPage} / ${pdfDoc.numPages}`;
+  await renderPage(currentPage);
+});
+
+document.getElementById('nextBtn').addEventListener('click', async () => {
+  if (!pdfDoc || currentPage >= pdfDoc.numPages) return;
+  currentPage++;
+  document.getElementById('pageInfo').textContent = `${currentPage} / ${pdfDoc.numPages}`;
+  await renderPage(currentPage);
+});
+
+document.getElementById('translateBtn').addEventListener('click', async () => {
+  if (!pdfDoc) return;
+  translatedPages.add(currentPage);
+  await renderPage(currentPage);
+});
+
+document.querySelectorAll('input[name=mode]').forEach(r => {
+  r.addEventListener('change', async () => { if (pdfDoc) await renderPage(currentPage); });
+});
+
+document.getElementById('cbTranslation').addEventListener('change', async () => {
+  if (pdfDoc) await renderPage(currentPage);
+});
+
+document.addEventListener('keydown', async e => {
+  if (!pdfDoc) return;
+  if (e.key === 'ArrowRight') {
+    if (currentPage >= pdfDoc.numPages) return;
+    currentPage++;
+    document.getElementById('pageInfo').textContent = `${currentPage} / ${pdfDoc.numPages}`;
+    await renderPage(currentPage);
+  } else if (e.key === 'ArrowLeft') {
+    if (currentPage <= 1) return;
+    currentPage--;
+    document.getElementById('pageInfo').textContent = `${currentPage} / ${pdfDoc.numPages}`;
+    await renderPage(currentPage);
+  } else if (e.key === 't' || e.key === 'T') {
+    if (!pdfDoc) return;
+    translatedPages.add(currentPage);
+    await renderPage(currentPage);
+  }
+});
+
+function setStatus(cls, msg) {
+  const el = document.getElementById('status');
+  el.className = 'status ' + cls;
+  el.textContent = msg;
+}
+
+loadPdfList();
+</script>
+</body>
+</html>

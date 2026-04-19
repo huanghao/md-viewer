@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>PDF 段落质量分析</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #1e1e1e; color: #cdd9e5; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── 顶栏 ── */
+.toolbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px; background: #2d333b;
+  border-bottom: 1px solid #444c56; flex-shrink: 0; flex-wrap: wrap;
+}
+.toolbar select {
+  background: #373e47; border: 1px solid #444c56; color: #cdd9e5;
+  border-radius: 4px; padding: 4px 8px; font-size: 13px; max-width: 280px;
+}
+.toolbar label { font-size: 12px; color: #8b949e; display: flex; align-items: center; gap: 4px; cursor: pointer; }
+.toolbar button {
+  background: #0969da; color: #fff; border: none;
+  border-radius: 4px; padding: 5px 12px; font-size: 13px; cursor: pointer;
+}
+.toolbar button:hover { background: #0550ae; }
+.toolbar button:disabled { opacity: 0.5; cursor: default; }
+.sep { width: 1px; height: 22px; background: #444c56; flex-shrink: 0; }
+.page-nav { display: flex; align-items: center; gap: 5px; }
+.page-nav button {
+  background: #373e47; border: 1px solid #444c56; color: #cdd9e5;
+  border-radius: 4px; padding: 3px 9px; cursor: pointer; font-size: 13px;
+}
+.page-nav button:hover { background: #444c56; }
+.page-nav span { font-size: 13px; min-width: 64px; text-align: center; }
+.threshold-row { display: flex; align-items: center; gap: 6px; }
+.threshold-row input[type=range] {
+  width: 80px; accent-color: #58a6ff;
+}
+.threshold-val { font-size: 12px; min-width: 30px; color: #58a6ff; }
+.legend { display: flex; gap: 10px; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #8b949e; }
+.legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+/* ── 主体 ── */
+.main { display: flex; flex: 1; min-height: 0; }
+
+/* PDF 区 */
+.pdf-area {
+  flex: 1; overflow-y: auto; background: #525659;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 20px; padding: 20px;
+}
+.page-wrapper { position: relative; box-shadow: 0 2px 20px rgba(0,0,0,0.5); }
+.page-wrapper canvas { display: block; }
+.overlay-canvas { position: absolute; top: 0; left: 0; }
+
+/* 侧栏 */
+.sidebar {
+  width: 300px; background: #2d333b;
+  border-left: 1px solid #444c56;
+  display: flex; flex-direction: column; flex-shrink: 0;
+}
+.sidebar-tabs { display: flex; border-bottom: 1px solid #444c56; flex-shrink: 0; }
+.sidebar-tab {
+  flex: 1; padding: 8px 4px; text-align: center; font-size: 12px;
+  cursor: pointer; color: #8b949e; border-bottom: 2px solid transparent;
+  user-select: none;
+}
+.sidebar-tab.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+.sidebar-body { flex: 1; overflow-y: auto; padding: 10px; font-size: 12px; }
+
+/* 统计 */
+.stat-section { margin-bottom: 16px; }
+.stat-title {
+  font-size: 10px; font-weight: 700; color: #8b949e;
+  text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px;
+}
+.stat-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 3px 0; border-bottom: 1px solid #373e47; font-size: 12px;
+}
+.stat-val { color: #58a6ff; font-weight: 600; }
+.bar-row { margin: 4px 0; }
+.bar-label { display: flex; justify-content: space-between; font-size: 11px; color: #8b949e; margin-bottom: 2px; }
+.bar-bg { height: 5px; background: #373e47; border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 5px; border-radius: 3px; transition: width 0.2s; }
+
+/* 段落列表 */
+.block-item {
+  background: #373e47; border-radius: 5px; padding: 7px 9px;
+  margin-bottom: 6px; cursor: pointer; border: 1px solid transparent;
+  transition: border-color 0.1s;
+}
+.block-item:hover { border-color: #444c56; }
+.block-item.selected { border-color: #58a6ff; background: #1f3358; }
+.block-badge {
+  display: inline-block; padding: 1px 6px; border-radius: 10px;
+  font-size: 10px; font-weight: 700; margin-bottom: 4px;
+}
+.badge-body { background: #0d3318; color: #56d364; }
+.badge-heading { background: #0d2545; color: #58a6ff; }
+.badge-caption { background: #3a2a00; color: #d29922; }
+.badge-warn { background: #3a0d0d; color: #f85149; }
+.block-text {
+  font-size: 11px; color: #cdd9e5; line-height: 1.5;
+  max-height: 56px; overflow: hidden;
+}
+.block-meta { font-size: 10px; color: #636e7b; margin-top: 3px; }
+
+/* 空状态 */
+.empty { color: #636e7b; text-align: center; padding: 24px 0; font-size: 13px; }
+.ok { color: #56d364; text-align: center; padding: 16px 0; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <select id="pdfSelect"><option value="">— 选择 PDF —</option></select>
+  <div class="sep"></div>
+  <div class="page-nav">
+    <button id="prevBtn">◀</button>
+    <span id="pageInfo">— / —</span>
+    <button id="nextBtn">▶</button>
+  </div>
+  <div class="sep"></div>
+  <div class="threshold-row">
+    <label>行高倍数</label>
+    <input type="range" id="threshold" min="0.5" max="3.0" step="0.1" value="1.5">
+    <span class="threshold-val" id="thresholdVal">1.5×</span>
+  </div>
+  <div class="sep"></div>
+  <label><input type="checkbox" id="cbBbox" checked> 边界框</label>
+  <label><input type="checkbox" id="cbIdx"> 序号</label>
+  <label><input type="checkbox" id="cbCols" checked> 双栏</label>
+  <div class="sep"></div>
+  <button id="analyzeBtn">分析全文</button>
+  <div class="sep"></div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#56d364"></div>正文</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#58a6ff"></div>标题</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#d29922"></div>图注/小字</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f85149"></div>可疑</div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="pdf-area" id="pdfArea">
+    <div class="empty" style="margin-top:80px">选择 PDF 文件开始分析</div>
+  </div>
+  <div class="sidebar">
+    <div class="sidebar-tabs">
+      <div class="sidebar-tab active" data-tab="stats">统计</div>
+      <div class="sidebar-tab" data-tab="blocks">段落</div>
+      <div class="sidebar-tab" data-tab="bad">Badcase</div>
+    </div>
+    <div class="sidebar-body" id="sidebarBody">
+      <div class="empty">加载 PDF 后显示</div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+// ── PDF.js（CDN，无需本地依赖）──────────────────────────────────────────
+import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs';
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
+
+// ── 常量 ────────────────────────────────────────────────────────────────
+const SCALE = 1.5;
+const DPR = window.devicePixelRatio || 1;
+
+// ── 状态 ────────────────────────────────────────────────────────────────
+let pdfDoc = null;
+let currentPage = 1;
+let currentBlocks = [];
+let selectedIdx = -1;
+let activeTab = 'stats';
+let lhMult = 1.5;
+
+// ── 段落拆分 ─────────────────────────────────────────────────────────────
+
+function buildBlocks(pageNum, items, viewport) {
+  const pageH = viewport.height / SCALE;
+  const pageW = viewport.width / SCALE;
+
+  // 过滤空项，附加屏幕坐标
+  const pts = items
+    .filter(it => it.str.trim())
+    .map(it => ({
+      ...it,
+      sx: it.transform[4],
+      sy: pageH - it.transform[5],   // PDF Y 翻转为屏幕 Y
+      fontH: it.height || Math.abs(it.transform[3]) || 12,
+    }));
+
+  if (!pts.length) return [];
+
+  // 双栏检测
+  const detectCols = document.getElementById('cbCols').checked;
+  let colSplit = null;
+  if (detectCols) {
+    const margin = pageW * 0.08;
+    const mid = pageW / 2;
+    const left  = pts.filter(p => p.sx > margin && p.sx < mid - margin * 0.3).length;
+    const right = pts.filter(p => p.sx > mid + margin * 0.3 && p.sx < pageW - margin).length;
+    const ratio = Math.min(left, right) / Math.max(left, right || 1);
+    if (left > 4 && right > 4 && ratio > 0.25) colSplit = mid;
+  }
+
+  if (colSplit !== null) {
+    const L = pts.filter(p => p.sx < colSplit).sort(byYX);
+    const R = pts.filter(p => p.sx >= colSplit).sort(byYX);
+    return [
+      ...splitGroup(pageNum, L, 'left', pageH),
+      ...splitGroup(pageNum, R, 'right', pageH),
+    ].sort((a, b) => a.y - b.y);
+  }
+
+  return splitGroup(pageNum, pts.sort(byYX), null, pageH);
+}
+
+function byYX(a, b) { return a.sy - b.sy || a.sx - b.sx; }
+
+function splitGroup(pageNum, pts, col, pageH) {
+  if (!pts.length) return [];
+  const blocks = [];
+  let cur = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const gap = Math.abs(pts[i].sy - pts[i-1].sy);
+    const lineH = pts[i-1].fontH || 12;
+    if (gap < lineH * lhMult) {
+      cur.push(pts[i]);
+    } else {
+      blocks.push(makeBlock(pageNum, cur, col, pageH));
+      cur = [pts[i]];
+    }
+  }
+  blocks.push(makeBlock(pageNum, cur, col, pageH));
+  return blocks;
+}
+
+function makeBlock(pageNum, pts, col, pageH) {
+  const x  = Math.min(...pts.map(p => p.sx));
+  const y  = Math.min(...pts.map(p => p.sy));
+  const x2 = Math.max(...pts.map(p => p.sx + Math.abs(p.width)));
+  const y2 = Math.max(...pts.map(p => p.sy + p.fontH));
+  const maxFontH = Math.max(...pts.map(p => p.fontH));
+  const text = pts.map(p => p.str).join(' ').replace(/\s+/g, ' ').trim();
+  const inMargin = pageH && (y < pageH * 0.06 || y2 > pageH * 0.94);
+  return { pageNum, pts, text, x, y, w: x2 - x, h: y2 - y, maxFontH, col, nItems: pts.length, pageH, inMargin };
+}
+
+// ── 分类 ─────────────────────────────────────────────────────────────────
+
+function classify(blocks) {
+  if (!blocks.length) return blocks;
+  const hs = blocks.map(b => b.maxFontH).filter(h => h > 0).sort((a,b) => a-b);
+  const median = hs[Math.floor(hs.length / 2)] || 12;
+
+  return blocks.map(b => {
+    const r = b.maxFontH / median;
+    let type = 'body';
+    if (r < 0.88) type = 'caption';
+    else if (r > 1.1 && b.text.length < 150) type = 'heading';
+
+    const tooShort = (b.pts.length === 1 && b.text.length < 8) || b.text.length < 4;
+    const isPageNum = b.inMargin && /^[\d\s\.\-–]+$/.test(b.text) && b.text.length < 10;
+    let warnReason = '';
+    if (isPageNum)          warnReason = '页码/页眉';
+    else if (tooShort)      warnReason = `文字过少(${b.text.length})`;
+    else if (b.pts.length > 60) warnReason = `表格/item过多(${b.pts.length})`;
+    const warn = warnReason !== '';
+
+    return { ...b, type, warn, warnReason, fontRatio: r };
+  });
+}
+
+// ── 渲染页面 ──────────────────────────────────────────────────────────────
+
+async function renderPage(num) {
+  const page = await pdfDoc.getPage(num);
+  const viewport = page.getViewport({ scale: SCALE });
+  const tc = await page.getTextContent();
+
+  const area = document.getElementById('pdfArea');
+  area.innerHTML = '';
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'page-wrapper';
+  wrapper.style.cssText = `width:${viewport.width}px;height:${viewport.height}px`;
+
+  // PDF canvas
+  const canvas = document.createElement('canvas');
+  canvas.width  = Math.round(viewport.width  * DPR);
+  canvas.height = Math.round(viewport.height * DPR);
+  canvas.style.cssText = `width:${viewport.width}px;height:${viewport.height}px`;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(DPR, DPR);
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  wrapper.appendChild(canvas);
+
+  // Overlay canvas
+  const ov = document.createElement('canvas');
+  ov.className = 'overlay-canvas';
+  ov.width  = canvas.width;
+  ov.height = canvas.height;
+  ov.style.cssText = canvas.style.cssText;
+  wrapper.appendChild(ov);
+  area.appendChild(wrapper);
+
+  // 拆分 + 分类
+  const raw = buildBlocks(num, tc.items, viewport);
+  currentBlocks = classify(raw);
+  selectedIdx = -1;
+
+  draw(ov, viewport);
+  renderSidebar(tc.items.length);
+
+  // 点击选中
+  ov.addEventListener('click', e => {
+    const r = ov.getBoundingClientRect();
+    const mx = e.clientX - r.left;
+    const my = e.clientY - r.top;
+    const idx = currentBlocks.findIndex(b =>
+      mx >= b.x * SCALE && mx <= (b.x + b.w) * SCALE &&
+      my >= b.y * SCALE && my <= (b.y + b.h) * SCALE
+    );
+    selectedIdx = idx;
+    draw(ov, viewport);
+    if (idx >= 0) {
+      if (activeTab !== 'blocks') setTab('blocks');
+      else scrollToBlock(idx);
+    }
+  });
+}
+
+// ── 绘制 overlay ──────────────────────────────────────────────────────────
+
+function draw(ov, viewport) {
+  const ctx = ov.getContext('2d');
+  ctx.clearRect(0, 0, ov.width, ov.height);
+  ctx.save();
+  ctx.scale(DPR, DPR);
+
+  const showBbox = document.getElementById('cbBbox').checked;
+  const showIdx  = document.getElementById('cbIdx').checked;
+  const showCols = document.getElementById('cbCols').checked;
+
+  // 双栏分割线
+  if (showCols && currentBlocks.some(b => b.col === 'left') && currentBlocks.some(b => b.col === 'right')) {
+    const mid = viewport.width / SCALE / 2;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(mid * SCALE, 0);
+    ctx.lineTo(mid * SCALE, viewport.height);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  if (!showBbox) { ctx.restore(); return; }
+
+  currentBlocks.forEach((b, i) => {
+    const sel = i === selectedIdx;
+    const fill = b.warn     ? 'rgba(248,81,73,0.18)'
+      : b.type === 'heading' ? 'rgba(88,166,255,0.18)'
+      : b.type === 'caption' ? 'rgba(210,153,34,0.18)'
+      :                        'rgba(86,211,100,0.12)';
+    const stroke = b.warn     ? 'rgba(248,81,73,0.85)'
+      : b.type === 'heading' ? 'rgba(88,166,255,0.85)'
+      : b.type === 'caption' ? 'rgba(210,153,34,0.85)'
+      :                        'rgba(86,211,100,0.7)';
+
+    ctx.fillStyle = sel ? 'rgba(88,166,255,0.28)' : fill;
+    ctx.fillRect(b.x * SCALE, b.y * SCALE, b.w * SCALE, b.h * SCALE);
+    ctx.strokeStyle = sel ? '#58a6ff' : stroke;
+    ctx.lineWidth = sel ? 2 : 1;
+    ctx.strokeRect(b.x * SCALE, b.y * SCALE, b.w * SCALE, b.h * SCALE);
+
+    if (showIdx) {
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      ctx.font = `${10}px monospace`;
+      ctx.fillText(`#${i}`, b.x * SCALE + 2, b.y * SCALE + 12);
+    }
+  });
+
+  ctx.restore();
+}
+
+// ── 侧栏渲染 ─────────────────────────────────────────────────────────────
+
+function renderSidebar(rawCount) {
+  if (activeTab === 'stats')  renderStats(rawCount);
+  if (activeTab === 'blocks') renderBlockList();
+  if (activeTab === 'bad')    renderBadcases();
+}
+
+function renderStats(rawCount) {
+  const blocks = currentBlocks;
+  const n = blocks.length;
+  const byType = {};
+  let warn = 0, totalChars = 0, left = 0, right = 0;
+  blocks.forEach(b => {
+    byType[b.type] = (byType[b.type] || 0) + 1;
+    if (b.warn) warn++;
+    totalChars += b.text.length;
+    if (b.col === 'left')  left++;
+    if (b.col === 'right') right++;
+  });
+  const dual = left > 0 && right > 0;
+  const avgChars = n ? Math.round(totalChars / n) : 0;
+
+  const typeRows = [
+    ['body',    '正文',    '#56d364'],
+    ['heading', '标题',    '#58a6ff'],
+    ['caption', '图注/小字','#d29922'],
+  ].map(([t, label, color]) => {
+    const cnt = byType[t] || 0;
+    const pct = n ? Math.round(cnt / n * 100) : 0;
+    return `<div class="bar-row">
+      <div class="bar-label"><span>${label}</span><span>${cnt} (${pct}%)</span></div>
+      <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('sidebarBody').innerHTML = `
+    <div class="stat-section">
+      <div class="stat-title">当前页</div>
+      <div class="stat-row"><span>原始 TextItem</span><span class="stat-val">${rawCount ?? '—'}</span></div>
+      <div class="stat-row"><span>段落数</span><span class="stat-val">${n}</span></div>
+      <div class="stat-row"><span>平均字符/段</span><span class="stat-val">${avgChars}</span></div>
+      <div class="stat-row"><span>可疑段落</span>
+        <span class="stat-val" style="color:${warn > 0 ? '#f85149' : '#56d364'}">${warn}</span></div>
+      <div class="stat-row"><span>双栏</span>
+        <span class="stat-val" style="color:${dual ? '#58a6ff' : '#636e7b'}">
+          ${dual ? `✓ 左${left} / 右${right}` : '单栏'}</span></div>
+    </div>
+    <div class="stat-section">
+      <div class="stat-title">类型分布</div>
+      ${typeRows}
+    </div>
+    <div class="stat-section">
+      <div class="stat-title">参数</div>
+      <div class="stat-row"><span>行高倍数</span><span class="stat-val">${lhMult}×</span></div>
+    </div>
+  `;
+}
+
+function renderBlockList() {
+  const body = document.getElementById('sidebarBody');
+  body.innerHTML = currentBlocks.map((b, i) => {
+    const labelMap = { body: '正文', heading: '标题', caption: '图注' };
+    const classMap = { body: 'badge-body', heading: 'badge-heading', caption: 'badge-caption' };
+    const badge = b.warn
+      ? `<span class="block-badge badge-warn">⚠ ${b.warnReason}</span>`
+      : `<span class="block-badge ${classMap[b.type]}">${labelMap[b.type]}${b.col ? ' · ' + b.col : ''}</span>`;
+    return `<div class="block-item ${i === selectedIdx ? 'selected' : ''}" data-idx="${i}">
+      ${badge}
+      <div class="block-text">${esc(b.text.slice(0, 130))}${b.text.length > 130 ? '…' : ''}</div>
+      <div class="block-meta">#${i} · x${Math.round(b.x)} y${Math.round(b.y)} · ${Math.round(b.w)}×${Math.round(b.h)} · 字号${b.maxFontH.toFixed(1)} · ${b.pts.length} items</div>
+    </div>`;
+  }).join('');
+
+  body.querySelectorAll('.block-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const idx = Number(el.dataset.idx);
+      selectedIdx = idx;
+      const ov = document.querySelector('.overlay-canvas');
+      if (ov) {
+        pdfDoc.getPage(currentPage).then(page => {
+          draw(ov, page.getViewport({ scale: SCALE }));
+        });
+      }
+      renderBlockList();
+      el.scrollIntoView({ block: 'nearest' });
+    });
+  });
+}
+
+function renderBadcases() {
+  const bad = currentBlocks.filter(b => b.warn);
+  const body = document.getElementById('sidebarBody');
+  if (!bad.length) {
+    body.innerHTML = '<div class="ok">✓ 本页无 badcase</div>';
+    return;
+  }
+  body.innerHTML = `<div style="color:#8b949e;font-size:11px;margin-bottom:8px">发现 ${bad.length} 个可疑段落</div>` +
+    bad.map(b => {
+      const i = currentBlocks.indexOf(b);
+      return `<div class="block-item" data-idx="${i}">
+        <span class="block-badge badge-warn">⚠ ${b.warnReason}</span>
+        <div class="block-text">${esc(b.text.slice(0, 130))}${b.text.length > 130 ? '…' : ''}</div>
+        <div class="block-meta">#${i} · ${b.pts.length} items · ${b.text.length} chars</div>
+      </div>`;
+    }).join('');
+
+  body.querySelectorAll('.block-item').forEach(el => {
+    el.addEventListener('click', () => {
+      selectedIdx = Number(el.dataset.idx);
+      setTab('blocks');
+    });
+  });
+}
+
+function scrollToBlock(idx) {
+  const items = document.querySelectorAll('.block-item');
+  items[idx]?.scrollIntoView({ block: 'nearest' });
+  renderBlockList();
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── 全文分析 ──────────────────────────────────────────────────────────────
+
+async function analyzeAll() {
+  if (!pdfDoc) return;
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = true;
+  btn.textContent = '分析中…';
+
+  const total = pdfDoc.numPages;
+  let totalBlocks = 0, totalWarn = 0, totalItems = 0, dualPages = 0;
+  const typeCount = { body: 0, heading: 0, caption: 0 };
+  const perPage = [];
+
+  for (let p = 1; p <= total; p++) {
+    btn.textContent = `分析中 ${p}/${total}`;
+    const page = await pdfDoc.getPage(p);
+    const vp = page.getViewport({ scale: SCALE });
+    const tc = await page.getTextContent();
+    const blocks = classify(buildBlocks(p, tc.items, vp));
+    const warn = blocks.filter(b => b.warn).length;
+    const isDual = blocks.some(b => b.col === 'left') && blocks.some(b => b.col === 'right');
+    if (isDual) dualPages++;
+    blocks.forEach(b => typeCount[b.type] = (typeCount[b.type] || 0) + 1);
+    totalBlocks += blocks.length;
+    totalWarn   += warn;
+    totalItems  += tc.items.length;
+    perPage.push({ p, n: blocks.length, warn, isDual, items: tc.items.length });
+  }
+
+  btn.disabled = false;
+  btn.textContent = '分析全文';
+
+  setTab('stats');
+  const avgB = Math.round(totalBlocks / total);
+  const warnPct = totalBlocks ? Math.round(totalWarn / totalBlocks * 100) : 0;
+
+  const typeRows = [
+    ['body',    '正文',    '#56d364'],
+    ['heading', '标题',    '#58a6ff'],
+    ['caption', '图注/小字','#d29922'],
+  ].map(([t, label, color]) => {
+    const cnt = typeCount[t] || 0;
+    const pct = totalBlocks ? Math.round(cnt / totalBlocks * 100) : 0;
+    return `<div class="bar-row">
+      <div class="bar-label"><span>${label}</span><span>${cnt} (${pct}%)</span></div>
+      <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('sidebarBody').innerHTML = `
+    <div class="stat-section">
+      <div class="stat-title">全文概览（${total} 页）</div>
+      <div class="stat-row"><span>总 TextItem</span><span class="stat-val">${totalItems}</span></div>
+      <div class="stat-row"><span>总段落数</span><span class="stat-val">${totalBlocks}</span></div>
+      <div class="stat-row"><span>平均段落/页</span><span class="stat-val">${avgB}</span></div>
+      <div class="stat-row"><span>可疑段落</span>
+        <span class="stat-val" style="color:${warnPct > 5 ? '#f85149' : '#56d364'}">${totalWarn} (${warnPct}%)</span></div>
+      <div class="stat-row"><span>双栏页面</span><span class="stat-val">${dualPages} / ${total}</span></div>
+    </div>
+    <div class="stat-section">
+      <div class="stat-title">全文类型分布</div>
+      ${typeRows}
+    </div>
+    <div class="stat-section">
+      <div class="stat-title">逐页（点击跳转）</div>
+      ${perPage.map(({p, n, warn, isDual}) => `
+        <div class="stat-row" style="cursor:pointer" data-page="${p}">
+          <span>第 ${p} 页 ${isDual ? '<span style="color:#58a6ff">⚏</span>' : ''}</span>
+          <span>${n} 段${warn > 0 ? ` <span style="color:#f85149">⚠${warn}</span>` : ''}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  document.querySelectorAll('[data-page]').forEach(el => {
+    el.addEventListener('click', async () => {
+      currentPage = Number(el.dataset.page);
+      document.getElementById('pageInfo').textContent = `${currentPage} / ${pdfDoc.numPages}`;
+      await renderPage(currentPage);
+    });
+  });
+}
+
+// ── Tab 切换 ──────────────────────────────────────────────────────────────
+
+function setTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.sidebar-tab').forEach(el => {
+    el.classList.toggle('active', el.dataset.tab === tab);
+  });
+  renderSidebar();
+}
+
+document.querySelectorAll('.sidebar-tab').forEach(el => {
+  el.addEventListener('click', () => setTab(el.dataset.tab));
+});
+
+// ── 控件事件 ─────────────────────────────────────────────────────────────
+
+async function loadPdfList() {
+  const res = await fetch('/pdfs');
+  const list = await res.json();
+  const sel = document.getElementById('pdfSelect');
+  list.forEach(({ name, path }) => {
+    const opt = document.createElement('option');
+    opt.value = path; opt.textContent = name;
+    sel.appendChild(opt);
+  });
+}
+
+document.getElementById('pdfSelect').addEventListener('change', async e => {
+  const path = e.target.value;
+  if (!path) return;
+  pdfDoc = await pdfjsLib.getDocument(`/pdf?path=${encodeURIComponent(path)}`).promise;
+  currentPage = 1;
+  document.getElementById('pageInfo').textContent = `1 / ${pdfDoc.numPages}`;
+  await renderPage(1);
+});
+
+document.getElementById('prevBtn').addEventListener('click', async () => {
+  if (!pdfDoc || currentPage <= 1) return;
+  currentPage--;
+  document.getElementById('pageInfo').textContent = `${currentPage} / ${pdfDoc.numPages}`;
+  await renderPage(currentPage);
+});
+
+document.getElementById('nextBtn').addEventListener('click', async () => {
+  if (!pdfDoc || currentPage >= pdfDoc.numPages) return;
+  currentPage++;
+  document.getElementById('pageInfo').textContent = `${currentPage} / ${pdfDoc.numPages}`;
+  await renderPage(currentPage);
+});
+
+document.getElementById('threshold').addEventListener('input', async e => {
+  lhMult = parseFloat(e.target.value);
+  document.getElementById('thresholdVal').textContent = lhMult.toFixed(1) + '×';
+  if (pdfDoc) await renderPage(currentPage);
+});
+
+['cbBbox', 'cbIdx', 'cbCols'].forEach(id => {
+  document.getElementById(id).addEventListener('change', async () => {
+    if (pdfDoc) await renderPage(currentPage);
+  });
+});
+
+document.getElementById('analyzeBtn').addEventListener('click', analyzeAll);
+
+document.addEventListener('keydown', async e => {
+  if (!pdfDoc) return;
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+    if (currentPage >= pdfDoc.numPages) return;
+    currentPage++;
+    document.getElementById('pageInfo').textContent = `${currentPage} / ${pdfDoc.numPages}`;
+    await renderPage(currentPage);
+  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+    if (currentPage <= 1) return;
+    currentPage--;
+    document.getElementById('pageInfo').textContent = `${currentPage} / ${pdfDoc.numPages}`;
+    await renderPage(currentPage);
+  }
+});
+
+loadPdfList();
+</script>
+</body>
+</html>

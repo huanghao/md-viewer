@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>PDF 翻译触发方式 — 交互原型</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f6f8fa; color: #24292e; }
+
+  .page-header {
+    background: #fff;
+    border-bottom: 1px solid #d0d7de;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .page-header h1 { font-size: 16px; font-weight: 600; }
+  .mode-tabs { display: flex; gap: 4px; margin-left: auto; }
+  .mode-tab {
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid #d0d7de;
+    background: #fff;
+    cursor: pointer;
+    font-size: 13px;
+    color: #57606a;
+    transition: all 0.15s;
+  }
+  .mode-tab.active { background: #0969da; color: #fff; border-color: #0969da; }
+  .mode-tab:hover:not(.active) { background: #f3f4f6; }
+
+  .layout { display: flex; height: calc(100vh - 57px); }
+
+  /* PDF 模拟区 */
+  .pdf-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px;
+    background: #525659;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+  .pdf-page {
+    background: #fff;
+    width: 595px;
+    min-height: 842px;
+    padding: 60px 72px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.3);
+    position: relative;
+  }
+
+  /* 段落 */
+  .para {
+    position: relative;
+    margin-bottom: 16px;
+    padding: 4px 0;
+    line-height: 1.7;
+    font-size: 13px;
+    color: #24292e;
+    cursor: default;
+    border-radius: 3px;
+    transition: background 0.1s;
+  }
+  .para.highlighted { background: rgba(9,105,218,0.08); }
+  .para.translated { background: rgba(26,127,55,0.06); }
+
+  .para-title {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    margin-top: 8px;
+  }
+
+  /* 译文 */
+  .translation-result {
+    margin-top: 6px;
+    padding: 6px 10px;
+    background: #f0f7ff;
+    border-left: 3px solid #0969da;
+    border-radius: 0 4px 4px 0;
+    font-size: 12px;
+    color: #0550ae;
+    line-height: 1.6;
+    display: none;
+  }
+  .para.translated .translation-result { display: block; }
+
+  /* 侧边栏 */
+  .sidebar {
+    width: 280px;
+    background: #fff;
+    border-left: 1px solid #d0d7de;
+    display: flex;
+    flex-direction: column;
+  }
+  .sidebar-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid #d0d7de;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .sidebar-body { flex: 1; overflow-y: auto; padding: 12px; }
+  .sidebar-item {
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    color: #57606a;
+    border: 1px solid #d0d7de;
+    margin-bottom: 8px;
+  }
+  .sidebar-item .si-orig { font-size: 11px; color: #8b949e; margin-bottom: 4px; }
+  .sidebar-item .si-trans { color: #0550ae; }
+  .sidebar-empty { color: #8b949e; font-size: 12px; text-align: center; padding: 24px 0; }
+
+  /* 方案 A: hover 按钮固定左侧 */
+  .translate-btn-left {
+    display: none;
+    position: absolute;
+    left: -40px;
+    top: 4px;
+    background: #0969da;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    z-index: 10;
+    white-space: nowrap;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  }
+  .translate-btn-left:hover { background: #0550ae; }
+
+  /* 方案 B: hover 高亮 + 快捷键 */
+  .hotkey-hint {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 4px;
+    background: rgba(0,0,0,0.6);
+    color: #fff;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  kbd {
+    display: inline-block;
+    background: rgba(255,255,255,0.15);
+    border-radius: 3px;
+    padding: 0 4px;
+    font-family: monospace;
+    font-size: 10px;
+  }
+
+  /* 方案 C: 双击 */
+  /* no extra elements, just cursor */
+  body.mode-c .para { cursor: default; }
+
+  /* 方案 D: 每段固定图标 */
+  .para-icon {
+    display: none;
+    position: absolute;
+    left: -28px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+    background: #f3f4f6;
+    border: 1px solid #d0d7de;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    color: #57606a;
+    transition: background 0.1s;
+  }
+  .para-icon:hover { background: #0969da; color: #fff; border-color: #0969da; }
+
+  /* 模式说明 */
+  .mode-desc {
+    background: #fff;
+    border-bottom: 1px solid #d0d7de;
+    padding: 10px 24px;
+    font-size: 12px;
+    color: #57606a;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .mode-desc strong { color: #24292e; }
+  .mode-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    background: #ddf4ff;
+    color: #0550ae;
+  }
+
+  /* 快捷键监听提示 */
+  .shortcut-toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #1f2328;
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    opacity: 0;
+    transition: all 0.2s;
+    pointer-events: none;
+    z-index: 999;
+  }
+  .shortcut-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>PDF 翻译触发方式 — 交互原型</h1>
+  <div class="mode-tabs">
+    <button class="mode-tab active" onclick="setMode('a')">A · Hover 按钮左侧</button>
+    <button class="mode-tab" onclick="setMode('b')">B · Hover + 快捷键 T</button>
+    <button class="mode-tab" onclick="setMode('c')">C · 双击段落</button>
+    <button class="mode-tab" onclick="setMode('d')">D · 每段固定图标</button>
+  </div>
+</div>
+
+<div class="mode-desc" id="modeDesc">
+  <span class="mode-badge">方案 A</span>
+  <span><strong>Hover 段落</strong>时，段落左侧出现「译」按钮，固定位置，点击翻译。</span>
+</div>
+
+<div class="layout">
+  <div class="pdf-area">
+    <div class="pdf-page" id="pdfPage">
+
+      <div class="para para-title">Abstract</div>
+
+      <div class="para" data-text="We present a novel approach to neural machine translation that leverages large-scale pretraining on multilingual corpora. Our method achieves state-of-the-art results on standard benchmarks while significantly reducing inference time compared to previous approaches.">
+        <button class="translate-btn-left">译</button>
+        <span class="para-icon">译</span>
+        <span class="hotkey-hint">T to translate</span>
+        We present a novel approach to neural machine translation that leverages large-scale pretraining on multilingual corpora. Our method achieves state-of-the-art results on standard benchmarks while significantly reducing inference time compared to previous approaches.
+        <div class="translation-result">我们提出了一种新颖的神经机器翻译方法，利用多语言语料库的大规模预训练。我们的方法在标准基准测试中达到了最先进的结果，同时与以前的方法相比显著减少了推理时间。</div>
+      </div>
+
+      <div class="para para-title">1. Introduction</div>
+
+      <div class="para" data-text="The rapid advancement of deep learning has transformed natural language processing, enabling systems to perform translation tasks with unprecedented accuracy. However, the computational cost of these systems remains a significant barrier to widespread deployment.">
+        <button class="translate-btn-left">译</button>
+        <span class="para-icon">译</span>
+        <span class="hotkey-hint">T to translate</span>
+        The rapid advancement of deep learning has transformed natural language processing, enabling systems to perform translation tasks with unprecedented accuracy. However, the computational cost of these systems remains a significant barrier to widespread deployment.
+        <div class="translation-result">深度学习的快速发展改变了自然语言处理，使系统能够以前所未有的精度执行翻译任务。然而，这些系统的计算成本仍然是广泛部署的重大障碍。</div>
+      </div>
+
+      <div class="para" data-text="In this paper, we introduce TransFormer-XL, a transformer-based architecture that addresses these limitations through a combination of sparse attention mechanisms and knowledge distillation. Our key contributions are threefold.">
+        <button class="translate-btn-left">译</button>
+        <span class="para-icon">译</span>
+        <span class="hotkey-hint">T to translate</span>
+        In this paper, we introduce TransFormer-XL, a transformer-based architecture that addresses these limitations through a combination of sparse attention mechanisms and knowledge distillation. Our key contributions are threefold.
+        <div class="translation-result">在本文中，我们介绍了 TransFormer-XL，一种基于 transformer 的架构，通过稀疏注意力机制和知识蒸馏的组合来解决这些限制。我们的主要贡献有三个方面。</div>
+      </div>
+
+      <div class="para" data-text="First, we propose a novel sparse attention pattern that reduces the quadratic complexity of standard self-attention to near-linear, while preserving translation quality on long documents. Second, we develop a cross-lingual knowledge distillation framework that transfers knowledge from a large teacher model to a compact student model.">
+        <button class="translate-btn-left">译</button>
+        <span class="para-icon">译</span>
+        <span class="hotkey-hint">T to translate</span>
+        First, we propose a novel sparse attention pattern that reduces the quadratic complexity of standard self-attention to near-linear, while preserving translation quality on long documents. Second, we develop a cross-lingual knowledge distillation framework that transfers knowledge from a large teacher model to a compact student model.
+        <div class="translation-result">首先，我们提出了一种新颖的稀疏注意力模式，将标准自注意力的二次复杂度降低到近线性，同时保持长文档的翻译质量。其次，我们开发了一个跨语言知识蒸馏框架，将知识从大型教师模型转移到紧凑的学生模型。</div>
+      </div>
+
+      <div class="para para-title">2. Related Work</div>
+
+      <div class="para" data-text="Neural machine translation has evolved significantly since the introduction of sequence-to-sequence models. The transformer architecture (Vaswani et al., 2017) marked a turning point, replacing recurrent networks with self-attention mechanisms that allow for parallelization during training.">
+        <button class="translate-btn-left">译</button>
+        <span class="para-icon">译</span>
+        <span class="hotkey-hint">T to translate</span>
+        Neural machine translation has evolved significantly since the introduction of sequence-to-sequence models. The transformer architecture (Vaswani et al., 2017) marked a turning point, replacing recurrent networks with self-attention mechanisms that allow for parallelization during training.
+        <div class="translation-result">自序列到序列模型引入以来，神经机器翻译已经显著发展。Transformer 架构（Vaswani et al., 2017）标志着一个转折点，用允许训练期间并行化的自注意力机制替代了循环网络。</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <div class="sidebar-header">翻译历史</div>
+    <div class="sidebar-body" id="sidebarBody">
+      <div class="sidebar-empty" id="sidebarEmpty">点击段落翻译后，译文将显示在这里</div>
+    </div>
+  </div>
+</div>
+
+<div class="shortcut-toast" id="toast"></div>
+
+<script>
+let currentMode = 'a';
+let hoveredPara = null;
+
+const modeDescs = {
+  a: ['方案 A', '<strong>Hover 段落</strong>时，段落左侧出现「译」按钮，固定位置，点击翻译。'],
+  b: ['方案 B', '<strong>Hover 段落</strong>时高亮，按 <kbd style="background:#e6edf3;color:#24292e;border:1px solid #d0d7de;border-radius:3px;padding:1px 5px;font-family:monospace">T</kbd> 键翻译当前高亮段落。无需移动鼠标。'],
+  c: ['方案 C', '<strong>双击段落</strong>触发翻译。无任何视觉提示，最简洁，但需要记住操作方式。'],
+  d: ['方案 D', '每段左侧<strong>固定显示</strong>小「译」图标，随时可点。视觉上稍有噪音。'],
+};
+
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-tab').forEach((t, i) => {
+    t.classList.toggle('active', ['a','b','c','d'][i] === mode);
+  });
+
+  const [badge, desc] = modeDescs[mode];
+  document.getElementById('modeDesc').innerHTML =
+    `<span class="mode-badge">${badge}</span><span>${desc}</span>`;
+
+  // 重置所有段落状态
+  document.querySelectorAll('.para:not(.para-title)').forEach(p => {
+    p.classList.remove('highlighted');
+    p.querySelector('.translate-btn-left').style.display = 'none';
+    p.querySelector('.hotkey-hint').style.display = 'none';
+    const icon = p.querySelector('.para-icon');
+    icon.style.display = mode === 'd' ? 'flex' : 'none';
+  });
+
+  hoveredPara = null;
+  rebindEvents();
+}
+
+function rebindEvents() {
+  document.querySelectorAll('.para:not(.para-title)').forEach(para => {
+    // 清除旧事件（克隆替换）
+    const fresh = para.cloneNode(true);
+    para.parentNode.replaceChild(fresh, para);
+  });
+
+  document.querySelectorAll('.para:not(.para-title)').forEach(para => {
+    const btn = para.querySelector('.translate-btn-left');
+    const hint = para.querySelector('.hotkey-hint');
+    const icon = para.querySelector('.para-icon');
+
+    if (currentMode === 'd') {
+      icon.style.display = 'flex';
+      icon.addEventListener('click', (e) => {
+        e.stopPropagation();
+        doTranslate(para);
+      });
+      return;
+    }
+
+    para.addEventListener('mouseenter', () => {
+      hoveredPara = para;
+      para.classList.add('highlighted');
+      if (currentMode === 'a') btn.style.display = 'block';
+      if (currentMode === 'b') hint.style.display = 'block';
+    });
+
+    para.addEventListener('mouseleave', (e) => {
+      if (currentMode === 'a' && e.relatedTarget === btn) return;
+      para.classList.remove('highlighted');
+      if (currentMode === 'a') btn.style.display = 'none';
+      if (currentMode === 'b') hint.style.display = 'none';
+      if (hoveredPara === para) hoveredPara = null;
+    });
+
+    if (currentMode === 'a') {
+      btn.addEventListener('mouseleave', () => {
+        para.classList.remove('highlighted');
+        btn.style.display = 'none';
+      });
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        doTranslate(para);
+      });
+    }
+
+    if (currentMode === 'c') {
+      para.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        doTranslate(para);
+      });
+    }
+  });
+}
+
+function doTranslate(para) {
+  if (para.classList.contains('translated')) return;
+  para.classList.add('translated');
+  para.classList.remove('highlighted');
+
+  // 加到侧边栏
+  const empty = document.getElementById('sidebarEmpty');
+  if (empty) empty.remove();
+
+  const orig = para.dataset.text || para.innerText.trim().split('\n')[0].substring(0, 60) + '...';
+  const trans = para.querySelector('.translation-result').textContent;
+
+  const item = document.createElement('div');
+  item.className = 'sidebar-item';
+  item.innerHTML = `<div class="si-orig">${orig.substring(0, 50)}…</div><div class="si-trans">${trans.substring(0, 60)}…</div>`;
+  document.getElementById('sidebarBody').prepend(item);
+
+  showToast('已翻译');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1500);
+}
+
+// 快捷键 T (方案 B)
+document.addEventListener('keydown', (e) => {
+  if (e.key === 't' || e.key === 'T') {
+    if (currentMode === 'b' && hoveredPara) {
+      doTranslate(hoveredPara);
+      showToast('T — 翻译');
+    }
+  }
+});
+
+// 初始化
+setMode('a');
+</script>
+</body>
+</html>

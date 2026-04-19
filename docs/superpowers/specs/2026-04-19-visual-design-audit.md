@@ -28,15 +28,14 @@
 
 ## 2. 工具栏
 
-项目里有 **3 处工具栏**，高度不统一：
+项目里有 **2 处工具栏**：
 
 | 位置 | CSS 类 | 高度 | 内容 |
 |------|--------|------|------|
 | 顶部主工具栏 | `.toolbar` | **48px** | 刷新、diff、字号、连接状态、设置 |
-| 右侧 Tab 标题行 | `.tabs` | **36px**（min-height） | 批注 / 翻译 tab 切换 |
-| 右侧 Tab 下工具栏 | 无独立类，内嵌在 tab 内容里 | **实际 > 36px**，比 tab 标题高 | 筛选、排序等操作按钮 |
+| 右侧批注栏 Tab 行 | `.annotation-tabs` | **约 28px**（由 `.annotation-tab` padding 7px 撑开） | tab 切换 + 操作按钮并排在同一行 |
 
-**问题**：右侧 tab 下的工具栏高度超过了 tab 标题行，视觉上突兀。原因是它复用了主工具栏的按钮样式（padding 相同），但容器语境不同。
+右侧批注栏的结构：tab 按钮（`.annotation-tab`，padding 7px 4px）和操作图标按钮（`.annotation-icon-btn`，30×30px）**在同一行 flex 容器**里，图标按钮高于 tab 文字区域，由 `align-items: center` 居中对齐，整行高度由 30px 的图标按钮撑开。这是已知的设计，tab 标题和操作按钮共享同一行高。
 
 ---
 
@@ -202,7 +201,6 @@ SVG 规范：16×16px，线宽 1.5px，线性风格。
 
 | 问题 | 位置 | 严重程度 |
 |------|------|---------|
-| 右侧 tab 下工具栏比 tab 标题还高 | 批注/翻译 tab | ⚠ 明显 |
 | 次要文字色有 4 个近似值 | 全局 | ⚠ 明显 |
 | 字号 10–14px 五档差 1px | 全局 | ⚠ 明显 |
 | 计数 badge（红）和编号 badge（蓝）语义混淆 | 批注栏 | ⚠ 明显 |
@@ -266,8 +264,79 @@ SVG 规范：16×16px，线宽 1.5px，线性风格。
 
 ---
 
+## 14. Theme 系统与视觉元素的关系
+
+### 架构
+
+Theme 系统分两层，各自独立，互不干扰：
+
+```
+┌─────────────────────────────────────────────────────┐
+│  UI Shell（css.ts）                                  │
+│  工具栏、侧边栏、按钮、badge、列表项……               │
+│  硬编码颜色，不受 theme 切换影响                     │
+├─────────────────────────────────────────────────────┤
+│  Markdown Theme（<style id="theme-md-css">）         │
+│  .markdown-body 内所有排版样式                       │
+│  GitHub / Notion / Bear 三选一，可运行时切换          │
+├─────────────────────────────────────────────────────┤
+│  Highlight Theme（<style id="theme-hl-css">）        │
+│  代码块语法高亮颜色                                  │
+│  GitHub Light / GitHub Dark / Atom One Dark 三选一   │
+└─────────────────────────────────────────────────────┘
+```
+
+### 实现方式
+
+HTML 初始时注入两个 `<style>` 标签（`html.ts` 第 68-69 行），默认值为 GitHub 主题：
+
+```html
+<style id="theme-md-css">/* github markdown css */</style>
+<style id="theme-hl-css">/* highlight github css */</style>
+```
+
+用户在设置里切换主题时，`applyTheme()` 直接替换这两个标签的 `textContent`，无需重新渲染内容。
+
+### 各主题覆盖范围
+
+| 主题 | 类型 | 覆盖的 CSS 类 | 覆盖内容 |
+|------|------|-------------|---------|
+| GitHub（默认） | Markdown | `.markdown-body` | 完整 github-markdown-css，字号 16px，行高 1.5 |
+| Notion | Markdown | `.markdown-body` | 在 GitHub 基础上叠加：字体 ui-sans-serif，行高 1.75，颜色 #37352f，去掉标题下划线 |
+| Bear / iA Writer | Markdown | `.markdown-body` | 叠加：衬线字体 Georgia，行高 1.8，更大字号，更宽行间距 |
+| GitHub Light | Highlight | `.hljs` | 浅色代码高亮 |
+| GitHub Dark | Highlight | `.hljs` | 深色代码高亮 |
+| Atom One Dark | Highlight | `.hljs` | 深色代码高亮（暖色调） |
+
+### 哪些视觉元素受 theme 影响
+
+**受影响（在 `.markdown-body` 内）**：
+- 正文字体、字号、行高、颜色
+- 标题样式（字重、边框、间距）
+- 链接颜色
+- 行内代码背景和颜色
+- 代码块背景（Markdown theme 控制容器，Highlight theme 控制 token 颜色）
+- 引用块、表格、分割线
+
+**不受影响（UI Shell，css.ts 硬编码）**：
+- 工具栏、侧边栏、批注栏
+- 所有按钮、搜索框、列表项
+- Badge、Toast、对话框
+- 面包屑、tab 标题
+
+### 问题
+
+**UI Shell 颜色与 Markdown theme 颜色没有关联**。例如：
+- GitHub theme 正文色 `#24292e`，UI Shell 主文字也是 `#24292e`——偶然一致
+- Notion theme 正文色 `#37352f`，但 UI Shell 仍是 `#24292e`——切换主题后正文和 UI 颜色不一致
+- Bear theme 背景白色，但如果未来加深色 Markdown theme，UI Shell 没有对应的暗色模式
+
+**结论**：Theme 系统目前只管内容区排版，UI Shell 是独立的一套，两者没有 token 共享。这在当前三个主题下问题不大（都是浅色），若要支持暗色模式则需要重新设计。
+
+---
+
 ## 下一步
 
-1. **优先修**：右侧 tab 工具栏高度（视觉最突兀）
-2. **次优先**：统一次要文字色（改动面广但机械，风险低）
-3. **后续**：建立 CSS token 变量，逐步替换硬编码值
+1. **优先修**：统一次要文字色（改动面广但机械，风险低）
+2. **后续**：建立 CSS token 变量，逐步替换硬编码值
+3. **长期**：如需暗色模式，需要 UI Shell 也参与 theme 系统

@@ -1321,7 +1321,7 @@ export const styles = `
     /* Inline diff 内容区 */
     .diff-inline-body {
       padding: 32px 32px;
-      max-width: 1100px;
+      max-width: 1000px;
       margin: 0 auto;
     }
 

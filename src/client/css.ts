@@ -8,10 +8,10 @@ export const styles = `
       --color-text-primary:   #24292e;
       --color-text-secondary: #57606a;
       --color-text-muted:     #8b949e;
-      --color-border:         var(--color-border);
-      --color-border-subtle:  var(--color-border-subtle);
+      --color-border:         #d0d7de;
+      --color-border-subtle:  #e8ecf0;
       --color-bg-subtle:      #f6f8fa;
-      --color-accent:         var(--color-accent);
+      --color-accent:         #0969da;
 
       /* typography tokens */
       --text-xs: 11px;
@@ -2331,9 +2331,42 @@ export const styles = `
     .translation-item-del:hover { color: #cf222e; }
 
     /* PDF 悬停「译」按钮 */
+    /* hover-hotkey 模式：段落高亮背景 */
+    .pdf-para-highlight {
+      position: absolute;
+      left: 0;
+      right: 0;
+      background: rgba(9, 105, 218, 0.07);
+      border-radius: 3px;
+      pointer-events: none;
+      display: none;
+      z-index: 5;
+    }
+
+    /* hover-icon 模式：每段固定「译」图标 */
+    .pdf-translate-icon {
+      position: absolute;
+      left: 4px;
+      background: #f3f4f6;
+      border: 1px solid #d0d7de;
+      border-radius: 3px;
+      color: #57606a;
+      font-size: 10px;
+      font-weight: 600;
+      font-family: inherit;
+      padding: 1px 5px;
+      cursor: pointer;
+      white-space: nowrap;
+      z-index: 100;
+      pointer-events: auto;
+      line-height: 1.6;
+      opacity: 0.7;
+    }
+    .pdf-translate-icon:hover { background: #0969da; color: #fff; border-color: #0969da; opacity: 1; }
+
     .pdf-translate-btn {
       position: absolute;
-      right: 8px;
+      left: 8px;
       background: #0969da;
       border: none;
       border-radius: var(--radius-sm);

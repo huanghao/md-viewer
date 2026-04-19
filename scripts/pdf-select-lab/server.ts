@@ -12,13 +12,14 @@ import { resolve } from "path";
 
 const PORT = 4321;
 const HTML_PATH = resolve(import.meta.dir, "index.html");
+const HTML_DOM_PATH = resolve(import.meta.dir, "index-dom-select.html");
 
 Bun.serve({
   port: PORT,
   async fetch(req) {
     const url = new URL(req.url);
 
-    // 提供 index.html
+    // 提供 index.html（Canvas 拉框版）
     if (url.pathname === "/" || url.pathname === "/index.html") {
       try {
         const html = readFileSync(HTML_PATH, "utf-8");
@@ -30,6 +31,21 @@ Bun.serve({
         });
       } catch {
         return new Response("index.html not found", { status: 404 });
+      }
+    }
+
+    // 提供 index-dom-select.html（原版 DOM 三路径对比）
+    if (url.pathname === "/dom-select") {
+      try {
+        const html = readFileSync(HTML_DOM_PATH, "utf-8");
+        return new Response(html, {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store",
+          },
+        });
+      } catch {
+        return new Response("index-dom-select.html not found", { status: 404 });
       }
     }
 
@@ -106,4 +122,5 @@ Bun.serve({
 });
 
 console.log(`\n  PDF 选中测试工具已启动`);
-console.log(`  http://localhost:${PORT}\n`);
+console.log(`  http://localhost:${PORT}            ← Canvas 拉框版`);
+console.log(`  http://localhost:${PORT}/dom-select  ← 原版 DOM 三路径对比\n`);

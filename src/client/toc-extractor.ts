@@ -91,3 +91,51 @@ export async function resolvePdfOutlinePageNums(
   }
   await walk(items);
 }
+
+// sidecar 文件路径约定：foo.pdf.toc.json
+export function sidecarPath(pdfPath: string): string {
+  return pdfPath + '.toc.json';
+}
+
+export async function loadSidecar(pdfPath: string): Promise<TocItem[] | null> {
+  try {
+    const res = await fetch(`/api/file?path=${encodeURIComponent(sidecarPath(pdfPath))}`);
+    if (!res.ok) return null;
+    return JSON.parse(await res.text()) as TocItem[];
+  } catch { return null; }
+}
+
+export async function saveSidecar(pdfPath: string, toc: TocItem[]): Promise<void> {
+  await fetch('/api/file-write', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: sidecarPath(pdfPath), content: JSON.stringify(toc, null, 2) }),
+  });
+}
+
+// 逐页扫描 PDF 标题，onProgress 每扫完一页回调一次（增量更新 UI 用）
+export async function scanPdfHeadings(
+  pdfPath: string,
+  getTextBlocks: (pageNum: number) => Array<{ text: string; height: number; y: number }>,
+  totalPages: number,
+  onProgress: (toc: TocItem[]) => void
+): Promise<TocItem[]> {
+  const flat: TocItem[] = [];
+
+  for (let page = 1; page <= totalPages; page++) {
+    const blocks = getTextBlocks(page);
+    for (const block of blocks) {
+      // 利用 classifyPageItems 的结果：height 相对于中位数
+      // 这里用简化启发式：height > 14 认为是标题
+      if (block.height >= 14 && block.text.trim().length > 0 && block.text.trim().length < 120) {
+        const level = block.height >= 18 ? 1 : 2;
+        flat.push({ title: block.text.trim(), level, pageNum: page, children: [] });
+      }
+    }
+    onProgress(buildTree([...flat]));
+  }
+
+  const toc = buildTree(flat);
+  await saveSidecar(pdfPath, toc);
+  return toc;
+}

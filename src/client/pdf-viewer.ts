@@ -74,6 +74,8 @@ export interface PdfViewerInstance {
   getPdfDoc(): any;
   /** Mark translate icons as translated/untranslated based on current translation list */
   markTranslatedIcons(keys: Set<string>): void;
+  /** Re-render all pages at a new scale. Returns after placeholders are resized (render is async). */
+  setScale(scale: number): Promise<void>;
 }
 
 const SCALE_DEFAULT: number = (typeof window !== 'undefined' && (window as any).__pdfDefaultScale)
@@ -178,7 +180,8 @@ function expandDblClick(
 const RENDER_MARGIN = 2500;
 
 export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewerInstance> {
-  const { container, filePath, scale = SCALE_DEFAULT } = opts;
+  const { container, filePath } = opts;
+  let scale = opts.scale ?? SCALE_DEFAULT;
 
   // Each viewer owns its own root div. main.ts appends/removes it from #content.
   // This allows multiple viewers to coexist without destroying each other's DOM.
@@ -731,6 +734,35 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     });
   }
 
+  async function setScale(newScale: number): Promise<void> {
+    // Update the closure variable used by renderPage and redrawOverlay
+    scale = newScale;
+
+    // Clear render state and reset all wrappers
+    rendered.clear();
+    rendering.clear();
+    textBlocksByPage.clear();
+    textContentCache.clear();
+    overlayCanvases.clear();
+    persistentRects.clear();
+    tempRects.clear();
+
+    for (let i = 0; i < pageWrappers.length; i++) {
+      const wrapper = pageWrappers[i];
+      // Re-fetch each page's viewport for accurate sizing
+      const page = await pdfDoc.getPage(i + 1);
+      const vp = page.getViewport({ scale: newScale });
+      wrapper.style.width = `${vp.width}px`;
+      wrapper.style.height = `${vp.height}px`;
+      // Remove all rendered content (canvas, text layer, overlay)
+      wrapper.innerHTML = '';
+      wrapper.classList.add('pdf-page-placeholder');
+      // Re-observe to trigger IntersectionObserver
+      observer.unobserve(wrapper);
+      observer.observe(wrapper);
+    }
+  }
+
   return {
     el, destroy, scrollToPage, scrollToBlockY,
     highlightQuote, highlightByItemRange, clearHighlights, clearSelectionMark,
@@ -739,6 +771,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     drawTempRect, clearTempRect,
     getPdfDoc: () => pdfDoc,
     markTranslatedIcons,
+    setScale,
     get onAnnotationClick() { return opts.onAnnotationClick; },
     set onAnnotationClick(fn: ((annotationId: string, clientX: number, clientY: number) => void) | undefined) { opts.onAnnotationClick = fn; },
   };

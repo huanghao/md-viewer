@@ -92,8 +92,8 @@ export function createPdfAnnotationBridge(opts: PdfAnnotationBridgeOptions): Pdf
   function handleAnnotationClick(annotationId: string, clientX: number, clientY: number) {
     const ann = opts.getAnnotations().find(a => a.id === annotationId);
     if (!ann) return;
-    // Place popover at right edge of viewport so it doesn't cover the PDF
-    showPopover(ann, window.innerWidth, clientY - 8);
+    // Place popover at bottom-right corner of viewport
+    showPopover(ann, window.innerWidth, window.innerHeight);
   }
 
   return { handleTextSelected, handleAnnotationClick, renderHighlights };

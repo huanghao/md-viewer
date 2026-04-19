@@ -47,7 +47,7 @@ import {
 } from './annotation';
 
 import { createPdfViewer, type PdfViewerInstance } from "./pdf-viewer.js";
-import { clampZoom, zoomStep, pdfZoomKey, MD_ZOOM_MIN, MD_ZOOM_MAX, PDF_ZOOM_MIN, PDF_ZOOM_MAX } from './zoom.js';
+import { clampZoom, zoomStep, pdfZoomKey, MD_ZOOM_MIN, MD_ZOOM_MAX, PDF_ZOOM_MIN, PDF_ZOOM_MAX, PDF_ZOOM_DEFAULT } from './zoom.js';
 import { createPdfAnnotationBridge } from "./pdf-annotation.js";
 import { extractMdToc, extractPdfOutline, loadSidecar, saveSidecar, scanPdfHeadings } from './toc-extractor.js';
 import { renderTocPanel, setActiveTocItem } from './ui/toc-panel.js';
@@ -1985,7 +1985,7 @@ function zoomOut() {
 
 function zoomReset() {
   if (isPdfPath(state.currentFile ?? '')) {
-    setPdfZoomValue(state.currentFile!, 1.5);
+    setPdfZoomValue(state.currentFile!, PDF_ZOOM_DEFAULT);
   } else {
     currentFontScale = 1.0;
     applyFontScale();
@@ -2014,7 +2014,7 @@ function setPdfZoomValue(filePath: string, scale: number) {
 }
 
 function getPdfZoom(filePath: string): number {
-  return parseFloat(localStorage.getItem(pdfZoomKey(filePath)) ?? '1.5');
+  return parseFloat(localStorage.getItem(pdfZoomKey(filePath)) ?? String(PDF_ZOOM_DEFAULT));
 }
 
 function updateZoomDisplay() {
@@ -2144,9 +2144,11 @@ function clearMonitorTranslationStats(): void {
 }
 
 // ==================== 键盘缩放快捷键 ====================
+const IS_MAC = navigator.platform.toUpperCase().includes('MAC');
 document.addEventListener('keydown', (e: KeyboardEvent) => {
-  const isMac = navigator.platform.toUpperCase().includes('MAC');
-  const mod = isMac ? e.metaKey : e.ctrlKey;
+  const tag = (document.activeElement as HTMLElement)?.tagName?.toLowerCase();
+  if (tag === 'input' || tag === 'textarea') return;
+  const mod = IS_MAC ? e.metaKey : e.ctrlKey;
   if (!mod) return;
   if (e.key === '=' || e.key === '+') { e.preventDefault(); zoomIn(); }
   else if (e.key === '-') { e.preventDefault(); zoomOut(); }

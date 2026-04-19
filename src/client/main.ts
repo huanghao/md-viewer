@@ -48,6 +48,8 @@ import {
 
 import { createPdfViewer, type PdfViewerInstance } from "./pdf-viewer.js";
 import { createPdfAnnotationBridge } from "./pdf-annotation.js";
+import { extractMdToc, extractPdfOutline, resolvePdfOutlinePageNums, loadSidecar, scanPdfHeadings } from './toc-extractor.js';
+import { renderTocPanel } from './ui/toc-panel.js';
 import {
   LocalTranslationProvider,
   getTranslationStats,
@@ -288,6 +290,92 @@ function setupTocResize(): void {
     document.addEventListener('mouseup', onMouseUp);
     e.preventDefault();
   });
+}
+
+function getActivePdfViewer(): PdfViewerInstance | null {
+  if (!state.currentFile) return null;
+  return pdfViewerRegistry.get(state.currentFile)?.viewer ?? null;
+}
+
+function flattenOutlineDests(nodes: any[]): ({ num: number; gen: number } | null)[] {
+  const result: ({ num: number; gen: number } | null)[] = [];
+  function walk(items: any[]) {
+    for (const n of items) {
+      const dest = n.dest;
+      const ref = Array.isArray(dest) && dest[0] != null && typeof dest[0] === 'object' && 'num' in dest[0]
+        ? dest[0] as { num: number; gen: number }
+        : null;
+      result.push(ref);
+      walk(n.items ?? []);
+    }
+  }
+  walk(nodes);
+  return result;
+}
+
+async function updateToc(filePath: string): Promise<void> {
+  const panel = document.getElementById('tocPanel');
+  if (!panel) return;
+
+  const isPdf = filePath.endsWith('.pdf');
+  const isMd = filePath.endsWith('.md');
+
+  if (!isPdf && !isMd) {
+    renderTocPanel(panel, [], () => {});
+    return;
+  }
+
+  if (isMd) {
+    const file = state.sessionFiles.get(filePath);
+    const content = file?.content ?? '';
+    const toc = extractMdToc(content);
+    renderTocPanel(panel, toc, item => {
+      if (item.anchor) {
+        const el = document.getElementById(item.anchor);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+    return;
+  }
+
+  // PDF: try sidecar first
+  const sidecar = await loadSidecar(filePath);
+  if (sidecar) {
+    renderTocPanel(panel, sidecar, item => {
+      if (item.pageNum) getActivePdfViewer()?.scrollToPage(item.pageNum);
+    });
+    return;
+  }
+
+  // PDF: wait for viewer to be ready, then try outline
+  const viewer = getActivePdfViewer();
+  if (!viewer) return;
+
+  renderTocPanel(panel, [], () => {}, true); // loading state
+
+  try {
+    const pdfDoc = viewer.getPdfDoc();
+    const outline = await pdfDoc.getOutline();
+    if (outline && outline.length > 0) {
+      const toc = extractPdfOutline(outline);
+      const dests = flattenOutlineDests(outline);
+      await resolvePdfOutlinePageNums(toc, dests, pdfDoc);
+      renderTocPanel(panel, toc, item => {
+        if (item.pageNum) getActivePdfViewer()?.scrollToPage(item.pageNum);
+      });
+      return;
+    }
+  } catch { /* outline read failed, fall through to scan */ }
+
+  // PDF: lazy scan
+  await scanPdfHeadings(
+    filePath,
+    page => viewer.getTextBlocks(page),
+    viewer.getTotalPages(),
+    toc => renderTocPanel(panel, toc, item => {
+      if (item.pageNum) getActivePdfViewer()?.scrollToPage(item.pageNum);
+    })
+  );
 }
 
 // 刷新当前文件（页面加载时自动调用）
@@ -1112,6 +1200,7 @@ async function switchFile(path: string) {
   renderSidebar();
 
   renderContent();
+  updateToc(path);
   syncAnnotationsForCurrentFile(true);
   await updateToolbarButtons();
 }

@@ -70,6 +70,7 @@ export interface PdfViewerInstance {
   renderRectHighlight(pageNum: number, x1: number, y1: number, x2: number, y2: number, annotationId: string): void;
   /** Called when user clicks a persistent annotation rect */
   onAnnotationClick?: (annotationId: string, clientX: number, clientY: number) => void;
+  getPdfDoc(): any;
 }
 
 const SCALE_DEFAULT: number = (typeof window !== 'undefined' && (window as any).__pdfDefaultScale)
@@ -181,6 +182,8 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
   const el = document.createElement("div");
   el.className = "pdf-viewer-container";
   container.appendChild(el);
+
+  const hotkeyHandler = (_e: KeyboardEvent) => {};
 
   const pdfjs = await getPdfjsLib();
   const url = `/api/pdf-asset?path=${encodeURIComponent(filePath)}`;
@@ -323,54 +326,19 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     const blocks = buildTextBlocks(pageNum, textContent.items as PdfPageTextItem[], viewport, scale);
     textBlocksByPage.set(pageNum, blocks);
 
-    // Event handlers
-    // 悬停「译」按钮：每个 pageWrapper 最多一个，复用移动
-    let translateBtn: HTMLButtonElement | null = null;
-    let translateBtnBlock: PdfTextBlock | null = null;
-
-    const getOrCreateTranslateBtn = (): HTMLButtonElement => {
-      if (!translateBtn) {
-        translateBtn = document.createElement("button");
-        translateBtn.className = "pdf-translate-btn";
-        translateBtn.textContent = "译";
-        translateBtn.addEventListener("click", (ev) => {
-          ev.stopPropagation();
-          if (translateBtnBlock) opts.onParagraphClick!(translateBtnBlock);
-        });
-        wrapper.appendChild(translateBtn);
-      }
-      return translateBtn;
-    };
-
+    // Event handlers: 每段左侧固定「译」图标
     if (opts.onParagraphClick) {
-      textLayerDiv.addEventListener("mousemove", (e) => {
-        const me = e as MouseEvent;
-        const wrapperRect = wrapper.getBoundingClientRect();
-        const hoverX = me.clientX - wrapperRect.left;
-        const hoverY = (me.clientY - wrapperRect.top) / scale;
-        const block = findBlockAtY(blocks, hoverY);
-        if (!block) {
-          if (translateBtn) translateBtn.style.display = "none";
-          return;
-        }
-        if (block === translateBtnBlock && translateBtn && translateBtn.style.display !== "none") return;
-        translateBtnBlock = block;
-        const btn = getOrCreateTranslateBtn();
-        btn.style.display = "block";
-        btn.style.top = `${block.y * scale}px`;
-      });
-
-      textLayerDiv.addEventListener("mouseleave", (e) => {
-        if (translateBtn && e.relatedTarget === translateBtn) return;
-        if (translateBtn) translateBtn.style.display = "none";
-      });
-
-      wrapper.addEventListener("mouseleave", (e) => {
-        if (!translateBtn) return;
-        const related = e.relatedTarget as Node | null;
-        if (related && (textLayerDiv.contains(related) || related === textLayerDiv)) return;
-        translateBtn.style.display = "none";
-      });
+      for (const block of blocks) {
+        const icon = document.createElement("button");
+        icon.className = "pdf-translate-icon";
+        icon.textContent = "译";
+        icon.style.top = `${block.y * scale}px`;
+        icon.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          opts.onParagraphClick!(block);
+        });
+        wrapper.appendChild(icon);
+      }
     }
     if (opts.onTextSelected) {
       const pageH = viewport.height / scale;
@@ -405,28 +373,9 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
           });
           redrawOverlay(pageNum);
         }
-        // 非拖拽时驱动译按钮显示
-        if (opts.onParagraphClick && !dragging) {
-          const block = findBlockAtY(blocks, curY);
-          if (!block) {
-            if (translateBtn) translateBtn.style.display = 'none';
-          } else {
-            if (translateBtn && translateBtn.style.display !== 'none' && translateBtnBlock === block) return;
-            translateBtnBlock = block;
-            const realBtn = getOrCreateTranslateBtn();
-            realBtn.style.display = 'block';
-            realBtn.style.top = `${block.y * scale}px`;
-          }
-        }
       });
 
-      overlayCanvas.addEventListener('mouseleave', (e) => {
-        if (opts.onParagraphClick) {
-          const btn = wrapper.querySelector<HTMLButtonElement>('.pdf-translate-btn');
-          if (btn && e.relatedTarget === btn) return;
-          if (btn) btn.style.display = 'none';
-        }
-      });
+      overlayCanvas.addEventListener('mouseleave', () => {});
 
       overlayCanvas.addEventListener('mouseup', (e) => {
         if (!dragging) return;
@@ -742,6 +691,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     overlayCanvases.clear();
     persistentRects.clear();
     tempRects.clear();
+    document.removeEventListener('keydown', hotkeyHandler);
   }
 
   function getRenderedCount(): number { return rendered.size; }
@@ -753,6 +703,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     renderRectHighlight,
     getTextBlocks, getRenderedCount, getTotalPages,
     drawTempRect, clearTempRect,
+    getPdfDoc: () => pdfDoc,
     get onAnnotationClick() { return opts.onAnnotationClick; },
     set onAnnotationClick(fn: ((annotationId: string, clientX: number, clientY: number) => void) | undefined) { opts.onAnnotationClick = fn; },
   };

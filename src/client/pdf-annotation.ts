@@ -81,13 +81,7 @@ export function createPdfAnnotationBridge(opts: PdfAnnotationBridgeOptions): Pdf
         length?: number;
         rectCoords?: { x1: number; y1: number; x2: number; y2: number };
       };
-      // Use item index anchor for precise O(1) highlighting
-      if (typeof pa.start === "number" && typeof pa.length === "number") {
-        const endIdx = pa.start + pa.length - 1;
-        opts.viewer.highlightByItemRange(pa.page, pa.start, endIdx, a.id, a.quote);
-      } else {
-        opts.viewer.highlightQuote(a.page, a.quote, a.id);
-      }
+      // Rect highlight only — span highlight not used in canvas-rect mode
       if (pa.rectCoords) {
         const { x1, y1, x2, y2 } = pa.rectCoords;
         opts.viewer.renderRectHighlight(pa.page, x1, y1, x2, y2, a.id);

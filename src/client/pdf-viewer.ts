@@ -443,7 +443,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
           y2: Math.max(downPdfY, upPdfY),
         };
 
-        const CONTEXT_ITEMS = 10;
+        const CONTEXT_ITEMS = 3;
         const prefix = allItems.slice(Math.max(0, startItemIdx - CONTEXT_ITEMS), startItemIdx).map(it => it.str).join(' ').trim();
         const suffix = allItems.slice(endItemIdx + 1, Math.min(allItems.length, endItemIdx + 1 + CONTEXT_ITEMS)).map(it => it.str).join(' ').trim();
 

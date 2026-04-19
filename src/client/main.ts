@@ -21,7 +21,7 @@ import { renderSidebar } from './ui/sidebar';
 import { showToast, showSuccess, showError, showWarning, showInfo } from './ui/toast';
 import { showSettingsDialog, closeSettingsDialog } from './ui/settings';
 import { renderJsonContent } from './ui/json-viewer';
-import { mountScrollbar, unmountScrollbar, updateDiffMarkers, clearDiffMarkers } from './ui/doc-scrollbar';
+import { mountScrollbar, unmountScrollbar, updateScrollbar, updateDiffMarkers, clearDiffMarkers } from './ui/doc-scrollbar';
 
 import { getMdThemeCss, getHlThemeCss } from './themes/index';
 
@@ -254,7 +254,8 @@ function applyTocPaneHeight(height: number): void {
 
 function initTocPaneHeight(): void {
   const saved = localStorage.getItem(TOC_PANE_HEIGHT_KEY);
-  applyTocPaneHeight(saved ? parseInt(saved, 10) : TOC_PANE_DEFAULT_HEIGHT);
+  const parsed = saved ? parseInt(saved, 10) : NaN;
+  applyTocPaneHeight(Number.isFinite(parsed) && parsed > 0 ? parsed : TOC_PANE_DEFAULT_HEIGHT);
 }
 
 function setupTocResize(): void {
@@ -316,6 +317,14 @@ function flattenOutlineDests(nodes: any[]): ({ num: number; gen: number } | null
 async function updateToc(filePath: string): Promise<void> {
   const panel = document.getElementById('tocPanel');
   if (!panel) return;
+
+  // Always clean up the MD scroll handler when switching files
+  const contentEl = document.getElementById('content');
+  const prevHandler = contentEl && (contentEl as any).__tocScrollHandler;
+  if (prevHandler && contentEl) {
+    contentEl.removeEventListener('scroll', prevHandler);
+    (contentEl as any).__tocScrollHandler = null;
+  }
 
   const isPdf = filePath.endsWith('.pdf');
   const isMd = filePath.endsWith('.md');
@@ -902,6 +911,7 @@ function renderContent() {
       unmountScrollbar();
       mountScrollbar();
       mountPdfPageIndicator(existingEntry.viewer, container);
+      updateToc(filePath);
       return;
     }
 
@@ -922,6 +932,8 @@ function renderContent() {
       onPageRendered: (_pageNum) => {
         // Page just became visible — replay annotation highlights for it
         currentPdfBridge?.renderHighlights(getAnnotations());
+        // Update scrollbar after first page renders (scrollHeight is now > clientHeight)
+        updateScrollbar();
       },
     }).then((pdfViewerInstance) => {
       currentPdfViewer = pdfViewerInstance;

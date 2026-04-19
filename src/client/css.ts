@@ -195,7 +195,7 @@ export const styles = `
       height: 28px;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       color: #57606a;
     }
     .mode-switch-icon {
@@ -268,7 +268,7 @@ export const styles = `
       z-index: var(--z-quick-action);
     }
     body.quick-action-confirm-visible .quick-action-confirm-host {
-      margin-top: 6px;
+      margin-top: 8px;
     }
 
     /* 当前文件路径 */
@@ -491,7 +491,7 @@ export const styles = `
     }
     .add-file-confirm-actions {
       display: flex;
-      gap: 6px;
+      gap: 8px;
       flex-shrink: 0;
     }
     .add-file-confirm-button {
@@ -742,7 +742,7 @@ export const styles = `
     .connection-status {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       font-size: 11px;
       color: #57606a;
       padding: 2px 6px;
@@ -948,7 +948,7 @@ export const styles = `
     }
     .tab-manager-row {
       display: flex;
-      gap: 6px;
+      gap: 8px;
       margin-bottom: 8px;
       flex-shrink: 0;
     }
@@ -1044,7 +1044,7 @@ export const styles = `
       flex-shrink: 0;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
     }
     .tab-manager-status {
       display: inline-block;
@@ -1081,7 +1081,7 @@ export const styles = `
       font-size: 11px;
       padding: 2px 6px;
       border-radius: 4px;
-      margin-left: 6px;
+      margin-left: 8px;
       font-weight: 500;
       vertical-align: middle;
     }
@@ -1136,7 +1136,7 @@ export const styles = `
     .markdown-body .mermaid-actions {
       display: flex;
       justify-content: flex-end;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
     .markdown-body .mermaid-source-toggle {
       border: 1px solid #d0d7de;
@@ -1251,7 +1251,7 @@ export const styles = `
     .breadcrumb {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       font-size: 13px;
       color: #24292e;
     }
@@ -1267,7 +1267,7 @@ export const styles = `
     }
     .copy-filename-button {
       padding: 4px;
-      margin-left: 6px;
+      margin-left: 8px;
       border: none;
       background: transparent;
       color: #586069;
@@ -1638,7 +1638,7 @@ export const styles = `
     }
 
     .workspace-icon {
-      margin-right: 6px;
+      margin-right: 8px;
       font-size: 16px;
     }
 
@@ -1682,7 +1682,7 @@ export const styles = `
     .workspace-remove-actions {
       display: flex;
       gap: 2px;
-      margin-left: 6px;
+      margin-left: 8px;
       flex-shrink: 0;
     }
 
@@ -1841,7 +1841,7 @@ export const styles = `
     }
 
     .tree-icon {
-      margin-right: 6px;
+      margin-right: 8px;
       font-size: 14px;
       flex-shrink: 0;
     }
@@ -1883,7 +1883,7 @@ export const styles = `
     }
 
     .tree-missing-section {
-      margin-top: 6px;
+      margin-top: 8px;
       padding-left: 8px;
     }
 
@@ -2017,7 +2017,7 @@ export const styles = `
     .settings-toggle {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       cursor: pointer;
     }
     .settings-toggle-label {
@@ -2151,7 +2151,7 @@ export const styles = `
     .settings-key-list {
       display: flex;
       flex-wrap: wrap;
-      gap: 6px;
+      gap: 8px;
       max-height: 140px;
       overflow: auto;
       padding: 8px;
@@ -2463,7 +2463,7 @@ export const styles = `
       border-left: 4px solid transparent;
       border-radius: 8px;
       padding: 8px;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
       cursor: pointer;
       transition: all 0.2s;
     }
@@ -2517,7 +2517,7 @@ export const styles = `
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 6px;
+      gap: 8px;
       margin-bottom: 4px;
     }
     .annotation-row-title {
@@ -2668,7 +2668,7 @@ export const styles = `
       color: #57606a;
     }
     .annotation-reply-entry {
-      margin-top: 6px;
+      margin-top: 8px;
       border: 1px solid #e5e7eb;
       border-radius: 6px;
       background: #fafbfc;
@@ -2864,7 +2864,7 @@ export const styles = `
     }
     .annotation-composer-header,
     .annotation-popover-header {
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
     .annotation-composer-header {
       cursor: move;
@@ -3055,7 +3055,7 @@ export const styles = `
     .json-preview {
       color: #6a737d;
       font-size: 13px;
-      margin-left: 6px;
+      margin-left: 8px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -3116,7 +3116,7 @@ export const styles = `
       padding: 5px 10px;
       border-bottom: 1px solid #f0f0f0;
       background: #fefefe;
-      gap: 6px;
+      gap: 8px;
       flex-shrink: 0;
     }
     .focus-filter-label {
@@ -3575,7 +3575,7 @@ export const styles = `
     .monitor-call-row {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       padding: 3px 12px;
       color: #374151;
       font-size: 11px;

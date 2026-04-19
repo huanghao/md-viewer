@@ -1,6 +1,6 @@
 {
   "name": "md-viewer",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Markdown viewer with live reload",
   "type": "module",
   "bin": {

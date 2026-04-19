@@ -89,7 +89,7 @@ let currentPdfBridge: ReturnType<typeof createPdfAnnotationBridge> | null = null
 const translationProvider = new LocalTranslationProvider();
 
 // PDF viewer registry: tracks all open PDF viewers and their idle timers
-const PDF_IDLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+const PDF_IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 interface PdfViewerEntry {
   viewer: PdfViewerInstance;
   lastActiveAt: number;
@@ -238,6 +238,55 @@ function setupSidebarResize(): void {
     if (Number.isFinite(current)) {
       applySidebarWidth(current);
     }
+  });
+}
+
+const TOC_PANE_HEIGHT_KEY = 'md-viewer:toc-pane-height';
+const TOC_PANE_DEFAULT_HEIGHT = 240;
+const TOC_PANE_MIN_HEIGHT = 80;
+const TOC_PANE_MAX_HEIGHT = 600;
+
+function applyTocPaneHeight(height: number): void {
+  document.documentElement.style.setProperty('--toc-pane-height', `${height}px`);
+}
+
+function initTocPaneHeight(): void {
+  const saved = localStorage.getItem(TOC_PANE_HEIGHT_KEY);
+  applyTocPaneHeight(saved ? parseInt(saved, 10) : TOC_PANE_DEFAULT_HEIGHT);
+}
+
+function setupTocResize(): void {
+  const resizer = document.getElementById('tocResizer');
+  const pane = document.getElementById('tocPane');
+  if (!resizer || !pane) return;
+
+  let startY = 0;
+  let startHeight = 0;
+
+  const onMouseMove = (e: MouseEvent) => {
+    const delta = startY - e.clientY;
+    const newHeight = Math.min(TOC_PANE_MAX_HEIGHT, Math.max(TOC_PANE_MIN_HEIGHT, startHeight + delta));
+    applyTocPaneHeight(newHeight);
+  };
+
+  const onMouseUp = (e: MouseEvent) => {
+    resizer.classList.remove('dragging');
+    document.body.classList.remove('toc-resizing');
+    const delta = startY - e.clientY;
+    const newHeight = Math.min(TOC_PANE_MAX_HEIGHT, Math.max(TOC_PANE_MIN_HEIGHT, startHeight + delta));
+    localStorage.setItem(TOC_PANE_HEIGHT_KEY, String(newHeight));
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+  };
+
+  resizer.addEventListener('mousedown', (e: MouseEvent) => {
+    startY = e.clientY;
+    startHeight = pane.getBoundingClientRect().height;
+    resizer.classList.add('dragging');
+    document.body.classList.add('toc-resizing');
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    e.preventDefault();
   });
 }
 
@@ -2164,6 +2213,8 @@ function startWorkspacePolling() {
 
   setupDragAndDrop();
   setupSidebarResize();
+  initTocPaneHeight();
+  setupTocResize();
   document.addEventListener('click', (e) => {
     if (!isAddConfirmVisible()) return;
     const target = e.target as HTMLElement | null;

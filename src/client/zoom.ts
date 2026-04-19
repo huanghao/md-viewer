@@ -10,10 +10,11 @@ export function clampZoom(value: number, min: number, max: number): number {
   return Math.round(Math.min(Math.max(value, min), max) * 100) / 100;
 }
 
+/** Steps current zoom by ±0.1. Uses wide internal bounds (0–99); callers must apply domain clamp (MD_ZOOM_MIN/MAX or PDF_ZOOM_MIN/MAX). */
 export function zoomStep(current: number, direction: 1 | -1): number {
   return clampZoom(current + direction * ZOOM_STEP, 0, 99);
 }
 
-export function PDF_ZOOM_KEY(filePath: string): string {
+export function pdfZoomKey(filePath: string): string {
   return `md-viewer:pdf-zoom:${filePath}`;
 }

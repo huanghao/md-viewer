@@ -391,6 +391,11 @@ async function updateToc(filePath: string): Promise<void> {
   if (isMd) {
     const file = state.sessionFiles.get(filePath);
     const content = file?.content ?? '';
+    if (!content) {
+      // File not yet loaded — stay in loading state, updateToc will be called again via onFileLoaded
+      renderTocPanel(panel, [], () => {}, true);
+      return;
+    }
     const toc = extractMdToc(content);
 
     // toolbar (48px) + tabs (~36px) = offset so heading isn't hidden under fixed headers
@@ -1422,9 +1427,9 @@ async function switchFile(path: string) {
   switchToFile(path);
   renderSidebar();
 
-  // Immediately clear TOC to avoid showing stale content during transition
+  // Immediately show loading state to avoid stale TOC during transition
   const tocPanel = document.getElementById('tocPanel');
-  if (tocPanel) tocPanel.innerHTML = '<div class="toc-empty">加载中…</div>';
+  if (tocPanel) renderTocPanel(tocPanel, [], () => {}, true);
 
   renderContent();
   if (!isPdfPath(path)) updateToc(path);

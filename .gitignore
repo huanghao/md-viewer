@@ -199,6 +199,7 @@ dist-server/
 # Build artifacts
 mdv-server-arm64
 mdv-server-*
+packages/*.tar.gz
 
 # Vim swap files
 *.swp

@@ -7,11 +7,12 @@ let _flatItems: TocItem[] = [];
 function renderItems(items: TocItem[], startIdx: { v: number }): string {
   return items.map(item => {
     const idx = startIdx.v++;
+    const pageBadge = item.pageNum ? `<span class="toc-page-badge">${item.pageNum}</span>` : '';
     return `<a class="toc-item" data-level="${item.level}"
        data-page="${item.pageNum ?? ''}"
        data-anchor="${item.anchor ?? ''}"
        data-idx="${idx}"
-       title="${item.title}"><span class="toc-level-badge">#${item.level}</span><span class="toc-item-title">${item.title}</span></a>${renderItems(item.children, startIdx)}`;
+       title="${item.title}"><span class="toc-level-badge">#${item.level}</span><span class="toc-item-title">${item.title}</span>${pageBadge}</a>${renderItems(item.children, startIdx)}`;
   }).join('');
 }
 
@@ -76,9 +77,9 @@ export function setActiveTocItem(container: HTMLElement, pageNum?: number, title
     const el = container.querySelector<HTMLElement>(`.toc-item[data-page="${pageNum}"]`);
     el?.classList.add('active');
   } else if (titleOrAnchor) {
-    // Try title match first (MD), then anchor match (fallback)
+    // Match by .toc-item-title text (excludes level badge), then anchor fallback
     let el = Array.from(container.querySelectorAll<HTMLElement>('.toc-item'))
-      .find(e => e.textContent?.trim() === titleOrAnchor);
+      .find(e => e.querySelector('.toc-item-title')?.textContent?.trim() === titleOrAnchor);
     if (!el) el = container.querySelector<HTMLElement>(`.toc-item[data-anchor="${titleOrAnchor}"]`) ?? undefined;
     el?.classList.add('active');
   }

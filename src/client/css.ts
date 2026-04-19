@@ -737,6 +737,14 @@ export const styles = `
     .toc-item.active .toc-level-badge {
       display: inline;
     }
+    .toc-page-badge {
+      margin-left: auto;
+      padding-left: 6px;
+      font-size: 10px;
+      color: var(--color-text-muted, #8b949e);
+      flex-shrink: 0;
+      font-variant-numeric: tabular-nums;
+    }
 
     .file-item {
       display: flex;

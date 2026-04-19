@@ -378,9 +378,10 @@ function coordPath(items, pageH, downX, downY, upX, upY) {
     const ix2 = ix + Math.abs(it.width);
     const iy2 = baselineY + fontH * 0.3;
 
-    const cx = (ix + ix2) / 2;
     const cy = (iy + iy2) / 2;
-    if (cx >= selLeft && cx <= selRight && cy >= selTop && cy <= selBottom) {
+    const hOverlap = ix < selRight && ix2 > selLeft;
+    const vHit = cy >= selTop && cy <= selBottom;
+    if (hOverlap && vHit) {
       hits.push({ idx: i, it, ix, iy, ix2, iy2, fontH });
     }
   }

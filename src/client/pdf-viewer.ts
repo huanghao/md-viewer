@@ -297,7 +297,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     overlayCanvas.style.cssText = `
       position: absolute; top: 0; left: 0;
       width: ${viewport.width}px; height: ${viewport.height}px;
-      pointer-events: auto; cursor: crosshair;
+      pointer-events: auto; cursor: default;
     `;
     const overlayCtx = overlayCanvas.getContext('2d')!;
     overlayCtx.scale(dpr, dpr);
@@ -383,6 +383,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
           redrawOverlay(pageNum);
         }
         dragging = true;
+        overlayCanvas.style.cursor = 'crosshair';
         const rect = wrapper.getBoundingClientRect();
         downScreenX = e.clientX;
         downScreenY = e.clientY;
@@ -422,9 +423,10 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
         }
       });
 
-      overlayCanvas.addEventListener('mouseleave', () => {
+      overlayCanvas.addEventListener('mouseleave', (e) => {
         if (opts.onParagraphClick) {
           const btn = wrapper.querySelector<HTMLButtonElement>('.pdf-translate-btn');
+          if (btn && e.relatedTarget === btn) return;
           if (btn) btn.style.display = 'none';
         }
       });
@@ -432,6 +434,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
       overlayCanvas.addEventListener('mouseup', (e) => {
         if (!dragging) return;
         dragging = false;
+        overlayCanvas.style.cursor = 'default';
         const dx = Math.abs(e.clientX - downScreenX);
         const dy = Math.abs(e.clientY - downScreenY);
         if (dx < 5 && dy < 5) {

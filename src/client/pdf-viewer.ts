@@ -445,9 +445,8 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
           y2: Math.max(downPdfY, upPdfY),
         };
 
-        const CONTEXT_ITEMS = 3;
-        const prefix = allItems.slice(Math.max(0, startItemIdx - CONTEXT_ITEMS), startItemIdx).map(it => it.str).join(' ').trim();
-        const suffix = allItems.slice(endItemIdx + 1, Math.min(allItems.length, endItemIdx + 1 + CONTEXT_ITEMS)).map(it => it.str).join(' ').trim();
+        const prefix = buildPdfContext(allItems, startItemIdx, 'before');
+        const suffix = buildPdfContext(allItems, endItemIdx, 'after');
 
         opts.onTextSelected!(pageNum, result.text, prefix, suffix, e.clientX, e.clientY, startItemIdx, endItemIdx);
       });
@@ -865,6 +864,52 @@ function coordPath(
   }
 
   return { text: parts.join(' ').trim() || null, hits: hits.map(h => h.idx), detail };
+}
+
+// Build context string up to a sentence boundary, with a hard char cap.
+// direction 'before': collect items before anchorIdx, stop at sentence end (. ! ?)
+// direction 'after':  collect items after anchorIdx, stop at sentence end
+function buildPdfContext(items: PdfPageTextItem[], anchorIdx: number, direction: 'before' | 'after'): string {
+  const ITEM_LIMIT = 10;
+  const CHAR_LIMIT = 120;
+  const SENTENCE_END = /[.!?。！？]\s*$/;
+  const SENTENCE_START = /^[.!?。！？]/;
+
+  if (direction === 'before') {
+    const start = Math.max(0, anchorIdx - ITEM_LIMIT);
+    const parts: string[] = [];
+    for (let i = anchorIdx - 1; i >= start; i--) {
+      const s = items[i].str.trim();
+      if (!s) continue;
+      parts.unshift(s);
+      const joined = parts.join(' ');
+      if (joined.length >= CHAR_LIMIT) {
+        // Trim to char limit from the left
+        return joined.slice(-CHAR_LIMIT).replace(/^\S+\s/, '').trim();
+      }
+      // Stop if the item we just added ends a sentence (i.e. context starts cleanly after it)
+      if (SENTENCE_END.test(s)) break;
+    }
+    return parts.join(' ').trim();
+  } else {
+    const end = Math.min(items.length - 1, anchorIdx + ITEM_LIMIT);
+    const parts: string[] = [];
+    for (let i = anchorIdx + 1; i <= end; i++) {
+      const s = items[i].str.trim();
+      if (!s) continue;
+      parts.push(s);
+      const joined = parts.join(' ');
+      if (joined.length >= CHAR_LIMIT) {
+        // Trim to char limit, end at last sentence boundary if possible
+        const trimmed = joined.slice(0, CHAR_LIMIT);
+        const m = trimmed.match(/^(.*[.!?。！？])\s*/s);
+        return m ? m[1].trim() : trimmed.replace(/\s\S+$/, '').trim();
+      }
+      // Stop after collecting an item that ends a sentence
+      if (SENTENCE_END.test(s)) break;
+    }
+    return parts.join(' ').trim();
+  }
 }
 
 function getSelectionContext(items: PdfPageTextItem[], selectedText: string): { prefix: string; suffix: string } {

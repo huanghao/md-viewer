@@ -570,6 +570,7 @@ function renderContent() {
     if (path !== state.currentFile) scheduleEviction(path);
   }
   currentPdfViewer = null;
+  (window as any).__currentPdfViewer = null;
   currentPdfBridge = null;
   container.removeAttribute('data-pdf');
 

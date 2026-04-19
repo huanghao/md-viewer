@@ -1327,6 +1327,7 @@ async function handleDiffButtonClick(): Promise<void> {
   diffViewActive = true;
   const diffBtn = document.getElementById('diffButton');
   if (diffBtn) diffBtn.classList.add('active');
+  document.getElementById('content')?.classList.add('diff-active');
 
   // 插入 banner 到 #content 父元素
   const contentEl = document.getElementById('content');
@@ -1354,6 +1355,7 @@ function closeDiffView(): void {
   currentDiffBlockIndex = -1;
   const diffBtn = document.getElementById('diffButton');
   if (diffBtn) diffBtn.classList.remove('active');
+  document.getElementById('content')?.classList.remove('diff-active');
 
   // 移除 banner
   const banner = document.getElementById('diffBanner');

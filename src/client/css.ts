@@ -281,21 +281,6 @@ export const styles = `
       transition: color 0.15s, border-color 0.15s;
     }
     .view-tab:hover { color: #444; background: #f3f3f3; }
-    .view-tab-toc-btn {
-      width: 32px;
-      flex-shrink: 0;
-      border: none;
-      background: transparent;
-      color: #888;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-bottom: 2px solid transparent;
-      padding: 0;
-    }
-    .view-tab-toc-btn:hover { color: #444; background: #f3f3f3; }
-    .sidebar.toc-visible .view-tab-toc-btn { color: var(--color-accent, #0969da); }
     .view-tab.active {
       color: var(--color-accent);
       border-bottom-color: var(--color-accent);
@@ -629,18 +614,17 @@ export const styles = `
     .toc-open-btn {
       display: none;
       align-items: center;
-      gap: 4px;
       width: 100%;
-      padding: 5px 10px;
+      padding: 5px 8px 5px 10px;
       border: none;
       border-top: 1px solid var(--color-border, #d0d7de);
       background: transparent;
       color: var(--color-text-muted, #8b949e);
       font-size: var(--text-xs);
       cursor: pointer;
-      text-align: left;
       flex-shrink: 0;
     }
+    .toc-open-btn span { flex: 1; text-align: left; }
     .toc-open-btn:hover {
       background: var(--color-bg-subtle, #f6f8fa);
       color: var(--color-text-secondary, #57606a);

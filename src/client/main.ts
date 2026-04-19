@@ -264,11 +264,11 @@ function applyTocVisibility(filePath: string): void {
   const sidebar = document.querySelector('.sidebar') as HTMLElement | null;
   if (!sidebar) return;
   const map = loadTocOpenByFile();
-  // Default: closed (only open if explicitly saved as open)
-  if (map[filePath] === true) {
-    sidebar.classList.add('toc-visible');
-  } else {
+  // Default: open (only close if explicitly saved as false)
+  if (map[filePath] === false) {
     sidebar.classList.remove('toc-visible');
+  } else {
+    sidebar.classList.add('toc-visible');
   }
 }
 
@@ -283,15 +283,6 @@ function setupTocOpenBtn(): void {
   (window as any).__onTocClose = () => {
     if (state.currentFile) saveTocOpenForFile(state.currentFile, false);
   };
-  // view-tabs toggle button
-  document.addEventListener('click', (e) => {
-    const btn = (e.target as HTMLElement)?.closest('#tocToggleTabBtn');
-    if (!btn) return;
-    const sidebar = document.querySelector('.sidebar') as HTMLElement | null;
-    if (!sidebar) return;
-    const isVisible = sidebar.classList.toggle('toc-visible');
-    if (state.currentFile) saveTocOpenForFile(state.currentFile, isVisible);
-  });
 }
 const TOC_PANE_DEFAULT_HEIGHT = 240;
 const TOC_PANE_MIN_HEIGHT = 80;
@@ -376,7 +367,8 @@ async function updateToc(filePath: string): Promise<void> {
   }
 
   const isPdf = filePath.endsWith('.pdf');
-  const isMd = filePath.endsWith('.md');
+  const lower = filePath.toLowerCase();
+  const isMd = lower.endsWith('.md') || lower.endsWith('.markdown');
 
   if (!isPdf && !isMd) {
     renderTocPanel(panel, [], () => {});
@@ -388,14 +380,15 @@ async function updateToc(filePath: string): Promise<void> {
     const content = file?.content ?? '';
     const toc = extractMdToc(content);
 
-    // Jump by matching heading text, since marked doesn't generate ids by default
+    // toolbar (48px) + tabs (~36px) = offset so heading isn't hidden under fixed headers
+    const HEADER_OFFSET = 90;
     const jumpToMdHeading = (title: string) => {
       const headings = Array.from(document.querySelectorAll<HTMLElement>('#reader h1, #reader h2, #reader h3'));
       const target = headings.find(h => h.textContent?.trim() === title);
       if (target) {
         const contentEl = document.getElementById('content');
         if (contentEl) {
-          contentEl.scrollTo({ top: target.offsetTop - 8, behavior: 'instant' });
+          contentEl.scrollTo({ top: target.offsetTop - HEADER_OFFSET, behavior: 'instant' });
         } else {
           target.scrollIntoView({ behavior: 'instant', block: 'start' });
         }
@@ -1393,7 +1386,7 @@ async function switchFile(path: string) {
   if (tocPanel) tocPanel.innerHTML = '<div class="toc-empty">加载中…</div>';
 
   renderContent();
-  if (!path.endsWith('.pdf')) updateToc(path);
+  if (!isPdfPath(path)) updateToc(path);
   syncAnnotationsForCurrentFile(true);
   await updateToolbarButtons();
 }

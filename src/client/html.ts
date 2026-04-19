@@ -102,8 +102,8 @@ export function generateClientHTML(): string {
 
       <!-- TOC 收起时的展开按钮 -->
       <button class="toc-open-btn" id="tocOpenBtn" title="展开目录" aria-label="展开目录">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M4 10l4-4 4 4"/></svg>
         <span>目录</span>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M4 10l4-4 4 4"/></svg>
       </button>
 
       <!-- TOC 面板（下半部分） -->

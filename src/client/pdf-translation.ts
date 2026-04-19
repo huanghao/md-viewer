@@ -143,6 +143,11 @@ export function removeTranslation(filePath: string, pageNum: number, startItemId
   );
 }
 
+export function unloadTranslations(): void {
+  currentTranslations = [];
+  currentFilePath = null;
+}
+
 export function clearAllTranslations(filePath: string): void {
   const prefix = `md-viewer:translation:${filePath}:`;
   const keysToRemove: string[] = [];

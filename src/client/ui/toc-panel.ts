@@ -16,14 +16,24 @@ function renderItems(items: TocItem[], startIdx: { v: number }): string {
   }).join('');
 }
 
+function findAncestor(el: HTMLElement, cls: string): HTMLElement | null {
+  let cur: HTMLElement | null = el.parentElement;
+  while (cur) {
+    if (cur.classList.contains(cls)) return cur;
+    cur = cur.parentElement;
+  }
+  return null;
+}
+
 export function renderTocPanel(
   container: HTMLElement,
   toc: TocItem[],
   onJump: TocJumpFn,
-  loading = false
+  loading = false,
+  doc: Document = document
 ): void {
-  const pane = container.closest('.toc-pane') as HTMLElement | null;
-  const sidebar = container.closest('.sidebar') as HTMLElement | null;
+  const pane = findAncestor(container, 'toc-pane');
+  const sidebar = findAncestor(container, 'sidebar');
 
   if (loading) {
     container.innerHTML = '<div class="toc-empty">加载中…</div>';
@@ -44,8 +54,8 @@ export function renderTocPanel(
   // toc-visible is managed by caller (per-file preference)
 
   // Ensure header exists in toc-pane (created once, persists across re-renders)
-  if (pane && !pane.querySelector('.toc-header')) {
-    const header = document.createElement('div');
+  if (pane && !Array.from(pane.children).some(c => (c as HTMLElement).classList.contains('toc-header'))) {
+    const header = doc.createElement('div');
     header.className = 'toc-header';
     header.innerHTML = `
       <span class="toc-header-label">目录</span>
@@ -55,7 +65,7 @@ export function renderTocPanel(
         </svg>
       </button>`;
     pane.insertBefore(header, pane.firstChild);
-    header.querySelector('.toc-toggle-btn')?.addEventListener('click', () => {
+    (header.getElementsByClassName('toc-toggle-btn')[0] as HTMLElement | undefined)?.addEventListener('click', () => {
       sidebar?.classList.remove('toc-visible');
       // Persist close for current file
       (window as any).__onTocClose?.();

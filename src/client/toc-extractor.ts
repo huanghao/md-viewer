@@ -38,15 +38,17 @@ export function extractMdToc(content: string): TocItem[] {
 function buildTree(flat: TocItem[]): TocItem[] {
   const root: TocItem[] = [];
   const stack: TocItem[] = [];
+  // Clone each item so repeated buildTree calls don't accumulate children
+  const nodes = flat.map(item => ({ ...item, children: [] as TocItem[] }));
 
-  for (const item of flat) {
-    while (stack.length && stack[stack.length - 1].level >= item.level) stack.pop();
+  for (const node of nodes) {
+    while (stack.length && stack[stack.length - 1].level >= node.level) stack.pop();
     if (stack.length === 0) {
-      root.push(item);
+      root.push(node);
     } else {
-      stack[stack.length - 1].children.push(item);
+      stack[stack.length - 1].children.push(node);
     }
-    stack.push(item);
+    stack.push(node);
   }
 
   return root;

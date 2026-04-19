@@ -620,7 +620,11 @@ export function renderTranslationList(
   const el = document.getElementById('translationList');
   if (!el) return;
 
+  // Sort by time desc for display, but assign serial by page order
   const entries = [...getTranslations()].sort((a, b) => b.timestamp - a.timestamp);
+  const byPageOrder = [...getTranslations()].sort((a, b) => a.pageNum - b.pageNum || a.startItemIdx - b.startItemIdx);
+  const serialMap = new Map(byPageOrder.map((e, i) => [`${e.pageNum}:${e.startItemIdx}`, i + 1]));
+
   const translationTabCount = document.getElementById('translationTabCount');
   if (translationTabCount) translationTabCount.textContent = entries.length > 0 ? `(${entries.length})` : '';
   if (entries.length === 0) {
@@ -631,11 +635,13 @@ export function renderTranslationList(
   el.innerHTML = entries.map((entry) => {
     const originalEscaped = escapeHtml(entry.originalText);
     const key = `${entry.pageNum}:${entry.startItemIdx}`;
+    const serial = serialMap.get(key) ?? 0;
+    const serialTag = `<span class="translation-item-serial">P${entry.pageNum} #${serial}</span>`;
     if (!entry.translatedText) {
       if (entry.error) {
         return `
           <div class="translation-item is-error" data-key="${key}" data-page="${entry.pageNum}" data-start="${entry.startItemIdx}" data-end="${entry.endItemIdx}">
-            <div class="translation-item-original">${originalEscaped}</div>
+            <div class="translation-item-header">${serialTag}<span class="translation-item-original">${originalEscaped}</span></div>
             <div class="translation-item-error">${escapeHtml(entry.error)}</div>
             <div class="translation-item-footer">
               <span class="translation-item-time">${formatRelativeTimeShort(entry.timestamp)}</span>
@@ -646,14 +652,14 @@ export function renderTranslationList(
       }
       return `
         <div class="translation-item" data-key="${key}">
-          <div class="translation-item-original">${originalEscaped}</div>
+          <div class="translation-item-header">${serialTag}<span class="translation-item-original">${originalEscaped}</span></div>
           <div class="translation-item-loading">翻译中…</div>
         </div>`;
     }
     const translatedEscaped = escapeHtml(entry.translatedText);
     return `
       <div class="translation-item" data-key="${key}" data-page="${entry.pageNum}" data-start="${entry.startItemIdx}" data-end="${entry.endItemIdx}">
-        <div class="translation-item-original">${originalEscaped}</div>
+        <div class="translation-item-header">${serialTag}<span class="translation-item-original">${originalEscaped}</span></div>
         <div class="translation-item-text">${translatedEscaped}</div>
         <div class="translation-item-footer">
           <span class="translation-item-time">${formatRelativeTimeShort(entry.timestamp)}</span>

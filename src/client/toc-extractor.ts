@@ -113,25 +113,42 @@ export async function saveSidecar(pdfPath: string, toc: TocItem[]): Promise<void
   });
 }
 
-// 逐页扫描 PDF 标题，onProgress 每扫完一页回调一次（增量更新 UI 用）
+interface PdfJsDoc {
+  numPages: number;
+  getPage(n: number): Promise<{ getTextContent(): Promise<{ items: Array<{ str: string; height: number; transform: number[] }> }> }>;
+}
+
+// 逐页扫描 PDF 标题，直接用 pdfjs doc 读取文本（不依赖页面渲染）
 export async function scanPdfHeadings(
   pdfPath: string,
-  getTextBlocks: (pageNum: number) => Array<{ text: string; height: number; y: number }>,
-  totalPages: number,
+  pdfDoc: PdfJsDoc,
   onProgress: (toc: TocItem[]) => void
 ): Promise<TocItem[]> {
   const flat: TocItem[] = [];
+  const totalPages = pdfDoc.numPages;
 
-  for (let page = 1; page <= totalPages; page++) {
-    const blocks = getTextBlocks(page);
-    for (const block of blocks) {
-      // 利用 classifyPageItems 的结果：height 相对于中位数
-      // 这里用简化启发式：height > 14 认为是标题
-      if (block.height >= 14 && block.text.trim().length > 0 && block.text.trim().length < 120) {
-        const level = block.height >= 18 ? 1 : 2;
-        flat.push({ title: block.text.trim(), level, pageNum: page, children: [] });
+  for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+    try {
+      const page = await pdfDoc.getPage(pageNum);
+      const tc = await page.getTextContent();
+      const items = tc.items;
+
+      // Compute median height to classify headings relative to body text
+      const heights = items.map(it => it.height || Math.abs(it.transform?.[3] ?? 0)).filter(h => h > 0);
+      if (!heights.length) continue;
+      heights.sort((a, b) => a - b);
+      const median = heights[Math.floor(heights.length / 2)];
+
+      for (const item of items) {
+        const text = item.str.trim();
+        if (!text || text.length > 150) continue;
+        const h = item.height || Math.abs(item.transform?.[3] ?? 0);
+        if (h <= median * 1.1) continue; // only text taller than body median
+        const level = h >= median * 1.6 ? 1 : 2;
+        flat.push({ title: text, level, pageNum, children: [] });
       }
-    }
+    } catch { /* skip unreadable page */ }
+
     onProgress(buildTree([...flat]));
   }
 

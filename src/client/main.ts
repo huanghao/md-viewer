@@ -48,7 +48,7 @@ import {
 
 import { createPdfViewer, type PdfViewerInstance } from "./pdf-viewer.js";
 import { createPdfAnnotationBridge } from "./pdf-annotation.js";
-import { extractMdToc, extractPdfOutline, resolvePdfOutlinePageNums, loadSidecar, scanPdfHeadings } from './toc-extractor.js';
+import { extractMdToc, extractPdfOutline, loadSidecar, saveSidecar, scanPdfHeadings } from './toc-extractor.js';
 import { renderTocPanel, setActiveTocItem } from './ui/toc-panel.js';
 import {
   LocalTranslationProvider,
@@ -338,20 +338,32 @@ function getActivePdfViewer(): PdfViewerInstance | null {
   return pdfViewerRegistry.get(state.currentFile)?.viewer ?? null;
 }
 
-function flattenOutlineDests(nodes: any[]): ({ num: number; gen: number } | null)[] {
-  const result: ({ num: number; gen: number } | null)[] = [];
-  function walk(items: any[]) {
-    for (const n of items) {
-      const dest = n.dest;
-      const ref = Array.isArray(dest) && dest[0] != null && typeof dest[0] === 'object' && 'num' in dest[0]
-        ? dest[0] as { num: number; gen: number }
-        : null;
-      result.push(ref);
-      walk(n.items ?? []);
+// Resolve a single outline dest (array or named string) to a page index (0-based)
+async function resolveOutlineDest(dest: any, pdfDoc: any): Promise<number | null> {
+  try {
+    let resolved = dest;
+    if (typeof dest === 'string') {
+      resolved = await pdfDoc.getDestination(dest);
+    }
+    if (!Array.isArray(resolved) || !resolved[0]) return null;
+    const ref = resolved[0];
+    if (typeof ref === 'object' && 'num' in ref) {
+      return await pdfDoc.getPageIndex(ref);
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+async function resolveOutlinePageNums(nodes: any[], pdfDoc: any, items: TocItem[]): Promise<void> {
+  let i = 0;
+  async function walk(ns: any[], its: TocItem[]) {
+    for (let j = 0; j < ns.length; j++) {
+      const pageIdx = await resolveOutlineDest(ns[j].dest, pdfDoc);
+      if (pageIdx !== null) its[j].pageNum = pageIdx + 1;
+      await walk(ns[j].items ?? [], its[j].children);
     }
   }
-  walk(nodes);
-  return result;
+  await walk(nodes, items);
 }
 
 async function updateToc(filePath: string): Promise<void> {
@@ -447,19 +459,19 @@ async function updateToc(filePath: string): Promise<void> {
     const outline = await pdfDoc.getOutline();
     if (outline && outline.length > 0) {
       const toc = extractPdfOutline(outline);
-      const dests = flattenOutlineDests(outline);
-      await resolvePdfOutlinePageNums(toc, dests, pdfDoc);
+      await resolveOutlinePageNums(outline, pdfDoc, toc);
+      // Cache as sidecar so next open is instant
+      saveSidecar(filePath, toc).catch(() => {});
       renderTocPanel(panel, toc, pdfJump);
       applyTocVisibility(filePath);
       return;
     }
   } catch { /* outline read failed, fall through to scan */ }
 
-  // PDF: lazy scan
+  // PDF: lazy scan via pdfjs doc (works on all pages, not just rendered ones)
   await scanPdfHeadings(
     filePath,
-    page => viewer.getTextBlocks(page),
-    viewer.getTotalPages(),
+    viewer.getPdfDoc(),
     toc => {
       renderTocPanel(panel, toc, pdfJump);
       applyTocVisibility(filePath);

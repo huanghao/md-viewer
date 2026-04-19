@@ -303,6 +303,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     overlayCanvases.set(pageNum, overlayCanvas);
     persistentRects.set(pageNum, []);
     tempRects.set(pageNum, null);
+    let justDragged = false;
 
     const textContent = await page.getTextContent();
     textContentCache.set(pageNum, textContent);
@@ -415,6 +416,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
           redrawOverlay(pageNum);
           return;
         }
+        justDragged = true;
         const rect = wrapper.getBoundingClientRect();
         const upPdfX = (e.clientX - rect.left) / scale;
         const upPdfY = (e.clientY - rect.top) / scale;
@@ -447,22 +449,23 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
 
         opts.onTextSelected!(pageNum, result.text, prefix, suffix, e.clientX, e.clientY, startItemIdx, endItemIdx);
       });
+    }
 
-      overlayCanvas.addEventListener('click', (e) => {
-        if (opts.onAnnotationClick) {
-          const rect = wrapper.getBoundingClientRect();
-          const clickX = (e.clientX - rect.left) / scale;
-          const clickY = (e.clientY - rect.top) / scale;
-          const perPage = persistentRects.get(pageNum) || [];
-          for (const r of perPage) {
-            if (clickX >= r.x1 && clickX <= r.x2 && clickY >= r.y1 && clickY <= r.y2) {
-              opts.onAnnotationClick(r.annotationId, e.clientX, e.clientY);
-              break;
-            }
+    overlayCanvas.addEventListener('click', (e) => {
+      if (justDragged) { justDragged = false; return; }
+      if (opts.onAnnotationClick) {
+        const rect = wrapper.getBoundingClientRect();
+        const clickX = (e.clientX - rect.left) / scale;
+        const clickY = (e.clientY - rect.top) / scale;
+        const perPage = persistentRects.get(pageNum) || [];
+        for (const r of perPage) {
+          if (clickX >= r.x1 && clickX <= r.x2 && clickY >= r.y1 && clickY <= r.y2) {
+            opts.onAnnotationClick(r.annotationId, e.clientX, e.clientY);
+            break;
           }
         }
-      });
-    }
+      }
+    });
 
     wrapper.classList.remove("pdf-page-placeholder");
     rendered.add(pageNum);
@@ -637,7 +640,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     const wrapper = pageWrappers[pageNum - 1];
     if (!wrapper) return;
 
-    const perPage = persistentRects.get(pageNum) || [];
+    const perPage = (persistentRects.get(pageNum) || []).filter(r => r.annotationId !== annotationId);
     perPage.push({ annotationId, x1, y1, x2, y2 });
     persistentRects.set(pageNum, perPage);
     redrawOverlay(pageNum);
@@ -707,6 +710,9 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     rendering.clear();
     textBlocksByPage.clear();
     textContentCache.clear();
+    overlayCanvases.clear();
+    persistentRects.clear();
+    tempRects.clear();
   }
 
   function getRenderedCount(): number { return rendered.size; }

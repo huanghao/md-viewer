@@ -2488,6 +2488,7 @@ function startWorkspacePolling() {
 
   renderContent();
   syncAnnotationsForCurrentFile(true);
+  if (state.currentFile) updateToc(state.currentFile);
 
   setupDragAndDrop();
   setupSidebarResize();

@@ -15,6 +15,7 @@ import { showError } from './ui/toast';
 import { resolveAnnotationAnchor } from './utils/annotation-anchor';
 import { isOpen, isResolved, isOrphan, type AnnotationStatus } from '../annotation-status';
 import { adjustAnnotationCount } from './state';
+import { formatRelativeTimeShort } from './utils/format';
 
 // ==================== 类型定义 ====================
 export interface Annotation {
@@ -637,6 +638,7 @@ export function renderTranslationList(
             <div class="translation-item-original">${originalEscaped}</div>
             <div class="translation-item-error">${escapeHtml(entry.error)}</div>
             <div class="translation-item-footer">
+              <span class="translation-item-time">${formatRelativeTimeShort(entry.timestamp)}</span>
               <button class="translation-item-retry" data-page="${entry.pageNum}" data-start="${entry.startItemIdx}">重试</button>
               <button class="translation-item-del" data-page="${entry.pageNum}" data-start="${entry.startItemIdx}">删除</button>
             </div>
@@ -654,6 +656,7 @@ export function renderTranslationList(
         <div class="translation-item-original">${originalEscaped}</div>
         <div class="translation-item-text">${translatedEscaped}</div>
         <div class="translation-item-footer">
+          <span class="translation-item-time">${formatRelativeTimeShort(entry.timestamp)}</span>
           <button class="translation-item-del" data-page="${entry.pageNum}" data-start="${entry.startItemIdx}" title="删除">删除</button>
         </div>
       </div>`;

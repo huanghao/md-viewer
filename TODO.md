@@ -11,6 +11,9 @@
 2）PDF 页面内没有当前页数/总页数提示，也没有跳转到指定页的快捷方式
 
 
+## 翻译 hover 按钮开关
+在设置页面加一个开关，控制 PDF 页面 hover 时是否显示「译」按钮。
+
 ## 翻译服务重启，后台服务重启
 
 ## 页面zoom in/out
@@ -33,4 +36,4 @@ bun run build.ts && bun run scripts/embed-client.ts
 - 若要真正 reflow，需重新生成 PDF（如 pdf-lib）或用纯 HTML 重排，text layer 坐标全部失效
 - 整页翻译 API 成本比选段翻译高
 
-后续可探索：先做 overlay 叠加方案验证视觉效果，再评估是否值得做完整 reflow。
+后续可探索：先做 overlay 叠加方案验证视觉效果，再评估是否值得做完整 reflow。用户体验上"译文紧跟原文段落下方"是最理想的阅读方式，值得重点探索。

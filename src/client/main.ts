@@ -47,7 +47,6 @@ import {
 } from './annotation';
 
 import { createPdfViewer, type PdfViewerInstance } from "./pdf-viewer.js";
-import { clampZoom, zoomStep, pdfZoomKey, MD_ZOOM_MIN, MD_ZOOM_MAX, PDF_ZOOM_MIN, PDF_ZOOM_MAX, PDF_ZOOM_DEFAULT } from './zoom.js';
 import { createPdfAnnotationBridge } from "./pdf-annotation.js";
 import { extractMdToc, extractPdfOutline, loadSidecar, saveSidecar, scanPdfHeadings } from './toc-extractor.js';
 import { renderTocPanel, setActiveTocItem } from './ui/toc-panel.js';
@@ -66,6 +65,8 @@ import {
 } from "./pdf-translation.js";
 import { storageGet, storageSet, storageGetNumber } from './utils/storage';
 import { createResizer } from './utils/resizer';
+import { setupKeyboardShortcuts } from './keyboard-shortcuts';
+import { initZoom, zoomIn, zoomOut, zoomReset, updateZoomDisplay, setPdfZoomValue, getPdfZoom } from './zoom-controller';
 
 declare global {
   function cleanupAllExpiredRecords(): number;
@@ -1492,71 +1493,6 @@ function setupDragAndDrop() {
   });
 }
 
-// ==================== 键盘快捷键 ====================
-function setupKeyboardShortcuts() {
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      if (dismissAnnotationPopupByEscape()) {
-        e.preventDefault();
-        return;
-      }
-      const settingsOverlay = document.getElementById('settingsDialogOverlay');
-      if (settingsOverlay?.classList.contains('show')) {
-        e.preventDefault();
-        closeSettingsDialog();
-        return;
-      }
-      const addWorkspaceOverlay = document.getElementById('addWorkspaceDialogOverlay');
-      if (addWorkspaceOverlay?.classList.contains('show')) {
-        e.preventDefault();
-        addWorkspaceOverlay.classList.remove('show');
-        return;
-      }
-    }
-
-    // Cmd-K (Mac) 或 Ctrl-K (Windows/Linux) 聚焦搜索框
-    // 如果焦点在 textarea/input 里（如评论框），不拦截，让 Emacs 快捷键生效
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-      const tag = (document.activeElement as HTMLElement)?.tagName?.toLowerCase();
-      if (tag === 'textarea' || tag === 'input') return;
-      e.preventDefault();
-      const input = document.getElementById('searchInput') as HTMLInputElement | null;
-      if (input) {
-        input.focus();
-        input.select();
-      }
-      return;
-    }
-
-    // Cmd-W (Mac) 或 Ctrl-W (Windows/Linux) 关闭当前标签页
-    if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
-      e.preventDefault(); // 阻止关闭浏览器标签
-
-      // 如果有当前文件，关闭它
-      if (state.currentFile) {
-        removeFileHandler(state.currentFile);
-      }
-    }
-
-    // n / p：diff 视图中跳转差异块
-    if (diffViewActive && !e.metaKey && !e.ctrlKey && !e.altKey) {
-      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-      if (tag !== 'input' && tag !== 'textarea') {
-        if (e.key === 'n') {
-          e.preventDefault();
-          navigateDiffBlock(1);
-          return;
-        }
-        if (e.key === 'p') {
-          e.preventDefault();
-          navigateDiffBlock(-1);
-          return;
-        }
-      }
-    }
-  });
-}
-
 // ==================== URL 参数处理 ====================
 function handleURLParams() {
   const params = new URLSearchParams(window.location.search);
@@ -1940,82 +1876,6 @@ function copyFileName(fileName: string, event?: Event) {
   copyFilePath(fileName, event);
 }
 
-
-// ==================== 缩放功能 ====================
-let currentFontScale = 1.0;
-
-function initFontScale() {
-  currentFontScale = storageGetNumber('fontScale', 1);
-  applyFontScale();
-}
-
-function applyFontScale() {
-  document.documentElement.style.setProperty('--font-scale', currentFontScale.toString());
-  storageSet('fontScale', currentFontScale);
-  updateZoomDisplay();
-}
-
-function zoomIn() {
-  if (isPdfPath(state.currentFile ?? '')) {
-    adjustPdfZoom(+1);
-  } else {
-    currentFontScale = clampZoom(zoomStep(currentFontScale, +1), MD_ZOOM_MIN, MD_ZOOM_MAX);
-    applyFontScale();
-  }
-}
-
-function zoomOut() {
-  if (isPdfPath(state.currentFile ?? '')) {
-    adjustPdfZoom(-1);
-  } else {
-    currentFontScale = clampZoom(zoomStep(currentFontScale, -1), MD_ZOOM_MIN, MD_ZOOM_MAX);
-    applyFontScale();
-  }
-}
-
-function zoomReset() {
-  if (isPdfPath(state.currentFile ?? '')) {
-    setPdfZoomValue(state.currentFile!, PDF_ZOOM_DEFAULT);
-  } else {
-    currentFontScale = 1.0;
-    applyFontScale();
-  }
-}
-
-// PDF zoom — per-file, debounced re-render
-let pdfZoomDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-
-function adjustPdfZoom(direction: 1 | -1) {
-  if (!state.currentFile) return;
-  const current = getPdfZoom(state.currentFile);
-  const next = clampZoom(zoomStep(current, direction), PDF_ZOOM_MIN, PDF_ZOOM_MAX);
-  setPdfZoomValue(state.currentFile, next);
-}
-
-function setPdfZoomValue(filePath: string, scale: number) {
-  storageSet(pdfZoomKey(filePath), scale);
-  updateZoomDisplay();
-  if (pdfZoomDebounceTimer) clearTimeout(pdfZoomDebounceTimer);
-  pdfZoomDebounceTimer = setTimeout(async () => {
-    const viewer = pdfViewerRegistry.get(filePath)?.viewer;
-    if (viewer) await viewer.setScale(scale);
-  }, 300);
-}
-
-function getPdfZoom(filePath: string): number {
-  return storageGetNumber(pdfZoomKey(filePath), PDF_ZOOM_DEFAULT);
-}
-
-function updateZoomDisplay() {
-  const btn = document.getElementById('fontScaleText');
-  if (!btn) return;
-  if (isPdfPath(state.currentFile ?? '')) {
-    const scale = getPdfZoom(state.currentFile!);
-    btn.textContent = `${Math.round(scale * 100)}%`;
-  } else {
-    btn.textContent = `${Math.round(currentFontScale * 100)}%`;
-  }
-}
 
 // ==================== 系统监控浮窗 ====================
 const MEM_PER_PAGE_MB = 27; // A4 @ scale=1.5, dpr=2
@@ -2506,7 +2366,10 @@ function startWorkspacePolling() {
   setupSidebarCollapse();
 
   // 初始化字体缩放
-  initFontScale();
+  initZoom({
+    getCurrentFile: () => state.currentFile,
+    getPdfViewer: (filePath) => pdfViewerRegistry.get(filePath)?.viewer ?? null,
+  });
 
   // 初始化批注功能
   initAnnotationElements();
@@ -2551,7 +2414,14 @@ function startWorkspacePolling() {
     clearAddConfirm();
   });
   handleURLParams();
-  setupKeyboardShortcuts();
+  setupKeyboardShortcuts({
+    dismissAnnotationPopup: dismissAnnotationPopupByEscape,
+    closeSettings: closeSettingsDialog,
+    removeFile: removeFileHandler,
+    navigateDiff: navigateDiffBlock,
+    getCurrentFile: () => state.currentFile,
+    isDiffActive: () => diffViewActive,
+  });
 
   // 添加批注文本选中监听
   document.addEventListener('mouseup', () => {

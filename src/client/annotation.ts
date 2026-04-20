@@ -902,15 +902,23 @@ function editThreadItem(annotationId: string, itemId: string, filePath: string):
 
   let committed = false; // 防止 blur 在 save/cancel 后再次触发
 
-  const cancel = () => {
-    if (committed) return;
-    committed = true;
+  const restoreLineEl = () => {
     lineEl.classList.remove('is-editing');
     lineEl.innerHTML = originalHTML;
     lineEl.querySelector('[data-edit-thread-item]')?.addEventListener('click', (e) => {
       e.stopPropagation();
       editThreadItem(annotationId, itemId, filePath);
     });
+    lineEl.querySelector('[data-delete-thread-item]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteThreadItem(annotationId, itemId, filePath);
+    });
+  };
+
+  const cancel = () => {
+    if (committed) return;
+    committed = true;
+    restoreLineEl();
   };
 
   const save = () => {
@@ -919,12 +927,7 @@ function editThreadItem(annotationId: string, itemId: string, filePath: string):
     const newText = textarea.value.trim();
     if (!newText || newText === item.note) {
       // 内容未变，恢复原样
-      lineEl.classList.remove('is-editing');
-      lineEl.innerHTML = originalHTML;
-      lineEl.querySelector('[data-edit-thread-item]')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        editThreadItem(annotationId, itemId, filePath);
-      });
+      restoreLineEl();
       return;
     }
     item.note = newText;
@@ -1865,16 +1868,12 @@ export function initAnnotationElements(): void {
       element: resizerEl,
       bodyClass: 'annotation-sidebar-resizing',
       guard: () => !getElements().sidebar?.classList.contains('collapsed'),
-      onMove: (delta) => {
-        const root = document.documentElement;
-        const currentWidth = Number(getComputedStyle(root).getPropertyValue('--annotation-sidebar-width').replace('px', '')) || ANNOTATION_WIDTH_DEFAULT;
-        setAnnotationSidebarWidth(currentWidth + delta);
+      onMove: (_delta, clientX) => {
+        setAnnotationSidebarWidth(window.innerWidth - clientX);
         syncAnnotationSidebarLayout();
       },
-      onEnd: (delta) => {
-        const root = document.documentElement;
-        const currentWidth = Number(getComputedStyle(root).getPropertyValue('--annotation-sidebar-width').replace('px', '')) || ANNOTATION_WIDTH_DEFAULT;
-        setAnnotationSidebarWidth(currentWidth + delta);
+      onEnd: (_delta, clientX) => {
+        setAnnotationSidebarWidth(window.innerWidth - clientX);
         syncAnnotationSidebarLayout();
       },
     });

@@ -1,7 +1,7 @@
 # 代码质量审计报告
 
 > 生成日期：2026-04-20  
-> 最后更新：2026-04-20（第二轮扫描，重构后实际状态）  
+> 最后更新：2026-04-20（第三轮，main.ts 拆分完成）  
 > 代码库规模：22,777 行 / 68 个 TypeScript 文件
 
 ---
@@ -14,10 +14,10 @@
 | D2: handlers.ts 参数套板 | ❌ 4 处重复 | ✅ 已提取 `parseAnnotationRef` |
 | D3: resizer 逻辑重复 | ❌ 2 处重复 | ✅ 已提取 `utils/resizer.ts` |
 | D4: getElements() 无缓存 | ❌ 每次重新查询 DOM | ✅ 已改为懒加载单例 |
-| D5: main.ts 过大（2840 行） | ❌ 混合 6 个功能模块 | ⏳ 待处理 |
+| D5: main.ts 过大（2840 行） | ❌ 混合 6 个功能模块 | 🔶 部分完成（2840→2696 行，提取了 keyboard-shortcuts.ts + zoom-controller.ts） |
 | D6: css.ts 面板样式重复 | ❌ 3858 行，多处重复 | ⏳ 待处理 |
 
-**403 个单元测试全部通过。**
+**422 个单元测试全部通过。**
 
 ---
 
@@ -58,21 +58,22 @@
 
 ## Part 2 — 待处理问题
 
-### D5. `main.ts` 功能过度集中（2,829 行）
+### D5. `main.ts` 功能过度集中 — 🔶 部分完成
 
 **严重程度：** 中  
-**当前状态：** 文件混合了至少 6 个功能模块，45+ 个顶级函数
+**进展：** 2840 → 2696 行（-144 行）
 
-| 行范围（估算） | 功能模块 | 理想归属 |
-|--------------|---------|---------|
-| sidebar 相关 | 宽度/折叠/resize | 可保留或抽 `sidebar.ts` |
-| TOC 相关 | 高度/展开状态 | 可保留或抽 `toc-state.ts` |
-| PDF viewer 集成 | 加载/缩放/滚动 | `pdf-viewer.ts` 已有模块 |
-| 文件 diff | diff 渲染 | 可保留 |
-| 全局快捷键 | keyboard 注册 | `keyboard.ts` |
-| fontScale | 字体缩放状态 | `state.ts` 或 `config.ts` |
+已提取：
+- `src/client/keyboard-shortcuts.ts`（67 行）— 键盘快捷键，10 个测试
+- `src/client/zoom-controller.ts`（95 行）— 缩放控制，14 个测试
 
-**风险：** 中。大量跨功能状态引用，需要仔细处理依赖方向。建议先写集成测试再拆。
+**剩余未拆（有意推迟）：**
+
+| 功能 | 原因 |
+|------|------|
+| Diff 功能（~250 行） | `diffViewActive` 全局状态被 `renderContent`/`syncFileFromDisk`/`switchFile` 共享，提取会引入循环依赖，需先重构状态管理 |
+| SSE 连接管理（~114 行） | 与状态管理深度耦合 |
+| Sidebar/TOC（各 ~60 行） | 行数小，提取收益不大 |
 
 ---
 
@@ -103,6 +104,11 @@
 ## 附：本次重构提交记录
 
 ```
+f580827 refactor(main): replace inline zoom/keyboard with new modules
+3df9ff3 feat(zoom-controller): extract zoom logic from main.ts
+69f7c40 feat(keyboard-shortcuts): extract setupKeyboardShortcuts
+4ded4dd docs: add main.ts split design spec
+1ea27e1 docs(audit): update with post-refactor actual state
 ac85048 docs: add code quality audit report
 84a2a29 refactor: extract createResizer util
 16a9cd6 refactor(handlers): extract parseAnnotationRef

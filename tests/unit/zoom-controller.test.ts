@@ -100,13 +100,66 @@ describe('zoomReset (PDF mode)', () => {
   });
 });
 
+describe('zoomIn / zoomOut (PDF mode)', () => {
+  it('zoomIn calls getPdfViewer().setScale with clamped value', async () => {
+    const setScale = mock(() => Promise.resolve());
+    const deps = makeDeps('/test.pdf', { setScale });
+    initZoom(deps);
+    zoomIn();
+    await new Promise(r => setTimeout(r, 350));
+    expect(setScale).toHaveBeenCalled();
+    const [scale] = (setScale as any).mock.calls[0];
+    expect(scale).toBeGreaterThan(PDF_ZOOM_DEFAULT);
+  });
+
+  it('zoomOut calls getPdfViewer().setScale with clamped value', async () => {
+    const setScale = mock(() => Promise.resolve());
+    const deps = makeDeps('/test.pdf', { setScale });
+    initZoom(deps);
+    zoomOut();
+    await new Promise(r => setTimeout(r, 350));
+    expect(setScale).toHaveBeenCalled();
+    const [scale] = (setScale as any).mock.calls[0];
+    expect(scale).toBeLessThan(PDF_ZOOM_DEFAULT);
+  });
+});
+
+describe('setPdfZoomValue', () => {
+  it('writes to storage immediately', () => {
+    const deps = makeDeps('/test.pdf');
+    initZoom(deps);
+    setPdfZoomValue('/test.pdf', 2.0);
+    expect(getPdfZoom('/test.pdf')).toBe(2.0);
+  });
+
+  it('debounces viewer.setScale call', async () => {
+    const setScale = mock(() => Promise.resolve());
+    const deps = makeDeps('/test.pdf', { setScale });
+    initZoom(deps);
+    setPdfZoomValue('/test.pdf', 2.0);
+    expect(setScale).not.toHaveBeenCalled();
+    await new Promise(r => setTimeout(r, 350));
+    expect(setScale).toHaveBeenCalledWith(2.0);
+  });
+});
+
 describe('updateZoomDisplay', () => {
-  it('shows percentage text on fontScaleText element', () => {
+  it('shows MD percentage text on fontScaleText element', () => {
     const btn = { textContent: '' };
     getElementMock.mockReturnValue(btn);
     initZoom(makeDeps('/test.md'));
     setPropertyMock.mockReset();
     updateZoomDisplay();
     expect(btn.textContent).toBe('100%');
+  });
+
+  it('shows PDF percentage text for PDF file', () => {
+    const btn = { textContent: '' };
+    getElementMock.mockReturnValue(btn);
+    const deps = makeDeps('/test.pdf');
+    initZoom(deps);
+    storage.setItem('md-viewer:pdf-zoom:/test.pdf', '2');
+    updateZoomDisplay();
+    expect(btn.textContent).toBe('200%');
   });
 });

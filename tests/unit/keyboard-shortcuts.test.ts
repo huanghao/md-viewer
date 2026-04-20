@@ -80,6 +80,34 @@ describe('Cmd/Ctrl-W', () => {
   });
 });
 
+describe('Cmd/Ctrl-K', () => {
+  it('focuses searchInput element', () => {
+    const input = document.createElement('input');
+    input.id = 'searchInput';
+    document.body.appendChild(input);
+    const deps = makeDeps();
+    setupKeyboardShortcuts(deps);
+    document.dispatchEvent(makeEvent('k', { metaKey: true }));
+    expect(document.activeElement).toBe(input);
+    document.body.removeChild(input);
+  });
+
+  it('does not trigger when active element is textarea', () => {
+    const textarea = document.createElement('textarea');
+    document.body.appendChild(textarea);
+    textarea.focus();
+    const input = document.createElement('input');
+    input.id = 'searchInput';
+    document.body.appendChild(input);
+    const deps = makeDeps();
+    setupKeyboardShortcuts(deps);
+    document.dispatchEvent(makeEvent('k', { metaKey: true }));
+    expect(document.activeElement).not.toBe(input);
+    document.body.removeChild(textarea);
+    document.body.removeChild(input);
+  });
+});
+
 describe('n/p diff navigation', () => {
   it('calls navigateDiff(1) on n when diff active', () => {
     const deps = makeDeps({ isDiffActive: () => true });

@@ -85,6 +85,7 @@ function applyTheme(): void {
 }
 
 const SIDEBAR_WIDTH_STORAGE_KEY = 'md-viewer:sidebar-width';
+const PDF_MODE_KEY = 'md-viewer:pdf-mode';
 const SIDEBAR_DEFAULT_WIDTH = 260;
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 680;
@@ -105,6 +106,21 @@ interface PdfViewerEntry {
   savedScrollTop?: number;
 }
 const pdfViewerRegistry = new Map<string, PdfViewerEntry>();
+
+function applyPdfModeButtons(mode: 'select' | 'annotate'): void {
+  const isAnnotate = mode === 'annotate';
+  const selectBtn = document.getElementById('pdfModeSelectBtn');
+  const annotateBtn = document.getElementById('pdfModeAnnotateBtn');
+  if (selectBtn) selectBtn.classList.toggle('is-active', !isAnnotate);
+  if (annotateBtn) annotateBtn.classList.toggle('is-active', isAnnotate);
+}
+
+(window as any).setPdfMode = function(mode: 'select' | 'annotate') {
+  if (!currentPdfViewer) return;
+  currentPdfViewer.setAnnotateMode(mode === 'annotate');
+  storageSet(PDF_MODE_KEY, mode);
+  applyPdfModeButtons(mode);
+};
 
 function evictPdfViewer(filePath: string): void {
   const entry = pdfViewerRegistry.get(filePath);
@@ -901,6 +917,10 @@ function renderContent() {
   (window as any).__currentPdfViewer = null;
   currentPdfBridge = null;
   container.removeAttribute('data-pdf');
+  const pdfModeSelectBtnHide = document.getElementById('pdfModeSelectBtn');
+  const pdfModeAnnotateBtnHide = document.getElementById('pdfModeAnnotateBtn');
+  if (pdfModeSelectBtnHide) pdfModeSelectBtnHide.style.display = 'none';
+  if (pdfModeAnnotateBtnHide) pdfModeAnnotateBtnHide.style.display = 'none';
 
   // Show translation tab only for PDF files
   const translationTabBtn = document.querySelector<HTMLElement>('.annotation-tab[data-tab="translation"]');
@@ -1027,6 +1047,14 @@ function renderContent() {
       mountPdfPageIndicator(existingEntry.viewer, container);
       refreshTranslationList();
       updateToc(filePath);
+      // Restore and apply saved PDF mode
+      const savedPdfMode = storageGet<string>(PDF_MODE_KEY, 'select') as 'select' | 'annotate';
+      currentPdfViewer.setAnnotateMode(savedPdfMode === 'annotate');
+      const pdfModeSelectBtn = document.getElementById('pdfModeSelectBtn');
+      const pdfModeAnnotateBtn = document.getElementById('pdfModeAnnotateBtn');
+      if (pdfModeSelectBtn) pdfModeSelectBtn.style.display = '';
+      if (pdfModeAnnotateBtn) pdfModeAnnotateBtn.style.display = '';
+      applyPdfModeButtons(savedPdfMode);
       return;
     }
 
@@ -1084,6 +1112,14 @@ function renderContent() {
           ?.classList.toggle('is-highlighted', active);
       });
       updateToc(filePath);
+      // Restore and apply saved PDF mode
+      const savedPdfMode = storageGet<string>(PDF_MODE_KEY, 'select') as 'select' | 'annotate';
+      currentPdfViewer.setAnnotateMode(savedPdfMode === 'annotate');
+      const pdfModeSelectBtn = document.getElementById('pdfModeSelectBtn');
+      const pdfModeAnnotateBtn = document.getElementById('pdfModeAnnotateBtn');
+      if (pdfModeSelectBtn) pdfModeSelectBtn.style.display = '';
+      if (pdfModeAnnotateBtn) pdfModeAnnotateBtn.style.display = '';
+      applyPdfModeButtons(savedPdfMode);
     });
     return; // don't fall through to markdown renderer
   }

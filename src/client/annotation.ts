@@ -17,6 +17,7 @@ import { isOpen, isResolved, isOrphan, type AnnotationStatus } from '../annotati
 import { adjustAnnotationCount } from './state';
 import { formatRelativeTimeShort } from './utils/format';
 import { storageGet, storageSet, storageGetNumber } from './utils/storage';
+import { createResizer } from './utils/resizer';
 
 // ==================== 类型定义 ====================
 export interface Annotation {
@@ -1898,26 +1899,26 @@ export function initAnnotationElements(): void {
     openAnnotationSidebar();
   });
 
-  getElements().sidebarResizer?.addEventListener('mousedown', (event) => {
-    if (getElements().sidebar?.classList.contains('collapsed')) return;
-    event.preventDefault();
-    const root = document.documentElement;
-    const currentWidth = Number(getComputedStyle(root).getPropertyValue('--annotation-sidebar-width').replace('px', '')) || ANNOTATION_WIDTH_DEFAULT;
-    const startX = event.clientX;
-    document.body.classList.add('annotation-sidebar-resizing');
-    const onMove = (moveEvent: MouseEvent) => {
-      const delta = startX - moveEvent.clientX;
-      setAnnotationSidebarWidth(currentWidth + delta);
-      syncAnnotationSidebarLayout();
-    };
-    const onUp = () => {
-      document.body.classList.remove('annotation-sidebar-resizing');
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  });
+  const resizerEl = getElements().sidebarResizer;
+  if (resizerEl) {
+    createResizer({
+      element: resizerEl,
+      bodyClass: 'annotation-sidebar-resizing',
+      guard: () => !getElements().sidebar?.classList.contains('collapsed'),
+      onMove: (delta) => {
+        const root = document.documentElement;
+        const currentWidth = Number(getComputedStyle(root).getPropertyValue('--annotation-sidebar-width').replace('px', '')) || ANNOTATION_WIDTH_DEFAULT;
+        setAnnotationSidebarWidth(currentWidth + delta);
+        syncAnnotationSidebarLayout();
+      },
+      onEnd: (delta) => {
+        const root = document.documentElement;
+        const currentWidth = Number(getComputedStyle(root).getPropertyValue('--annotation-sidebar-width').replace('px', '')) || ANNOTATION_WIDTH_DEFAULT;
+        setAnnotationSidebarWidth(currentWidth + delta);
+        syncAnnotationSidebarLayout();
+      },
+    });
+  }
 
   document.getElementById('content')?.addEventListener('scroll', () => {
     hideQuickAdd(false); // 滚动只隐藏按钮，不清除 pending 划线

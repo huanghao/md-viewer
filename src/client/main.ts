@@ -65,6 +65,7 @@ import {
   highlightTranslationBlock,
 } from "./pdf-translation.js";
 import { storageGet, storageSet, storageGetNumber } from './utils/storage';
+import { createResizer } from './utils/resizer';
 
 declare global {
   function cleanupAllExpiredRecords(): number;
@@ -211,32 +212,18 @@ function setupSidebarResize(): void {
   const resizer = document.getElementById('sidebarResizer');
   if (!resizer) return;
 
-  let dragging = false;
-
-  const onMove = (event: MouseEvent) => {
-    if (!dragging) return;
-    const width = clampSidebarWidth(event.clientX);
-    applySidebarWidth(width);
-  };
-
-  const onUp = (event: MouseEvent) => {
-    if (!dragging) return;
-    dragging = false;
-    const width = clampSidebarWidth(event.clientX);
-    applySidebarWidth(width);
-    storageSet(SIDEBAR_WIDTH_STORAGE_KEY, width);
-    document.body.classList.remove('sidebar-resizing');
-    window.removeEventListener('mousemove', onMove);
-    window.removeEventListener('mouseup', onUp);
-  };
-
-  resizer.addEventListener('mousedown', (event) => {
-    if (window.innerWidth <= 900) return;
-    dragging = true;
-    document.body.classList.add('sidebar-resizing');
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    event.preventDefault();
+  createResizer({
+    element: resizer,
+    bodyClass: 'sidebar-resizing',
+    guard: () => window.innerWidth > 900,
+    onMove: (_delta, clientX) => {
+      applySidebarWidth(clampSidebarWidth(clientX));
+    },
+    onEnd: (_delta, clientX) => {
+      const width = clampSidebarWidth(clientX);
+      applySidebarWidth(width);
+      storageSet(SIDEBAR_WIDTH_STORAGE_KEY, width);
+    },
   });
 
   window.addEventListener('resize', () => {

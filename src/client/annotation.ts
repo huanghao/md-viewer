@@ -237,7 +237,7 @@ export function getAnnotations(): Annotation[] {
 }
 
 // ==================== DOM 元素引用 ====================
-function getElements() {
+function queryAnnotationElements() {
   return {
     sidebar: document.getElementById('annotationSidebar'),
     sidebarResizer: document.getElementById('annotationSidebarResizer'),
@@ -260,6 +260,13 @@ function getElements() {
     closeToggle: document.getElementById('annotationSidebarClose'),
     floatingOpenBtn: document.getElementById('annotationFloatingOpenBtn'),
   };
+}
+
+type AnnotationElements = ReturnType<typeof queryAnnotationElements>;
+let _cachedElements: AnnotationElements | null = null;
+
+function getElements(): AnnotationElements {
+  return _cachedElements ??= queryAnnotationElements();
 }
 
 // ==================== 工具函数 ====================
@@ -1732,6 +1739,7 @@ export function handleSelectionForAnnotation(filePath: string | null): void {
 
 // ==================== 初始化 ====================
 export function initAnnotationElements(): void {
+  _cachedElements = null;
   initAnnotationSidebarWidth();
   setSidebarCollapsed(true);
 

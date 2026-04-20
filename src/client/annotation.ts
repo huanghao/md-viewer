@@ -78,7 +78,7 @@ const state: AnnotationState = {
   filter: 'open',
   density: getInitialDensity(),
 };
-const ANNOTATION_PANEL_OPEN_BY_FILE_KEY = 'md-viewer:annotation-panel-open-by-file';
+const ANNOTATION_PANEL_OPEN_KEY = 'md-viewer:annotation-panel-open';
 
 export function nextAnnotationSerial(annotations: Annotation[]): number {
   const maxSerial = annotations.reduce((max, ann) => {
@@ -206,9 +206,7 @@ export function setAnnotations(filePath: string | null): void {
   hideQuickAdd(true);
   hidePopover(true);
   if (filePath) {
-    const openByFile = loadAnnotationPanelOpenByFile();
-    const opened = openByFile[filePath] === true;
-    setSidebarCollapsed(!opened);
+    setSidebarCollapsed(!loadAnnotationPanelOpen());
   } else {
     setSidebarCollapsed(true);
   }
@@ -513,20 +511,13 @@ function setSidebarCollapsed(collapsed: boolean): void {
   }
 }
 
-function loadAnnotationPanelOpenByFile(): Record<string, boolean> {
-  const parsed = storageGet<Record<string, boolean>>(ANNOTATION_PANEL_OPEN_BY_FILE_KEY, {});
-  return parsed && typeof parsed === 'object' ? parsed : {};
-}
-
-function saveAnnotationPanelOpenByFile(next: Record<string, boolean>): void {
-  storageSet(ANNOTATION_PANEL_OPEN_BY_FILE_KEY, next);
+function loadAnnotationPanelOpen(): boolean {
+  // Default: closed (only open if explicitly saved as '1')
+  return storageGet<string>(ANNOTATION_PANEL_OPEN_KEY, '0') === '1';
 }
 
 function persistCurrentFilePanelOpen(opened: boolean): void {
-  if (!state.currentFilePath) return;
-  const map = loadAnnotationPanelOpenByFile();
-  map[state.currentFilePath] = opened;
-  saveAnnotationPanelOpenByFile(map);
+  storageSet(ANNOTATION_PANEL_OPEN_KEY, opened ? '1' : '0');
 }
 
 function clampSidebarWidth(width: number): number {

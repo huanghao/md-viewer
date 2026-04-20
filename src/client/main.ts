@@ -238,27 +238,24 @@ function setupSidebarResize(): void {
 }
 
 const TOC_PANE_HEIGHT_KEY = 'md-viewer:toc-pane-height';
-const TOC_OPEN_BY_FILE_KEY = 'md-viewer:toc-open-by-file';
+const TOC_OPEN_KEY = 'md-viewer:toc-open';
 
-function loadTocOpenByFile(): Record<string, boolean> {
-  return storageGet<Record<string, boolean>>(TOC_OPEN_BY_FILE_KEY, {});
+function loadTocOpen(): boolean {
+  // Default: open (only closed if explicitly saved as '0')
+  return storageGet<string>(TOC_OPEN_KEY, '1') !== '0';
 }
 
-function saveTocOpenForFile(filePath: string, open: boolean): void {
-  const map = loadTocOpenByFile();
-  map[filePath] = open;
-  storageSet(TOC_OPEN_BY_FILE_KEY, map);
+function saveTocOpen(open: boolean): void {
+  storageSet(TOC_OPEN_KEY, open ? '1' : '0');
 }
 
-function applyTocVisibility(filePath: string): void {
+function applyTocVisibility(_filePath: string): void {
   const sidebar = document.querySelector('.sidebar') as HTMLElement | null;
   if (!sidebar) return;
-  const map = loadTocOpenByFile();
-  // Default: open (only close if explicitly saved as false)
-  if (map[filePath] === false) {
-    sidebar.classList.remove('toc-visible');
-  } else {
+  if (loadTocOpen()) {
     sidebar.classList.add('toc-visible');
+  } else {
+    sidebar.classList.remove('toc-visible');
   }
 }
 
@@ -267,11 +264,11 @@ function setupTocOpenBtn(): void {
     const sidebar = document.querySelector('.sidebar') as HTMLElement | null;
     if (!sidebar) return;
     sidebar.classList.add('toc-visible');
-    if (state.currentFile) saveTocOpenForFile(state.currentFile, true);
+    saveTocOpen(true);
   });
   // Wire close callback for toc-panel.ts
   (window as any).__onTocClose = () => {
-    if (state.currentFile) saveTocOpenForFile(state.currentFile, false);
+    saveTocOpen(false);
   };
 }
 const TOC_PANE_DEFAULT_HEIGHT = 240;

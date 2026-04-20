@@ -18,6 +18,8 @@ import { adjustAnnotationCount } from './state';
 import { formatRelativeTimeShort } from './utils/format';
 import { storageGet, storageSet, storageGetNumber } from './utils/storage';
 import { createResizer } from './utils/resizer';
+import { getTextNodes, globalOffsetForPosition, positionForGlobalOffset, clamp, placeFloating, getReaderText } from './annotation/position';
+import { isResolvedAnn, getAnchorTrack, matchesFilter, getVisibleAnnotations as getVisibleAnnotationsUtil } from './annotation/query';
 
 // ==================== 类型定义 ====================
 export interface Annotation {
@@ -268,90 +270,11 @@ function getElements(): AnnotationElements {
   return _cachedElements ??= queryAnnotationElements();
 }
 
+export function invalidateAnnotationElementsCache(): void {
+  _cachedElements = null;
+}
+
 // ==================== 工具函数 ====================
-function getTextNodes(root: Node): Text[] {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  const nodes: Text[] = [];
-  let node: Node | null;
-  while ((node = walker.nextNode())) {
-    if (node.nodeValue && node.nodeValue.length > 0) {
-      nodes.push(node as Text);
-    }
-  }
-  return nodes;
-}
-
-function globalOffsetForPosition(root: HTMLElement, targetNode: Node, targetOffset: number): number {
-  const nodes = getTextNodes(root);
-  let count = 0;
-  for (const node of nodes) {
-    if (node === targetNode) {
-      return count + targetOffset;
-    }
-    count += node.nodeValue?.length || 0;
-  }
-  return -1;
-}
-
-function positionForGlobalOffset(
-  root: HTMLElement,
-  offset: number,
-  index?: TextNodeIndex
-): { node: Text; offset: number } | null {
-  if (index) {
-    return positionForOffsetFast(index, offset);
-  }
-  // 原始线性逻辑（fallback，保持向后兼容）
-  const nodes = getTextNodes(root);
-  let count = 0;
-  for (const node of nodes) {
-    const len = node.nodeValue?.length || 0;
-    const next = count + len;
-    if (offset <= next) {
-      return { node, offset: Math.max(0, offset - count) };
-    }
-    count = next;
-  }
-  if (nodes.length === 0) return null;
-  const last = nodes[nodes.length - 1];
-  return { node: last, offset: last.nodeValue?.length || 0 };
-}
-
-function clamp(val: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, val));
-}
-
-function placeFloating(el: HTMLElement, x: number, y: number): void {
-  const width = 360;
-  const height = 220;
-  const left = clamp(x, 8, window.innerWidth - width - 8);
-  const top = clamp(y, 8, window.innerHeight - height - 8);
-  el.style.left = `${left}px`;
-  el.style.top = `${top}px`;
-}
-
-function getReaderText(root: HTMLElement): string {
-  return getTextNodes(root).map((node) => node.nodeValue || '').join('');
-}
-
-function isResolvedAnn(ann: Annotation): boolean {
-  return isResolved(ann.status as AnnotationStatus);
-}
-
-function getAnchorTrack(ann: Annotation): 'exact' | 'reanchored' | 'orphan' {
-  if (isOrphan(ann.status as AnnotationStatus)) return 'orphan';
-  if ((ann.confidence || 0) >= 0.95) return 'exact';
-  return 'reanchored';
-}
-
-function matchesFilter(ann: Annotation, filter: AnnotationFilter): boolean {
-  const orphan = isOrphan(ann.status as AnnotationStatus) || getAnchorTrack(ann) === 'orphan';
-  if (filter === 'all') return true;
-  if (filter === 'open') return isOpen(ann.status as AnnotationStatus);
-  if (filter === 'resolved') return isResolved(ann.status as AnnotationStatus) && !orphan;
-  if (filter === 'orphan') return orphan;
-  return true;
-}
 
 export function getAnnotationCurrentFilePath(): string | null {
   return state.currentFilePath;
@@ -466,12 +389,6 @@ function iconSvg(type: 'up' | 'down' | 'check' | 'trash' | 'comment' | 'list' | 
   return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.2 4.2L8 8l3.8-3.8 1 1L9 9l3.8 3.8-1 1L8 10l-3.8 3.8-1-1L7 9 3.2 5.2z"/></svg>';
 }
 
-function getVisibleAnnotations(): Annotation[] {
-  return [...state.annotations]
-    .filter((ann) => matchesFilter(ann, state.filter))
-    .sort((a, b) => a.start - b.start);
-}
-
 function updateControlState(): void {
   const el = getElements();
   el.filterMenu?.querySelectorAll('.annotation-filter-item[data-filter]').forEach((node) => {
@@ -494,7 +411,7 @@ function updateControlState(): void {
 }
 
 function updateAnnotationCount(): void {
-  const count = getVisibleAnnotations().length;
+  const count = getVisibleAnnotationsUtil(state.annotations, state.filter).length;
   const tabCount = document.getElementById('annotationTabCount');
   if (tabCount) tabCount.textContent = count > 0 ? `(${count})` : '';
 }
@@ -1243,7 +1160,7 @@ function setActiveAnnotation(id: string | null, filePath: string | null): void {
 }
 
 function jumpToRelative(id: string, delta: number, filePath: string): void {
-  const sorted = getVisibleAnnotations();
+  const sorted = getVisibleAnnotationsUtil(state.annotations, state.filter);
   const index = sorted.findIndex((item) => item.id === id);
   if (index < 0) return;
   const target = sorted[index + delta];
@@ -1489,7 +1406,7 @@ export function applyAnnotations(): void {
     }
   }
 
-  const sorted = [...getVisibleAnnotations()]
+  const sorted = [...getVisibleAnnotationsUtil(state.annotations, state.filter)]
     .sort((a, b) => b.start - a.start);
   for (const ann of sorted) {
     applySingleAnnotation(ann, index);
@@ -1545,7 +1462,7 @@ export function renderAnnotationList(filePath: string | null): void {
     return;
   }
 
-  const sorted = getVisibleAnnotations();
+  const sorted = getVisibleAnnotationsUtil(state.annotations, state.filter);
   if (sorted.length === 0) {
     el.annotationList.innerHTML = '<div class="annotation-empty">当前筛选下无评论</div>';
     return;

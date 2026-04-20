@@ -64,6 +64,7 @@ import {
   clearAllTranslations,
   highlightTranslationBlock,
 } from "./pdf-translation.js";
+import { storageGet, storageSet, storageGetNumber } from './utils/storage';
 
 declare global {
   function cleanupAllExpiredRecords(): number;
@@ -114,6 +115,7 @@ function evictPdfViewer(filePath: string): void {
 }
 
 function scheduleEviction(filePath: string): void {
+  if (!state.config.pdfIdleEviction) return;
   const entry = pdfViewerRegistry.get(filePath);
   if (!entry) return;
   if (entry.idleTimer) clearTimeout(entry.idleTimer);
@@ -180,20 +182,19 @@ function applySidebarWidth(width: number): void {
 }
 
 function initSidebarWidth(): void {
-  const saved = Number(localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY));
-  const width = Number.isFinite(saved) && saved > 0 ? saved : SIDEBAR_DEFAULT_WIDTH;
-  applySidebarWidth(width);
+  const saved = storageGetNumber(SIDEBAR_WIDTH_STORAGE_KEY, SIDEBAR_DEFAULT_WIDTH);
+  applySidebarWidth(saved > 0 ? saved : SIDEBAR_DEFAULT_WIDTH);
 }
 
 const SIDEBAR_COLLAPSED_KEY = 'md-viewer:sidebar-collapsed';
 
 function setSidebarCollapsed(collapsed: boolean): void {
   document.body.classList.toggle('sidebar-collapsed', collapsed);
-  localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
+  storageSet(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
 }
 
 function initSidebarCollapsed(): void {
-  const saved = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+  const saved = storageGet<string>(SIDEBAR_COLLAPSED_KEY, '');
   if (saved === '1') setSidebarCollapsed(true);
 }
 
@@ -223,7 +224,7 @@ function setupSidebarResize(): void {
     dragging = false;
     const width = clampSidebarWidth(event.clientX);
     applySidebarWidth(width);
-    localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(width));
+    storageSet(SIDEBAR_WIDTH_STORAGE_KEY, width);
     document.body.classList.remove('sidebar-resizing');
     window.removeEventListener('mousemove', onMove);
     window.removeEventListener('mouseup', onUp);
@@ -253,16 +254,13 @@ const TOC_PANE_HEIGHT_KEY = 'md-viewer:toc-pane-height';
 const TOC_OPEN_BY_FILE_KEY = 'md-viewer:toc-open-by-file';
 
 function loadTocOpenByFile(): Record<string, boolean> {
-  try {
-    const raw = localStorage.getItem(TOC_OPEN_BY_FILE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch { return {}; }
+  return storageGet<Record<string, boolean>>(TOC_OPEN_BY_FILE_KEY, {});
 }
 
 function saveTocOpenForFile(filePath: string, open: boolean): void {
   const map = loadTocOpenByFile();
   map[filePath] = open;
-  localStorage.setItem(TOC_OPEN_BY_FILE_KEY, JSON.stringify(map));
+  storageSet(TOC_OPEN_BY_FILE_KEY, map);
 }
 
 function applyTocVisibility(filePath: string): void {
@@ -298,9 +296,8 @@ function applyTocPaneHeight(height: number): void {
 }
 
 function initTocPaneHeight(): void {
-  const saved = localStorage.getItem(TOC_PANE_HEIGHT_KEY);
-  const parsed = saved ? parseInt(saved, 10) : NaN;
-  applyTocPaneHeight(Number.isFinite(parsed) && parsed > 0 ? parsed : TOC_PANE_DEFAULT_HEIGHT);
+  const saved = storageGetNumber(TOC_PANE_HEIGHT_KEY, TOC_PANE_DEFAULT_HEIGHT);
+  applyTocPaneHeight(saved > 0 ? saved : TOC_PANE_DEFAULT_HEIGHT);
 }
 
 function setupTocResize(): void {
@@ -322,7 +319,7 @@ function setupTocResize(): void {
     document.body.classList.remove('toc-resizing');
     const delta = startY - e.clientY;
     const newHeight = Math.min(TOC_PANE_MAX_HEIGHT, Math.max(TOC_PANE_MIN_HEIGHT, startHeight + delta));
-    localStorage.setItem(TOC_PANE_HEIGHT_KEY, String(newHeight));
+    storageSet(TOC_PANE_HEIGHT_KEY, newHeight);
     document.removeEventListener('mousemove', onMouseMove);
     document.removeEventListener('mouseup', onMouseUp);
   };
@@ -909,7 +906,7 @@ function renderContent() {
   for (const [path, entry] of pdfViewerRegistry.entries()) {
     if (entry.viewer.el.parentNode) {
       entry.savedScrollTop = container.scrollTop;
-      localStorage.setItem(`md-viewer:pdf-scroll:${path}`, String(container.scrollTop));
+      storageSet(`md-viewer:pdf-scroll:${path}`, container.scrollTop);
       entry.viewer.el.remove();
     }
     if (path !== state.currentFile) scheduleEviction(path);
@@ -1064,7 +1061,7 @@ function renderContent() {
     }).then((pdfViewerInstance) => {
       currentPdfViewer = pdfViewerInstance;
       container.setAttribute('data-current-file', filePath);
-      const savedScroll = Number(localStorage.getItem(`md-viewer:pdf-scroll:${filePath}`));
+      const savedScroll = storageGetNumber(`md-viewer:pdf-scroll:${filePath}`, 0);
       pdfViewerRegistry.set(filePath, {
         viewer: pdfViewerInstance,
         lastActiveAt: Date.now(),
@@ -1958,14 +1955,13 @@ function copyFileName(fileName: string, event?: Event) {
 let currentFontScale = 1.0;
 
 function initFontScale() {
-  const saved = localStorage.getItem('fontScale');
-  if (saved) currentFontScale = parseFloat(saved);
+  currentFontScale = storageGetNumber('fontScale', 1);
   applyFontScale();
 }
 
 function applyFontScale() {
   document.documentElement.style.setProperty('--font-scale', currentFontScale.toString());
-  localStorage.setItem('fontScale', currentFontScale.toString());
+  storageSet('fontScale', currentFontScale);
   updateZoomDisplay();
 }
 
@@ -2007,7 +2003,7 @@ function adjustPdfZoom(direction: 1 | -1) {
 }
 
 function setPdfZoomValue(filePath: string, scale: number) {
-  localStorage.setItem(pdfZoomKey(filePath), String(scale));
+  storageSet(pdfZoomKey(filePath), scale);
   updateZoomDisplay();
   if (pdfZoomDebounceTimer) clearTimeout(pdfZoomDebounceTimer);
   pdfZoomDebounceTimer = setTimeout(async () => {
@@ -2017,7 +2013,7 @@ function setPdfZoomValue(filePath: string, scale: number) {
 }
 
 function getPdfZoom(filePath: string): number {
-  return parseFloat(localStorage.getItem(pdfZoomKey(filePath)) ?? String(PDF_ZOOM_DEFAULT));
+  return storageGetNumber(pdfZoomKey(filePath), PDF_ZOOM_DEFAULT);
 }
 
 function updateZoomDisplay() {

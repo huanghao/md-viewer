@@ -1,4 +1,4 @@
-import { storageSet } from './utils/storage';
+import { storageSet, storageGet } from './utils/storage';
 
 const WORKSPACE_KNOWN_KEY = 'md-viewer:workspaceKnownFiles';
 
@@ -16,10 +16,9 @@ export function restoreWorkspaceKnownFilesFromStorage(): void {
   workspaceKnownFiles.clear();
 
   try {
-    const savedKnown = localStorage.getItem(WORKSPACE_KNOWN_KEY);
-    if (!savedKnown) return;
+    const records = storageGet(WORKSPACE_KNOWN_KEY);
+    if (!records) return;
 
-    const records = JSON.parse(savedKnown);
     if (!Array.isArray(records)) return;
 
     for (const item of records) {

@@ -429,6 +429,9 @@ export function renderTabs(): void {
     tabsRenderSnapshot
   ].join('###');
 
+  // 确保 tabs 可见（display 可能被外部操作改为 none）
+  container.style.display = 'flex';
+
   // 当 tabs 可见数据没有变化时，避免重复重建 DOM 导致滚动条闪烁
   if (nextTabsRenderKey === lastTabsRenderKey) {
     return;
@@ -436,7 +439,6 @@ export function renderTabs(): void {
   lastTabsRenderKey = nextTabsRenderKey;
 
   touchTabAccess(state.currentFile);
-  container.style.display = 'flex';
 
   const tabsHtml = filesWithDisplay
     .map(file => {

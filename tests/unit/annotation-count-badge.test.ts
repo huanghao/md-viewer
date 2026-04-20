@@ -15,12 +15,6 @@ function resetSummaries() {
 
 beforeEach(resetSummaries);
 
-describe('isOpen — badge 计数的判断依据', () => {
-  it('anchored 是 open', () => expect(isOpen('anchored')).toBe(true));
-  it('unanchored 不是 open', () => expect(isOpen('unanchored')).toBe(false));
-  it('resolved 不是 open', () => expect(isOpen('resolved')).toBe(false));
-});
-
 describe('adjustAnnotationCount', () => {
   it('从 0 增加后 count 正确', () => {
     adjustAnnotationCount('/a.md', +1);

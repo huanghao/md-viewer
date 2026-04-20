@@ -3,6 +3,7 @@ import { saveConfig } from '../config';
 import { renderSidebar } from './sidebar';
 import { showError, showSuccess } from './toast';
 import { MD_THEMES, HL_THEMES } from '../themes/index';
+import { getAllStorageKeys, storageRemove } from '../utils/storage';
 
 // 打开对话框时保存的原始主题值，用于 Cancel 时恢复
 let _savedMarkdownTheme = '';
@@ -212,12 +213,7 @@ interface ClientStateSnapshot {
 }
 
 function getClientStateSnapshot(): ClientStateSnapshot {
-  const allKeys: string[] = [];
-  for (let i = 0; i < localStorage.length; i += 1) {
-    const key = localStorage.key(i);
-    if (key) allKeys.push(key);
-  }
-  allKeys.sort();
+  const allKeys = getAllStorageKeys().sort();
   const mdvKeys = allKeys.filter((key) => key.startsWith('md-viewer:'));
   const commentStateKeyCount = mdvKeys.filter((key) => (
     key === 'md-viewer:annotation-panel-open-by-file' ||
@@ -238,13 +234,12 @@ function getClientStateSnapshot(): ClientStateSnapshot {
 
 function clearClientState(): void {
   const toDelete: string[] = [];
-  for (let i = 0; i < localStorage.length; i += 1) {
-    const key = localStorage.key(i);
-    if (!key) continue;
+  const allKeys = getAllStorageKeys();
+  for (const key of allKeys) {
     if (key.startsWith('md-viewer:')) toDelete.push(key);
   }
   for (const key of toDelete) {
-    localStorage.removeItem(key);
+    storageRemove(key);
   }
   showSuccess(`已清理客户端状态（${toDelete.length} 项）`, 1800);
   window.setTimeout(() => window.location.reload(), 250);
@@ -258,16 +253,15 @@ async function clearAllComments(): Promise<void> {
       throw new Error(data?.error || `HTTP ${response.status}`);
     }
     const keysToDelete: string[] = [];
-    for (let i = 0; i < localStorage.length; i += 1) {
-      const key = localStorage.key(i);
-      if (!key) continue;
+    const allKeys = getAllStorageKeys();
+    for (const key of allKeys) {
       if (key.startsWith('md-viewer:annotations:')) keysToDelete.push(key);
       if (key === 'md-viewer:annotation-panel-open-by-file') keysToDelete.push(key);
       if (key === 'md-viewer:annotation-density') keysToDelete.push(key);
       if (key === 'md-viewer:annotation-sidebar-width') keysToDelete.push(key);
     }
     for (const key of keysToDelete) {
-      localStorage.removeItem(key);
+      storageRemove(key);
     }
     showSuccess(`已清空评论状态（服务端 ${data?.deleted || 0} 条，本地 ${keysToDelete.length} 项）`, 1800);
     window.setTimeout(() => window.location.reload(), 250);

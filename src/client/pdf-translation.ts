@@ -1,5 +1,6 @@
 import type { PdfTextBlock } from "./pdf-viewer.js";
 import type { PdfViewerInstance } from "./pdf-viewer.js";
+import { storageGet, storageSet, getAllStorageKeys, storageRemove } from "./utils/storage";
 
 export interface TranslationProvider {
   translate(text: string, sourceLang: string, targetLang: string): Promise<string>;
@@ -111,15 +112,15 @@ function translationKey(filePath: string, pageNum: number, startItemIdx: number)
 export function loadTranslations(filePath: string): void {
   currentFilePath = filePath;
   currentTranslations = [];
-  // 扫描 localStorage 找该文件的所有翻译
+  // 扫描 storage 找该文件的所有翻译
   const prefix = `md-viewer:translation:${filePath}:`;
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (!key || !key.startsWith(prefix)) continue;
+  const allKeys = getAllStorageKeys();
+  for (const key of allKeys) {
+    if (!key.startsWith(prefix)) continue;
     try {
-      const val = localStorage.getItem(key);
+      const val = storageGet(key);
       if (!val) continue;
-      const entry = JSON.parse(val) as StoredTranslation;
+      const entry = val as StoredTranslation;
       if (entry && entry.originalText && entry.translatedText !== undefined) {
         currentTranslations.push(entry);
       }
@@ -137,7 +138,7 @@ export function getTranslations(): StoredTranslation[] {
 
 export function removeTranslation(filePath: string, pageNum: number, startItemIdx: number): void {
   const key = translationKey(filePath, pageNum, startItemIdx);
-  localStorage.removeItem(key);
+  storageRemove(key);
   currentTranslations = currentTranslations.filter(
     (t) => !(t.pageNum === pageNum && t.startItemIdx === startItemIdx)
   );
@@ -151,11 +152,11 @@ export function unloadTranslations(): void {
 export function clearAllTranslations(filePath: string): void {
   const prefix = `md-viewer:translation:${filePath}:`;
   const keysToRemove: string[] = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && key.startsWith(prefix)) keysToRemove.push(key);
+  const allKeys = getAllStorageKeys();
+  for (const key of allKeys) {
+    if (key.startsWith(prefix)) keysToRemove.push(key);
   }
-  keysToRemove.forEach((k) => localStorage.removeItem(k));
+  keysToRemove.forEach((k) => storageRemove(k));
   currentTranslations = [];
 }
 
@@ -205,18 +206,17 @@ async function _doTranslate(
       endItemIdx,
       timestamp: Date.now(),
     };
-    localStorage.setItem(key, JSON.stringify(entry));
+    storageSet(key, entry);
     // 超出 10 条时删除最旧的
     const allKeys: string[] = [];
     const filePrefix = `md-viewer:translation:${filePath}:`;
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith(filePrefix)) allKeys.push(k);
+    const storageKeys = getAllStorageKeys();
+    for (const k of storageKeys) {
+      if (k.startsWith(filePrefix)) allKeys.push(k);
     }
     const entries: Array<{ key: string; ts: number }> = allKeys.map((k) => {
       try {
-        const v = localStorage.getItem(k);
-        const parsed = v ? (JSON.parse(v) as { timestamp?: number }) : null;
+        const parsed = storageGet(k, null) as { timestamp?: number } | null;
         return { key: k, ts: parsed?.timestamp ?? 0 };
       } catch {
         return { key: k, ts: 0 };
@@ -225,7 +225,7 @@ async function _doTranslate(
     entries.sort((a, b) => a.ts - b.ts);
     const toDeleteCount = Math.max(0, allKeys.length - 10);
     entries.slice(0, toDeleteCount).forEach(({ key: k }) => {
-      localStorage.removeItem(k);
+      storageRemove(k);
       currentTranslations = currentTranslations.filter(
         (t) => translationKey(filePath, t.pageNum, t.startItemIdx) !== k
       );
@@ -267,16 +267,15 @@ export async function translateBlock(
 
   // 检查缓存
   const key = translationKey(filePath, block.pageNum, startItemIdx);
-  const cached = localStorage.getItem(key);
+  const cached = storageGet(key, null) as StoredTranslation | null;
   if (cached) {
     try {
-      const entry = JSON.parse(cached) as StoredTranslation;
-      if (entry.translatedText) {
+      if (cached.translatedText) {
         const exists = currentTranslations.some(
           (t) => t.pageNum === block.pageNum && t.startItemIdx === startItemIdx
         );
         if (!exists) {
-          currentTranslations.push(entry);
+          currentTranslations.push(cached);
           currentTranslations.sort((a, b) => a.pageNum - b.pageNum || a.startItemIdx - b.startItemIdx);
         }
         onUpdate();

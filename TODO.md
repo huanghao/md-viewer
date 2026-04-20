@@ -1,5 +1,10 @@
 # 待完成任务
 
+## PDF 空闲自动回收功能（pdfIdleEviction）评估删除
+当前该功能默认关闭（`pdfIdleEviction: false`），通过 AppConfig 可开启。
+评估删除的条件：长期使用下内存从未成为问题，或者"关 tab 即销毁"的策略已足够。
+代码位置：`src/client/main.ts` `scheduleEviction`、`PDF_IDLE_TIMEOUT_MS`；`src/client/types.ts` `pdfIdleEviction`；`src/client/config.ts` 默认值。
+
 ## 搜索路径现在很慢是为什么
 
 

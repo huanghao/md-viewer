@@ -1,5 +1,5 @@
 import type { FileTreeNode } from './types';
-import { storageSet } from './utils/storage';
+import { storageSet, storageGet } from './utils/storage';
 
 const WORKSPACE_TREE_EXPANDED_KEY = 'md-viewer:workspaceTreeExpandedState';
 
@@ -20,9 +20,8 @@ function saveWorkspaceExpandedState(): void {
 export function restoreWorkspaceExpandedStateFromStorage(): void {
   workspaceExpandedState.clear();
   try {
-    const raw = localStorage.getItem(WORKSPACE_TREE_EXPANDED_KEY);
-    if (!raw) return;
-    const parsed = JSON.parse(raw);
+    const parsed = storageGet(WORKSPACE_TREE_EXPANDED_KEY);
+    if (!parsed) return;
     if (!Array.isArray(parsed)) return;
     for (const item of parsed) {
       if (!Array.isArray(item) || item.length !== 2) continue;

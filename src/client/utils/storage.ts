@@ -23,3 +23,20 @@ export function storageGetNumber(key: string, fallback: number): number {
   const n = Number(raw);
   return Number.isFinite(n) ? n : fallback;
 }
+
+export function getAllStorageKeys(): string[] {
+  const keys: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key) keys.push(key);
+  }
+  return keys;
+}
+
+export function storageRemove(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // ignore errors
+  }
+}

@@ -41,6 +41,7 @@ export interface AppConfig {
   codeTheme: string;      // 'github' | 'github-dark' | 'atom-one-dark'
   mathInline: boolean;    // render $...$ inline math (disable if $ is used as currency)
   workspacePollInterval: number; // workspace tree polling interval in ms
+  pdfIdleEviction: boolean;     // auto-evict idle PDF viewers after 30 min (default off)
   workspaces: Workspace[];
 }
 

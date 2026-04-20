@@ -1,8 +1,8 @@
 import type { AppConfig } from './types';
+import { storageGet, storageSet } from './utils/storage';
 
 const CONFIG_KEY = 'md-viewer:config';
 
-// 默认配置
 export const defaultConfig: AppConfig = {
   sidebarTab: 'focus',
   focusWindowKey: '8h',
@@ -10,36 +10,18 @@ export const defaultConfig: AppConfig = {
   codeTheme: 'github',
   mathInline: true,
   workspacePollInterval: 5000,
+  pdfIdleEviction: false,
   workspaces: [],
 };
 
-// 加载配置
 export function loadConfig(): AppConfig {
-  try {
-    const saved = localStorage.getItem(CONFIG_KEY);
-    if (!saved) return { ...defaultConfig };
-
-    const config = JSON.parse(saved);
-    return {
-      ...defaultConfig,
-      ...config
-    };
-  } catch (e) {
-    console.error('加载配置失败:', e);
-    return { ...defaultConfig };
-  }
+  return { ...defaultConfig, ...storageGet<Partial<AppConfig>>(CONFIG_KEY, {}) };
 }
 
-// 保存配置
 export function saveConfig(config: AppConfig): void {
-  try {
-    localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
-  } catch (e) {
-    console.error('保存配置失败:', e);
-  }
+  storageSet(CONFIG_KEY, config);
 }
 
-// 更新配置
 export function updateConfig(updates: Partial<AppConfig>): AppConfig {
   const config = loadConfig();
   const newConfig = { ...config, ...updates };

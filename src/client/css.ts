@@ -12,6 +12,12 @@ export const styles = `
       --color-border-subtle:  #e8ecf0;
       --color-bg-subtle:      #f6f8fa;
       --color-accent:         #0969da;
+      --color-error:          #cf222e;
+      --color-error-bg:       #ffebe9;
+      --color-success:        #1a7f37;
+      --color-success-alt:    #2da44e;
+      --color-success-bg:     #dafbe1;
+      --color-warning-bg:     #fff8c5;
 
       /* typography tokens */
       --text-xs: 11px;
@@ -335,7 +341,7 @@ export const styles = `
       transform: scale(0.95);
     }
     .current-path-copy.success {
-      color: #1a7f37;
+      color: var(--color-success);
     }
 
     /* Notion 风格复制图标 */
@@ -405,7 +411,7 @@ export const styles = `
 
     /* 搜索高亮 */
     .search-highlight {
-      background: #fff8c5;
+      background: var(--color-warning-bg);
       color: var(--color-text-primary);
       font-weight: 500;
       padding: 0 2px;
@@ -495,7 +501,7 @@ export const styles = `
       font-size: var(--text-sm);
     }
     .add-file-confirm.state-warning {
-      background: #fff8c5;
+      background: var(--color-warning-bg);
       border-color: #f0d264;
       color: #7a4e00;
     }
@@ -505,9 +511,9 @@ export const styles = `
       color: #095a9f;
     }
     .add-file-confirm.state-error {
-      background: #ffebe9;
+      background: var(--color-error-bg);
       border-color: #ffb3ad;
-      color: #cf222e;
+      color: var(--color-error);
     }
     .add-file-confirm-text {
       line-height: 1.4;
@@ -695,7 +701,7 @@ export const styles = `
     }
     .toc-error {
       padding: 8px 0;
-      color: #cf222e;
+      color: var(--color-error);
       font-size: var(--text-sm);
       line-height: 1.5;
     }
@@ -782,16 +788,16 @@ export const styles = `
       font-weight: 400;
     }
     .file-item.missing {
-      color: #cf222e;
+      color: var(--color-error);
       background: #fff5f5;
     }
     .file-item.missing .tree-name {
-      color: #cf222e;
+      color: var(--color-error);
       text-decoration: line-through;
     }
     .file-item.missing.current {
-      background: #ffebe9;
-      color: #cf222e;
+      background: var(--color-error-bg);
+      color: var(--color-error);
     }
     .file-item .tree-toggle {
       display: none;
@@ -1368,7 +1374,7 @@ export const styles = `
       color: #374151;
     }
     .markdown-body .mermaid-source-copy.copied {
-      color: #1a7f37;
+      color: var(--color-success);
       border-color: #9bd0aa;
       background: #f2fbf5;
     }
@@ -1448,7 +1454,7 @@ export const styles = `
       transform: scale(0.95);
     }
     .copy-filename-button.success {
-      color: #1a7f37;
+      color: var(--color-success);
     }
 
     /* 加载动画 */
@@ -1509,7 +1515,7 @@ export const styles = `
       gap: 10px;
       padding: 6px 16px;
       padding-right: calc(var(--annotation-sidebar-width) + 16px);
-      background: #fff8c5;
+      background: var(--color-warning-bg);
       border-bottom: 1px solid #d4a72c;
       font-size: var(--text-sm);
       color: #633c01;
@@ -1542,8 +1548,8 @@ export const styles = `
     .diff-accept-btn {
       padding: 4px 12px;
       border-radius: var(--radius-md);
-      border: 1px solid #2da44e;
-      background: #2da44e;
+      border: 1px solid var(--color-success-alt);
+      background: var(--color-success-alt);
       color: #fff;
       font-size: var(--text-sm);
       cursor: pointer;
@@ -1579,7 +1585,7 @@ export const styles = `
 
     /* 删除 block */
     .diff-block-delete {
-      background: #ffebe9;
+      background: var(--color-error-bg);
     }
     .diff-block-delete * {
       text-decoration: line-through;
@@ -1588,7 +1594,7 @@ export const styles = `
 
     /* 修改：删除部分 */
     .diff-block-modify-del {
-      background: #ffebe9;
+      background: var(--color-error-bg);
     }
     .diff-block-modify-del * {
       text-decoration: line-through;
@@ -1632,7 +1638,7 @@ export const styles = `
 
     /* 内容刷新闪烁动画 */
     @keyframes flash {
-      0% { background: #fff8c5; }
+      0% { background: var(--color-warning-bg); }
       100% { background: transparent; }
     }
 
@@ -1696,18 +1702,18 @@ export const styles = `
 
     /* Toast 类型样式 */
     .toast-success {
-      border-left: 4px solid #1a7f37;
+      border-left: 4px solid var(--color-success);
     }
     .toast-success .toast-icon {
-      background: #dafbe1;
-      color: #1a7f37;
+      background: var(--color-success-bg);
+      color: var(--color-success);
     }
 
     .toast-error {
       border-left: 4px solid #d1242f;
     }
     .toast-error .toast-icon {
-      background: #ffebe9;
+      background: var(--color-error-bg);
       color: #d1242f;
     }
 
@@ -1715,7 +1721,7 @@ export const styles = `
       border-left: 4px solid #bf8700;
     }
     .toast-warning .toast-icon {
-      background: #fff8c5;
+      background: var(--color-warning-bg);
       color: #bf8700;
     }
 
@@ -1811,7 +1817,7 @@ export const styles = `
       white-space: nowrap;
     }
     .workspace-name--failed {
-      color: #cf222e;
+      color: var(--color-error);
       opacity: 0.7;
     }
 
@@ -1836,8 +1842,8 @@ export const styles = `
     }
 
     .workspace-remove:hover {
-      background: #ffebe9;
-      color: #cf222e;
+      background: var(--color-error-bg);
+      color: var(--color-error);
     }
 
     .workspace-remove-actions {
@@ -1880,8 +1886,8 @@ export const styles = `
       font-size: var(--text-sm);
       line-height: 1;
       font-weight: 600;
-      background: #ffebe9;
-      color: #cf222e;
+      background: var(--color-error-bg);
+      color: var(--color-error);
       padding: 0 8px;
     }
 
@@ -2050,7 +2056,7 @@ export const styles = `
 
     .tree-missing-title {
       font-size: var(--text-xs);
-      color: #cf222e;
+      color: var(--color-error);
       padding: 4px 8px;
       text-transform: uppercase;
       letter-spacing: 0.4px;
@@ -2058,7 +2064,7 @@ export const styles = `
     }
 
     .tree-item.missing {
-      color: #cf222e;
+      color: var(--color-error);
       text-decoration: line-through;
       background: #fff5f5;
       opacity: 0.95;
@@ -2090,9 +2096,9 @@ export const styles = `
     }
 
     .tree-inline-action.danger:hover {
-      border-color: #cf222e;
-      color: #cf222e;
-      background: #ffebe9;
+      border-color: var(--color-error);
+      color: var(--color-error);
+      background: var(--color-error-bg);
     }
 
     /* 已移除：独立已打开文件区域，状态已合并到工作区文件树 */
@@ -2423,7 +2429,7 @@ export const styles = `
       cursor: pointer;
     }
     .translation-item:hover { background: #f0f3f6; }
-    .translation-item.is-highlighted { background: #fff8c5; }
+    .translation-item.is-highlighted { background: var(--color-warning-bg); }
     .translation-item-header {
       display: flex;
       align-items: baseline;
@@ -2458,7 +2464,7 @@ export const styles = `
     }
     .translation-item-error {
       font-size: var(--text-sm);
-      color: #cf222e;
+      color: var(--color-error);
       padding: 4px 0;
     }
     .translation-item-retry {
@@ -2492,7 +2498,7 @@ export const styles = `
       color: var(--color-text-muted);
       padding: 0 2px;
     }
-    .translation-item-del:hover { color: #cf222e; }
+    .translation-item-del:hover { color: var(--color-error); }
 
     /* PDF 每段固定「译」图标 */
     .pdf-translate-icon {
@@ -2514,9 +2520,9 @@ export const styles = `
       opacity: 0.7;
     }
     .pdf-translate-icon:hover { background: var(--color-accent); color: #fff; border-color: var(--color-accent); opacity: 1; }
-    .pdf-translate-icon.is-translated { background: #dafbe1; border-color: #2da44e; color: #1a7f37; opacity: 0.85; }
-    .pdf-translate-icon.is-translated:hover { background: #2da44e; color: #fff; border-color: #2da44e; opacity: 1; }
-    .pdf-translate-icon.is-highlighted { background: #fff8c5; border-color: #d4a72c; color: #7d4e00; opacity: 1; }
+    .pdf-translate-icon.is-translated { background: var(--color-success-bg); border-color: var(--color-success-alt); color: var(--color-success); opacity: 0.85; }
+    .pdf-translate-icon.is-translated:hover { background: var(--color-success-alt); color: #fff; border-color: var(--color-success-alt); opacity: 1; }
+    .pdf-translate-icon.is-highlighted { background: var(--color-warning-bg); border-color: #d4a72c; color: #7d4e00; opacity: 1; }
 
     /* 评论侧边栏 */
     .annotation-sidebar {
@@ -2750,11 +2756,11 @@ export const styles = `
       background: #f2ead7;
     }
     .annotation-icon-action.resolve.is-resolved {
-      color: #1a7f37;
+      color: var(--color-success);
     }
     .annotation-icon-action.resolve.is-resolved:hover {
-      border-color: #2da44e;
-      background: #dafbe1;
+      border-color: var(--color-success-alt);
+      background: var(--color-success-bg);
     }
     .annotation-icon-action.danger {
       color: #8c6d4a;
@@ -2895,7 +2901,7 @@ export const styles = `
     }
     .annotation-status-tag.warn {
       border-color: #ffd8d3;
-      color: #cf222e;
+      color: var(--color-error);
       background: #fff8f8;
     }
     .annotation-actions {
@@ -2933,8 +2939,8 @@ export const styles = `
       background: #f7efe5;
     }
     .annotation-btn-resolve {
-      color: #1a7f37;
-      border-color: #1a7f37;
+      color: var(--color-success);
+      border-color: var(--color-success);
     }
     .annotation-btn-resolve:hover {
       background: #eaf9ef;
@@ -3149,7 +3155,7 @@ export const styles = `
       text-align: center;
     }
     #findBarCount.no-result {
-      color: #cf222e;
+      color: var(--color-error);
     }
     #findBar button {
       border: none;

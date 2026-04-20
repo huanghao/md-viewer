@@ -846,6 +846,7 @@ function renderThreadListHTML(annotation: Annotation, simple = false): string {
       <div class="annotation-thread-line ${item.type === 'reply' ? 'is-reply' : ''}" data-thread-item-id="${item.id}" data-annotation-id="${annotation.id}">
         <span class="annotation-thread-text">${escapeHtml(item.note)}</span>
         <button class="annotation-thread-edit-btn" data-edit-thread-item="${item.id}" data-annotation-id="${annotation.id}" title="编辑">${iconSvg('edit')}</button>
+        ${item.type === 'reply' ? `<button class="annotation-thread-edit-btn" data-delete-thread-item="${item.id}" data-annotation-id="${annotation.id}" title="删除回复">${iconSvg('trash')}</button>` : ''}
       </div>`)
     .join('');
   return body || '<div class="annotation-thread-line">（无评论内容）</div>';
@@ -956,6 +957,23 @@ function editThreadItem(annotationId: string, itemId: string, filePath: string):
     if (related && annotationItem && annotationItem.contains(related)) return;
     setTimeout(() => { if (!committed) cancel(); }, 150);
   });
+}
+
+function deleteThreadItem(annotationId: string, itemId: string, filePath: string): void {
+  const ann = state.annotations.find((a) => a.id === annotationId);
+  if (!ann) return;
+  const thread = getCommentThread(ann);
+  const idx = thread.findIndex((t) => t.id === itemId);
+  if (idx <= 0) return; // 不删第一条（comment 本体）
+  thread.splice(idx, 1);
+  ann.thread = thread;
+  persistAnnotation(filePath, ann, '删除回复失败');
+  renderAnnotationList(filePath);
+  if (state.pinnedAnnotationId === annotationId) {
+    const mark = document.querySelector(`[data-annotation-id="${annotationId}"]`) as HTMLElement | null;
+    const rect = mark?.getBoundingClientRect();
+    showPopover(ann, rect ? rect.right + 8 : 120, rect ? rect.top + 8 : 120);
+  }
 }
 
 function autoResizeReplyInput(input: HTMLTextAreaElement): void {
@@ -1553,6 +1571,16 @@ export function renderAnnotationList(filePath: string | null): void {
     });
   });
 
+  el.annotationList.querySelectorAll('[data-delete-thread-item]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const itemId = (btn as HTMLElement).getAttribute('data-delete-thread-item');
+      const annotationId = (btn as HTMLElement).getAttribute('data-annotation-id');
+      if (!itemId || !annotationId || !filePath) return;
+      deleteThreadItem(annotationId, itemId, filePath);
+    });
+  });
+
   el.annotationList.querySelectorAll('[data-reply-entry]').forEach((entry) => {
     entry.addEventListener('click', (event) => {
       event.stopPropagation();
@@ -1731,6 +1759,14 @@ export function initAnnotationElements(): void {
       const itemId = editBtn.getAttribute('data-edit-thread-item');
       const annotationId = editBtn.getAttribute('data-annotation-id');
       if (itemId && annotationId) editThreadItem(annotationId, itemId, filePath);
+      return;
+    }
+    const deleteBtn = target.closest('[data-delete-thread-item]') as HTMLElement | null;
+    if (deleteBtn) {
+      event.stopPropagation();
+      const itemId = deleteBtn.getAttribute('data-delete-thread-item');
+      const annotationId = deleteBtn.getAttribute('data-annotation-id');
+      if (itemId && annotationId) deleteThreadItem(annotationId, itemId, filePath);
       return;
     }
     const entry = target.closest('[data-popover-reply-entry]') as HTMLElement | null;

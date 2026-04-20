@@ -108,6 +108,27 @@ describe('annotation-storage', () => {
     expect(after.annotations.some((item) => item.id === 'a3')).toBe(true);
   });
 
+  it('finds annotations via suffix match when exact path not found (CLI cwd mismatch)', () => {
+    // Simulate: file stored as /some/other/cwd/project/docs/report.md
+    // CLI run from /different/cwd, passing relative path project/docs/report.md
+    // resolve() gives /different/cwd/project/docs/report.md — no exact match
+    // fallback should match via suffix
+    replaceAnnotations('/some/other/cwd/project/docs/report.md', [
+      { id: 'r1', start: 0, length: 5, quote: 'hello', note: 'note-r1', createdAt: 9000, status: 'anchored' },
+    ]);
+
+    // Exact match works
+    const exact = getAnnotationsByDocument('/some/other/cwd/project/docs/report.md', 10, 0, 'open');
+    expect(exact.total).toBe(1);
+
+    // Suffix match: raw input is relative path, resolve() would produce wrong abs path
+    // We pass the raw relative-style suffix directly to simulate the fallback
+    const suffixMatch = getAnnotationsByDocument('project/docs/report.md', 10, 0, 'open');
+    expect(suffixMatch.total).toBe(1);
+    expect(suffixMatch.annotations[0].id).toBe('r1');
+    expect(suffixMatch.path).toBe('/some/other/cwd/project/docs/report.md');
+  });
+
   it('supports incremental status update and delete', () => {
     const statusUpdated = updateAnnotationStatus('/tmp/a.md', { id: 'a1' }, 'resolved');
     expect(statusUpdated.ok).toBe(true);

@@ -917,10 +917,12 @@ function renderContent() {
   (window as any).__currentPdfViewer = null;
   currentPdfBridge = null;
   container.removeAttribute('data-pdf');
-  const pdfModeSelectBtnHide = document.getElementById('pdfModeSelectBtn');
-  const pdfModeAnnotateBtnHide = document.getElementById('pdfModeAnnotateBtn');
-  if (pdfModeSelectBtnHide) pdfModeSelectBtnHide.style.display = 'none';
-  if (pdfModeAnnotateBtnHide) pdfModeAnnotateBtnHide.style.display = 'none';
+  if (!state.currentFile || !isPdfPath(state.currentFile)) {
+    const pdfModeSelectBtnHide = document.getElementById('pdfModeSelectBtn');
+    const pdfModeAnnotateBtnHide = document.getElementById('pdfModeAnnotateBtn');
+    if (pdfModeSelectBtnHide) pdfModeSelectBtnHide.style.display = 'none';
+    if (pdfModeAnnotateBtnHide) pdfModeAnnotateBtnHide.style.display = 'none';
+  }
 
   // Show translation tab only for PDF files
   const translationTabBtn = document.querySelector<HTMLElement>('.annotation-tab[data-tab="translation"]');

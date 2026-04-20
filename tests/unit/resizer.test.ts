@@ -69,4 +69,35 @@ describe('createResizer', () => {
     listeners['mouseup'][0]({ clientX: 90 });
     expect((document.body.classList.remove as any).mock.calls[0][0]).toBe('my-resizing');
   });
+
+  it('starts drag when guard returns true', () => {
+    const onMove = mock();
+    const el = { addEventListener: mock() } as any;
+    createResizer({ element: el, bodyClass: 'resizing', onMove, onEnd: mock(), guard: () => true });
+
+    const [[, mousedownFn]] = (el.addEventListener as any).mock.calls;
+    mousedownFn({ clientX: 100, preventDefault: mock() });
+
+    listeners['mousemove'][0]({ clientX: 80 });
+    expect(onMove).toHaveBeenCalledWith(20, 80);
+  });
+
+  it('cleans up listeners after mouseup so second drag works independently', () => {
+    const onMove = mock();
+    const el = { addEventListener: mock() } as any;
+    createResizer({ element: el, bodyClass: 'resizing', onMove, onEnd: mock() });
+
+    const [[, mousedownFn]] = (el.addEventListener as any).mock.calls;
+    // first drag
+    mousedownFn({ clientX: 100, preventDefault: mock() });
+    listeners['mouseup'][0]({ clientX: 80 });
+
+    // after mouseup, no stale mousemove listeners
+    expect(listeners['mousemove'].length).toBe(0);
+
+    // second drag
+    mousedownFn({ clientX: 200, preventDefault: mock() });
+    listeners['mousemove'][0]({ clientX: 190 });
+    expect(onMove).toHaveBeenLastCalledWith(10, 190);
+  });
 });

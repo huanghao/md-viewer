@@ -106,6 +106,21 @@ describe('Cmd/Ctrl-K', () => {
     document.body.removeChild(textarea);
     document.body.removeChild(input);
   });
+
+  it('does not trigger when active element is input', () => {
+    const activeInput = document.createElement('input');
+    document.body.appendChild(activeInput);
+    activeInput.focus();
+    const searchInput = document.createElement('input');
+    searchInput.id = 'searchInput';
+    document.body.appendChild(searchInput);
+    const deps = makeDeps();
+    setupKeyboardShortcuts(deps);
+    document.dispatchEvent(makeEvent('k', { metaKey: true }));
+    expect(document.activeElement).not.toBe(searchInput);
+    document.body.removeChild(activeInput);
+    document.body.removeChild(searchInput);
+  });
 });
 
 describe('n/p diff navigation', () => {

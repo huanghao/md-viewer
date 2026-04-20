@@ -163,3 +163,42 @@ describe('updateZoomDisplay', () => {
     expect(btn.textContent).toBe('200%');
   });
 });
+
+describe('applyFontScale', () => {
+  it('sets --font-scale CSS variable and persists to storage', () => {
+    initZoom(makeDeps('/test.md'));
+    setPropertyMock.mockReset();
+    storage.clear();
+    // zoomIn triggers applyFontScale
+    zoomIn();
+    expect(setPropertyMock).toHaveBeenCalledWith('--font-scale', '1.1');
+    // storageSet stores number 1.1
+    expect(storage.getItem('fontScale')).toBe('1.1');
+  });
+});
+
+describe('PDF zoom clamping', () => {
+  it('zoomIn clamps at PDF_ZOOM_MAX', async () => {
+    const setScale = mock(() => Promise.resolve());
+    const deps = makeDeps('/test.pdf', { setScale });
+    initZoom(deps);
+    // set current zoom to max
+    storage.setItem('md-viewer:pdf-zoom:/test.pdf', '3'); // PDF_ZOOM_MAX = 3.0
+    zoomIn();
+    await new Promise(r => setTimeout(r, 350));
+    const [scale] = (setScale as any).mock.calls[0];
+    expect(scale).toBeLessThanOrEqual(3.0);
+  });
+
+  it('zoomOut clamps at PDF_ZOOM_MIN', async () => {
+    const setScale = mock(() => Promise.resolve());
+    const deps = makeDeps('/test.pdf', { setScale });
+    initZoom(deps);
+    // set current zoom to min
+    storage.setItem('md-viewer:pdf-zoom:/test.pdf', '0.5'); // PDF_ZOOM_MIN = 0.5
+    zoomOut();
+    await new Promise(r => setTimeout(r, 350));
+    const [scale] = (setScale as any).mock.calls[0];
+    expect(scale).toBeGreaterThanOrEqual(0.5);
+  });
+});

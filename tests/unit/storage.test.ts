@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, mock } from 'bun:test';
-import { storageGet, storageSet, storageGetNumber } from '../../src/client/utils/storage';
+import { storageGet, storageSet, storageGetNumber, getAllStorageKeys, storageRemove } from '../../src/client/utils/storage';
 
 class MemoryStorage implements Storage {
   private data = new Map<string, string>();
@@ -91,5 +91,32 @@ describe('storageGetNumber', () => {
   it('returns fallback for NaN', () => {
     storage.setItem('key', 'NaN');
     expect(storageGetNumber('key', 5)).toBe(5);
+  });
+});
+
+describe('getAllStorageKeys', () => {
+  it('returns empty array when storage is empty', () => {
+    expect(getAllStorageKeys()).toEqual([]);
+  });
+
+  it('returns all keys', () => {
+    storage.setItem('a', '1');
+    storage.setItem('b', '2');
+    const keys = getAllStorageKeys();
+    expect(keys).toContain('a');
+    expect(keys).toContain('b');
+    expect(keys.length).toBe(2);
+  });
+});
+
+describe('storageRemove', () => {
+  it('removes an existing key', () => {
+    storage.setItem('key', 'value');
+    storageRemove('key');
+    expect(storage.getItem('key')).toBeNull();
+  });
+
+  it('does not throw when key does not exist', () => {
+    expect(() => storageRemove('nonexistent')).not.toThrow();
   });
 });

@@ -1024,6 +1024,12 @@ export const styles = `
       background: rgba(0, 0, 0, 0.08);
     }
 
+    .toolbar-text-button.is-active {
+      background: rgba(0, 0, 0, 0.06);
+      color: var(--color-text-primary, #111827);
+      font-weight: 500;
+    }
+
     /* 标签页 */
     .tabs {
       display: flex;

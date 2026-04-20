@@ -1,15 +1,12 @@
+import { storageSet } from './utils/storage';
+
 const WORKSPACE_KNOWN_KEY = 'md-viewer:workspaceKnownFiles';
 
 const workspaceKnownFiles = new Map<string, Set<string>>();
 
 function saveWorkspaceKnownFiles(): void {
   try {
-    localStorage.setItem(
-      WORKSPACE_KNOWN_KEY,
-      JSON.stringify(
-        Array.from(workspaceKnownFiles.entries()).map(([workspaceId, paths]) => [workspaceId, Array.from(paths)])
-      )
-    );
+    storageSet(WORKSPACE_KNOWN_KEY, Array.from(workspaceKnownFiles.entries()).map(([workspaceId, paths]) => [workspaceId, Array.from(paths)]));
   } catch (e) {
     console.error('保存列表差异状态失败:', e);
   }

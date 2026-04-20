@@ -1,4 +1,5 @@
 import type { FileTreeNode } from './types';
+import { storageSet } from './utils/storage';
 
 const WORKSPACE_TREE_EXPANDED_KEY = 'md-viewer:workspaceTreeExpandedState';
 
@@ -10,7 +11,7 @@ function saveWorkspaceExpandedState(): void {
       workspaceId,
       Array.from(pathMap.entries()),
     ]));
-    localStorage.setItem(WORKSPACE_TREE_EXPANDED_KEY, JSON.stringify(payload));
+    storageSet(WORKSPACE_TREE_EXPANDED_KEY, payload);
   } catch (e) {
     console.error('保存工作区目录展开状态失败:', e);
   }

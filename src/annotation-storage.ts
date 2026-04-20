@@ -506,7 +506,27 @@ export function getAnnotationsByDocument(
   const totalRow = getDb()
     .query(`SELECT COUNT(1) as count FROM annotations WHERE doc_path = ? ${whereStatus}`)
     .get(path) as { count: number } | null;
-  const total = Number(totalRow?.count || 0);
+  let total = Number(totalRow?.count || 0);
+
+  // Fallback: if exact path not found, try suffix match using the original raw input.
+  // This handles the case where the CLI is run from a different cwd than where the file
+  // was opened in the viewer (e.g. relative path resolves to a different absolute path).
+  let resolvedPath = path;
+  if (total === 0) {
+    const rawSuffix = (docPath || '').trim().replace(/\\/g, '/');
+    if (rawSuffix) {
+      const fallbackRow = getDb()
+        .query(`SELECT doc_path FROM annotations WHERE doc_path LIKE ? ${whereStatus} LIMIT 1`)
+        .get(`%${rawSuffix}`) as { doc_path: string } | null;
+      if (fallbackRow) {
+        resolvedPath = fallbackRow.doc_path;
+        const retryRow = getDb()
+          .query(`SELECT COUNT(1) as count FROM annotations WHERE doc_path = ? ${whereStatus}`)
+          .get(resolvedPath) as { count: number } | null;
+        total = Number(retryRow?.count || 0);
+      }
+    }
+  }
 
   const rows = getDb()
     .query(
@@ -517,11 +537,11 @@ export function getAnnotationsByDocument(
        ORDER BY start ASC, created_at ASC
        LIMIT ? OFFSET ?`
     )
-    .all(path, safeLimit, safeOffset) as any[];
+    .all(resolvedPath, safeLimit, safeOffset) as any[];
 
   const annotations = rows.map((row) => mapRowToAnnotation(row)) as StoredAnnotation[];
 
-  return { path, total, annotations };
+  return { path: resolvedPath, total, annotations };
 }
 
 export function appendAnnotationReply(

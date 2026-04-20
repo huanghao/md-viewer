@@ -698,11 +698,25 @@ export async function handleGetAnnotations(c: Context) {
   }
 }
 
+interface AnnotationRef {
+  path: string;
+  id: string | undefined;
+  serial: number | undefined;
+}
+
+function parseAnnotationRef(body: any): AnnotationRef {
+  const path = typeof body?.path === "string" ? body.path : "";
+  const id = typeof body?.id === "string" ? body.id : undefined;
+  const serial = Number(body?.serial);
+  const validSerial = Number.isFinite(serial) && serial > 0 ? Math.floor(serial) : undefined;
+  return { path, id, serial: validSerial };
+}
+
 // API: 保存单条评论（增量 upsert）
 export async function handleUpsertAnnotation(c: Context) {
   try {
     const body = await c.req.json();
-    const path = typeof body?.path === "string" ? body.path : "";
+    const { path } = parseAnnotationRef(body);
     const annotation = body?.annotation;
     if (!path) return c.json({ error: "缺少 path 参数" }, 400);
 
@@ -718,19 +732,14 @@ export async function handleUpsertAnnotation(c: Context) {
 export async function handleReplyAnnotation(c: Context) {
   try {
     const body = await c.req.json();
-    const path = typeof body?.path === "string" ? body.path : "";
-    const id = typeof body?.id === "string" ? body.id : undefined;
-    const serial = Number(body?.serial);
+    const { path, id, serial } = parseAnnotationRef(body);
     const text = typeof body?.text === "string" ? body.text : "";
     const author = typeof body?.author === "string" ? body.author : "me";
     if (!path) return c.json({ error: "缺少 path 参数" }, 400);
 
     const result = appendAnnotationReply(
       path,
-      {
-        id,
-        serial: Number.isFinite(serial) && serial > 0 ? Math.floor(serial) : undefined,
-      },
+      { id, serial },
       text,
       author
     );
@@ -745,15 +754,10 @@ export async function handleReplyAnnotation(c: Context) {
 export async function handleDeleteAnnotation(c: Context) {
   try {
     const body = await c.req.json();
-    const path = typeof body?.path === "string" ? body.path : "";
-    const id = typeof body?.id === "string" ? body.id : undefined;
-    const serial = Number(body?.serial);
+    const { path, id, serial } = parseAnnotationRef(body);
     if (!path) return c.json({ error: "缺少 path 参数" }, 400);
 
-    const result = deleteAnnotation(path, {
-      id,
-      serial: Number.isFinite(serial) && serial > 0 ? Math.floor(serial) : undefined,
-    });
+    const result = deleteAnnotation(path, { id, serial });
     if (!result.ok) return c.json({ error: result.error || "删除评论失败" }, 400);
     return c.json({ success: true, deleted: true });
   } catch (error: any) {
@@ -765,17 +769,12 @@ export async function handleDeleteAnnotation(c: Context) {
 export async function handleUpdateAnnotationStatus(c: Context) {
   try {
     const body = await c.req.json();
-    const path = typeof body?.path === "string" ? body.path : "";
-    const id = typeof body?.id === "string" ? body.id : undefined;
-    const serial = Number(body?.serial);
+    const { path, id, serial } = parseAnnotationRef(body);
     const statusRaw = String(body?.status || "anchored");
     const status = statusRaw === "resolved" || statusRaw === "unanchored" ? statusRaw : "anchored";
     if (!path) return c.json({ error: "缺少 path 参数" }, 400);
 
-    const result = updateAnnotationStatus(path, {
-      id,
-      serial: Number.isFinite(serial) && serial > 0 ? Math.floor(serial) : undefined,
-    }, status);
+    const result = updateAnnotationStatus(path, { id, serial }, status);
     if (!result.ok) return c.json({ error: result.error || "更新评论状态失败" }, 400);
     return c.json({ success: true, annotation: result.updated });
   } catch (error: any) {

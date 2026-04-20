@@ -577,6 +577,7 @@ async function syncFileFromDisk(
       if (banner) banner.remove();
     }
     renderContent();
+    if (state.currentFile) updateToc(state.currentFile);
     // Defer annotation sync to the next frame: renderAnnotationList calls
     // getBoundingClientRect() on every annotation mark, which forces a
     // synchronous layout. Deferring lets the browser finish laying out the

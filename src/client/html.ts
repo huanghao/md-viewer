@@ -127,7 +127,7 @@ export function generateClientHTML(): string {
         <button class="toolbar-text-button" id="pdfModeSelectBtn" onclick="setPdfMode('select')" title="文本选择模式" style="display:none">
           <span>[𝐓 选择]</span>
         </button>
-        <button class="toolbar-text-button is-active" id="pdfModeAnnotateBtn" onclick="setPdfMode('annotate')" title="拉框批注模式" style="display:none">
+        <button class="toolbar-text-button" id="pdfModeAnnotateBtn" onclick="setPdfMode('annotate')" title="拉框批注模式" style="display:none">
           <span>[⬚ 批注]</span>
         </button>
         <button class="toolbar-text-button" onclick="showSettingsDialog()" title="设置">

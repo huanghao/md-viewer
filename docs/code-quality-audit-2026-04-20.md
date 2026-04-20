@@ -10,14 +10,15 @@
 
 | 问题 | 初始状态 | 当前状态 |
 |------|---------|---------|
-| D1: localStorage 重复 | ❌ 12 个文件各自实现 | ✅ 已统一到 `utils/storage.ts`（state.ts 除外） |
+| D1: localStorage 重复 | ❌ 12 个文件各自实现 | ✅ 已统一到 `utils/storage.ts`（含 state.ts） |
 | D2: handlers.ts 参数套板 | ❌ 4 处重复 | ✅ 已提取 `parseAnnotationRef` |
 | D3: resizer 逻辑重复 | ❌ 2 处重复 | ✅ 已提取 `utils/resizer.ts` |
 | D4: getElements() 无缓存 | ❌ 每次重新查询 DOM | ✅ 已改为懒加载单例 |
 | D5: main.ts 过大（2840 行） | ❌ 混合 6 个功能模块 | 🔶 部分完成（2840→2696 行，提取了 keyboard-shortcuts.ts + zoom-controller.ts） |
-| D6: css.ts 面板样式重复 | ❌ 3858 行，多处重复 | ⏳ 待处理 |
+| D6: css.ts 面板样式重复 | ❌ 3858 行，多处重复 | 🔶 部分完成（新增 13 个颜色变量，替换 50+ 处硬编码颜色） |
+| D7: annotation.ts 过大（2012 行） | ❌ 数据/UI/工具混合 | 🔶 部分完成（2012→1929 行，提取了 annotation/position.ts + annotation/query.ts） |
 
-**422 个单元测试全部通过。**
+**460 个单元测试全部通过。**
 
 ---
 

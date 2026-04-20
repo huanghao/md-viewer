@@ -2775,6 +2775,11 @@ export const styles = `
       border-color: #a4875f;
       background: #f7efe5;
     }
+    .annotation-icon-action.is-copied {
+      color: var(--color-success);
+      border-color: var(--color-success-alt);
+      background: var(--color-success-bg);
+    }
     .annotation-note {
       font-size: var(--text-sm);
       color: var(--color-text-primary);

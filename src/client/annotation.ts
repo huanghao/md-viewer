@@ -1007,14 +1007,15 @@ export function showPopover(ann: Annotation, x: number, y: number): void {
   if (copyBtn) {
     const fresh = copyBtn.cloneNode(true) as HTMLButtonElement;
     copyBtn.replaceWith(fresh);
+    const copyIconSvg = fresh.innerHTML;
     fresh.addEventListener('click', () => {
       navigator.clipboard.writeText(ann.quote).then(() => {
-        fresh.title = '已复制';
-        fresh.setAttribute('aria-label', '已复制');
+        fresh.innerHTML = iconSvg('check');
+        fresh.classList.add('is-copied');
         setTimeout(() => {
-          fresh.title = '复制原文';
-          fresh.setAttribute('aria-label', '复制原文');
-        }, 1000);
+          fresh.innerHTML = copyIconSvg;
+          fresh.classList.remove('is-copied');
+        }, 1500);
       });
     });
   }

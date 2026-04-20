@@ -1,5 +1,6 @@
 import type { AppState, FileInfo, FileData } from './types';
 import { loadConfig } from './config';
+import { storageGet, storageSet } from './utils/storage';
 import {
   clearListDiff,
   clearWorkspacePathMissing,
@@ -41,49 +42,26 @@ export function getSessionFiles(): FileInfo[] {
   return Array.from(state.sessionFiles.values());
 }
 
-export function saveState(): void {
-  try {
-    const data = {
-      files: Array.from(state.sessionFiles.entries()).map(([path, file]) => [path, {
-        path: file.path,
-        name: file.name,
-        isRemote: file.isRemote || false,
-        isMissing: file.isMissing || false,
-        lastModified: file.lastModified,
-        displayedModified: file.displayedModified,
-        lastAccessed: file.lastAccessed || Date.now()
-      }]),
-      currentFile: state.currentFile
-    };
+function buildStateData() {
+  return {
+    files: Array.from(state.sessionFiles.entries()).map(([path, file]) => [path, {
+      path: file.path,
+      name: file.name,
+      isRemote: file.isRemote || false,
+      isMissing: file.isMissing || false,
+      lastModified: file.lastModified,
+      displayedModified: file.displayedModified,
+      lastAccessed: file.lastAccessed || Date.now()
+    }]),
+    currentFile: state.currentFile
+  };
+}
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch (e: any) {
-    // 处理 QuotaExceededError
-    if (e.name === 'QuotaExceededError' || e.code === 22) {
-      console.warn('localStorage 配额已满，执行清理...');
-      cleanupOldFiles();
-      // 重试保存
-      try {
-        const data = {
-          files: Array.from(state.sessionFiles.entries()).map(([path, file]) => [path, {
-            path: file.path,
-            name: file.name,
-            isRemote: file.isRemote || false,
-            isMissing: file.isMissing || false,
-            lastModified: file.lastModified,
-            displayedModified: file.displayedModified,
-            lastAccessed: file.lastAccessed || Date.now()
-          }]),
-          currentFile: state.currentFile
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      } catch (retryError) {
-        console.error('保存状态失败（重试后）:', retryError);
-      }
-    } else {
-      console.error('保存状态失败:', e);
-    }
-  }
+export function saveState(): void {
+  storageSet(STORAGE_KEY, buildStateData(), () => {
+    console.warn('localStorage 配额已满，执行清理...');
+    cleanupOldFiles();
+  });
 }
 
 /**
@@ -114,10 +92,8 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
   try {
     restoreWorkspaceAuxiliaryState();
 
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) return;
-
-    const data = JSON.parse(saved);
+    const data = storageGet<any>(STORAGE_KEY, null);
+    if (!data) return;
     if (!data.files || data.files.length === 0) return;
 
     // 恢复文件列表（重新加载内容）
@@ -150,10 +126,7 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
       const currentFile = state.sessionFiles.has(data.currentFile)
         ? data.currentFile
         : null;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        files: validFiles,
-        currentFile
-      }));
+      storageSet(STORAGE_KEY, { files: validFiles, currentFile });
     }
 
     // 恢复当前文件

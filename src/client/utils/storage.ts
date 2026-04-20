@@ -7,11 +7,20 @@ export function storageGet<T>(key: string, fallback: T): T {
   }
 }
 
-export function storageSet<T>(key: string, value: T): void {
+export function storageSet<T>(key: string, value: T, onQuota?: () => void): void {
   try {
     localStorage.setItem(key, JSON.stringify(value));
-  } catch (e) {
-    if ((e as any)?.name !== 'QuotaExceededError') {
+  } catch (e: any) {
+    if (e?.name === 'QuotaExceededError' || e?.code === 22) {
+      if (onQuota) {
+        onQuota();
+        try {
+          localStorage.setItem(key, JSON.stringify(value));
+        } catch (retryError) {
+          console.error(`[storage] 保存 ${key} 失败（重试后）:`, retryError);
+        }
+      }
+    } else {
       console.error(`[storage] 保存 ${key} 失败:`, e);
     }
   }

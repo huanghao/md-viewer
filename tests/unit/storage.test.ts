@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'bun:test';
+import { beforeEach, describe, expect, it, mock } from 'bun:test';
 import { storageGet, storageSet, storageGetNumber } from '../../src/client/utils/storage';
 
 class MemoryStorage implements Storage {
@@ -47,6 +47,29 @@ describe('storageSet', () => {
     storage.setItem = () => { throw Object.assign(new Error('quota'), { name: 'QuotaExceededError' }); };
     expect(() => storageSet('key', 'value')).not.toThrow();
     storage.setItem = orig;
+  });
+
+  it('calls onQuota callback on QuotaExceededError then retries', () => {
+    let calls = 0;
+    const orig = storage.setItem.bind(storage);
+    storage.setItem = (k: string, v: string) => {
+      if (calls++ === 0) throw Object.assign(new Error('quota'), { name: 'QuotaExceededError' });
+      orig(k, v);
+    };
+    const onQuota = mock();
+    storageSet('key', 'value', onQuota);
+    storage.setItem = orig;
+    expect(onQuota).toHaveBeenCalled();
+    expect(storage.getItem('key')).toBe('"value"');
+  });
+
+  it('does not call onQuota for non-quota errors', () => {
+    const orig = storage.setItem.bind(storage);
+    storage.setItem = () => { throw new Error('other error'); };
+    const onQuota = mock();
+    expect(() => storageSet('key', 'value', onQuota)).not.toThrow();
+    storage.setItem = orig;
+    expect(onQuota).not.toHaveBeenCalled();
   });
 });
 

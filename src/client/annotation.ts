@@ -16,6 +16,7 @@ import { resolveAnnotationAnchor } from './utils/annotation-anchor';
 import { isOpen, isResolved, isOrphan, type AnnotationStatus } from '../annotation-status';
 import { adjustAnnotationCount } from './state';
 import { formatRelativeTimeShort } from './utils/format';
+import { storageGet, storageSet, storageGetNumber } from './utils/storage';
 
 // ==================== 类型定义 ====================
 export interface Annotation {
@@ -61,12 +62,8 @@ interface AnnotationState {
 }
 
 function getInitialDensity(): AnnotationDensity {
-  try {
-    if (typeof localStorage === 'undefined') return 'default';
-    return localStorage.getItem('md-viewer:annotation-density') === 'simple' ? 'simple' : 'default';
-  } catch {
-    return 'default';
-  }
+  if (typeof localStorage === 'undefined') return 'default';
+  return storageGet<string>('md-viewer:annotation-density', 'default') === 'simple' ? 'simple' : 'default';
 }
 
 // ==================== 状态管理 ====================
@@ -509,18 +506,12 @@ function setSidebarCollapsed(collapsed: boolean): void {
 }
 
 function loadAnnotationPanelOpenByFile(): Record<string, boolean> {
-  try {
-    const raw = localStorage.getItem(ANNOTATION_PANEL_OPEN_BY_FILE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch {
-    return {};
-  }
+  const parsed = storageGet<Record<string, boolean>>(ANNOTATION_PANEL_OPEN_BY_FILE_KEY, {});
+  return parsed && typeof parsed === 'object' ? parsed : {};
 }
 
 function saveAnnotationPanelOpenByFile(next: Record<string, boolean>): void {
-  localStorage.setItem(ANNOTATION_PANEL_OPEN_BY_FILE_KEY, JSON.stringify(next));
+  storageSet(ANNOTATION_PANEL_OPEN_BY_FILE_KEY, next);
 }
 
 function persistCurrentFilePanelOpen(opened: boolean): void {
@@ -537,13 +528,12 @@ function clampSidebarWidth(width: number): number {
 function setAnnotationSidebarWidth(width: number): void {
   const clamped = clampSidebarWidth(width);
   document.documentElement.style.setProperty('--annotation-sidebar-width', `${clamped}px`);
-  localStorage.setItem(ANNOTATION_WIDTH_KEY, String(clamped));
+  storageSet(ANNOTATION_WIDTH_KEY, String(clamped));
 }
 
 function initAnnotationSidebarWidth(): void {
-  const saved = Number(localStorage.getItem(ANNOTATION_WIDTH_KEY));
-  const width = Number.isFinite(saved) && saved > 0 ? saved : ANNOTATION_WIDTH_DEFAULT;
-  setAnnotationSidebarWidth(width);
+  const width = storageGetNumber(ANNOTATION_WIDTH_KEY, ANNOTATION_WIDTH_DEFAULT);
+  setAnnotationSidebarWidth(width > 0 ? width : ANNOTATION_WIDTH_DEFAULT);
 }
 
 export function syncAnnotationSidebarLayout(): void {
@@ -1888,7 +1878,7 @@ export function initAnnotationElements(): void {
 
   getElements().densityToggle?.addEventListener('click', () => {
     state.density = state.density === 'default' ? 'simple' : 'default';
-    localStorage.setItem('md-viewer:annotation-density', state.density);
+    storageSet('md-viewer:annotation-density', state.density);
     const currentFile = getActiveAnnotationFilePath();
     renderAnnotationList(currentFile || null);
   });

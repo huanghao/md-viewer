@@ -903,10 +903,16 @@ function renderContent() {
   currentPdfBridge = null;
   container.removeAttribute('data-pdf');
 
-  // If switching away from PDF, clear translation list
-  if (!state.currentFile || !isPdfPath(state.currentFile)) {
+  // Show translation tab only for PDF files
+  const translationTabBtn = document.querySelector<HTMLElement>('.annotation-tab[data-tab="translation"]');
+  const isPdf = !!state.currentFile && isPdfPath(state.currentFile);
+  if (translationTabBtn) translationTabBtn.style.display = isPdf ? '' : 'none';
+
+  // If switching away from PDF, clear translation list and switch to comments tab
+  if (!isPdf) {
     unloadTranslations();
     renderTranslationList(null, getTranslations, () => {}, () => {});
+    switchAnnotationTab('comments');
   }
 
   if (!state.currentFile) {

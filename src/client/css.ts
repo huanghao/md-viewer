@@ -604,7 +604,7 @@ export const styles = `
     }
 
     .toc-resizer:hover, .toc-resizer.dragging {
-      background: var(--color-accent, #0969da);
+      background: var(--color-accent);
     }
 
     .sidebar.toc-visible .toc-resizer {
@@ -731,7 +731,7 @@ export const styles = `
     }
 
     .toc-item.active {
-      color: var(--color-accent, #0969da);
+      color: var(--color-accent);
       background: #dbeafe;
     }
 
@@ -2501,7 +2501,7 @@ export const styles = `
       background: #f3f4f6;
       border: 1px solid #d0d7de;
       border-radius: 3px;
-      color: #57606a;
+      color: var(--color-text-secondary);
       font-size: 10px;
       font-weight: 600;
       font-family: inherit;
@@ -2513,7 +2513,7 @@ export const styles = `
       line-height: 1.6;
       opacity: 0.7;
     }
-    .pdf-translate-icon:hover { background: #0969da; color: #fff; border-color: #0969da; opacity: 1; }
+    .pdf-translate-icon:hover { background: var(--color-accent); color: #fff; border-color: var(--color-accent); opacity: 1; }
     .pdf-translate-icon.is-translated { background: #dafbe1; border-color: #2da44e; color: #1a7f37; opacity: 0.85; }
     .pdf-translate-icon.is-translated:hover { background: #2da44e; color: #fff; border-color: #2da44e; opacity: 1; }
     .pdf-translate-icon.is-highlighted { background: #fff8c5; border-color: #d4a72c; color: #7d4e00; opacity: 1; }

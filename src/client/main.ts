@@ -31,6 +31,7 @@ import { setAnnotationSummaries } from './state';
 // 导入批注功能
 import {
   initAnnotationElements,
+  invalidateAnnotationElementsCache,
   applyAnnotations,
   renderAnnotationList,
   handleSelectionForAnnotation,
@@ -1097,6 +1098,7 @@ function renderContent() {
     `
     : '';
   container.innerHTML = `${deletedNotice}<div class="markdown-body" id="reader">${html}</div>`;
+  invalidateAnnotationElementsCache();
   container.setAttribute('data-current-file', file.path);
   container.scrollTop = file.savedScrollTop ?? 0;
   rewriteMarkdownAssetUrls(container, file.path);

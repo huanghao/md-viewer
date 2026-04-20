@@ -70,6 +70,10 @@ export interface PdfViewerInstance {
   /** Called when user clicks a persistent annotation rect */
   onAnnotationClick?: (annotationId: string, clientX: number, clientY: number) => void;
   getPdfDoc(): any;
+  /** Switch between text-selection mode (false) and annotate-rect mode (true) */
+  setAnnotateMode(enabled: boolean): void;
+  /** Returns current annotate mode state */
+  isAnnotateMode(): boolean;
   /** Mark translate icons as translated/untranslated based on current translation list */
   markTranslatedIcons(keys: Set<string>): void;
   /** Re-render all pages at a new scale. Clears all annotation and temp rects — caller must replay them. Returns after placeholders are resized (actual render is async via IntersectionObserver). */
@@ -205,6 +209,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
   const textContentCache: Map<number, any> = new Map(); // Cache textContent for item-based highlighting
   const rendered = new Set<number>(); // pages already rendered
   const rendering = new Set<number>(); // pages currently being rendered
+  let annotateMode = false; // default: text selection mode
 
   // Step 1: get viewport dimensions for all pages to build placeholders.
   // We fetch page 1 to get the typical size, then assume uniform pages.
@@ -293,7 +298,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     textLayerDiv.className = "pdf-text-layer textLayer";
     textLayerDiv.style.cssText = `
       width: ${viewport.width}px; height: ${viewport.height}px;
-      pointer-events: none; user-select: none;
+      pointer-events: ${annotateMode ? 'none' : 'auto'}; user-select: ${annotateMode ? 'none' : 'text'};
     `;
     wrapper.appendChild(textLayerDiv);
 
@@ -304,7 +309,7 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     overlayCanvas.style.cssText = `
       position: absolute; top: 0; left: 0;
       width: ${viewport.width}px; height: ${viewport.height}px;
-      pointer-events: auto; cursor: default;
+      pointer-events: ${annotateMode ? 'auto' : 'none'}; cursor: default;
     `;
     const overlayCtx = overlayCanvas.getContext('2d')!;
     overlayCtx.scale(dpr, dpr);
@@ -709,6 +714,25 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     return textBlocksByPage.get(pageNum) ?? [];
   }
 
+  function setAnnotateMode(enabled: boolean): void {
+    annotateMode = enabled;
+    // Update all already-rendered pages
+    overlayCanvases.forEach((canvas, pageNum) => {
+      canvas.style.pointerEvents = enabled ? 'auto' : 'none';
+      const wrapper = pageWrappers[pageNum - 1];
+      if (!wrapper) return;
+      const textLayer = wrapper.querySelector<HTMLElement>('.pdf-text-layer');
+      if (textLayer) {
+        textLayer.style.pointerEvents = enabled ? 'none' : 'auto';
+        textLayer.style.userSelect = enabled ? 'none' : 'text';
+      }
+    });
+  }
+
+  function isAnnotateMode(): boolean {
+    return annotateMode;
+  }
+
   function destroy() {
     observer.disconnect();
     el.remove();
@@ -769,6 +793,8 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     getTextBlocks, getRenderedCount, getTotalPages,
     drawTempRect, clearTempRect,
     getPdfDoc: () => pdfDoc,
+    setAnnotateMode,
+    isAnnotateMode,
     markTranslatedIcons,
     setScale,
     get onAnnotationClick() { return opts.onAnnotationClick; },

@@ -1003,6 +1003,21 @@ export function showPopover(ann: Annotation, x: number, y: number): void {
     el.popoverResolveBtn.innerHTML = resolved ? iconSvg('reopen') : iconSvg('check');
     el.popoverResolveBtn.classList.toggle('is-resolved', resolved);
   }
+  const copyBtn = document.getElementById('popoverCopyBtn') as HTMLButtonElement | null;
+  if (copyBtn) {
+    const fresh = copyBtn.cloneNode(true) as HTMLButtonElement;
+    copyBtn.replaceWith(fresh);
+    fresh.addEventListener('click', () => {
+      navigator.clipboard.writeText(ann.quote).then(() => {
+        fresh.title = '已复制';
+        fresh.setAttribute('aria-label', '已复制');
+        setTimeout(() => {
+          fresh.title = '复制原文';
+          fresh.setAttribute('aria-label', '复制原文');
+        }, 1000);
+      });
+    });
+  }
   placeFloating(el.popover, x, y);
   el.popover.classList.remove('hidden');
 }

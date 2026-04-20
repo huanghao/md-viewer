@@ -1,14 +1,19 @@
 import { positionForOffset as positionForOffsetFast, type TextNodeIndex } from '../utils/text-node-index';
 
 export function getTextNodes(root: Node): Text[] {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const nodes: Text[] = [];
-  let node: Node | null;
-  while ((node = walker.nextNode())) {
-    if (node.nodeValue && node.nodeValue.length > 0) {
-      nodes.push(node as Text);
+  function walk(node: Node) {
+    if (node.nodeType === 3) { // TEXT_NODE
+      if (node.nodeValue && node.nodeValue.length > 0) {
+        nodes.push(node as Text);
+      }
+    } else {
+      for (let i = 0; i < node.childNodes.length; i++) {
+        walk(node.childNodes[i]);
+      }
     }
   }
+  walk(root);
   return nodes;
 }
 

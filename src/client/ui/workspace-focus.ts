@@ -11,6 +11,7 @@ import { getPinnedFiles } from '../utils/pinned-files';
 import { scanWorkspace } from '../workspace';
 import { renderFileRow } from './file-row';
 import { getFileExtension } from '../utils/file-type';
+import { storageGet, storageSet } from '../utils/storage';
 
 // Simple glob matcher for .mdvignore patterns
 // Supports: *, **, ?, and prefix matching (e.g. "bots-ws/" matches any path under bots-ws/)
@@ -62,15 +63,12 @@ export function toggleFocusTypeFilter(ext: string): void {
 const FOCUS_COLLAPSED_KEY = 'md-viewer:focus-ws-collapsed';
 
 export function getFocusCollapsed(): Set<string> {
-  try {
-    return new Set(JSON.parse(localStorage.getItem(FOCUS_COLLAPSED_KEY) || '[]'));
-  } catch {
-    return new Set();
-  }
+  const arr = storageGet<string[]>(FOCUS_COLLAPSED_KEY, []);
+  return new Set(Array.isArray(arr) ? arr : []);
 }
 
 export function saveFocusCollapsed(s: Set<string>): void {
-  localStorage.setItem(FOCUS_COLLAPSED_KEY, JSON.stringify([...s]));
+  storageSet(FOCUS_COLLAPSED_KEY, [...s]);
 }
 
 const FOCUS_WINDOW_MS: Record<string, number> = {

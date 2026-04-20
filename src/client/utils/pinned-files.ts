@@ -1,22 +1,14 @@
+import { storageGet, storageSet } from './storage';
+
 const PINNED_KEY = 'md-viewer:pinned-files';
 
 function loadPinned(): Set<string> {
-  try {
-    const raw = localStorage.getItem(PINNED_KEY);
-    if (!raw) return new Set();
-    const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? new Set(arr) : new Set();
-  } catch {
-    return new Set();
-  }
+  const arr = storageGet<string[]>(PINNED_KEY, []);
+  return Array.isArray(arr) ? new Set(arr) : new Set();
 }
 
 function savePinned(pinned: Set<string>): void {
-  try {
-    localStorage.setItem(PINNED_KEY, JSON.stringify(Array.from(pinned)));
-  } catch {
-    // ignore quota errors — pins are best-effort
-  }
+  storageSet(PINNED_KEY, Array.from(pinned));
 }
 
 export function isPinned(filePath: string): boolean {

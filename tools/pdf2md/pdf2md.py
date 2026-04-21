@@ -38,7 +38,98 @@ def split_paper(raw_text: str) -> dict:
             "appendix": str,       # Contributors/Acknowledgements/Appendix 等
         }
     """
-    pass
+    lines = raw_text.splitlines()
+    n = len(lines)
+
+    abstract_line = next(
+        (i for i, l in enumerate(lines) if re.match(r'^Abstract\s*$', l.strip())), None
+    )
+    references_line = next(
+        (i for i, l in enumerate(lines) if re.match(r'^References\s*$', l.strip())), None
+    )
+    appendix_line = next(
+        (i for i, l in enumerate(lines)
+         if re.match(r'^(Contributors|Acknowledgements|Appendix)\b', l.strip())), None
+    )
+
+    meta_end = abstract_line if abstract_line is not None else 0
+    meta_lines = lines[:meta_end]
+
+    body_start = _find_body_start(lines, after=abstract_line)
+
+    body_end = references_line if references_line is not None else (
+        appendix_line if appendix_line is not None else n
+    )
+    refs_end = appendix_line if appendix_line is not None else n
+
+    if abstract_line is not None and body_start is not None:
+        abstract_lines = [
+            l for l in lines[abstract_line + 1:body_start]
+            if not re.match(r'^\d+\.?\s+\S', l)
+        ]
+        abstract = "\n".join(abstract_lines).strip()
+    else:
+        abstract = ""
+
+    if body_start is not None:
+        body = "\n".join(lines[body_start:body_end]).strip()
+    else:
+        body = raw_text.strip()
+
+    if references_line is not None:
+        references = "\n".join(lines[references_line + 1:refs_end]).strip()
+    else:
+        references = ""
+
+    if appendix_line is not None:
+        appendix = "\n".join(lines[appendix_line:n]).strip()
+    else:
+        appendix = ""
+
+    return {
+        "meta_lines": meta_lines,
+        "abstract": abstract,
+        "body": body,
+        "references": references,
+        "appendix": appendix,
+    }
+
+
+def _find_body_start(lines: list[str], after: int | None) -> int | None:
+    start = (after + 1) if after is not None else 0
+
+    numbered = [
+        i for i in range(start, len(lines))
+        if re.match(r'^\d+\.?\s+\S', lines[i].strip())
+    ]
+    if not numbered:
+        return None
+
+    if len(numbered) <= 1:
+        return numbered[0]
+
+    # Detect a TOC cluster: a group of immediately-adjacent numbered lines (gap == 1).
+    # In a real TOC, entries appear on consecutive lines with no blank lines between them.
+    # Body sections are separated by blank lines (gap >= 2).
+    # If such a cluster exists (3+ entries), everything after it is the real body.
+    # Otherwise, the first numbered line is already the body start.
+    gaps = [numbered[i] - numbered[i - 1] for i in range(1, len(numbered))]
+    toc_cluster_size = 1
+    for gap in gaps:
+        if gap == 1:
+            toc_cluster_size += 1
+        else:
+            break
+
+    if toc_cluster_size >= 3:
+        # Skip the TOC cluster; body starts at the next numbered line after the cluster
+        if toc_cluster_size < len(numbered):
+            return numbered[toc_cluster_size]
+        # All numbered lines were TOC — no body found
+        return None
+
+    # No TOC cluster detected; first numbered line is body start
+    return numbered[0]
 
 
 def parse_meta(meta_lines: list[str]) -> dict:
@@ -54,7 +145,39 @@ def parse_meta(meta_lines: list[str]) -> dict:
             "url": str | None,
         }
     """
-    pass
+    text = "\n".join(meta_lines)
+
+    title = None
+    for line in meta_lines:
+        line = line.strip()
+        if len(line) > 10 and not re.match(r'^[\d\s\w]{1,5}$', line):
+            title = line
+            break
+
+    date = None
+    date_match = re.search(r'Date:\s+(\w+)\s+(\d+),\s+(\d{4})', text)
+    if date_match:
+        try:
+            dt = datetime.strptime(
+                f"{date_match.group(1)} {date_match.group(2)} {date_match.group(3)}",
+                "%B %d %Y"
+            )
+            date = dt.strftime("%Y-%m-%d")
+        except ValueError:
+            pass
+
+    arxiv_id = None
+    arxiv_match = re.search(r'(?:arXiv:|arxiv:)?(\d{4}\.\d{4,5})', text)
+    if arxiv_match:
+        arxiv_id = arxiv_match.group(1)
+
+    return {
+        "title": title,
+        "authors": [],
+        "date": date,
+        "arxiv_id": arxiv_id,
+        "url": f"https://arxiv.org/abs/{arxiv_id}" if arxiv_id else None,
+    }
 
 
 # ---------------------------------------------------------------------------

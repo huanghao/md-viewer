@@ -334,7 +334,16 @@ TRANSLATE_API = "http://localhost:3000/api/translate"
 
 def translate_text(text: str) -> str:
     """调用 mdv 本地翻译服务，返回译文。"""
-    pass
+    payload = json.dumps({"text": text}).encode()
+    req = urllib.request.Request(
+        TRANSLATE_API,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        data = json.loads(resp.read())
+        return data["translatedText"]
 
 
 def extract_paragraphs(md_text: str) -> list[tuple[str, str]]:
@@ -342,14 +351,76 @@ def extract_paragraphs(md_text: str) -> list[tuple[str, str]]:
     从带标题的 MD 文本提取段落，返回 [(para_id, text), ...]。
     段落 ID 格式：{section_num}-p{index}，如 3.1.1-p0
     """
-    pass
+    lines = md_text.splitlines()
+    section_path = "0"
+    para_counts: dict[str, int] = {}
+    paragraphs: list[tuple[str, str]] = []
+    current_para: list[str] = []
+
+    def flush():
+        if not current_para:
+            return
+        text = "\n".join(current_para).strip()
+        current_para.clear()
+        if not text or len(text) < 20:
+            return
+        if text.startswith("> **[Figure") or text.startswith("> **[Table"):
+            return
+        if text.startswith("$$"):
+            return
+        idx = para_counts.get(section_path, 0)
+        para_counts[section_path] = idx + 1
+        paragraphs.append((f"{section_path}-p{idx}", text))
+
+    for line in lines:
+        m = re.match(r'^#{1,3}\s+(\d+(?:\.\d+)*)\.?\s+', line)
+        if m:
+            flush()
+            section_path = m.group(1)
+            continue
+        if not line.strip():
+            flush()
+            continue
+        current_para.append(line)
+
+    flush()
+    return paragraphs
 
 
 def generate_translation_sidecar(
     main_md: str, out_path: Path, checkpoint_every: int = 5
 ) -> None:
     """生成翻译 sidecar JSON 文件，增量保存。"""
-    pass
+    paragraphs = extract_paragraphs(main_md)
+    print(f"  共提取 {len(paragraphs)} 个段落")
+
+    existing: dict[str, str] = {}
+    if out_path.exists():
+        existing = json.loads(out_path.read_text(encoding="utf-8"))
+        print(f"  已有翻译 {len(existing)} 条，跳过已翻译段落")
+
+    new_count = 0
+    for i, (para_id, text) in enumerate(paragraphs):
+        if para_id in existing:
+            continue
+        text_to_translate = text[:500] + "..." if len(text) > 500 else text
+        try:
+            result = translate_text(text_to_translate)
+            existing[para_id] = result
+            new_count += 1
+            print(f"  [{i+1}/{len(paragraphs)}] {para_id}: {text[:40]!r} → {result[:30]!r}")
+            if new_count % checkpoint_every == 0:
+                out_path.write_text(
+                    json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8"
+                )
+        except Exception as e:
+            print(f"  [{i+1}/{len(paragraphs)}] {para_id} 翻译失败: {e}")
+        time.sleep(0.05)
+
+    out_path.write_text(
+        json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    print(f"  完成！新增 {new_count} 条，总计 {len(existing)} 条")
 
 
 # ---------------------------------------------------------------------------

@@ -265,7 +265,64 @@ def insert_headings(body: str, toc: list[dict], audit_path: Path) -> str:
 
     返回插入标题后的 body 文本。
     """
-    pass
+    lines = body.splitlines()
+    insertions: dict[int, int] = {}  # toc_index -> line_index
+    last_found_line = 0
+
+    for toc_idx, entry in enumerate(toc):
+        title = entry["title"]
+        found_line = _find_title_line(lines, title, after=last_found_line)
+
+        if found_line is not None:
+            insertions[toc_idx] = found_line
+            last_found_line = found_line
+        else:
+            _append_audit(audit_path, {
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "step": "structure",
+                "section": f"{entry['num']}. {title}",
+                "strategy": "not_found",
+            })
+
+    # 按行号倒序插入，避免行号偏移
+    result_lines = lines[:]
+    for toc_idx in sorted(insertions.keys(), key=lambda i: insertions[i], reverse=True):
+        entry = toc[toc_idx]
+        level = entry["level"]
+        prefix = "#" * level
+        heading_line = f"{prefix} {entry['num']}. {entry['title']}"
+        result_lines.insert(insertions[toc_idx], heading_line)
+
+    return "\n".join(result_lines)
+
+
+def _find_title_line(lines: list[str], title: str, after: int) -> int | None:
+    # 策略 A: 精确匹配
+    for i in range(after, len(lines)):
+        if title in lines[i]:
+            return i
+
+    # 策略 B: 去标点后匹配（规范化多余空格）
+    title_clean = re.sub(r'\s+', ' ', re.sub(r'[^\w\s]', ' ', title).lower()).strip()
+    for i in range(after, len(lines)):
+        line_clean = re.sub(r'\s+', ' ', re.sub(r'[^\w\s]', ' ', lines[i]).lower()).strip()
+        if title_clean in line_clean:
+            return i
+
+    # 策略 B2: 只匹配前 4 个词
+    words = title.split()[:4]
+    if len(words) >= 2:
+        prefix_pattern = r'\s+'.join(re.escape(w) for w in words)
+        for i in range(after, len(lines)):
+            if re.search(prefix_pattern, lines[i], re.IGNORECASE):
+                return i
+
+    return None
+
+
+def _append_audit(audit_path: Path, entry: dict) -> None:
+    with audit_path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
 # ---------------------------------------------------------------------------

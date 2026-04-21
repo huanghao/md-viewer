@@ -20,6 +20,8 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+from pypdf import PdfReader
+
 
 # ---------------------------------------------------------------------------
 # 论文拆分
@@ -215,7 +217,41 @@ def extract_toc(pdf_path: Path) -> list[dict]:
     返回:
         [{"num": "3.1", "title": "Pre-Training Data", "level": 2, "pageNum": 4}, ...]
     """
-    pass
+    reader = PdfReader(str(pdf_path))
+    outline = reader.outline
+    if not outline:
+        return []
+
+    result: list[dict] = []
+    counters: list[int] = []
+
+    def _walk(items: list, depth: int) -> None:
+        while len(counters) <= depth:
+            counters.append(0)
+
+        for item in items:
+            if isinstance(item, list):
+                _walk(item, depth + 1)
+            else:
+                # 重置更深层计数器
+                del counters[depth + 1:]
+                counters[depth] += 1
+
+                num = ".".join(str(c) for c in counters[:depth + 1])
+                try:
+                    page_num = item.page.page_number + 1
+                except Exception:
+                    page_num = 0
+
+                result.append({
+                    "num": num,
+                    "title": item.title,
+                    "level": depth + 1,
+                    "pageNum": page_num,
+                })
+
+    _walk(outline, 0)
+    return result
 
 
 # ---------------------------------------------------------------------------

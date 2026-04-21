@@ -284,9 +284,9 @@ def insert_headings(body: str, toc: list[dict], audit_path: Path) -> str:
                 "strategy": "not_found",
             })
 
-    # 按行号倒序插入，避免行号偏移
+    # 按行号倒序插入，避免行号偏移；toc_idx 作为 tiebreaker 保证同行时顺序正确
     result_lines = lines[:]
-    for toc_idx in sorted(insertions.keys(), key=lambda i: insertions[i], reverse=True):
+    for toc_idx in sorted(insertions.keys(), key=lambda i: (insertions[i], i), reverse=True):
         entry = toc[toc_idx]
         level = entry["level"]
         prefix = "#" * level
@@ -428,6 +428,7 @@ def generate_translation_sidecar(
 # ---------------------------------------------------------------------------
 
 def run(pdf_path: Path, model: str, do_translate: bool, translate_only: bool) -> None:
+    # model 参数保留给未来的 LLM 标题插入 fallback（见 TODO），当前未使用
     out_dir = pdf_path.parent / pdf_path.stem
     out_dir.mkdir(exist_ok=True)
     audit_path = out_dir / "audit.jsonl"

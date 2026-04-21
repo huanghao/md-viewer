@@ -428,7 +428,79 @@ def generate_translation_sidecar(
 # ---------------------------------------------------------------------------
 
 def run(pdf_path: Path, model: str, do_translate: bool, translate_only: bool) -> None:
-    pass
+    out_dir = pdf_path.parent / pdf_path.stem
+    out_dir.mkdir(exist_ok=True)
+    audit_path = out_dir / "audit.jsonl"
+
+    if not translate_only:
+        # Step 1: markitdown → raw.md
+        print(f"[1/4] markitdown 转换: {pdf_path.name}")
+        from markitdown import MarkItDown
+        raw_text = MarkItDown().convert(str(pdf_path)).text_content
+        (out_dir / "raw.md").write_text(raw_text, encoding="utf-8")
+        print(f"      raw.md: {len(raw_text.splitlines())} 行")
+
+        # Step 2: 拆分论文
+        print("[2/4] 拆分论文各部分")
+        parts = split_paper(raw_text)
+        meta = parse_meta(parts["meta_lines"])
+        (out_dir / "meta.json").write_text(
+            json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        if parts["appendix"]:
+            (out_dir / "appendix.md").write_text(parts["appendix"], encoding="utf-8")
+        print(f"      abstract: {len(parts['abstract'])} chars, "
+              f"body: {len(parts['body'].splitlines())} 行, "
+              f"references: {len(parts['references'])} chars")
+
+        # Step 3: 提取 TOC
+        print("[3/4] 提取 TOC")
+        toc = extract_toc(pdf_path)
+        (out_dir / "toc.json").write_text(
+            json.dumps(toc, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        print(f"      {len(toc)} 个章节")
+
+        # Step 4: 插入标题，组合 main.md
+        print("[4/4] 插入章节标题，生成 main.md")
+        body_with_headings = insert_headings(parts["body"], toc, audit_path)
+
+        sections = []
+        if parts["abstract"]:
+            sections.append(f"## Abstract\n\n{parts['abstract']}")
+        sections.append(body_with_headings)
+        if parts["references"]:
+            sections.append(f"## References\n\n{parts['references']}")
+        main_md = "\n\n---\n\n".join(sections)
+        (out_dir / "main.md").write_text(main_md, encoding="utf-8")
+        print(f"      main.md: {len(main_md.splitlines())} 行")
+
+        # manifest
+        (out_dir / "manifest.json").write_text(
+            json.dumps({
+                "version": 1,
+                "pdf": pdf_path.name,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }, indent=2),
+            encoding="utf-8",
+        )
+
+    # Step 5: 翻译 sidecar（可选）
+    if do_translate or translate_only:
+        main_md_path = out_dir / "main.md"
+        if not main_md_path.exists():
+            print("错误：main.md 不存在，请先运行转换（去掉 --translate-only）", file=sys.stderr)
+            sys.exit(1)
+        print("[翻译] 生成翻译 sidecar")
+        try:
+            generate_translation_sidecar(
+                main_md_path.read_text(encoding="utf-8"),
+                out_dir / "main.translation.json",
+            )
+        except urllib.error.URLError:
+            print("  警告：mdv 翻译服务不在线，跳过翻译（请先运行 mdv server start）")
+
+    print(f"\n完成！输出目录: {out_dir}/")
 
 
 def main() -> None:

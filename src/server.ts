@@ -36,6 +36,7 @@ import {
   handleUpdateSessionState,
   handleWriteFile,
   handleGetClientConfig,
+  handleGetTranslationSidecar,
 } from "./handlers.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
 
@@ -127,6 +128,9 @@ app.post("/api/session-state", handleUpdateSessionState);
 
 // API: 客户端配置
 app.get("/api/config", (c) => handleGetClientConfig());
+
+// API: 翻译 sidecar（双语对照）
+app.get("/api/translation-sidecar", handleGetTranslationSidecar);
 
 // ==================== 翻译（内嵌 ONNX）====================
 

@@ -1878,15 +1878,18 @@ async function updateToolbarButtons() {
     if (file.isMissing || file.isRemote || isPdfPath(state.currentFile ?? '')) {
       translationButton.style.display = 'none';
     } else {
+      const pathSnapshot = state.currentFile;
       fetch(`/api/translation-sidecar?path=${encodeURIComponent(state.currentFile ?? '')}`)
         .then(r => r.json())
         .then((result: { ok: boolean; data?: Record<string, string> }) => {
+          if (state.currentFile !== pathSnapshot) return;
           translationData = result.ok ? (result.data ?? null) : null;
           if (translationButton) {
             translationButton.style.display = translationData ? 'flex' : 'none';
           }
         })
         .catch(() => {
+          if (state.currentFile !== pathSnapshot) return;
           translationData = null;
           translationButton.style.display = 'none';
         });

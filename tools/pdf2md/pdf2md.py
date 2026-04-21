@@ -147,12 +147,36 @@ def parse_meta(meta_lines: list[str]) -> dict:
     """
     text = "\n".join(meta_lines)
 
+    # 标题：第一个长度 > 10、不是噪音行的非空行
+    _NOISE_PATTERNS = re.compile(r'^(arXiv:|arxiv:|Date:|Website:|http|\d{4}\.\d{4})')
     title = None
-    for line in meta_lines:
+    title_idx = -1
+    for idx, line in enumerate(meta_lines):
         line = line.strip()
-        if len(line) > 10 and not re.match(r'^[\d\s\w]{1,5}$', line):
-            title = line
-            break
+        if not line:
+            continue
+        if len(line) <= 10:
+            continue
+        if re.match(r'^[\d\s]{1,5}$', line):
+            continue
+        if _NOISE_PATTERNS.match(line):
+            continue
+        title = line
+        title_idx = idx
+        break
+
+    # 作者：title 之后、第一个 Date/Website/arXiv 行之前，包含逗号或 @ 或 et al 的行
+    authors: list[str] = []
+    if title_idx >= 0:
+        for line in meta_lines[title_idx + 1:]:
+            line = line.strip()
+            if not line:
+                continue
+            if _NOISE_PATTERNS.match(line):
+                break
+            if ',' in line or '@' in line or 'et al' in line.lower():
+                authors = [line]
+                break
 
     date = None
     date_match = re.search(r'Date:\s+(\w+)\s+(\d+),\s+(\d{4})', text)
@@ -173,7 +197,7 @@ def parse_meta(meta_lines: list[str]) -> dict:
 
     return {
         "title": title,
-        "authors": [],
+        "authors": authors,
         "date": date,
         "arxiv_id": arxiv_id,
         "url": f"https://arxiv.org/abs/{arxiv_id}" if arxiv_id else None,

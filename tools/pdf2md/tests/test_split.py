@@ -155,3 +155,9 @@ Some ref.
     result = split_paper(raw)
     assert result["abstract"].strip() == "Some abstract text here."
     assert "Actual introduction text here." in result["body"]
+
+
+def test_parse_meta_authors():
+    result = split_paper(SAMPLE_RAW)
+    meta = parse_meta(result["meta_lines"])
+    assert meta["authors"] == ["Llama Team, AI @ Meta"]

@@ -911,19 +911,22 @@ export async function handleWriteFile(c: Context) {
 
 // API: 读取翻译 sidecar 文件（.translation.json）
 export async function handleGetTranslationSidecar(c: Context) {
-  const filePath = c.req.query('path');
-  if (!filePath) return c.json({ ok: false, error: 'missing path' });
-  const sidecarPath = filePath + '.translation.json';
+  const filePath = c.req.query("path");
+  if (!filePath) return c.json({ ok: false, error: "missing path" });
+  const resolvedPath = resolve(filePath);
+  const sidecarPath = resolvedPath + ".translation.json";
   try {
     const text = await Bun.file(sidecarPath).text();
     const data = JSON.parse(text);
-    if (!data || typeof data !== 'object' || Array.isArray(data)) {
-      return c.json({ ok: false, error: 'invalid format' });
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+      return c.json({ ok: false, error: "invalid format" });
     }
     const entries = Object.keys(data).length;
-    if (entries === 0) return c.json({ ok: false, error: 'empty sidecar' });
+    if (entries === 0) return c.json({ ok: false, error: "empty sidecar" });
     return c.json({ ok: true, data });
-  } catch {
+  } catch (err: unknown) {
+    const isNotFound = err instanceof Error && "code" in err && (err as NodeJS.ErrnoException).code === "ENOENT";
+    if (!isNotFound) console.error("[translation-sidecar] error reading sidecar:", err);
     return c.json({ ok: false });
   }
 }

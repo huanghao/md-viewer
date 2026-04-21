@@ -24,12 +24,14 @@ python pdf2md.py paper.pdf --translate-only
 
 ```
 paper/                               # 以 PDF 文件名命名的目录
-  ├── manifest.json                  # bundle 元信息（版本、文件清单、生成时间）
+  ├── manifest.json                  # 元信息（版本、生成时间）
   ├── main.md                        # 主文件：摘要 + 带标题的正文 + 参考文献
   ├── main.translation.json          # 翻译 sidecar（--translate 时生成）
+  ├── meta.json                      # 论文元信息（标题、作者、日期等，从 arxiv 头部解析）
+  ├── appendix.md                    # 附录（Contributors、Acknowledgements、Appendix 等）
   ├── toc.json                       # PDF outline（扁平化，带编号）
   ├── raw.md                         # markitdown 原始输出（debug 用）
-  └── agent-audit.jsonl              # LLM 调用记录
+  └── audit.jsonl                    # LLM 调用记录
 ```
 
 `manifest.json` 示例：
@@ -37,18 +39,11 @@ paper/                               # 以 PDF 文件名命名的目录
 {
   "version": 1,
   "pdf": "paper.pdf",
-  "created_at": "2026-04-22T10:00:00Z",
-  "files": {
-    "main": "main.md",
-    "translation": "main.translation.json",
-    "toc": "toc.json",
-    "raw": "raw.md",
-    "audit": "agent-audit.jsonl"
-  }
+  "created_at": "2026-04-22T10:00:00Z"
 }
 ```
 
-`version` 代表 bundle 目录布局的 API 版本，未来若调整文件结构需递增。
+`version` 代表目录布局的 API 版本，未来若调整文件结构需递增。
 
 ## 处理流程
 
@@ -69,24 +64,44 @@ markitdown 的特点：正文段落质量好，但不包含章节标题，表格
 
 | 边界 | 匹配规则 | 说明 |
 |------|----------|------|
+| 元信息结束 | 搜索 `^Abstract` | arxiv 头部（作者、日期、arXiv 号等）在 Abstract 之前 |
 | 摘要开始 | 搜索 `^Abstract` | arxiv 论文摘要标题 |
-| 正文开始 | 搜索 `^Abstract` 之后的下一个 `^\d+\.?\s` 行 | 第一章编号行，如 `1 Introduction`、`1. Overview` |
+| 目录区域 | `Abstract` 之后到正文开始之间，若存在大量 `^\d+\.?\s` 密集行则为目录 | 丢弃 |
+| 正文开始 | 跳过目录区域后的第一个 `^\d+\.?\s` 行 | 如 `1 Introduction`、`1. Overview` |
+| 参考文献 | 搜索 `^References` | |
 | 附录开始 | 搜索 `^Contributors` / `^Acknowledgements` / `^Appendix` | 取最早出现的 |
-| 参考文献 | 搜索 `^References` | 在附录之前或末尾 |
 
-拆分结果（最终合并进 `main.md`）：
-- **abstract**：`Abstract` 行到正文开始之间
-- **body**：正文第一章 → 附录/参考文献之前
-- **references**：`References` 行之后，附录之前
-
-丢弃：raw.md 开头的 arxiv 元信息（日期、版本号等噪音行）、Contributors、Acknowledgements、Appendix 等附录内容。
+拆分结果：
+- **meta.json**：raw.md 开头到 `Abstract` 之前，解析为结构化 JSON（标题、作者、日期、arXiv 号）
+- **abstract**（写入 main.md 开头）：`Abstract` 行到正文开始之间，去掉目录区域
+- **body**（写入 main.md 中段）：正文第一章 → 参考文献之前
+- **references**（写入 main.md 末尾）：`References` 行之后，附录之前
+- **appendix.md**：Contributors、Acknowledgements、Appendix 等，单独保存
 
 `main.md` 组合顺序：abstract → body（含插入标题）→ references
 
+`meta.json` 示例：
+```json
+{
+  "title": "The Llama 3 Herd of Models",
+  "authors": ["Llama Team, AI @ Meta"],
+  "date": "2024-07-23",
+  "arxiv_id": "2407.21783",
+  "url": "https://arxiv.org/abs/2407.21783"
+}
+```
+
+arxiv 元信息解析规则（基于 markitdown 输出的固定格式）：
+- 标题：第一个非空行（在作者行之前）
+- 日期：匹配 `Date: \w+ \d+, \d{4}`
+- arXiv 号：匹配 `\d{4}\.\d{4,5}`
+- 作者：`^[A-Z][a-z]+ Team` 或类似格式（可选，解析失败留空）
+
 边界找不到时的处理：
-- 找不到 `Abstract`：abstract 为空，以第一个 `^\d` 行作为正文开始
+- 找不到 `Abstract`：meta.json 为空，abstract 为空，以第一个 `^\d` 行作为正文开始
 - 找不到正文开始标志：整个 raw.md 作为 body
 - 找不到 `References`：references 为空
+- 找不到附录标志：appendix.md 为空
 
 ### Step 3：提取 TOC
 
@@ -122,7 +137,7 @@ markitdown 的特点：正文段落质量好，但不包含章节标题，表格
 
 **策略 C：跳过**
 
-两种策略都失败时，记录 `not_found` 到 `agent-audit.jsonl`，跳过该标题，继续处理下一个。
+两种策略都失败时，记录 `not_found` 到 `audit.jsonl`，跳过该标题，继续处理下一个。
 
 插入格式：
 ```
@@ -182,28 +197,25 @@ response = client.messages.create(
 
 默认模型：`claude-haiku-4-5`。
 
-### agent-audit.jsonl 字段说明
+### audit.jsonl 字段说明
 
-每次操作追加一行到 `paper/agent-audit.jsonl`：
+每次 LLM 调用追加一行到 `paper/audit.jsonl`，只记录实际调用了 LLM 的操作：
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `ts` | string | ISO 8601 时间戳 |
 | `step` | string | 处理阶段：`structure`（标题插入）/ `translate`（翻译） |
-| `section` | string | 当前处理的章节编号+标题，如 `3.1.1. Web Data Curation` |
-| `strategy` | string | 定位策略：`exact_match` / `fuzzy_match` / `llm_fallback` / `not_found` |
-| `matched_line` | int | 规则匹配时：插入位置的行号 |
-| `model` | string | LLM 调用时：使用的模型名 |
-| `input_tokens` | int | LLM 调用时：输入 token 数 |
-| `output_tokens` | int | LLM 调用时：输出 token 数 |
-| `duration_ms` | int | LLM 调用时：耗时毫秒 |
-| `result` | object | LLM 调用时：模型返回的原始结果 |
-
-规则命中时只记录 `ts`、`step`、`section`、`strategy`、`matched_line`，不记录 LLM 相关字段。
+| `section` | string | 当前处理的章节或段落，如 `3.1.1. Web Data Curation` |
+| `prompt` | string | 发送给 LLM 的完整 prompt |
+| `model` | string | 使用的模型名 |
+| `input_tokens` | int | 输入 token 数 |
+| `output_tokens` | int | 输出 token 数 |
+| `duration_ms` | int | 耗时毫秒 |
+| `response` | string | 模型返回的原始文本 |
 
 ## Python 版本与依赖
 
-Python 版本：**3.11+**（在 `tools/pdf2md/.python-version` 中声明）
+Python 版本：**3.12**（在 `tools/pdf2md/.python-version` 中声明）
 
 依赖（`tools/pdf2md/requirements.txt`）：
 ```
@@ -219,7 +231,7 @@ python-dotenv>=1.0.0
 tools/pdf2md/
   ├── pdf2md.py            # 主脚本（单文件入口）
   ├── requirements.txt     # Python 依赖
-  ├── .python-version      # Python 版本声明（3.11）
+  ├── .python-version      # Python 版本声明（3.12）
   ├── README.md            # 使用说明
   └── tests/
       └── test_split.py    # 论文拆分逻辑的单元测试

@@ -136,6 +136,9 @@ export function generateClientHTML(): string {
         <button class="toolbar-text-button" id="diffButton" onclick="handleDiffButtonClick()" style="display: none;" title="查看修改内容">
           <span id="diffButtonText">[± Diff]</span>
         </button>
+        <button class="toolbar-text-button" id="translationButton" onclick="handleTranslationButtonClick()" style="display: none;" title="切换双语对照模式">
+          <span id="translationButtonText">[🌐 译]</span>
+        </button>
         <button class="toolbar-text-button" id="refreshButton" onclick="handleRefreshButtonClick()" style="display: none;" title="文件已更新，点击刷新">
           <span id="refreshButtonText">[↻ 刷新]</span>
         </button>

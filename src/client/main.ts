@@ -68,6 +68,8 @@ import { storageGet, storageSet, storageGetNumber } from './utils/storage';
 import { createResizer } from './utils/resizer';
 import { setupKeyboardShortcuts } from './keyboard-shortcuts';
 import { initZoom, zoomIn, zoomOut, zoomReset, updateZoomDisplay, setPdfZoomValue, getPdfZoom } from './zoom-controller';
+import { buildParagraphMap } from './translation/paragraph-mapper';
+import { enterTranslationMode, exitTranslationMode, isTranslationActive } from './translation/translation-view';
 
 declare global {
   function cleanupAllExpiredRecords(): number;
@@ -91,6 +93,7 @@ const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 680;
 const fileRefreshSeq = new Map<string, number>();
 let diffViewActive = false;
+let translationData: Record<string, string> | null = null;
 let workspacePollRunning = false;
 let mermaidInitialized = false;
 let currentPdfViewer: PdfViewerInstance | null = null;
@@ -895,6 +898,15 @@ function renderContent() {
   const container = document.getElementById('content');
   if (!container) return;
   if (!diffViewActive) container.classList.remove('diff-active');
+
+  if (isTranslationActive()) {
+    exitTranslationMode();
+    const translationBtn = document.getElementById('translationButton');
+    if (translationBtn) translationBtn.classList.remove('active');
+  }
+  translationData = null;
+  const translationButton = document.getElementById('translationButton');
+  if (translationButton) translationButton.style.display = 'none';
 
   // Save scroll position of the outgoing MD file before switching content.
   const outgoingFile = container.getAttribute('data-current-file');
@@ -1734,6 +1746,24 @@ async function handleDiffButtonClick(): Promise<void> {
   renderDiffView(file.content, newContent);
 }
 
+async function handleTranslationButtonClick() {
+  const btn = document.getElementById('translationButton');
+  const reader = document.getElementById('reader');
+  if (!reader || !translationData) return;
+
+  if (isTranslationActive()) {
+    exitTranslationMode();
+    if (btn) btn.classList.remove('active');
+    applyAnnotations();
+  } else {
+    const paragraphMap = buildParagraphMap(reader.parentElement ?? reader);
+    enterTranslationMode(translationData, paragraphMap);
+    if (btn) btn.classList.add('active');
+    applyAnnotations();
+  }
+}
+(window as any).handleTranslationButtonClick = handleTranslationButtonClick;
+
 function closeDiffView(): void {
   diffViewActive = false;
   currentDiffBlockIndex = -1;
@@ -1842,6 +1872,26 @@ async function updateToolbarButtons() {
   const isDirty = file.lastModified > file.displayedModified;
   if (diffButton) diffButton.style.display = isDirty && !file.isRemote ? 'flex' : 'none';
   if (refreshButton) refreshButton.style.display = isDirty ? 'flex' : 'none';
+
+  const translationButton = document.getElementById('translationButton');
+  if (translationButton) {
+    if (file.isMissing || file.isRemote || isPdfPath(state.currentFile ?? '')) {
+      translationButton.style.display = 'none';
+    } else {
+      fetch(`/api/translation-sidecar?path=${encodeURIComponent(state.currentFile ?? '')}`)
+        .then(r => r.json())
+        .then((result: { ok: boolean; data?: Record<string, string> }) => {
+          translationData = result.ok ? (result.data ?? null) : null;
+          if (translationButton) {
+            translationButton.style.display = translationData ? 'flex' : 'none';
+          }
+        })
+        .catch(() => {
+          translationData = null;
+          translationButton.style.display = 'none';
+        });
+    }
+  }
 }
 
 // 点击刷新按钮

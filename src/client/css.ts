@@ -3876,13 +3876,9 @@ export const styles = `
     }
 
     .translation-block {
-      color: var(--text-secondary, #666);
       font-size: 0.92em;
-      border-left: 2px solid var(--accent-color, #4a9eff);
-      padding-left: 0.8em;
       margin-top: 0.2em;
       margin-bottom: 1em;
-      font-style: italic;
     }
 
     [data-translation-source] {

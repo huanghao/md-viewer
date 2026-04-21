@@ -914,7 +914,7 @@ export async function handleGetTranslationSidecar(c: Context) {
   const filePath = c.req.query("path");
   if (!filePath) return c.json({ ok: false, error: "missing path" });
   const resolvedPath = resolve(filePath);
-  const sidecarPath = resolvedPath + ".translation.json";
+  const sidecarPath = resolvedPath.replace(/\.[^/.]+$/, "") + ".translation.json";
   try {
     const text = await Bun.file(sidecarPath).text();
     const data = JSON.parse(text);

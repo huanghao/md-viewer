@@ -1385,7 +1385,7 @@ export function applyAnnotations(): void {
 
   // 一次 TreeWalker 建立索引，供所有批注定位复用
   const index: TextNodeIndex | undefined = el.reader
-    ? buildTextNodeIndex(collectTextNodes(el.reader))
+    ? buildTextNodeIndex(collectTextNodes(el.reader, '[data-translation-target]'))
     : undefined;
 
   if (el.reader) {

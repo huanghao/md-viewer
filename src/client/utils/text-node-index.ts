@@ -69,13 +69,25 @@ export function positionForOffset(index: TextNodeIndex, offset: number): TextNod
 /**
  * 用 TreeWalker 从 root 收集所有非空文本节点。
  * 在浏览器环境中调用，返回节点数组供 buildTextNodeIndex 使用。
+ * @param skipSelector 可选 CSS 选择器，匹配该选择器的元素及其子节点会被跳过（用于过滤译文块等）
  */
-export function collectTextNodes(root: Node): Text[] {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+export function collectTextNodes(root: Node, skipSelector?: string): Text[] {
+  const filter: NodeFilter = skipSelector
+    ? {
+        acceptNode(node: Node): number {
+          // REJECT the matching element and its entire subtree
+          if (node.nodeType === 1 /* ELEMENT_NODE */ && (node as Element).matches(skipSelector)) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          return NodeFilter.FILTER_ACCEPT;
+        },
+      }
+    : { acceptNode: () => NodeFilter.FILTER_ACCEPT };
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ALL, filter);
   const nodes: Text[] = [];
   let node: Node | null;
   while ((node = walker.nextNode())) {
-    if (node.nodeValue && node.nodeValue.length > 0) {
+    if (node.nodeType === 3 /* TEXT_NODE */ && node.nodeValue && node.nodeValue.length > 0) {
       nodes.push(node as Text);
     }
   }

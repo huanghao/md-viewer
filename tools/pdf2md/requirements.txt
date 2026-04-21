@@ -1,0 +1,5 @@
+markitdown[pdf]>=0.1.0
+pypdf>=4.0.0
+anthropic>=0.49.0
+python-dotenv>=1.0.0
+pytest>=8.0.0

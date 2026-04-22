@@ -22,6 +22,7 @@ import { showToast, showSuccess, showError, showWarning, showInfo } from './ui/t
 import { showSettingsDialog, closeSettingsDialog } from './ui/settings';
 import { renderJsonContent } from './ui/json-viewer';
 import { mountScrollbar, unmountScrollbar, updateScrollbar, updateDiffMarkers, clearDiffMarkers } from './ui/doc-scrollbar';
+import { shouldRefreshDiff, refreshDiffBannerLabel } from './ui/diff-refresh';
 
 import { getMdThemeCss, getHlThemeCss } from './themes/index';
 
@@ -1707,6 +1708,14 @@ function renderDiffView(oldContent: string, newContent: string): void {
   navigateDiffBlock(1);
 }
 
+function refreshDiffIfActive(): void {
+  if (!state.currentFile) return;
+  const file = state.sessionFiles.get(state.currentFile);
+  if (!shouldRefreshDiff({ diffViewActive, pendingContent: file?.pendingContent })) return;
+  refreshDiffBannerLabel(document);
+  renderDiffView(file!.content, file!.pendingContent!);
+}
+
 async function handleDiffButtonClick(): Promise<void> {
   if (!state.currentFile) return;
   const file = state.sessionFiles.get(state.currentFile);
@@ -2201,6 +2210,8 @@ async function syncOpenFilesAfterReconnect() {
         file.lastModified = data.lastModified;
         file.pendingContent = data.content;
         hasUpdate = true;
+        // 若当前文件正在 diff 模式，刷新 diff 界面
+        if (state.currentFile === file.path) refreshDiffIfActive();
       }
     } catch {
       // 忽略单个文件的错误
@@ -2212,9 +2223,9 @@ async function syncOpenFilesAfterReconnect() {
     renderSidebar();
     await updateToolbarButtons();
 
-    // 如果当前文件有更新，给用户提示
+    // 如果当前文件有更新且未在 diff 模式，给用户提示
     const currentFile = state.currentFile ? state.sessionFiles.get(state.currentFile) : null;
-    if (currentFile && currentFile.pendingContent !== undefined) {
+    if (currentFile && currentFile.pendingContent !== undefined && !diffViewActive) {
       showInfo('文件有更新，点击 Diff 查看差异', 3000);
     }
   }
@@ -2254,6 +2265,14 @@ function connectSSE(isReconnect = false) {
       if (file.isMissing) {
         file.isMissing = false;
         clearWorkspacePathMissing(data.path);
+      }
+      // 若当前文件正在 diff 模式，fetch 新内容并刷新 diff 界面
+      if (diffViewActive && state.currentFile === data.path) {
+        const fetched = await loadFile(data.path, true);
+        if (fetched) {
+          file.pendingContent = fetched.content;
+          refreshDiffIfActive();
+        }
       }
       saveState();
     } else {

@@ -4,8 +4,7 @@ pdf2md.py — 学术 PDF → 结构化 Markdown
 
 用法:
   python pdf2md.py paper.pdf
-  python pdf2md.py paper.pdf --translate
-  python pdf2md.py paper.pdf --translate-only
+  python pdf2md.py paper.pdf --force   # 强制重新生成（默认跳过已有输出）
   python pdf2md.py paper.pdf --model claude-opus-4-7
 """
 from __future__ import annotations
@@ -59,10 +58,26 @@ def split_paper(raw_text: str) -> dict:
 
     body_start = _find_body_start(lines, after=abstract_line)
 
-    body_end = references_line if references_line is not None else (
-        appendix_line if appendix_line is not None else n
-    )
-    refs_end = appendix_line if appendix_line is not None else n
+    # references 总在 appendix 之前；若 appendix 出现在 references 之前（如 Contributors 在正文里），
+    # 以 references 为准切分 body，appendix 取 references 之后的内容
+    if references_line is not None and appendix_line is not None:
+        if appendix_line < references_line:
+            # appendix 在 references 之前：appendix 是正文的一部分，不切分 body
+            body_end = references_line
+            refs_end = n
+            appendix_line = None  # 不单独提取 appendix
+        else:
+            body_end = references_line
+            refs_end = appendix_line
+    elif references_line is not None:
+        body_end = references_line
+        refs_end = n
+    elif appendix_line is not None:
+        body_end = appendix_line
+        refs_end = n
+    else:
+        body_end = n
+        refs_end = n
 
     if abstract_line is not None and body_start is not None:
         abstract_lines = [
@@ -95,6 +110,38 @@ def split_paper(raw_text: str) -> dict:
         "references": references,
         "appendix": appendix,
     }
+
+
+def clean_cid_noise(text: str) -> str:
+    """
+    把含 CID 字符引用的段落替换为公式占位符。
+    markitdown 无法解析 PDF 数学公式，输出形如 (cid:18) 的乱码。
+    策略：把相邻非空行合并为段落，对整个段落检测 CID 密度。
+    """
+    lines = text.splitlines()
+    result: list[str] = []
+    para: list[str] = []
+
+    def flush_para():
+        if not para:
+            return
+        block = "\n".join(para)
+        cid_count = len(re.findall(r'\(cid:\d+\)', block))
+        # 任意 CID 出现即替换（公式段落通常包含至少一个 CID）
+        if cid_count >= 1:
+            result.append("> **[Formula]**")
+        else:
+            result.extend(para)
+        para.clear()
+
+    for line in lines:
+        if not line.strip():
+            flush_para()
+            result.append(line)
+        else:
+            para.append(line)
+    flush_para()
+    return "\n".join(result)
 
 
 def _find_body_start(lines: list[str], after: int | None) -> int | None:
@@ -286,30 +333,67 @@ def insert_headings(body: str, toc: list[dict], audit_path: Path) -> str:
 
     # 按行号倒序插入，避免行号偏移；toc_idx 作为 tiebreaker 保证同行时顺序正确
     result_lines = lines[:]
+    # 标记需要删除的行（匹配到的纯文本标题行，插入 MD 标题后删掉原文）
+    lines_to_delete: set[int] = set()
+    for toc_idx, line_idx in insertions.items():
+        entry = toc[toc_idx]
+        line_text = lines[line_idx].strip()
+        # 如果匹配行的内容就是标题文字本身（纯文本重复行），标记删除
+        # 比较时去掉数字前缀（如 "1. Introduction" → "introduction"）
+        title_words = re.sub(r'[^\w\s]', ' ', entry["title"]).lower().split()
+        line_words = re.sub(r'[^\w\s]', ' ', line_text).lower().split()
+        # 去掉行首的数字前缀（TOC 编号）
+        while line_words and re.match(r'^\d+$', line_words[0]):
+            line_words = line_words[1:]
+        if line_words and title_words and line_words == title_words:
+            lines_to_delete.add(line_idx)
+
     for toc_idx in sorted(insertions.keys(), key=lambda i: (insertions[i], i), reverse=True):
         entry = toc[toc_idx]
         level = entry["level"]
         prefix = "#" * level
         heading_line = f"{prefix} {entry['num']}. {entry['title']}"
-        result_lines.insert(insertions[toc_idx], heading_line)
+        insert_at = insertions[toc_idx]
+        if insert_at in lines_to_delete:
+            # 替换而不是插入，避免重复
+            result_lines[insert_at] = heading_line
+            lines_to_delete.discard(insert_at)
+        else:
+            result_lines.insert(insert_at, heading_line)
 
     return "\n".join(result_lines)
 
 
 def _find_title_line(lines: list[str], title: str, after: int) -> int | None:
-    # 策略 A: 精确匹配
+    title_clean = re.sub(r'\s+', ' ', re.sub(r'[^\w\s]', ' ', title).lower()).strip()
+
+    # 策略 A: 优先匹配"标题行"——内容与标题高度相似的短行
+    # 形如 "2.1. Group Relative Policy Optimization"（带编号前缀或纯标题）
+    for i in range(after, len(lines)):
+        line = lines[i].strip()
+        if not line:
+            continue
+        line_clean = re.sub(r'\s+', ' ', re.sub(r'[^\w\s]', ' ', line).lower()).strip()
+        # 去掉行首数字前缀后比较
+        line_words = line_clean.split()
+        while line_words and re.match(r'^\d+$', line_words[0]):
+            line_words = line_words[1:]
+        line_no_num = ' '.join(line_words)
+        if line_no_num == title_clean:
+            return i
+
+    # 策略 B: 精确子串匹配（标题文字出现在行中）
     for i in range(after, len(lines)):
         if title in lines[i]:
             return i
 
-    # 策略 B: 去标点后匹配（规范化多余空格）
-    title_clean = re.sub(r'\s+', ' ', re.sub(r'[^\w\s]', ' ', title).lower()).strip()
+    # 策略 C: 去标点后匹配
     for i in range(after, len(lines)):
         line_clean = re.sub(r'\s+', ' ', re.sub(r'[^\w\s]', ' ', lines[i]).lower()).strip()
         if title_clean in line_clean:
             return i
 
-    # 策略 B2: 只匹配前 4 个词
+    # 策略 D: 只匹配前 4 个词
     words = title.split()[:4]
     if len(words) >= 2:
         prefix_pattern = r'\s+'.join(re.escape(w) for w in words)
@@ -427,79 +511,71 @@ def generate_translation_sidecar(
 # 主流程
 # ---------------------------------------------------------------------------
 
-def run(pdf_path: Path, model: str, do_translate: bool, translate_only: bool) -> None:
+def run(pdf_path: Path, model: str, force: bool) -> None:
     # model 参数保留给未来的 LLM 标题插入 fallback（见 TODO），当前未使用
     out_dir = pdf_path.parent / pdf_path.stem
     out_dir.mkdir(exist_ok=True)
     audit_path = out_dir / "audit.jsonl"
 
-    if not translate_only:
-        # Step 1: markitdown → raw.md
-        print(f"[1/4] markitdown 转换: {pdf_path.name}")
-        from markitdown import MarkItDown
-        raw_text = MarkItDown().convert(str(pdf_path)).text_content
-        (out_dir / "raw.md").write_text(raw_text, encoding="utf-8")
-        print(f"      raw.md: {len(raw_text.splitlines())} 行")
+    # 跳过已有输出（除非 --force）
+    main_md_path = out_dir / "main.md"
+    if main_md_path.exists() and not force:
+        print(f"已有输出目录 {out_dir.name}/，跳过转换（使用 --force 强制重新生成）")
+        print(f"完成！输出目录: {out_dir}/")
+        return
 
-        # Step 2: 拆分论文
-        print("[2/4] 拆分论文各部分")
-        parts = split_paper(raw_text)
-        meta = parse_meta(parts["meta_lines"])
-        (out_dir / "meta.json").write_text(
-            json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
-        if parts["appendix"]:
-            (out_dir / "appendix.md").write_text(parts["appendix"], encoding="utf-8")
-        print(f"      abstract: {len(parts['abstract'])} chars, "
-              f"body: {len(parts['body'].splitlines())} 行, "
-              f"references: {len(parts['references'])} chars")
+    # Step 1: markitdown → raw.md
+    print(f"[1/4] markitdown 转换: {pdf_path.name}")
+    from markitdown import MarkItDown
+    raw_text = MarkItDown().convert(str(pdf_path)).text_content
+    (out_dir / "raw.md").write_text(raw_text, encoding="utf-8")
+    print(f"      raw.md: {len(raw_text.splitlines())} 行")
 
-        # Step 3: 提取 TOC
-        print("[3/4] 提取 TOC")
-        toc = extract_toc(pdf_path)
-        (out_dir / "toc.json").write_text(
-            json.dumps(toc, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
-        print(f"      {len(toc)} 个章节")
+    # Step 2: 拆分论文 + 清洗 CID 乱码
+    print("[2/4] 拆分论文各部分")
+    parts = split_paper(raw_text)
+    meta = parse_meta(parts["meta_lines"])
+    (out_dir / "meta.json").write_text(
+        json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    if parts["appendix"]:
+        (out_dir / "appendix.md").write_text(parts["appendix"], encoding="utf-8")
+    print(f"      abstract: {len(parts['abstract'])} chars, "
+          f"body: {len(parts['body'].splitlines())} 行, "
+          f"references: {len(parts['references'])} chars")
 
-        # Step 4: 插入标题，组合 main.md
-        print("[4/4] 插入章节标题，生成 main.md")
-        body_with_headings = insert_headings(parts["body"], toc, audit_path)
+    # Step 3: 提取 TOC
+    print("[3/4] 提取 TOC")
+    toc = extract_toc(pdf_path)
+    (out_dir / "toc.json").write_text(
+        json.dumps(toc, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    print(f"      {len(toc)} 个章节")
 
-        sections = []
-        if parts["abstract"]:
-            sections.append(f"## Abstract\n\n{parts['abstract']}")
-        sections.append(body_with_headings)
-        if parts["references"]:
-            sections.append(f"## References\n\n{parts['references']}")
-        main_md = "\n\n---\n\n".join(sections)
-        (out_dir / "main.md").write_text(main_md, encoding="utf-8")
-        print(f"      main.md: {len(main_md.splitlines())} 行")
+    # Step 4: 插入标题，清洗公式噪音，组合 main.md
+    print("[4/4] 插入章节标题，生成 main.md")
+    body_with_headings = insert_headings(parts["body"], toc, audit_path)
+    body_clean = clean_cid_noise(body_with_headings)
 
-        # manifest
-        (out_dir / "manifest.json").write_text(
-            json.dumps({
-                "version": 1,
-                "pdf": pdf_path.name,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }, indent=2),
-            encoding="utf-8",
-        )
+    sections = []
+    if parts["abstract"]:
+        sections.append(f"## Abstract\n\n{clean_cid_noise(parts['abstract'])}")
+    sections.append(body_clean)
+    if parts["references"]:
+        sections.append(f"## References\n\n{parts['references']}")
+    main_md = "\n\n---\n\n".join(sections)
+    main_md_path.write_text(main_md, encoding="utf-8")
+    print(f"      main.md: {len(main_md.splitlines())} 行")
 
-    # Step 5: 翻译 sidecar（可选）
-    if do_translate or translate_only:
-        main_md_path = out_dir / "main.md"
-        if not main_md_path.exists():
-            print("错误：main.md 不存在，请先运行转换（去掉 --translate-only）", file=sys.stderr)
-            sys.exit(1)
-        print("[翻译] 生成翻译 sidecar")
-        try:
-            generate_translation_sidecar(
-                main_md_path.read_text(encoding="utf-8"),
-                out_dir / "main.translation.json",
-            )
-        except urllib.error.URLError:
-            print("  警告：mdv 翻译服务不在线，跳过翻译（请先运行 mdv server start）")
+    # manifest
+    (out_dir / "manifest.json").write_text(
+        json.dumps({
+            "version": 1,
+            "pdf": pdf_path.name,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }, indent=2),
+        encoding="utf-8",
+    )
 
     print(f"\n完成！输出目录: {out_dir}/")
 
@@ -510,18 +586,17 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="PDF → 结构化 Markdown")
     parser.add_argument("pdf", type=Path, help="输入 PDF 文件")
-    parser.add_argument("--translate", action="store_true", help="生成翻译 sidecar")
-    parser.add_argument("--translate-only", action="store_true",
-                        help="只翻译（已有 main.md 时跳过转换）")
+    parser.add_argument("--force", action="store_true",
+                        help="强制重新生成（默认跳过已有输出目录）")
     parser.add_argument("--model", default="claude-haiku-4-5",
-                        help="LLM 模型（默认 claude-haiku-4-5）")
+                        help="LLM 模型（默认 claude-haiku-4-5，保留给未来 LLM fallback）")
     args = parser.parse_args()
 
     if not args.pdf.exists():
         print(f"错误：文件不存在: {args.pdf}", file=sys.stderr)
         sys.exit(1)
 
-    run(args.pdf, args.model, args.translate, args.translate_only)
+    run(args.pdf, args.model, args.force)
 
 
 if __name__ == "__main__":

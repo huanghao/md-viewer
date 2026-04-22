@@ -161,3 +161,83 @@ def test_parse_meta_authors():
     result = split_paper(SAMPLE_RAW)
     meta = parse_meta(result["meta_lines"])
     assert meta["authors"] == ["Llama Team, AI @ Meta"]
+
+
+def test_split_appendix_after_references():
+    """appendix 在 references 之后时，references 正常提取"""
+    raw = """\
+Abstract
+
+Some abstract.
+
+1 Introduction
+
+Body text here.
+
+References
+
+Ref 1. Some paper.
+
+Contributors
+
+Alice, Bob.
+"""
+    result = split_paper(raw)
+    assert "Ref 1." in result["references"]
+    assert "Alice, Bob." in result["appendix"]
+
+
+def test_split_appendix_before_references():
+    """appendix 在 references 之前（如 Contributors 在正文里）时，references 仍正常提取"""
+    raw = """\
+Abstract
+
+Some abstract.
+
+1 Introduction
+
+Body text here.
+
+Contributors
+
+Alice, Bob contributed.
+
+References
+
+Ref 1. Some paper.
+"""
+    result = split_paper(raw)
+    assert "Ref 1." in result["references"]
+    # appendix 在 references 之前时不单独提取（归入 body）
+    assert result["appendix"] == ""
+
+
+# ---------------------------------------------------------------------------
+# clean_cid_noise tests
+# ---------------------------------------------------------------------------
+
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from pdf2md import clean_cid_noise
+
+
+def test_cid_formula_replaced():
+    text = "Normal paragraph.\n\n(cid:18) x (cid:19) = (cid:20) y\n\nAnother paragraph."
+    result = clean_cid_noise(text)
+    assert "> **[Formula]**" in result
+    assert "Normal paragraph." in result
+    assert "Another paragraph." in result
+
+
+def test_cid_normal_text_preserved():
+    text = "This text has no CID references at all.\n\nAnother clean paragraph."
+    result = clean_cid_noise(text)
+    assert result == text
+
+
+def test_cid_single_occurrence_replaced():
+    """单个 CID 引用也触发替换（公式段落）"""
+    text = "Almost normal text with one (cid:18) reference here in a longer sentence."
+    result = clean_cid_noise(text)
+    assert "> **[Formula]**" in result

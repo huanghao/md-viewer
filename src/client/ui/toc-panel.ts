@@ -39,7 +39,7 @@ export function renderTocPanel(
 
   if (toc.length === 0) {
     container.innerHTML = '<div class="toc-empty">无目录</div>';
-    sidebar?.classList.remove('toc-has-content', 'toc-visible');
+    sidebar?.classList.add('toc-has-content');
     return;
   }
 

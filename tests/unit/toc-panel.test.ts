@@ -59,14 +59,13 @@ describe('renderTocPanel', () => {
     expect(sidebar.classList.contains('toc-has-content')).toBe(true);
   });
 
-  it('removes toc-has-content from sidebar when toc is empty', () => {
+  it('keeps toc-has-content on sidebar when toc is empty', () => {
     const { doc } = makeWindow();
     const panel = makeContainer(doc);
     const sidebar = panel.parentElement!.parentElement!;
     sidebar.classList.add('toc-has-content', 'toc-visible');
     renderTocPanel(panel, [], () => {}, false, doc);
-    expect(sidebar.classList.contains('toc-has-content')).toBe(false);
-    expect(sidebar.classList.contains('toc-visible')).toBe(false);
+    expect(sidebar.classList.contains('toc-has-content')).toBe(true);
   });
 
   it('shows loading state and removes toc-has-content', () => {

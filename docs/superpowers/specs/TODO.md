@@ -1,5 +1,11 @@
 # TODO
 
+## 监控 API 指标
+
+为 server 各端点添加指标监控，包括请求数、响应时间、错误率等，便于排查性能问题（如 `/api/files` 响应慢导致 CLI 误判端口占用的问题）。
+
+---
+
 ## 重构：工作区状态提升到全局 state
 
 **问题：** `failedWorkspaceIds`、`loadingWorkspaceIds` 等工作区扫描状态分散在三个视图文件里（`sidebar-workspace.ts`、`workspace-focus.ts`），每次加新逻辑都要改三处，已经踩坑两次。

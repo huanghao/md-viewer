@@ -1,5 +1,9 @@
 # 待完成任务
 
+## 做一个快捷键配置页面
+
+## diff应该有bug。修改的部分好像会变成删除，但看不到新增的行
+
 ## PDF 空闲自动回收功能（pdfIdleEviction）评估删除
 当前该功能默认关闭（`pdfIdleEviction: false`），通过 AppConfig 可开启。
 评估删除的条件：长期使用下内存从未成为问题，或者"关 tab 即销毁"的策略已足够。
@@ -38,3 +42,7 @@ bun run build.ts && bun run scripts/embed-client.ts
 - 整页翻译 API 成本比选段翻译高
 
 后续可探索：先做 overlay 叠加方案验证视觉效果，再评估是否值得做完整 reflow。用户体验上"译文紧跟原文段落下方"是最理想的阅读方式，值得重点探索。
+
+## 其他
+- python 版本
+- requirements.txt

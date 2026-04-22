@@ -97,9 +97,9 @@ function getServerStatus(): ServerStatus {
  */
 async function isServerHttpReachable(host: string, port: number): Promise<boolean> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 800);
+  const timeout = setTimeout(() => controller.abort(), 2000);
   try {
-    const res = await fetch(`http://${host}:${port}/api/files`, {
+    const res = await fetch(`http://${host}:${port}/api/config`, {
       method: "GET",
       signal: controller.signal,
     });
@@ -116,7 +116,7 @@ async function isServerHttpReachable(host: string, port: number): Promise<boolea
  */
 async function isPortInUseByOther(host: string, port: number): Promise<boolean> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 800);
+  const timeout = setTimeout(() => controller.abort(), 2000);
   try {
     await fetch(`http://${host}:${port}/`, {
       method: "GET",

@@ -112,6 +112,49 @@ def split_paper(raw_text: str) -> dict:
     }
 
 
+def clean_fragment_lines(body: str, toc: list[dict]) -> str:
+    """
+    清除 body 中章节标题行之前的碎片行。
+    markitdown 有时会在章节标题行前输出一个来自上下文的短句碎片。
+    检测模式：某行内容是 TOC 标题文字（或带编号前缀），且下一非空行也是 TOC 标题文字 → 删除前者。
+    """
+    if not toc:
+        return body
+
+    # 构建标题行的匹配集合（去标点小写）
+    title_patterns = set()
+    for entry in toc:
+        clean = re.sub(r'\s+', ' ', re.sub(r'[^\w\s]', ' ', entry["title"]).lower()).strip()
+        title_patterns.add(clean)
+
+    lines = body.splitlines()
+    result: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        # 找到下一个非空行
+        next_nonempty = None
+        for j in range(i + 1, min(i + 4, len(lines))):
+            if lines[j].strip():
+                next_nonempty = lines[j]
+                break
+
+        if next_nonempty and next_nonempty.strip().startswith("#"):
+            # 下一非空行是 MD 标题行，检查当前行是否是碎片
+            line_clean = re.sub(r'\s+', ' ', re.sub(r'[^\w\s]', ' ', line.strip()).lower()).strip()
+            # 去掉行首数字前缀
+            words = line_clean.split()
+            while words and re.match(r'^\d+$', words[0]):
+                words = words[1:]
+            line_no_num = ' '.join(words)
+            if line_no_num in title_patterns and line.strip() and not line.strip().startswith("#"):
+                i += 1
+                continue  # 跳过这行碎片
+        result.append(line)
+        i += 1
+    return "\n".join(result)
+
+
 def clean_cid_noise(text: str) -> str:
     """
     把含 CID 字符引用的段落替换为公式占位符。
@@ -508,6 +551,91 @@ def generate_translation_sidecar(
 
 
 # ---------------------------------------------------------------------------
+# 质量评估
+# ---------------------------------------------------------------------------
+
+def assess_quality(main_md: str, toc: list[dict], audit_path: Path) -> dict:
+    """
+    对生成的 main.md 做启发式质量评估，返回评估结果 dict。
+    """
+    lines = main_md.splitlines()
+
+    # 1. 结构：TOC 覆盖率（已插入标题 / TOC 总条目）
+    inserted_headings = [l for l in lines if re.match(r'^#{1,3} \d', l)]
+    toc_total = len(toc)
+    toc_located = len(inserted_headings)
+    toc_coverage = toc_located / toc_total if toc_total > 0 else 1.0
+
+    # 2. 公式占位符数量
+    formula_count = sum(1 for l in lines if '> **[Formula]**' in l)
+
+    # 3. 正文段落平均长度（body 部分，排除标题/空行/占位符）
+    body_paras = [
+        l.strip() for l in lines
+        if l.strip()
+        and not l.startswith("#")
+        and not l.startswith(">")
+        and not l.startswith("---")
+    ]
+    avg_para_len = sum(len(p) for p in body_paras) / len(body_paras) if body_paras else 0
+
+    # 4. 参考文献是否存在
+    has_references = "## References" in main_md
+
+    # 5. not_found 章节数（从 audit.jsonl 读取）
+    not_found_count = 0
+    if audit_path.exists():
+        for line in audit_path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                try:
+                    entry = json.loads(line)
+                    if entry.get("strategy") == "not_found":
+                        not_found_count += 1
+                except Exception:
+                    pass
+
+    return {
+        "toc_total": toc_total,
+        "toc_located": toc_located,
+        "toc_coverage": toc_coverage,
+        "formula_count": formula_count,
+        "avg_para_len": avg_para_len,
+        "has_references": has_references,
+        "not_found_count": not_found_count,
+    }
+
+
+def print_quality_report(q: dict) -> None:
+    def ok(cond: bool) -> str:
+        return "✓" if cond else "⚠"
+
+    print("\n质量评估：")
+    cov_pct = int(q["toc_coverage"] * 100)
+    print(f"  结构：{q['toc_located']}/{q['toc_total']} 章节已定位 ({cov_pct}%)  {ok(q['toc_coverage'] >= 0.8)}")
+    if q["not_found_count"] > 0:
+        print(f"        {q['not_found_count']} 个章节未定位（见 audit.jsonl）")
+    if q["formula_count"] > 0:
+        print(f"  公式：{q['formula_count']} 个占位符（建议在 mdv 中确认公式段落）  ⚠")
+    else:
+        print(f"  公式：无公式乱码  ✓")
+    print(f"  正文：平均段落 {int(q['avg_para_len'])} 字符  {ok(q['avg_para_len'] >= 80)}")
+    print(f"  参考：{'已提取' if q['has_references'] else '未找到'}  {ok(q['has_references'])}")
+
+    # 总体判断
+    issues = []
+    if q["toc_coverage"] < 0.6:
+        issues.append("章节定位率过低")
+    if q["avg_para_len"] < 40:
+        issues.append("段落过短（碎片较多）")
+    if not q["has_references"]:
+        issues.append("未提取到参考文献")
+    if issues:
+        print(f"  总体：需要检查 — {', '.join(issues)}")
+    else:
+        print(f"  总体：可用")
+
+
+# ---------------------------------------------------------------------------
 # 主流程
 # ---------------------------------------------------------------------------
 
@@ -552,10 +680,11 @@ def run(pdf_path: Path, model: str, force: bool) -> None:
     )
     print(f"      {len(toc)} 个章节")
 
-    # Step 4: 插入标题，清洗公式噪音，组合 main.md
+    # Step 4: 插入标题，清洗碎片/公式噪音，组合 main.md
     print("[4/4] 插入章节标题，生成 main.md")
     body_with_headings = insert_headings(parts["body"], toc, audit_path)
-    body_clean = clean_cid_noise(body_with_headings)
+    body_defrag = clean_fragment_lines(body_with_headings, toc)
+    body_clean = clean_cid_noise(body_defrag)
 
     sections = []
     if parts["abstract"]:
@@ -576,6 +705,10 @@ def run(pdf_path: Path, model: str, force: bool) -> None:
         }, indent=2),
         encoding="utf-8",
     )
+
+    # 质量评估
+    q = assess_quality(main_md, toc, audit_path)
+    print_quality_report(q)
 
     print(f"\n完成！输出目录: {out_dir}/")
 

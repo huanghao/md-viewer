@@ -198,6 +198,7 @@ export function generateClientHTML(): string {
       <div class="annotation-tabs" id="annotationTabs">
         <button class="annotation-tab is-active" data-tab="comments" onclick="switchAnnotationTab('comments')">评论<span class="annotation-tab-count" id="annotationTabCount"></span></button>
         <button class="annotation-tab" data-tab="translation" onclick="switchAnnotationTab('translation')">翻译<span class="annotation-tab-count" id="translationTabCount"></span><span class="translation-status-dot" id="translationStatusDot" title="翻译服务未连接"></span></button>
+        <button class="annotation-tab" data-tab="chat" onclick="switchAnnotationTab('chat')">✨ Chat</button>
         <div class="annotation-tab-actions">
           <div class="annotation-tab-actions-group" id="annotationCommentsActions">
             <button class="annotation-icon-btn" id="annotationDensityToggle" title="切换默认/极简" aria-label="切换默认/极简">
@@ -227,6 +228,7 @@ export function generateClientHTML(): string {
         <div class="annotation-empty">无评论（选中文本即可添加）</div>
       </div>
       <div class="translation-list" id="translationList" style="display:none;"></div>
+      <div class="chat-list" id="chatList" style="display:none;"></div>
     </aside>
     <div class="annotation-sidebar-resizer" id="annotationSidebarResizer" title="拖拽调整评论栏宽度"></div>
     <button class="annotation-floating-open-btn" id="annotationFloatingOpenBtn" title="打开评论侧边栏" aria-label="打开评论侧边栏">

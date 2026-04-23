@@ -1700,6 +1700,8 @@ export function handleSelectionForAnnotation(filePath: string | null): void {
   const quotePrefix = fullText.slice(Math.max(0, start - prefixWindow), start);
   const quoteSuffix = fullText.slice(end, Math.min(fullText.length, end + suffixWindow));
 
+  setChatSelectedText(quote);
+
   const rect = range.getBoundingClientRect();
   showQuickAdd(rect.right + 6, rect.top - 8, {
     id: `ann-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,

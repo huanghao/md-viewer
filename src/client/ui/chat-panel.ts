@@ -134,7 +134,7 @@ export function renderChatPanel(): void {
       ></textarea>
       <button class="chat-send-btn" id="chatSendBtn" ${state.streaming ? 'disabled' : ''}>↑</button>
     </div>
-    <div class="chat-hint">Enter 发送 · Shift+Enter 换行</div>
+    <div class="chat-hint">Cmd+Enter 发送 · Enter 换行</div>
   `;
 
   renderSelBar();
@@ -182,7 +182,7 @@ function wireEvents(): void {
 
   if (input) {
     input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         void sendMessage();
       }

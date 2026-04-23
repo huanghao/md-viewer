@@ -489,9 +489,9 @@ export function toggleAnnotationSidebar(): void {
 
 // ==================== 翻译 Tab ====================
 
-let _currentAnnotationTab: 'comments' | 'translation' = 'comments';
+let _currentAnnotationTab: 'comments' | 'translation' | 'chat' = 'comments';
 
-export function switchAnnotationTab(tab: 'comments' | 'translation'): void {
+export function switchAnnotationTab(tab: 'comments' | 'translation' | 'chat'): void {
   _currentAnnotationTab = tab;
   const commentsList = document.getElementById('annotationList');
   const translationList = document.getElementById('translationList');
@@ -503,8 +503,10 @@ export function switchAnnotationTab(tab: 'comments' | 'translation'): void {
     btn.classList.toggle('is-active', (btn as HTMLElement).dataset.tab === tab);
   });
 
+  const chatList = document.getElementById('chatList');
   if (commentsList) commentsList.style.display = tab === 'comments' ? '' : 'none';
   if (translationList) translationList.style.display = tab === 'translation' ? '' : 'none';
+  if (chatList) chatList.style.display = tab === 'chat' ? '' : 'none';
   if (commentsActions) commentsActions.classList.toggle('hidden', tab !== 'comments');
   if (translationActions) translationActions.classList.toggle('hidden', tab !== 'translation');
 }
@@ -514,6 +516,13 @@ export function openTranslationTab(): void {
   persistCurrentFilePanelOpen(true);
   syncAnnotationSidebarLayout();
   switchAnnotationTab('translation');
+}
+
+export function openChatTab(): void {
+  setSidebarCollapsed(false);
+  persistCurrentFilePanelOpen(true);
+  syncAnnotationSidebarLayout();
+  switchAnnotationTab('chat');
 }
 
 export function renderTranslationList(

@@ -283,6 +283,7 @@ export function generateClientHTML(): string {
           <button id="popoverCopyBtn" class="annotation-icon-action" title="复制原文" aria-label="复制原文">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2h7l3 3v9H4V2zm1 1v10h8V6l-2-2H5V3zm-3 2v10h8v1H1V5h1z"/></svg>
           </button>
+          <button id="popoverAskAiBtn" class="annotation-icon-action" title="Ask AI" aria-label="Ask AI">✨</button>
           <button id="popoverDeleteBtn" class="annotation-icon-action danger" title="删除评论" aria-label="删除评论">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2h4l1 1h3v1H2V3h3l1-1zm-1 4h1v7H5V6zm3 0h1v7H8V6zm3 0h1v7h-1V6z"/></svg>
           </button>

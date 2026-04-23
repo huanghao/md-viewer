@@ -12,6 +12,7 @@ import {
   updateAnnotationStatusRemote,
 } from './api/annotations';
 import { showError } from './ui/toast';
+import { setChatSelectedText } from './ui/chat-panel.js';
 import { resolveAnnotationAnchor } from './utils/annotation-anchor';
 import { isOpen, isResolved, isOrphan, type AnnotationStatus } from '../annotation-status';
 import { adjustAnnotationCount } from './state';
@@ -1047,6 +1048,16 @@ export function showPopover(ann: Annotation, x: number, y: number): void {
           fresh.classList.remove('is-copied');
         }, 1500);
       });
+    });
+  }
+  const askAiBtn = document.getElementById('popoverAskAiBtn') as HTMLButtonElement | null;
+  if (askAiBtn) {
+    const fresh = askAiBtn.cloneNode(true) as HTMLButtonElement;
+    askAiBtn.replaceWith(fresh);
+    fresh.addEventListener('click', () => {
+      setChatSelectedText(ann.quote);
+      openChatTab();
+      hidePopover(true);
     });
   }
   placeFloating(el.popover, x, y);

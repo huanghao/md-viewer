@@ -1,13 +1,21 @@
-// src/client/ui/chat-panel.ts
 import { escapeHtml } from '../utils/escape.js';
 import { storageGet, storageSet } from '../utils/storage.js';
 
 const AGENT_URL_KEY = 'md-viewer:agent-url';
+const SESSION_ID_KEY = 'md-viewer:chat-session-id';
 const DEFAULT_AGENT_URL = 'http://localhost:3003';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+}
+
+interface DocContext {
+  filePath?: string;
+  quotePrefix?: string;
+  quote?: string;
+  quoteSuffix?: string;
+  lineNumber?: number;
 }
 
 interface ChatState {
@@ -16,14 +24,25 @@ interface ChatState {
   selectedText: string | null;
   currentFilePath: string | null;
   streaming: boolean;
+  docContext: DocContext;
+}
+
+// Persist sessionId across page reloads so history can be resumed
+function loadOrCreateSessionId(): string {
+  const stored = storageGet<string>(SESSION_ID_KEY, '');
+  if (stored) return stored;
+  const id = crypto.randomUUID();
+  storageSet(SESSION_ID_KEY, id);
+  return id;
 }
 
 const state: ChatState = {
-  sessionId: crypto.randomUUID(),
+  sessionId: loadOrCreateSessionId(),
   history: [],
   selectedText: null,
   currentFilePath: null,
   streaming: false,
+  docContext: {},
 };
 
 export function getAgentUrl(): string {
@@ -36,25 +55,56 @@ export function setAgentUrl(url: string): void {
 
 export function setChatSelectedText(text: string | null): void {
   state.selectedText = text;
-  renderChatPanel();
+  // Update docContext.quote for server-side context injection
+  state.docContext = { ...state.docContext, quote: text ?? undefined };
+  renderSelBar();
 }
 
 export function clearChatSelectedText(): void {
   state.selectedText = null;
-  renderChatPanel();
+  state.docContext = { ...state.docContext, quote: undefined, quotePrefix: undefined, quoteSuffix: undefined };
+  renderSelBar();
+}
+
+// Called with full context when user selects text
+export function setChatContext(ctx: DocContext): void {
+  state.docContext = ctx;
+  state.selectedText = ctx.quote ?? null;
+  renderSelBar();
 }
 
 export function onChatFileSwitch(filePath: string | null): void {
   state.currentFilePath = filePath;
   state.history = [];
   state.selectedText = null;
-  state.sessionId = crypto.randomUUID();
+  state.docContext = filePath ? { filePath } : {};
+  // New session per file
+  const id = crypto.randomUUID();
+  state.sessionId = id;
+  storageSet(SESSION_ID_KEY, id);
   renderChatPanel();
+  // Try to load history from server
+  if (filePath) void loadHistory();
 }
 
 export function initChatPanel(): void {
-  renderChatPanel();
+  void loadHistory().then(() => renderChatPanel());
 }
+
+async function loadHistory(): Promise<void> {
+  try {
+    const res = await fetch(`${getAgentUrl()}/session/${state.sessionId}/history`);
+    if (!res.ok) return;
+    const data = await res.json() as { history: Array<{ role: 'user' | 'assistant'; content: string }> };
+    if (data.history?.length) {
+      state.history = data.history.map((e) => ({ role: e.role, content: e.content }));
+    }
+  } catch {
+    // agent-server not running, ignore
+  }
+}
+
+// ── Rendering ─────────────────────────────────────────────────────────────────
 
 export function renderChatPanel(): void {
   const container = document.getElementById('chatList');
@@ -73,15 +123,7 @@ export function renderChatPanel(): void {
         : state.history.map(renderMessage).join('')
       }
     </div>
-    ${state.selectedText ? `
-      <div class="chat-sel-bar">
-        <div class="chat-sel-bar-label">
-          选中内容
-          <button id="chatClearSelBtn">× 清除</button>
-        </div>
-        <div class="chat-sel-bar-text">${escapeHtml(state.selectedText.slice(0, 60))}${state.selectedText.length > 60 ? '…' : ''}</div>
-      </div>
-    ` : ''}
+    <div id="chatSelBarSlot"></div>
     <div class="chat-input-area">
       <textarea
         class="chat-input"
@@ -94,13 +136,36 @@ export function renderChatPanel(): void {
     <div class="chat-hint">Enter 发送 · Shift+Enter 换行</div>
   `;
 
+  renderSelBar();
+  wireEvents();
+
+  const msgs = document.getElementById('chatMessages');
+  if (msgs) msgs.scrollTop = msgs.scrollHeight;
+}
+
+function renderSelBar(): void {
+  const slot = document.getElementById('chatSelBarSlot');
+  if (!slot) return;
+  if (state.selectedText) {
+    slot.innerHTML = `
+      <div class="chat-sel-bar">
+        <div class="chat-sel-bar-label">
+          选中内容
+          <button id="chatClearSelBtn">× 清除</button>
+        </div>
+        <div class="chat-sel-bar-text">${escapeHtml(state.selectedText.slice(0, 60))}${state.selectedText.length > 60 ? '…' : ''}</div>
+      </div>`;
+    document.getElementById('chatClearSelBtn')?.addEventListener('click', clearChatSelectedText);
+  } else {
+    slot.innerHTML = '';
+  }
+}
+
+function wireEvents(): void {
   const urlInput = document.getElementById('chatAgentUrlInput') as HTMLInputElement | null;
   if (urlInput) {
     urlInput.addEventListener('change', () => setAgentUrl(urlInput.value.trim() || DEFAULT_AGENT_URL));
   }
-
-  const clearSelBtn = document.getElementById('chatClearSelBtn');
-  if (clearSelBtn) clearSelBtn.addEventListener('click', clearChatSelectedText);
 
   const input = document.getElementById('chatInput') as HTMLTextAreaElement | null;
   const sendBtn = document.getElementById('chatSendBtn') as HTMLButtonElement | null;
@@ -119,9 +184,6 @@ export function renderChatPanel(): void {
   }
 
   if (sendBtn) sendBtn.addEventListener('click', () => void sendMessage());
-
-  const msgs = document.getElementById('chatMessages');
-  if (msgs) msgs.scrollTop = msgs.scrollHeight;
 }
 
 function renderMessage(msg: ChatMessage): string {
@@ -134,21 +196,20 @@ function renderMessage(msg: ChatMessage): string {
   return `<div class="chat-msg-ai">${html}</div>`;
 }
 
+// ── Send ──────────────────────────────────────────────────────────────────────
+
 async function sendMessage(): Promise<void> {
   const input = document.getElementById('chatInput') as HTMLTextAreaElement | null;
   if (!input) return;
   const text = input.value.trim();
   if (!text || state.streaming) return;
 
-  let userContent = text;
-  if (state.selectedText) {
-    userContent = `${text}\n\n[选中内容]\n${state.selectedText}`;
-  }
-
   input.value = '';
   input.style.height = 'auto';
-  state.history.push({ role: 'user', content: userContent });
+  state.history.push({ role: 'user', content: text });
+  const selText = state.selectedText;
   state.selectedText = null;
+  state.docContext = { ...state.docContext, quote: undefined, quotePrefix: undefined, quoteSuffix: undefined };
   state.streaming = true;
   renderChatPanel();
 
@@ -165,13 +226,20 @@ async function sendMessage(): Promise<void> {
   let rawText = '';
   let currentToolDiv: HTMLElement | null = null;
 
+  // Build context for server: include selected text in docContext
+  const contextPayload: DocContext = {
+    ...state.docContext,
+    ...(selText ? { quote: selText } : {}),
+  };
+
   try {
     const res = await fetch(`${getAgentUrl()}/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sessionId: state.sessionId,
-        message: userContent,
+        message: text,
+        context: Object.keys(contextPayload).length ? contextPayload : undefined,
       }),
     });
 
@@ -221,9 +289,7 @@ async function sendMessage(): Promise<void> {
           const toolDiv = document.createElement('div');
           toolDiv.className = 'chat-tool-call';
           toolDiv.innerHTML = `<span class="chat-tool-name">⚡ ${escapeHtml(ev.name ?? '')}</span> ${escapeHtml(ev.input ?? '')}`;
-          if (streamEl?.parentElement) {
-            streamEl.parentElement.insertBefore(toolDiv, streamEl);
-          }
+          if (streamEl?.parentElement) streamEl.parentElement.insertBefore(toolDiv, streamEl);
           currentToolDiv = toolDiv;
           if (streamEl) {
             const newCursor = document.createElement('span');
@@ -241,16 +307,15 @@ async function sendMessage(): Promise<void> {
         }
 
         if (ev.type === 'done') {
-          const streamEl2 = document.getElementById('chatStreamingMsg');
-          if (streamEl2) streamEl2.removeAttribute('id');
+          document.getElementById('chatStreamingMsg')?.removeAttribute('id');
           state.history.push({ role: 'assistant', content: rawText });
         }
 
         if (ev.type === 'error') {
-          const streamEl2 = document.getElementById('chatStreamingMsg');
-          if (streamEl2) {
-            streamEl2.innerHTML = `<span style="color:#f87171">错误: ${escapeHtml(ev.message ?? '')}</span>`;
-            streamEl2.removeAttribute('id');
+          const el = document.getElementById('chatStreamingMsg');
+          if (el) {
+            el.innerHTML = `<span style="color:var(--color-error)">错误: ${escapeHtml(ev.message ?? '')}</span>`;
+            el.removeAttribute('id');
           }
         }
 
@@ -258,10 +323,10 @@ async function sendMessage(): Promise<void> {
       }
     }
   } catch (e: any) {
-    const streamEl = document.getElementById('chatStreamingMsg');
-    if (streamEl) {
-      streamEl.innerHTML = `<span style="color:#f87171">连接失败: ${escapeHtml(e.message)}</span>`;
-      streamEl.removeAttribute('id');
+    const el = document.getElementById('chatStreamingMsg');
+    if (el) {
+      el.innerHTML = `<span style="color:var(--color-error)">连接失败: ${escapeHtml(e.message)}</span>`;
+      el.removeAttribute('id');
     }
   } finally {
     state.streaming = false;

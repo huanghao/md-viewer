@@ -2685,6 +2685,29 @@ export const styles = `
       outline: none;
     }
     .chat-config-bar input:focus { border-color: var(--color-accent); }
+    .chat-quick-prompts {
+      padding: 5px 10px 2px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .chat-quick-btn {
+      background: var(--color-bg-subtle);
+      border: 1px solid var(--color-border);
+      border-radius: 12px;
+      padding: 3px 9px;
+      font-size: 11px;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      white-space: nowrap;
+      line-height: 1.4;
+    }
+    .chat-quick-btn:hover {
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+      background: #fff;
+    }
 
     /* PDF 每段固定「译」图标 */
     .pdf-translate-icon {
@@ -2987,16 +3010,10 @@ export const styles = `
       white-space: pre-wrap;
       word-break: break-word;
       position: relative;
-      display: flex;
-      align-items: flex-start;
-      gap: 4px;
-    }
-    .annotation-thread-line .annotation-thread-text {
-      flex: 1;
-      min-width: 0;
     }
     .annotation-thread-edit-btn {
-      flex-shrink: 0;
+      position: absolute;
+      top: 0;
       display: none;
       width: 18px;
       height: 18px;
@@ -3008,6 +3025,8 @@ export const styles = `
       border-radius: var(--radius-sm);
       line-height: 1;
     }
+    .annotation-thread-edit-btn:nth-of-type(1) { right: 0; }
+    .annotation-thread-edit-btn:nth-of-type(2) { right: 20px; }
     .annotation-thread-edit-btn svg {
       width: 11px;
       height: 11px;

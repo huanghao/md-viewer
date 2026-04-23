@@ -3,7 +3,19 @@ import { storageGet, storageSet } from '../utils/storage.js';
 
 const AGENT_URL_KEY = 'md-viewer:agent-url';
 const SESSION_ID_KEY = 'md-viewer:chat-session-id';
+const PROMPTS_KEY = 'md-viewer:chat-quick-prompts';
 const DEFAULT_AGENT_URL = 'http://localhost:3003';
+
+const DEFAULT_QUICK_PROMPTS = [
+  '查看当前文档的评论并更新',
+  '总结这篇文档的主要内容',
+  '解释选中的这段话',
+  '把选中内容翻译成中文',
+];
+
+function getQuickPrompts(): string[] {
+  return storageGet<string[]>(PROMPTS_KEY, DEFAULT_QUICK_PROMPTS);
+}
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -125,6 +137,11 @@ export function renderChatPanel(): void {
       }
     </div>
     <div id="chatSelBarSlot"></div>
+    <div class="chat-quick-prompts" id="chatQuickPrompts">
+      ${getQuickPrompts().map((p, i) =>
+        `<button class="chat-quick-btn" data-idx="${i}">${escapeHtml(p)}</button>`
+      ).join('')}
+    </div>
     <div class="chat-input-area">
       <textarea
         class="chat-input"
@@ -167,6 +184,20 @@ function wireEvents(): void {
   if (urlInput) {
     urlInput.addEventListener('change', () => setAgentUrl(urlInput.value.trim() || DEFAULT_AGENT_URL));
   }
+
+  // Quick prompt buttons — click fills input, focus ready for Cmd+Enter
+  document.getElementById('chatQuickPrompts')?.querySelectorAll('.chat-quick-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const input = document.getElementById('chatInput') as HTMLTextAreaElement | null;
+      if (!input) return;
+      const prompts = getQuickPrompts();
+      const idx = Number((btn as HTMLElement).dataset.idx);
+      input.value = prompts[idx] ?? '';
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 90) + 'px';
+      input.focus();
+    });
+  });
 
   document.getElementById('chatNewSessionBtn')?.addEventListener('click', () => {
     const id = crypto.randomUUID();

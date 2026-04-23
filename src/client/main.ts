@@ -2380,7 +2380,7 @@ declare global {
     toggleMonitorPanel: () => void;
     switchMonitorTab: (tab: 'memory' | 'translation') => void;
     clearMonitorTranslationStats: () => void;
-    switchAnnotationTab: (tab: 'comments' | 'translation') => void;
+    switchAnnotationTab: (tab: 'comments' | 'translation' | 'chat') => void;
     zoomReset: () => void;
     openExternalFile?: (path: string) => void | Promise<void>;
     renderContent?: () => void;

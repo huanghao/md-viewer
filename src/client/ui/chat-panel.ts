@@ -116,6 +116,7 @@ export function renderChatPanel(): void {
     <div class="chat-config-bar">
       <span>Agent:</span>
       <input id="chatAgentUrlInput" type="text" value="${escapeHtml(agentUrl)}" placeholder="${DEFAULT_AGENT_URL}" />
+      <button id="chatNewSessionBtn" title="新建会话" style="background:none;border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:2px 6px;cursor:pointer;font-size:11px;color:var(--color-text-muted);white-space:nowrap;">+ 新建</button>
     </div>
     <div class="chat-messages" id="chatMessages">
       ${state.history.length === 0
@@ -166,6 +167,15 @@ function wireEvents(): void {
   if (urlInput) {
     urlInput.addEventListener('change', () => setAgentUrl(urlInput.value.trim() || DEFAULT_AGENT_URL));
   }
+
+  document.getElementById('chatNewSessionBtn')?.addEventListener('click', () => {
+    const id = crypto.randomUUID();
+    state.sessionId = id;
+    state.history = [];
+    state.selectedText = null;
+    storageSet(SESSION_ID_KEY, id);
+    renderChatPanel();
+  });
 
   const input = document.getElementById('chatInput') as HTMLTextAreaElement | null;
   const sendBtn = document.getElementById('chatSendBtn') as HTMLButtonElement | null;

@@ -12,7 +12,7 @@ import {
   updateAnnotationStatusRemote,
 } from './api/annotations';
 import { showError } from './ui/toast';
-import { setChatSelectedText } from './ui/chat-panel.js';
+import { setChatContext } from './ui/chat-panel.js';
 import { resolveAnnotationAnchor } from './utils/annotation-anchor';
 import { isOpen, isResolved, isOrphan, type AnnotationStatus } from '../annotation-status';
 import { adjustAnnotationCount } from './state';
@@ -1055,7 +1055,12 @@ export function showPopover(ann: Annotation, x: number, y: number): void {
     const fresh = askAiBtn.cloneNode(true) as HTMLButtonElement;
     askAiBtn.replaceWith(fresh);
     fresh.addEventListener('click', () => {
-      setChatSelectedText(ann.quote);
+      setChatContext({
+        filePath: state.currentFilePath ?? undefined,
+        quote: ann.quote,
+        quotePrefix: ann.quotePrefix,
+        quoteSuffix: ann.quoteSuffix,
+      });
       openChatTab();
       hidePopover(true);
     });
@@ -1695,12 +1700,17 @@ export function handleSelectionForAnnotation(filePath: string | null): void {
   const end = globalOffsetForPosition(el.reader, range.endContainer, range.endOffset);
   if (start < 0 || end <= start) return;
   const fullText = getReaderText(el.reader);
-  const prefixWindow = 32;
-  const suffixWindow = 32;
+  const prefixWindow = 200;
+  const suffixWindow = 200;
   const quotePrefix = fullText.slice(Math.max(0, start - prefixWindow), start);
   const quoteSuffix = fullText.slice(end, Math.min(fullText.length, end + suffixWindow));
 
-  setChatSelectedText(quote);
+  setChatContext({
+    filePath: state.currentFilePath ?? undefined,
+    quote,
+    quotePrefix,
+    quoteSuffix,
+  });
 
   const rect = range.getBoundingClientRect();
   showQuickAdd(rect.right + 6, rect.top - 8, {

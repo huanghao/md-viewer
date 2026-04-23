@@ -23,6 +23,7 @@ import { showSettingsDialog, closeSettingsDialog } from './ui/settings';
 import { renderJsonContent } from './ui/json-viewer';
 import { mountScrollbar, unmountScrollbar, updateScrollbar, updateDiffMarkers, clearDiffMarkers } from './ui/doc-scrollbar';
 import { shouldRefreshDiff, refreshDiffBannerLabel } from './ui/diff-refresh';
+import { initChatPanel, onChatFileSwitch } from './ui/chat-panel.js';
 
 import { getMdThemeCss, getHlThemeCss } from './themes/index';
 
@@ -1489,6 +1490,7 @@ async function switchFile(path: string) {
   renderContent();
   if (!isPdfPath(path)) updateToc(path);
   syncAnnotationsForCurrentFile(true);
+  onChatFileSwitch(path);
   await updateToolbarButtons();
 }
 
@@ -2485,6 +2487,7 @@ function startWorkspacePolling() {
 
   // 初始化批注功能
   initAnnotationElements();
+  initChatPanel();
   (window as any).__setPendingAnnotation = setPendingAnnotation;
   syncAnnotationSidebarLayout();
   window.addEventListener('resize', () => {

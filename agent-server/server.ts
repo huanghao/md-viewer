@@ -73,6 +73,8 @@ interface DocContext {
   lineNumber?: number;
 }
 
+const FILE_CONTENT_LIMIT = 60000; // ~15k tokens
+
 function buildSystemPrompt(ctx: DocContext): string {
   if (!ctx.filePath) return BASE_SYSTEM_PROMPT;
 
@@ -80,8 +82,22 @@ function buildSystemPrompt(ctx: DocContext): string {
   prompt += `\n\n# 当前文档\n路径：${ctx.filePath}`;
   if (ctx.lineNumber) prompt += `（第 ${ctx.lineNumber} 行附近）`;
 
+  // 注入文件内容
+  try {
+    if (existsSync(ctx.filePath)) {
+      const content = readFileSync(ctx.filePath, "utf-8");
+      const truncated = content.length > FILE_CONTENT_LIMIT
+        ? content.slice(0, FILE_CONTENT_LIMIT) + "\n\n[文件内容已截断]"
+        : content;
+      prompt += `\n\n## 文件内容\n\`\`\`\n${truncated}\n\`\`\``;
+    }
+  } catch {
+    // 文件不可读，跳过
+  }
+
+  // 注入选中文字上下文
   if (ctx.quote) {
-    if (ctx.quotePrefix) prompt += `\n\n[前文]\n${ctx.quotePrefix}`;
+    if (ctx.quotePrefix) prompt += `\n\n## 选中位置上下文\n[前文]\n${ctx.quotePrefix}`;
     prompt += `\n\n[选中内容]\n${ctx.quote}`;
     if (ctx.quoteSuffix) prompt += `\n\n[后文]\n${ctx.quoteSuffix}`;
   }

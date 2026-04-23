@@ -85,18 +85,26 @@ export function setChatContext(ctx: DocContext): void {
   renderSelBar();
 }
 
+// Stable sessionId per file path, stored in localStorage
+function sessionIdForFile(filePath: string): string {
+  const key = `md-viewer:chat-session:${filePath}`;
+  const stored = storageGet<string>(key, '');
+  if (stored) return stored;
+  const id = crypto.randomUUID();
+  storageSet(key, id);
+  return id;
+}
+
 export function onChatFileSwitch(filePath: string | null): void {
   state.currentFilePath = filePath;
   state.history = [];
   state.selectedText = null;
   state.docContext = filePath ? { filePath } : {};
-  // New session per file
-  const id = crypto.randomUUID();
-  state.sessionId = id;
-  storageSet(SESSION_ID_KEY, id);
+  // Stable session per file — same file always gets same sessionId
+  state.sessionId = filePath ? sessionIdForFile(filePath) : crypto.randomUUID();
   renderChatPanel();
-  // Try to load history from server
-  if (filePath) void loadHistory();
+  // Load history for this file's session
+  if (filePath) void loadHistory().then(() => renderChatPanel());
 }
 
 export function initChatPanel(): void {
@@ -204,7 +212,10 @@ function wireEvents(): void {
     state.sessionId = id;
     state.history = [];
     state.selectedText = null;
-    storageSet(SESSION_ID_KEY, id);
+    // Clear the per-file session so next switch creates a fresh one
+    if (state.currentFilePath) {
+      storageSet(`md-viewer:chat-session:${state.currentFilePath}`, id);
+    }
     renderChatPanel();
   });
 

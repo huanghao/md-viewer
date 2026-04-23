@@ -132,11 +132,22 @@ export function renderChatPanel(): void {
 
   const agentUrl = getAgentUrl();
 
+  const shortId = state.sessionId.slice(0, 8);
   container.innerHTML = `
     <div class="chat-config-bar">
       <span>Agent:</span>
       <input id="chatAgentUrlInput" type="text" value="${escapeHtml(agentUrl)}" placeholder="${DEFAULT_AGENT_URL}" />
       <button id="chatNewSessionBtn" title="新建会话" style="background:none;border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:2px 6px;cursor:pointer;font-size:11px;color:var(--color-text-muted);white-space:nowrap;">+ 新建</button>
+    </div>
+    <div class="chat-config-bar" style="border-top:none;padding-top:0;gap:4px;">
+      <span style="color:var(--color-text-muted)">Session:</span>
+      <code id="chatSessionIdDisplay" title="${escapeHtml(state.sessionId)}" style="flex:1;font-size:10px;color:var(--color-text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;" onclick="document.getElementById('chatResumeInput').style.display='flex';this.parentElement.style.display='none';">${shortId}…</code>
+      <button id="chatCopySessionBtn" title="复制完整 Session ID" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--color-text-muted);padding:0 2px;">⎘</button>
+    </div>
+    <div id="chatResumeInput" style="display:none;padding:4px 10px;gap:4px;align-items:center;border-bottom:1px solid var(--color-border);">
+      <input id="chatResumeIdInput" type="text" placeholder="粘贴 Session ID…" style="flex:1;background:#fff;border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:3px 6px;font-size:11px;font-family:monospace;outline:none;" />
+      <button id="chatResumeConfirmBtn" style="background:var(--color-accent);border:none;border-radius:var(--radius-sm);color:#fff;padding:3px 8px;cursor:pointer;font-size:11px;">Resume</button>
+      <button id="chatResumeCancelBtn" style="background:none;border:1px solid var(--color-border);border-radius:var(--radius-sm);color:var(--color-text-muted);padding:3px 6px;cursor:pointer;font-size:11px;">取消</button>
     </div>
     <div class="chat-messages" id="chatMessages">
       ${state.history.length === 0
@@ -205,6 +216,28 @@ function wireEvents(): void {
       input.style.height = Math.min(input.scrollHeight, 90) + 'px';
       input.focus();
     });
+  });
+
+  // Copy session ID
+  document.getElementById('chatCopySessionBtn')?.addEventListener('click', () => {
+    navigator.clipboard.writeText(state.sessionId);
+  });
+
+  // Resume: confirm
+  document.getElementById('chatResumeConfirmBtn')?.addEventListener('click', async () => {
+    const input = document.getElementById('chatResumeIdInput') as HTMLInputElement | null;
+    const id = input?.value.trim();
+    if (!id) return;
+    state.sessionId = id;
+    state.history = [];
+    if (state.currentFilePath) storageSet(`md-viewer:chat-session:${state.currentFilePath}`, id);
+    await loadHistory();
+    renderChatPanel();
+  });
+
+  // Resume: cancel
+  document.getElementById('chatResumeCancelBtn')?.addEventListener('click', () => {
+    renderChatPanel();
   });
 
   document.getElementById('chatNewSessionBtn')?.addEventListener('click', () => {

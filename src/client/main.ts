@@ -44,8 +44,6 @@ import {
   setPendingAnnotation,
   getAnnotations,
   switchAnnotationTab,
-  openTranslationTab,
-  renderTranslationList,
   openComposerFromPending,
 } from './annotation';
 
@@ -53,25 +51,10 @@ import { createPdfViewer, type PdfViewerInstance } from "./pdf-viewer.js";
 import { createPdfAnnotationBridge } from "./pdf-annotation.js";
 import { extractMdToc, extractPdfOutline, loadSidecar, saveSidecar, scanPdfHeadings } from './toc-extractor.js';
 import { renderTocPanel, setActiveTocItem } from './ui/toc-panel.js';
-import {
-  LocalTranslationProvider,
-  getTranslationStats,
-  clearTranslationStats,
-  loadTranslations,
-  unloadTranslations,
-  getTranslations,
-  translateBlock,
-  retryTranslation,
-  removeTranslation,
-  clearAllTranslations,
-  highlightTranslationBlock,
-} from "./pdf-translation.js";
 import { storageGet, storageSet, storageGetNumber } from './utils/storage';
 import { createResizer } from './utils/resizer';
 import { setupKeyboardShortcuts } from './keyboard-shortcuts';
 import { initZoom, zoomIn, zoomOut, zoomReset, updateZoomDisplay, setPdfZoomValue, getPdfZoom } from './zoom-controller';
-import { buildParagraphMap } from './translation/paragraph-mapper';
-import { enterTranslationMode, exitTranslationMode, isTranslationActive } from './translation/translation-view';
 
 declare global {
   function cleanupAllExpiredRecords(): number;
@@ -95,12 +78,10 @@ const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 680;
 const fileRefreshSeq = new Map<string, number>();
 let diffViewActive = false;
-let translationData: Record<string, string> | null = null;
 let workspacePollRunning = false;
 let mermaidInitialized = false;
 let currentPdfViewer: PdfViewerInstance | null = null;
 let currentPdfBridge: ReturnType<typeof createPdfAnnotationBridge> | null = null;
-const translationProvider = new LocalTranslationProvider();
 
 // PDF viewer registry: tracks all open PDF viewers and their idle timers
 const PDF_IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
@@ -901,15 +882,6 @@ function renderContent() {
   if (!container) return;
   if (!diffViewActive) container.classList.remove('diff-active');
 
-  if (isTranslationActive()) {
-    exitTranslationMode();
-    const translationBtn = document.getElementById('translationButton');
-    if (translationBtn) translationBtn.classList.remove('active');
-  }
-  translationData = null;
-  const translationButton = document.getElementById('translationButton');
-  if (translationButton) translationButton.style.display = 'none';
-
   // Save scroll position of the outgoing MD file before switching content.
   const outgoingFile = container.getAttribute('data-current-file');
   if (outgoingFile && !isPdfPath(outgoingFile) && outgoingFile !== state.currentFile) {
@@ -936,18 +908,6 @@ function renderContent() {
     const pdfModeAnnotateBtnHide = document.getElementById('pdfModeAnnotateBtn');
     if (pdfModeSelectBtnHide) pdfModeSelectBtnHide.style.display = 'none';
     if (pdfModeAnnotateBtnHide) pdfModeAnnotateBtnHide.style.display = 'none';
-  }
-
-  // Show translation tab only for PDF files
-  const translationTabBtn = document.querySelector<HTMLElement>('.annotation-tab[data-tab="translation"]');
-  const isPdf = !!state.currentFile && isPdfPath(state.currentFile);
-  if (translationTabBtn) translationTabBtn.style.display = isPdf ? '' : 'none';
-
-  // If switching away from PDF, clear translation list and switch to comments tab
-  if (!isPdf) {
-    unloadTranslations();
-    renderTranslationList(null, getTranslations, () => {}, () => {});
-    switchAnnotationTab('comments');
   }
 
   if (!state.currentFile) {
@@ -993,47 +953,6 @@ function renderContent() {
     // Mark container as PDF mode — CSS handles padding adjustments
     container.setAttribute('data-pdf', '1');
 
-    const refreshTranslationList = () => {
-      renderTranslationList(
-        filePath,
-        getTranslations,
-        (pageNum, startItemIdx) => {
-          removeTranslation(filePath, pageNum, startItemIdx);
-          refreshTranslationList();
-        },
-        (pageNum, startItemIdx, endItemIdx) => {
-          const blockY = startItemIdx / 10;
-          currentPdfViewer?.scrollToBlockY(pageNum, blockY);
-          if (currentPdfViewer) highlightTranslationBlock(currentPdfViewer, pageNum, startItemIdx, endItemIdx);
-        },
-        (pageNum, startItemIdx) => {
-          const entry = getTranslations().find(
-            (t) => t.pageNum === pageNum && t.startItemIdx === startItemIdx
-          );
-          if (!entry) return;
-          retryTranslation(entry, filePath, translationProvider, refreshTranslationList);
-        }
-      );
-      const keys = new Set(getTranslations()
-        .filter(t => t.translatedText)
-        .map(t => `${t.pageNum}:${t.startItemIdx}`));
-      currentPdfViewer?.markTranslatedIcons(keys);
-    };
-
-    // Load persisted translations and render immediately
-    loadTranslations(filePath);
-    refreshTranslationList();
-
-    const clearBtn = document.getElementById('translationClearBtn');
-    if (clearBtn) {
-      const newBtn = clearBtn.cloneNode(true) as HTMLElement;
-      clearBtn.parentNode?.replaceChild(newBtn, clearBtn);
-      newBtn.addEventListener('click', () => {
-        clearAllTranslations(filePath);
-        refreshTranslationList();
-      });
-    }
-
     // Reuse existing viewer if available — re-attach its el to container
     const existingEntry = pdfViewerRegistry.get(filePath);
     if (existingEntry) {
@@ -1061,7 +980,6 @@ function renderContent() {
       unmountScrollbar();
       mountScrollbar();
       mountPdfPageIndicator(existingEntry.viewer, container);
-      refreshTranslationList();
       updateToc(filePath);
       // Restore and apply saved PDF mode
       const savedPdfMode = storageGet<string>(PDF_MODE_KEY, 'select') as 'select' | 'annotate';
@@ -1083,10 +1001,6 @@ function renderContent() {
       scale,
       onTextSelected: (pageNum, selectedText, prefix, suffix, clientX, clientY, startItemIdx, endItemIdx) => {
         currentPdfBridge?.handleTextSelected(pageNum, selectedText, prefix, suffix, clientX, clientY, startItemIdx, endItemIdx);
-      },
-      onParagraphClick: (block) => {
-        translateBlock(block, filePath, translationProvider, refreshTranslationList);
-        openTranslationTab();
       },
       onPageRendered: (_pageNum) => {
         // Page just became visible — replay annotation highlights for it
@@ -1120,13 +1034,6 @@ function renderContent() {
       unmountScrollbar();
       mountScrollbar();
       mountPdfPageIndicator(pdfViewerInstance, container);
-      // hover 「译」按钮 → 高亮右侧翻译列表对应条目
-      pdfViewerInstance.el.addEventListener('pdf-translate-hover', (e) => {
-        const { pageNum, startItemIdx, active } = (e as CustomEvent).detail;
-        const key = `${pageNum}:${startItemIdx}`;
-        document.querySelector<HTMLElement>(`.translation-item[data-key="${key}"]`)
-          ?.classList.toggle('is-highlighted', active);
-      });
       updateToc(filePath);
       // Restore and apply saved PDF mode
       const savedPdfMode = storageGet<string>(PDF_MODE_KEY, 'select') as 'select' | 'annotate';
@@ -1757,24 +1664,6 @@ async function handleDiffButtonClick(): Promise<void> {
   renderDiffView(file.content, newContent);
 }
 
-async function handleTranslationButtonClick() {
-  const btn = document.getElementById('translationButton');
-  const reader = document.getElementById('reader');
-  if (!reader || !translationData) return;
-
-  if (isTranslationActive()) {
-    exitTranslationMode();
-    if (btn) btn.classList.remove('active');
-    applyAnnotations();
-  } else {
-    const paragraphMap = buildParagraphMap(reader.parentElement ?? reader);
-    enterTranslationMode(translationData, paragraphMap);
-    if (btn) btn.classList.add('active');
-    applyAnnotations();
-  }
-}
-(window as any).handleTranslationButtonClick = handleTranslationButtonClick;
-
 function closeDiffView(): void {
   diffViewActive = false;
   currentDiffBlockIndex = -1;
@@ -1884,28 +1773,6 @@ async function updateToolbarButtons() {
   if (diffButton) diffButton.style.display = isDirty && !file.isRemote ? 'flex' : 'none';
   if (refreshButton) refreshButton.style.display = isDirty ? 'flex' : 'none';
 
-  const translationButton = document.getElementById('translationButton');
-  if (translationButton) {
-    if (file.isMissing || file.isRemote || isPdfPath(state.currentFile ?? '')) {
-      translationButton.style.display = 'none';
-    } else {
-      const pathSnapshot = state.currentFile;
-      fetch(`/api/translation-sidecar?path=${encodeURIComponent(state.currentFile ?? '')}`)
-        .then(r => r.json())
-        .then((result: { ok: boolean; data?: Record<string, string> }) => {
-          if (state.currentFile !== pathSnapshot) return;
-          translationData = result.ok ? (result.data ?? null) : null;
-          if (translationButton) {
-            translationButton.style.display = translationData ? 'flex' : 'none';
-          }
-        })
-        .catch(() => {
-          if (state.currentFile !== pathSnapshot) return;
-          translationData = null;
-          translationButton.style.display = 'none';
-        });
-    }
-  }
 }
 
 // 点击刷新按钮
@@ -1984,7 +1851,7 @@ function copyFileName(fileName: string, event?: Event) {
 // ==================== 系统监控浮窗 ====================
 const MEM_PER_PAGE_MB = 27; // A4 @ scale=1.5, dpr=2
 let monitorPollTimer: ReturnType<typeof setInterval> | null = null;
-let monitorActiveTab: 'memory' | 'translation' | 'sessions' = 'memory';
+let monitorActiveTab: 'memory' | 'sessions' = 'memory';
 
 function getPdfMemStats(): Array<{ path: string; rendered: number; total: number; memMB: number; idleMins: number | null }> {
   return Array.from(pdfViewerRegistry.entries()).map(([path, entry]) => {
@@ -2016,67 +1883,20 @@ function renderMemoryTab(): void {
   `).join('') + `<div class="pdf-mem-total">合计 ~${totalMB}MB</div>`;
 }
 
-function renderTranslationTab(): void {
-  const el = document.getElementById('monitorTabTranslation');
-  if (!el) return;
-  const s = getTranslationStats();
-  const avgMs = s.totalCalls > 0 ? Math.round(s.totalDurationMs / s.totalCalls) : 0;
-
-  const statRows = [
-    ['服务商', 'MyMemory'],
-    ['总调用', String(s.totalCalls)],
-    ['成功', String(s.successCalls), s.successCalls > 0 ? 'is-ok' : ''],
-    ['失败', String(s.failCalls), s.failCalls > 0 ? 'is-error' : ''],
-    ['平均延迟', s.totalCalls > 0 ? `${avgMs}ms` : '—'],
-    ['最慢一次', s.maxDurationMs > 0 ? `${s.maxDurationMs}ms` : '—'],
-    ['发送字符', s.totalCharsSent > 0 ? s.totalCharsSent.toLocaleString() : '0'],
-    ['接收字符', s.totalCharsReceived > 0 ? s.totalCharsReceived.toLocaleString() : '0'],
-  ] as [string, string, string?][];
-
-  const callRows = [...s.recentCalls].reverse().map(r => {
-    const t = new Date(r.time);
-    const hms = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}`;
-    const text = r.ok ? `${r.charsSent}→${r.charsReceived} 字符` : (r.error || '失败');
-    return `<div class="monitor-call-row${r.ok ? '' : ' is-error'}">
-      <span class="monitor-call-time">${hms}</span>
-      <span class="monitor-call-dur">${r.durationMs}ms</span>
-      <span class="monitor-call-status">${r.ok ? '✓' : '✗'}</span>
-      <span class="monitor-call-text" title="${text}">${text}</span>
-    </div>`;
-  }).join('');
-
-  el.innerHTML = `
-    <div class="monitor-stat-section">统计</div>
-    ${statRows.map(([k, v, cls]) => `
-      <div class="monitor-stat-row">
-        <span class="monitor-stat-key">${k}</span>
-        <span class="monitor-stat-val${cls ? ' ' + cls : ''}">${v}</span>
-      </div>`).join('')}
-    <div class="monitor-calls-header">
-      <span class="monitor-calls-title">最近调用</span>
-      <button class="monitor-clear-btn" onclick="clearMonitorTranslationStats()">清除统计</button>
-    </div>
-    ${callRows || '<div class="pdf-mem-row pdf-mem-empty">暂无调用记录</div>'}
-  `;
-}
-
 function updateMonitorPanel(): void {
   if (monitorActiveTab === 'memory') renderMemoryTab();
-  else if (monitorActiveTab === 'translation') renderTranslationTab();
   else if (monitorActiveTab === 'sessions') void renderSessionsTab();
 }
 
-function switchMonitorTab(tab: 'memory' | 'translation' | 'sessions'): void {
+function switchMonitorTab(tab: 'memory' | 'sessions'): void {
   monitorActiveTab = tab;
-  const labels: Record<string, string> = { memory: '内存', translation: '翻译', sessions: 'Agent Sessions' };
+  const labels: Record<string, string> = { memory: '内存', sessions: 'Agent Sessions' };
   document.querySelectorAll('.monitor-tab').forEach(btn => {
     btn.classList.toggle('is-active', (btn as HTMLElement).textContent?.trim() === labels[tab]);
   });
   const memEl = document.getElementById('monitorTabMemory');
-  const trEl = document.getElementById('monitorTabTranslation');
   const sessEl = document.getElementById('monitorTabSessions');
   if (memEl) memEl.style.display = tab === 'memory' ? '' : 'none';
-  if (trEl) trEl.style.display = tab === 'translation' ? '' : 'none';
   if (sessEl) sessEl.style.display = tab === 'sessions' ? '' : 'none';
   updateMonitorPanel();
 }
@@ -2161,11 +1981,6 @@ function toggleMonitorPanel(): void {
   }
 }
 
-function clearMonitorTranslationStats(): void {
-  clearTranslationStats();
-  renderTranslationTab();
-}
-
 // ==================== 键盘缩放快捷键 ====================
 const IS_MAC = navigator.platform.toUpperCase().includes('MAC');
 document.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -2214,21 +2029,6 @@ function updateConnectionStatus(status: typeof sseConnectionState, retryInfo?: s
     indicator.classList.add('disconnected');
     text.textContent = '未连接';
     statusEl.title = '连接已断开';
-  }
-}
-
-function updateTranslationStatus(up: boolean | null) {
-  const dot = document.getElementById('translationStatusDot');
-  if (!dot) return;
-  if (up === true) {
-    dot.className = 'translation-status-dot up';
-    dot.title = '翻译服务已连接';
-  } else if (up === false) {
-    dot.className = 'translation-status-dot down';
-    dot.title = '翻译服务未连接';
-  } else {
-    dot.className = 'translation-status-dot';
-    dot.title = '翻译服务启动中…';
   }
 }
 
@@ -2386,12 +2186,6 @@ function connectSSE(isReconnect = false) {
     await onFileLoaded(data, data.focus !== false);
   });
 
-  // 翻译服务状态
-  eventSource.addEventListener('translate-status', (e: any) => {
-    const data = JSON.parse(e.data);
-    updateTranslationStatus(data.up);
-  });
-
   // 服务端请求状态（用于 mdv tabs）
   eventSource.addEventListener('state-request', async (e: any) => {
     const data = JSON.parse(e.data);
@@ -2448,9 +2242,8 @@ declare global {
     showToast?: (message: string, type: string) => void;
     showSettingsDialog: () => void;
     toggleMonitorPanel: () => void;
-    switchMonitorTab: (tab: 'memory' | 'translation' | 'sessions') => void;
-    clearMonitorTranslationStats: () => void;
-    switchAnnotationTab: (tab: 'comments' | 'translation' | 'chat') => void;
+    switchMonitorTab: (tab: 'memory' | 'sessions') => void;
+    switchAnnotationTab: (tab: 'comments' | 'chat') => void;
     zoomReset: () => void;
     openExternalFile?: (path: string) => void | Promise<void>;
     renderContent?: () => void;
@@ -2502,7 +2295,6 @@ window.showToast = showToast;
 window.showSettingsDialog = showSettingsDialog;
 window.toggleMonitorPanel = toggleMonitorPanel;
 window.switchMonitorTab = switchMonitorTab;
-window.clearMonitorTranslationStats = clearMonitorTranslationStats;
 window.switchAnnotationTab = switchAnnotationTab;
 window.zoomReset = zoomReset;
 window.openExternalFile = openFileInBrowser;

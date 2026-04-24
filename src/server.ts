@@ -36,7 +36,6 @@ import {
   handleUpdateSessionState,
   handleWriteFile,
   handleGetClientConfig,
-  handleGetTranslationSidecar,
 } from "./handlers.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
 
@@ -129,45 +128,6 @@ app.post("/api/session-state", handleUpdateSessionState);
 // API: 客户端配置
 app.get("/api/config", (c) => handleGetClientConfig());
 
-// API: 翻译 sidecar（双语对照）
-app.get("/api/translation-sidecar", handleGetTranslationSidecar);
-
-// ==================== 翻译（内嵌 ONNX）====================
-
-import path from "path";
-import { initTranslator, translate, translatorReady } from "./translation/index.ts";
-
-function resolveModelDir(): string {
-  // @huggingface/transformers cache_dir 下载后结构为 <cache_dir>/Xenova/opus-mt-en-zh/
-  const cacheBase = process.env.MODELS_DIR
-    ? path.join(process.env.MODELS_DIR, "opus-mt-en-zh")
-    : (() => {
-        const base = Bun.main.endsWith(".ts")
-          ? path.join(import.meta.dir, "..")
-          : path.dirname(process.execPath);
-        return path.join(base, "models", "opus-mt-en-zh");
-      })();
-  return path.join(cacheBase, "Xenova", "opus-mt-en-zh");
-}
-
-app.post("/api/translate", async (c) => {
-  const { text } = await c.req.json<{ text: string }>();
-  if (!text || typeof text !== "string") {
-    return c.json({ error: "missing text" }, 400);
-  }
-  if (translatorReady === false) {
-    return c.json({ error: "翻译模型加载失败，请检查 models/ 目录" }, 503);
-  }
-  if (translatorReady === null) {
-    return c.json({ error: "翻译模型正在加载，请稍后重试" }, 503);
-  }
-  try {
-    const translatedText = await translate(text);
-    return c.json({ translatedText });
-  } catch (e: any) {
-    return c.json({ error: e.message ?? "translate failed" }, 500);
-  }
-});
 
 // ==================== 启动服务 ====================
 
@@ -184,11 +144,6 @@ if (import.meta.main) {
 
   log(`🚀 MD Viewer Server 启动于 http://${HOST}:${PORT}/`);
   log(`📖 使用方法: 在浏览器中打开，然后添加 Markdown/HTML 文件路径`);
-
-  const modelDir = resolveModelDir();
-  initTranslator(modelDir)
-    .then(() => broadcastEvent({ type: "translate-status", up: true }))
-    .catch(() => broadcastEvent({ type: "translate-status", up: false }));
 
   process.on("SIGINT", () => process.exit(0));
   process.on("SIGTERM", () => process.exit(0));

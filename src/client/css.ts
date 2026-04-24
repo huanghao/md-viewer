@@ -2402,113 +2402,6 @@ export const styles = `
       font-weight: normal;
       opacity: 0.7;
     }
-    .translation-status-dot {
-      display: inline-block;
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: #d1d5db;
-      margin-left: 4px;
-      vertical-align: middle;
-      position: relative;
-      top: -1px;
-    }
-    .translation-status-dot.up {
-      background: #10b981;
-    }
-    .translation-status-dot.down {
-      background: #ef4444;
-    }
-
-    /* 翻译列表 */
-    .translation-list {
-      flex: 1;
-      overflow-y: auto;
-      min-height: 0;
-    }
-    .translation-empty {
-      padding: 24px 16px;
-      color: var(--color-text-muted);
-      font-size: var(--text-sm);
-      text-align: center;
-    }
-    .translation-item {
-      padding: 10px 12px;
-      border-bottom: 1px solid #eaeef2;
-      cursor: pointer;
-    }
-    .translation-item:hover { background: #f0f3f6; }
-    .translation-item.is-highlighted { background: var(--color-warning-bg); }
-    .translation-item-header {
-      display: flex;
-      align-items: baseline;
-      gap: 6px;
-      margin-bottom: 5px;
-    }
-    .translation-item-serial {
-      flex-shrink: 0;
-      font-size: var(--text-xs);
-      font-weight: 600;
-      color: var(--color-accent);
-      background: rgba(9,105,218,0.08);
-      border-radius: 3px;
-      padding: 1px 5px;
-      letter-spacing: 0.2px;
-    }
-    .translation-item-original {
-      font-size: var(--text-xs);
-      color: var(--color-text-muted);
-      line-height: 1.4;
-    }
-    .translation-item-text {
-      font-size: var(--text-sm);
-      color: #24292f;
-      line-height: 1.6;
-    }
-    .translation-item-loading {
-      font-size: var(--text-sm);
-      color: var(--color-text-muted);
-      font-style: italic;
-      padding: 4px 0;
-    }
-    .translation-item-error {
-      font-size: var(--text-sm);
-      color: var(--color-error);
-      padding: 4px 0;
-    }
-    .translation-item-retry {
-      background: none;
-      border: 1px solid var(--color-accent);
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      font-size: var(--text-xs);
-      color: var(--color-accent);
-      padding: 1px 6px;
-      margin-right: 4px;
-    }
-    .translation-item-retry:hover { background: var(--color-accent); color: #fff; }
-    .translation-item-footer {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 6px;
-      margin-top: 4px;
-    }
-    .translation-item-time {
-      font-size: var(--text-xs);
-      color: var(--color-text-muted);
-      margin-right: auto;
-    }
-    .translation-item-del {
-      background: none;
-      border: none;
-      cursor: pointer;
-      font-size: var(--text-xs);
-      color: var(--color-text-muted);
-      padding: 0 2px;
-    }
-    .translation-item-del:hover { color: var(--color-error); }
-
     /* ==================== Chat Tab ==================== */
     .chat-list {
       flex: 1;
@@ -2709,30 +2602,6 @@ export const styles = `
       color: var(--color-accent);
       background: #fff;
     }
-
-    /* PDF 每段固定「译」图标 */
-    .pdf-translate-icon {
-      position: absolute;
-      left: 4px;
-      background: #f3f4f6;
-      border: 1px solid #d0d7de;
-      border-radius: 3px;
-      color: var(--color-text-secondary);
-      font-size: 10px;
-      font-weight: 600;
-      font-family: inherit;
-      padding: 1px 5px;
-      cursor: pointer;
-      white-space: nowrap;
-      z-index: 100;
-      pointer-events: auto;
-      line-height: 1.6;
-      opacity: 0.7;
-    }
-    .pdf-translate-icon:hover { background: var(--color-accent); color: #fff; border-color: var(--color-accent); opacity: 1; }
-    .pdf-translate-icon.is-translated { background: var(--color-success-bg); border-color: var(--color-success-alt); color: var(--color-success); opacity: 0.85; }
-    .pdf-translate-icon.is-translated:hover { background: var(--color-success-alt); color: #fff; border-color: var(--color-success-alt); opacity: 1; }
-    .pdf-translate-icon.is-highlighted { background: var(--color-warning-bg); border-color: #d4a72c; color: #7d4e00; opacity: 1; }
 
     /* 评论侧边栏 */
     .annotation-sidebar {
@@ -3883,11 +3752,6 @@ export const styles = `
       border-bottom: 2px solid #fadb14;
     }
 
-    .pdf-translation-overlay {
-      word-break: break-all;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-    }
-
     /* PDF 页码指示器 */
     .pdf-page-indicator {
       position: fixed;
@@ -4126,13 +3990,4 @@ export const styles = `
       border-radius: 1px;
     }
 
-    .translation-block {
-      font-size: 0.92em;
-      margin-top: 0.2em;
-      margin-bottom: 1em;
-    }
-
-    [data-translation-source] {
-      margin-bottom: 0.2em;
-    }
 `;

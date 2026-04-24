@@ -13,7 +13,6 @@ import {
   isSupportedTextFile,
 } from "./utils.ts";
 import { broadcastFileOpened, addClient, removeClient, broadcastEvent } from "./sse.ts";
-import { translatorReady } from "./translation/index.ts";
 
 const encoder = new TextEncoder();
 import { watchFile, watchWorkspace } from "./file-watcher.ts";
@@ -510,9 +509,6 @@ export function handleEvents(c: Context) {
 
       // 发送初始连接成功消息
       controller.enqueue(encoder.encode(`event: connected\ndata: ${JSON.stringify({})}\n\n`));
-      // 发送翻译服务当前状态
-      controller.enqueue(encoder.encode(`event: translate-status\ndata: ${JSON.stringify({ type: 'translate-status', up: translatorReady })}\n\n`));
-
       // 清理断开连接的客户端
       c.req.signal.addEventListener("abort", () => {
         removeClient(client!);
@@ -906,28 +902,6 @@ export async function handleWriteFile(c: Context) {
     return c.json({ success: true });
   } catch (error: any) {
     return c.json({ error: error?.message || '写入文件失败' }, 500);
-  }
-}
-
-// API: 读取翻译 sidecar 文件（.translation.json）
-export async function handleGetTranslationSidecar(c: Context) {
-  const filePath = c.req.query("path");
-  if (!filePath) return c.json({ ok: false, error: "missing path" });
-  const resolvedPath = resolve(filePath);
-  const sidecarPath = resolvedPath.replace(/\.[^/.]+$/, "") + ".translation.json";
-  try {
-    const text = await Bun.file(sidecarPath).text();
-    const data = JSON.parse(text);
-    if (!data || typeof data !== "object" || Array.isArray(data)) {
-      return c.json({ ok: false, error: "invalid format" });
-    }
-    const entries = Object.keys(data).length;
-    if (entries === 0) return c.json({ ok: false, error: "empty sidecar" });
-    return c.json({ ok: true, data });
-  } catch (err: unknown) {
-    const isNotFound = err instanceof Error && "code" in err && (err as NodeJS.ErrnoException).code === "ENOENT";
-    if (!isNotFound) console.error("[translation-sidecar] error reading sidecar:", err);
-    return c.json({ ok: false });
   }
 }
 

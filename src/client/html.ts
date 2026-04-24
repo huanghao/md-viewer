@@ -136,9 +136,6 @@ export function generateClientHTML(): string {
         <button class="toolbar-text-button" id="diffButton" onclick="handleDiffButtonClick()" style="display: none;" title="查看修改内容">
           <span id="diffButtonText">[± Diff]</span>
         </button>
-        <button class="toolbar-text-button" id="translationButton" onclick="handleTranslationButtonClick()" style="display: none;" title="切换双语对照模式">
-          <span id="translationButtonText">[🌐 译]</span>
-        </button>
         <button class="toolbar-text-button" id="refreshButton" onclick="handleRefreshButtonClick()" style="display: none;" title="文件已更新，点击刷新">
           <span id="refreshButtonText">[↻ 刷新]</span>
         </button>
@@ -160,14 +157,12 @@ export function generateClientHTML(): string {
         <div class="monitor-panel-header">
           <div class="monitor-tabs">
             <button class="monitor-tab is-active" onclick="switchMonitorTab('memory')">内存</button>
-            <button class="monitor-tab" onclick="switchMonitorTab('translation')">翻译</button>
             <button class="monitor-tab" onclick="switchMonitorTab('sessions')">Agent Sessions</button>
           </div>
           <button class="monitor-close" onclick="toggleMonitorPanel()" title="关闭">×</button>
         </div>
         <div class="monitor-body">
           <div class="monitor-tab-panel" id="monitorTabMemory"></div>
-          <div class="monitor-tab-panel" id="monitorTabTranslation" style="display:none;"></div>
           <div class="monitor-tab-panel" id="monitorTabSessions" style="display:none;"></div>
         </div>
       </div>
@@ -199,7 +194,6 @@ export function generateClientHTML(): string {
     <aside class="annotation-sidebar" id="annotationSidebar">
       <div class="annotation-tabs" id="annotationTabs">
         <button class="annotation-tab is-active" data-tab="comments" onclick="switchAnnotationTab('comments')">评论<span class="annotation-tab-count" id="annotationTabCount"></span></button>
-        <button class="annotation-tab" data-tab="translation" onclick="switchAnnotationTab('translation')">翻译<span class="annotation-tab-count" id="translationTabCount"></span><span class="translation-status-dot" id="translationStatusDot" title="翻译服务未连接"></span></button>
         <button class="annotation-tab" data-tab="chat" onclick="switchAnnotationTab('chat')">✨ Chat</button>
         <div class="annotation-tab-actions">
           <div class="annotation-tab-actions-group" id="annotationCommentsActions">
@@ -208,11 +202,6 @@ export function generateClientHTML(): string {
             </button>
             <button class="annotation-icon-btn" id="annotationFilterToggle" title="筛选" aria-label="筛选">
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12L9.5 8v4.5l-3-1.5V8z"/></svg>
-            </button>
-          </div>
-          <div class="annotation-tab-actions-group hidden" id="annotationTranslationActions">
-            <button class="annotation-icon-btn" id="translationClearBtn" title="清空全部翻译" aria-label="清空全部翻译">
-              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2h4v1H6zM3 4h10v1H3zm1 1.5h8l-.8 8H4.8L4 5.5zm2 1.5v5h1V7H6zm3 0v5h1V7H9z"/></svg>
             </button>
           </div>
           <button class="annotation-icon-btn" id="annotationSplitToggle" title="拆分 Chat 面板" aria-label="拆分 Chat 面板">
@@ -232,7 +221,6 @@ export function generateClientHTML(): string {
       <div class="annotation-list" id="annotationList">
         <div class="annotation-empty">无评论（选中文本即可添加）</div>
       </div>
-      <div class="translation-list" id="translationList" style="display:none;"></div>
       <div class="chat-list" id="chatList" style="display:none;"></div>
     </aside>
     <div class="annotation-sidebar-resizer" id="annotationSidebarResizer" title="拖拽调整评论栏宽度"></div>

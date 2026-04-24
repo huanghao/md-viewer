@@ -42,7 +42,6 @@ export interface PdfViewerOptions {
     startItemIdx: number,
     endItemIdx: number
   ) => void;
-  onParagraphClick?: (block: PdfTextBlock) => void;
   /** Called when user clicks a persistent annotation rect on the overlay canvas */
   onAnnotationClick?: (annotationId: string, clientX: number, clientY: number) => void;
   /** Called after a page finishes rendering (canvas + text layer ready) */
@@ -74,8 +73,6 @@ export interface PdfViewerInstance {
   setAnnotateMode(enabled: boolean): void;
   /** Returns current annotate mode state */
   isAnnotateMode(): boolean;
-  /** Mark translate icons as translated/untranslated based on current translation list */
-  markTranslatedIcons(keys: Set<string>): void;
   /** Re-render all pages at a new scale. Clears all annotation and temp rects — caller must replay them. Returns after placeholders are resized (actual render is async via IntersectionObserver). */
   setScale(scale: number): Promise<void>;
 }
@@ -335,35 +332,6 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     const blocks = buildTextBlocks(pageNum, textContent.items as PdfPageTextItem[], viewport, scale);
     textBlocksByPage.set(pageNum, blocks);
 
-    // Event handlers: 每段左侧固定「译」图标
-    if (opts.onParagraphClick) {
-      for (const block of blocks) {
-        const startItemIdx = Math.round(block.y * 10);
-        const icon = document.createElement("button");
-        icon.className = "pdf-translate-icon";
-        icon.textContent = "译";
-        icon.style.top = `${block.y * scale}px`;
-        icon.dataset.page = String(block.pageNum);
-        icon.dataset.start = String(startItemIdx);
-        icon.addEventListener("click", (ev) => {
-          ev.stopPropagation();
-          opts.onParagraphClick!(block);
-        });
-        icon.addEventListener("mouseenter", () => {
-          el.dispatchEvent(new CustomEvent("pdf-translate-hover", {
-            bubbles: true,
-            detail: { pageNum: block.pageNum, startItemIdx, active: true },
-          }));
-        });
-        icon.addEventListener("mouseleave", () => {
-          el.dispatchEvent(new CustomEvent("pdf-translate-hover", {
-            bubbles: true,
-            detail: { pageNum: block.pageNum, startItemIdx, active: false },
-          }));
-        });
-        wrapper.appendChild(icon);
-      }
-    }
     if (opts.onTextSelected) {
       const pageH = viewport.height / scale;
       let dragging = false;
@@ -749,13 +717,6 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
   function getRenderedCount(): number { return rendered.size; }
   function getTotalPages(): number { return numPages; }
 
-  function markTranslatedIcons(keys: Set<string>): void {
-    el.querySelectorAll<HTMLElement>('.pdf-translate-icon[data-page]').forEach(icon => {
-      const k = `${icon.dataset.page}:${icon.dataset.start}`;
-      icon.classList.toggle('is-translated', keys.has(k));
-    });
-  }
-
   async function setScale(newScale: number): Promise<void> {
     // Update the closure variable used by renderPage and redrawOverlay
     scale = newScale;
@@ -795,7 +756,6 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
     getPdfDoc: () => pdfDoc,
     setAnnotateMode,
     isAnnotateMode,
-    markTranslatedIcons,
     setScale,
     get onAnnotationClick() { return opts.onAnnotationClick; },
     set onAnnotationClick(fn: ((annotationId: string, clientX: number, clientY: number) => void) | undefined) { opts.onAnnotationClick = fn; },

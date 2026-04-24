@@ -402,16 +402,14 @@ export function toggleAnnotationSidebar(): void {
   setSidebarCollapsed(!sidebar.classList.contains('collapsed'));
 }
 
-// ==================== 翻译 Tab ====================
+// ==================== Tab ====================
 
-let _currentAnnotationTab: 'comments' | 'translation' | 'chat' = 'comments';
+let _currentAnnotationTab: 'comments' | 'chat' = 'comments';
 
-export function switchAnnotationTab(tab: 'comments' | 'translation' | 'chat'): void {
+export function switchAnnotationTab(tab: 'comments' | 'chat'): void {
   _currentAnnotationTab = tab;
   const commentsList = document.getElementById('annotationList');
-  const translationList = document.getElementById('translationList');
   const commentsActions = document.getElementById('annotationCommentsActions');
-  const translationActions = document.getElementById('annotationTranslationActions');
   const tabs = document.querySelectorAll('.annotation-tab');
 
   tabs.forEach((btn) => {
@@ -420,17 +418,8 @@ export function switchAnnotationTab(tab: 'comments' | 'translation' | 'chat'): v
 
   const chatList = document.getElementById('chatList');
   if (commentsList) commentsList.style.display = tab === 'comments' ? '' : 'none';
-  if (translationList) translationList.style.display = tab === 'translation' ? '' : 'none';
   if (chatList) chatList.style.display = tab === 'chat' ? '' : 'none';
   if (commentsActions) commentsActions.classList.toggle('hidden', tab !== 'comments');
-  if (translationActions) translationActions.classList.toggle('hidden', tab !== 'translation');
-}
-
-export function openTranslationTab(): void {
-  setSidebarCollapsed(false);
-  persistCurrentFilePanelOpen(true);
-  syncAnnotationSidebarLayout();
-  switchAnnotationTab('translation');
 }
 
 export function openChatTab(): void {
@@ -438,121 +427,6 @@ export function openChatTab(): void {
   persistCurrentFilePanelOpen(true);
   syncAnnotationSidebarLayout();
   switchAnnotationTab('chat');
-}
-
-export function renderTranslationList(
-  filePath: string | null,
-  getTranslations: () => import('./pdf-translation.js').StoredTranslation[],
-  onRemove: (pageNum: number, startItemIdx: number) => void,
-  onJump: (pageNum: number, startItemIdx: number, endItemIdx: number) => void,
-  onRetry?: (pageNum: number, startItemIdx: number) => void
-): void {
-  const el = document.getElementById('translationList');
-  if (!el) return;
-
-  // Sort by time desc for display, but assign serial by page order
-  const entries = [...getTranslations()].sort((a, b) => b.timestamp - a.timestamp);
-  const byPageOrder = [...getTranslations()].sort((a, b) => a.pageNum - b.pageNum || a.startItemIdx - b.startItemIdx);
-  const serialMap = new Map(byPageOrder.map((e, i) => [`${e.pageNum}:${e.startItemIdx}`, i + 1]));
-
-  const translationTabCount = document.getElementById('translationTabCount');
-  if (translationTabCount) translationTabCount.textContent = entries.length > 0 ? `(${entries.length})` : '';
-  if (entries.length === 0) {
-    el.innerHTML = '<div class="translation-empty">悬停 PDF 段落，点击「译」按钮翻译</div>';
-    return;
-  }
-
-  el.innerHTML = entries.map((entry) => {
-    const originalEscaped = escapeHtml(entry.originalText);
-    const key = `${entry.pageNum}:${entry.startItemIdx}`;
-    const serial = serialMap.get(key) ?? 0;
-    const serialTag = `<span class="translation-item-serial">P${entry.pageNum} #${serial}</span>`;
-    if (!entry.translatedText) {
-      if (entry.error) {
-        return `
-          <div class="translation-item is-error" data-key="${key}" data-page="${entry.pageNum}" data-start="${entry.startItemIdx}" data-end="${entry.endItemIdx}">
-            <div class="translation-item-header">${serialTag}<span class="translation-item-original">${originalEscaped}</span></div>
-            <div class="translation-item-error">${escapeHtml(entry.error)}</div>
-            <div class="translation-item-footer">
-              <span class="translation-item-time">${formatRelativeTimeShort(entry.timestamp)}</span>
-              <button class="translation-item-retry" data-page="${entry.pageNum}" data-start="${entry.startItemIdx}">重试</button>
-              <button class="translation-item-del" data-page="${entry.pageNum}" data-start="${entry.startItemIdx}">删除</button>
-            </div>
-          </div>`;
-      }
-      return `
-        <div class="translation-item" data-key="${key}">
-          <div class="translation-item-header">${serialTag}<span class="translation-item-original">${originalEscaped}</span></div>
-          <div class="translation-item-loading">翻译中…</div>
-        </div>`;
-    }
-    const translatedEscaped = escapeHtml(entry.translatedText);
-    return `
-      <div class="translation-item" data-key="${key}" data-page="${entry.pageNum}" data-start="${entry.startItemIdx}" data-end="${entry.endItemIdx}">
-        <div class="translation-item-header">${serialTag}<span class="translation-item-original">${originalEscaped}</span></div>
-        <div class="translation-item-text">${translatedEscaped}</div>
-        <div class="translation-item-footer">
-          <span class="translation-item-time">${formatRelativeTimeShort(entry.timestamp)}</span>
-          <button class="translation-item-del" data-page="${entry.pageNum}" data-start="${entry.startItemIdx}" title="删除">删除</button>
-        </div>
-      </div>`;
-  }).join('');
-
-  function findTranslateIcon(pageNum: number, startItemIdx: number): HTMLElement | null {
-    return document.querySelector<HTMLElement>(
-      `.pdf-translate-icon[data-page="${pageNum}"][data-start="${startItemIdx}"]`
-    );
-  }
-
-  // 点击条目跳转，并短暂高亮对应「译」按钮
-  el.querySelectorAll<HTMLElement>('.translation-item[data-page]').forEach((item) => {
-    item.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).closest('.translation-item-del')) return;
-      const pageNum = Number(item.dataset.page);
-      const startItemIdx = Number(item.dataset.start);
-      const endItemIdx = Number(item.dataset.end);
-      if (Number.isFinite(pageNum)) {
-        onJump(pageNum, startItemIdx, endItemIdx);
-        const icon = findTranslateIcon(pageNum, startItemIdx);
-        if (icon) {
-          icon.classList.add('is-highlighted');
-          setTimeout(() => icon.classList.remove('is-highlighted'), 1500);
-        }
-      }
-    });
-
-    // hover 条目 → 高亮对应「译」按钮
-    item.addEventListener('mouseenter', () => {
-      const icon = findTranslateIcon(Number(item.dataset.page), Number(item.dataset.start));
-      icon?.classList.add('is-highlighted');
-    });
-    item.addEventListener('mouseleave', () => {
-      const icon = findTranslateIcon(Number(item.dataset.page), Number(item.dataset.start));
-      icon?.classList.remove('is-highlighted');
-    });
-  });
-
-  // 删除按钮
-  el.querySelectorAll<HTMLElement>('.translation-item-del').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const pageNum = Number(btn.dataset.page);
-      const startItemIdx = Number(btn.dataset.start);
-      if (filePath && Number.isFinite(pageNum)) onRemove(pageNum, startItemIdx);
-    });
-  });
-
-  // 重试按钮
-  if (onRetry) {
-    el.querySelectorAll<HTMLElement>('.translation-item-retry').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const pageNum = Number(btn.dataset.page);
-        const startItemIdx = Number(btn.dataset.start);
-        if (Number.isFinite(pageNum)) onRetry(pageNum, startItemIdx);
-      });
-    });
-  }
 }
 
 export function dismissAnnotationPopupByEscape(): boolean {
@@ -1334,7 +1208,7 @@ export function applyAnnotations(): void {
 
   // 一次 TreeWalker 建立索引，供所有批注定位复用
   const index: TextNodeIndex | undefined = el.reader
-    ? buildTextNodeIndex(collectTextNodes(el.reader, '[data-translation-target]'))
+    ? buildTextNodeIndex(collectTextNodes(el.reader))
     : undefined;
 
   if (el.reader) {

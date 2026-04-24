@@ -76,10 +76,10 @@ export function renderFileRow(
     ? `<span class="annotation-count-badge">${annotationCount}</span>`
     : '';
 
-  // Chat session 标识（该文件有绑定的 chat session）
-  const chatSessionId = localStorage.getItem(`md-viewer:chat-session:${path}`);
-  const chatBadge = chatSessionId
-    ? `<span title="有 Chat Session" style="font-size:10px;opacity:0.7;margin-left:2px;">✨</span>`
+  // Chat session 标识（该文件有活跃的 agent session）
+  const activeSession = (window as any).__activeAgentSessions?.get(path);
+  const chatBadge = activeSession
+    ? `<span class="chat-session-dot${activeSession.streaming ? ' streaming' : ''}" title="Agent Session 活跃${activeSession.streaming ? ' · 正在响应' : ''}"></span>`
     : '';
 
   // 相对修改时间（仅焦点视图）

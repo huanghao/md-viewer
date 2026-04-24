@@ -1853,6 +1853,33 @@ const MEM_PER_PAGE_MB = 27; // A4 @ scale=1.5, dpr=2
 let monitorPollTimer: ReturnType<typeof setInterval> | null = null;
 let monitorActiveTab: 'memory' | 'sessions' = 'memory';
 
+// Active agent sessions cache — keyed by filePath, used by file-row indicators
+export const activeAgentSessions = new Map<string, { sessionId: string; messages: number; model: string; streaming: boolean }>();
+
+async function refreshActiveAgentSessions(): Promise<void> {
+  const agentUrl = localStorage.getItem('md-viewer:agent-url') || 'http://localhost:3003';
+  try {
+    const res = await fetch(`${agentUrl}/status`, { signal: AbortSignal.timeout(2000) });
+    if (!res.ok) { activeAgentSessions.clear(); return; }
+    const status = await res.json() as { activeSessions: Array<{ id: string; messages: number; model: string; streaming: boolean }> };
+    // Rebuild map: sessionId → file path (from localStorage reverse lookup)
+    activeAgentSessions.clear();
+    for (const s of status.activeSessions) {
+      // Find which file this sessionId belongs to
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith('md-viewer:chat-session:') && localStorage.getItem(key) === s.id) {
+          const filePath = key.replace('md-viewer:chat-session:', '');
+          activeAgentSessions.set(filePath, { sessionId: s.id, messages: s.messages, model: s.model, streaming: s.streaming });
+        }
+      }
+    }
+    renderSidebar(); // re-render file list with updated indicators
+  } catch {
+    activeAgentSessions.clear();
+  }
+}
+
 function getPdfMemStats(): Array<{ path: string; rendered: number; total: number; memMB: number; idleMins: number | null }> {
   return Array.from(pdfViewerRegistry.entries()).map(([path, entry]) => {
     const rendered = entry.viewer.getRenderedCount();
@@ -1898,6 +1925,9 @@ function switchMonitorTab(tab: 'memory' | 'sessions'): void {
   const sessEl = document.getElementById('monitorTabSessions');
   if (memEl) memEl.style.display = tab === 'memory' ? '' : 'none';
   if (sessEl) sessEl.style.display = tab === 'sessions' ? '' : 'none';
+  // Manage polling: only memory tab needs frequent refresh
+  if (monitorPollTimer) { clearInterval(monitorPollTimer); monitorPollTimer = null; }
+  if (tab === 'memory') monitorPollTimer = setInterval(updateMonitorPanel, 2000);
   updateMonitorPanel();
 }
 
@@ -2072,7 +2102,10 @@ function toggleMonitorPanel(): void {
   } else {
     panel.style.display = 'block';
     updateMonitorPanel();
-    monitorPollTimer = setInterval(updateMonitorPanel, 2000);
+    // Only poll for memory tab (PDF stats change frequently); sessions tab loads once
+    if (monitorActiveTab === 'memory') {
+      monitorPollTimer = setInterval(updateMonitorPanel, 2000);
+    }
   }
 }
 
@@ -2391,6 +2424,11 @@ window.showSettingsDialog = showSettingsDialog;
 window.toggleMonitorPanel = toggleMonitorPanel;
 window.switchMonitorTab = switchMonitorTab;
 window.switchAnnotationTab = switchAnnotationTab;
+// Expose active agent sessions for file-row indicators
+(window as any).__activeAgentSessions = activeAgentSessions;
+// Poll active sessions every 5s to keep file indicators fresh
+setInterval(() => void refreshActiveAgentSessions(), 5000);
+void refreshActiveAgentSessions();
 window.zoomReset = zoomReset;
 window.openExternalFile = openFileInBrowser;
 window.renderContent = renderContent;

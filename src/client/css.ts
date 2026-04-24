@@ -2047,6 +2047,24 @@ export const styles = `
       margin-left: 2px;
     }
 
+    .chat-session-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--color-accent);
+      flex-shrink: 0;
+      margin-left: 3px;
+      vertical-align: middle;
+      opacity: 0.8;
+    }
+    .chat-session-dot.streaming {
+      animation: chat-session-pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes chat-session-pulse {
+      0%, 100% { opacity: 0.8; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.3); }
+    }
     .annotation-count-badge {
       background: #e05252;
       color: white;

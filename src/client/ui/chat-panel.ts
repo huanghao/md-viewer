@@ -127,7 +127,9 @@ async function loadHistory(): Promise<void> {
 // ── Rendering ─────────────────────────────────────────────────────────────────
 
 export function renderChatPanel(): void {
-  const container = document.getElementById('chatList');
+  // 拆分模式下渲染到独立面板，否则渲染到 tab 里
+  const isSplit = document.body.classList.contains('sidebar-split');
+  const container = document.getElementById(isSplit ? 'chatListSplit' : 'chatList');
   if (!container) return;
 
   const agentUrl = getAgentUrl();

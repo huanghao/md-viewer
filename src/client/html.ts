@@ -213,6 +213,9 @@ export function generateClientHTML(): string {
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2h4v1H6zM3 4h10v1H3zm1 1.5h8l-.8 8H4.8L4 5.5zm2 1.5v5h1V7H6zm3 0v5h1V7H9z"/></svg>
             </button>
           </div>
+          <button class="annotation-icon-btn" id="annotationSplitToggle" title="拆分 Chat 面板" aria-label="拆分 Chat 面板">
+            <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M2 3h5v10H2zm7 0h5v10H9zM7 3h2v10H7z" opacity=".3"/><rect x="2" y="3" width="5" height="10" rx=".5" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="9" y="3" width="5" height="10" rx=".5" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
+          </button>
           <button class="annotation-icon-btn" id="annotationSidebarClose" title="收起评论" aria-label="收起评论">
             <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="fill:none"><rect x="2" y="2.5" width="12" height="11" rx="1.5" fill="none"/><path d="M10 2.5v11"/></svg>
           </button>
@@ -231,6 +234,19 @@ export function generateClientHTML(): string {
       <div class="chat-list" id="chatList" style="display:none;"></div>
     </aside>
     <div class="annotation-sidebar-resizer" id="annotationSidebarResizer" title="拖拽调整评论栏宽度"></div>
+    <!-- 拆分模式下独立的 Chat 面板 -->
+    <aside class="chat-sidebar" id="chatSidebar" style="display:none;">
+      <div class="annotation-tabs">
+        <span class="annotation-tab is-active" style="pointer-events:none;">✨ Chat</span>
+        <div class="annotation-tab-actions">
+          <button class="annotation-icon-btn" id="chatSidebarMergeBtn" title="合并回评论面板" aria-label="合并回评论面板">
+            <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="3" width="12" height="10" rx=".5"/><path d="M8 3v10" stroke-width="1.2"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="chat-list" id="chatListSplit"></div>
+    </aside>
+    <div class="annotation-sidebar-resizer" id="chatSidebarResizer" style="display:none;" title="拖拽调整 Chat 面板宽度"></div>
     <button class="annotation-floating-open-btn" id="annotationFloatingOpenBtn" title="打开评论侧边栏" aria-label="打开评论侧边栏">
       <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5" fill="none"/><path d="M6 2.5v11"/><path d="M9 6l-2 2 2 2"/></svg>
     </button>

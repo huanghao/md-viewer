@@ -3,6 +3,7 @@ export const styles = `
       --font-scale: 1.0;
       --sidebar-width: 260px;
       --annotation-sidebar-width: 320px;
+      --chat-sidebar-width: 300px;
 
       /* color tokens */
       --color-text-primary:   #24292e;
@@ -2754,6 +2755,38 @@ export const styles = `
       transform: translateX(100%);
       pointer-events: none;
     }
+    /* 拆分模式下独立的 Chat 面板 */
+    .chat-sidebar {
+      width: var(--chat-sidebar-width);
+      background: var(--color-bg-subtle);
+      border-left: 1px solid var(--color-border);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+      position: fixed;
+      right: var(--annotation-sidebar-width);
+      top: 84px;
+      height: calc(100vh - 84px);
+      z-index: var(--z-sidebar);
+    }
+    .chat-sidebar .chat-list {
+      display: flex !important;
+      flex: 1;
+      overflow: hidden;
+    }
+    /* 拆分模式下内容区 padding 需要同时考虑两个面板 */
+    body.sidebar-split .content {
+      padding-right: calc(var(--annotation-sidebar-width) + var(--chat-sidebar-width) + 24px) !important;
+    }
+    body.sidebar-split .doc-scrollbar {
+      right: calc(var(--annotation-sidebar-width) + var(--chat-sidebar-width)) !important;
+    }
+    /* split 按钮激活态 */
+    #annotationSplitToggle.is-active {
+      color: var(--color-accent);
+      background: rgba(9,105,218,0.08);
+    }
     .annotation-sidebar-resizer {
       position: fixed;
       top: 84px;
@@ -2774,6 +2807,20 @@ export const styles = `
     body.annotation-sidebar-resizing {
       cursor: col-resize;
       user-select: none;
+    }
+    #chatSidebarResizer {
+      position: fixed;
+      top: 84px;
+      right: calc(var(--annotation-sidebar-width) + var(--chat-sidebar-width) - 4px);
+      width: 8px;
+      height: calc(100vh - 84px);
+      cursor: col-resize;
+      background: transparent;
+      z-index: var(--z-sidebar-resizer);
+      transition: background-color 0.15s ease;
+    }
+    #chatSidebarResizer:hover {
+      background: rgba(9, 105, 218, 0.08);
     }
     .annotation-icon-btn {
       width: 30px;
@@ -3010,6 +3057,12 @@ export const styles = `
       white-space: pre-wrap;
       word-break: break-word;
       position: relative;
+      display: flex;
+      align-items: flex-start;
+    }
+    .annotation-thread-line .annotation-thread-text {
+      flex: 1;
+      min-width: 0;
     }
     .annotation-thread-edit-btn {
       position: absolute;
@@ -3019,7 +3072,8 @@ export const styles = `
       height: 18px;
       padding: 0;
       border: none;
-      background: transparent;
+      background: rgba(255,255,255,0.85);
+      box-shadow: 0 0 2px rgba(0,0,0,0.08);
       cursor: pointer;
       color: var(--color-text-secondary);
       border-radius: var(--radius-sm);

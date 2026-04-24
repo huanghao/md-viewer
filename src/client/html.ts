@@ -143,7 +143,7 @@ export function generateClientHTML(): string {
           <span id="refreshButtonText">[↻ 刷新]</span>
         </button>
         <button class="toolbar-text-button" id="monitorButton" onclick="toggleMonitorPanel()" title="系统监控">
-          <span>[▦ 监控]</span>
+          <span>[◫ 监控]</span>
         </button>
         <button class="font-scale-button" id="fontScaleButton" onclick="zoomReset()" title="缩放 (⌘+ / ⌘−)，点击重置">
           <span id="fontScaleText">100%</span>

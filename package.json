@@ -21,6 +21,7 @@
     "@huggingface/transformers": "^4.1.0",
     "@mariozechner/pi-agent-core": "^0.69.0",
     "@mariozechner/pi-ai": "^0.69.0",
+    "@mariozechner/pi-coding-agent": "^0.70.2",
     "chokidar": "^5.0.0",
     "highlight.js": "^11.9.0",
     "hono": "^3.12.8",

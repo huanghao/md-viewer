@@ -8,7 +8,7 @@ import { registerBuiltInApiProviders } from "@mariozechner/pi-ai";
 registerBuiltInApiProviders();
 import type { Model } from "@mariozechner/pi-ai";
 import { SessionManager } from "@mariozechner/pi-coding-agent";
-import { existsSync, mkdirSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { getAuthToken } from "./auth.ts";
@@ -17,6 +17,18 @@ import { AGENT_TOOLS } from "./tools.ts";
 // ── Session storage directory ─────────────────────────────────────────────────
 const SESSIONS_DIR = join(homedir(), ".mdv", "agent-sessions");
 mkdirSync(SESSIONS_DIR, { recursive: true });
+
+// ── Session index (sessionId → actual JSONL file path) ────────────────────────
+const INDEX_FILE = join(SESSIONS_DIR, "sessions-index.json");
+const sessionIndex = new Map<string, string>(
+  existsSync(INDEX_FILE)
+    ? Object.entries(JSON.parse(readFileSync(INDEX_FILE, "utf-8")))
+    : []
+);
+
+function saveIndex(): void {
+  writeFileSync(INDEX_FILE, JSON.stringify(Object.fromEntries(sessionIndex), null, 2));
+}
 
 // ── Model descriptor ──────────────────────────────────────────────────────────
 function buildModel(): Model<"anthropic-messages"> {
@@ -80,12 +92,21 @@ function sessionFilePath(sessionId: string): string {
 function getOrCreateSession(sessionId: string): SessionEntry {
   if (sessions.has(sessionId)) return sessions.get(sessionId)!;
 
-  const filePath = sessionFilePath(sessionId);
-  const sessionMgr = existsSync(filePath)
-    ? SessionManager.open(filePath, SESSIONS_DIR)
-    : SessionManager.create(process.env.WORKING_DIR ?? process.cwd(), SESSIONS_DIR);
+  const knownPath = sessionIndex.get(sessionId);
+  let sessionMgr: SessionManager;
 
-  // Restore messages from SessionManager
+  if (knownPath && existsSync(knownPath)) {
+    sessionMgr = SessionManager.open(knownPath, SESSIONS_DIR);
+  } else {
+    sessionMgr = SessionManager.create(process.env.WORKING_DIR ?? process.cwd(), SESSIONS_DIR);
+    // Record the actual generated file path in the index
+    const actualPath: string | undefined = (sessionMgr as any).getSessionFile?.();
+    if (actualPath) {
+      sessionIndex.set(sessionId, actualPath);
+      saveIndex();
+    }
+  }
+
   const context = sessionMgr.buildSessionContext();
   const messages = context.messages;
 
@@ -213,21 +234,24 @@ app.post("/chat", async (c) => {
 app.delete("/session/:id", (c) => {
   const id = c.req.param("id");
   sessions.delete(id);
-  const fp = sessionFilePath(id);
-  if (existsSync(fp)) {
-    import("fs").then(({ unlinkSync }) => { try { unlinkSync(fp); } catch {} });
+  // Look up actual file path from index
+  const actualPath = sessionIndex.get(id) ?? sessionFilePath(id);
+  if (existsSync(actualPath)) {
+    try { require("fs").unlinkSync(actualPath); } catch {}
   }
+  sessionIndex.delete(id);
+  saveIndex();
   return c.json({ ok: true });
 });
 
 // GET /session/:id/history — return session messages for resume
 app.get("/session/:id/history", (c) => {
   const id = c.req.param("id");
-  const fp = sessionFilePath(id);
-  if (!existsSync(fp)) return c.json({ history: [] });
+  const actualPath = sessionIndex.get(id) ?? sessionFilePath(id);
+  if (!existsSync(actualPath)) return c.json({ history: [] });
 
   try {
-    const sm = SessionManager.open(fp, SESSIONS_DIR);
+    const sm = SessionManager.open(actualPath, SESSIONS_DIR);
     const context = sm.buildSessionContext();
     const history = context.messages
       .filter((m: any) => m.role === "user" || m.role === "assistant")

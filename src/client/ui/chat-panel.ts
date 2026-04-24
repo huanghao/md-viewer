@@ -161,14 +161,11 @@ export function renderChatPanel(): void {
       <button id="chatNewSessionBtn" title="新建会话" style="background:none;border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:2px 6px;cursor:pointer;font-size:11px;color:var(--color-text-muted);white-space:nowrap;">+ 新建</button>
     </div>
     <div class="chat-config-bar" style="border-top:none;padding-top:0;gap:4px;">
-      <span style="color:var(--color-text-muted)">Session:</span>
-      <code id="chatSessionIdDisplay" title="${escapeHtml(state.sessionId)}" style="flex:1;font-size:10px;color:var(--color-text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;" onclick="document.getElementById('chatResumeInput').style.display='flex';this.parentElement.style.display='none';">${shortId}…</code>
-      <button id="chatCopySessionBtn" title="复制完整 Session ID" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--color-text-muted);padding:0 2px;">⎘</button>
-    </div>
-    <div id="chatResumeInput" style="display:none;padding:4px 10px;gap:4px;align-items:center;border-bottom:1px solid var(--color-border);">
-      <input id="chatResumeIdInput" type="text" placeholder="粘贴 Session ID…" style="flex:1;background:#fff;border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:3px 6px;font-size:11px;font-family:monospace;outline:none;" />
-      <button id="chatResumeConfirmBtn" style="background:var(--color-accent);border:none;border-radius:var(--radius-sm);color:#fff;padding:3px 8px;cursor:pointer;font-size:11px;">Resume</button>
-      <button id="chatResumeCancelBtn" style="background:none;border:1px solid var(--color-border);border-radius:var(--radius-sm);color:var(--color-text-muted);padding:3px 6px;cursor:pointer;font-size:11px;">取消</button>
+      <span style="color:var(--color-text-muted);flex-shrink:0;">Session:</span>
+      <input id="chatSessionIdInput" type="text" value="${escapeHtml(state.sessionId)}"
+        title="当前 Session ID，修改后回车可 Resume 到指定 Session"
+        style="flex:1;background:transparent;border:none;border-bottom:1px dashed var(--color-border-subtle);border-radius:0;padding:2px 2px;font-size:10px;font-family:monospace;color:var(--color-text-muted);outline:none;min-width:0;" />
+      <button id="chatCopySessionBtn" title="复制 Session ID" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--color-text-muted);padding:0 2px;flex-shrink:0;">⎘</button>
     </div>
     <div class="chat-messages" id="chatMessages">
       ${state.history.length === 0
@@ -249,22 +246,21 @@ function wireEvents(): void {
     navigator.clipboard.writeText(state.sessionId);
   });
 
-  // Resume: confirm
-  document.getElementById('chatResumeConfirmBtn')?.addEventListener('click', async () => {
-    const input = document.getElementById('chatResumeIdInput') as HTMLInputElement | null;
-    const id = input?.value.trim();
-    if (!id) return;
-    state.sessionId = id;
-    state.history = [];
-    if (state.currentFilePath) storageSet(`md-viewer:chat-session:${state.currentFilePath}`, id);
-    await loadHistory();
-    renderChatPanel();
-  });
-
-  // Resume: cancel
-  document.getElementById('chatResumeCancelBtn')?.addEventListener('click', () => {
-    renderChatPanel();
-  });
+  // Session input: Enter or blur to resume
+  const sessionInput = document.getElementById('chatSessionIdInput') as HTMLInputElement | null;
+  if (sessionInput) {
+    const doResume = async () => {
+      const id = sessionInput.value.trim();
+      if (!id || id === state.sessionId) return;
+      state.sessionId = id;
+      state.history = [];
+      if (state.currentFilePath) storageSet(`md-viewer:chat-session:${state.currentFilePath}`, id);
+      await loadHistory();
+      renderChatPanel();
+    };
+    sessionInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); void doResume(); } });
+    sessionInput.addEventListener('blur', () => void doResume());
+  }
 
   document.getElementById('chatNewSessionBtn')?.addEventListener('click', () => {
     const id = crypto.randomUUID();

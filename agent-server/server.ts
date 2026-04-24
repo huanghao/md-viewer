@@ -20,14 +20,32 @@ mkdirSync(SESSIONS_DIR, { recursive: true });
 
 // ── Session index (sessionId → actual JSONL file path) ────────────────────────
 const INDEX_FILE = join(SESSIONS_DIR, "sessions-index.json");
-const sessionIndex = new Map<string, string>(
-  existsSync(INDEX_FILE)
-    ? Object.entries(JSON.parse(readFileSync(INDEX_FILE, "utf-8")))
-    : []
-);
+
+interface IndexEntry {
+  path: string;       // actual JSONL file path
+  filePath?: string;  // the document file this session is associated with
+}
+
+type IndexData = Record<string, IndexEntry>;
+
+function loadIndex(): Map<string, IndexEntry> {
+  if (!existsSync(INDEX_FILE)) return new Map();
+  try {
+    const raw = JSON.parse(readFileSync(INDEX_FILE, "utf-8")) as IndexData;
+    // Support old format (string values) and new format (object values)
+    return new Map(Object.entries(raw).map(([k, v]) => [
+      k,
+      typeof v === "string" ? { path: v } : v,
+    ]));
+  } catch { return new Map(); }
+}
+
+const sessionIndex = loadIndex();
 
 function saveIndex(): void {
-  writeFileSync(INDEX_FILE, JSON.stringify(Object.fromEntries(sessionIndex), null, 2));
+  const obj: IndexData = {};
+  for (const [k, v] of sessionIndex) obj[k] = v;
+  writeFileSync(INDEX_FILE, JSON.stringify(obj, null, 2));
 }
 
 // ── Model descriptor ──────────────────────────────────────────────────────────
@@ -89,20 +107,28 @@ function sessionFilePath(sessionId: string): string {
   return join(SESSIONS_DIR, `${sessionId}.jsonl`);
 }
 
-function getOrCreateSession(sessionId: string): SessionEntry {
-  if (sessions.has(sessionId)) return sessions.get(sessionId)!;
+function getOrCreateSession(sessionId: string, filePath?: string): SessionEntry {
+  if (sessions.has(sessionId)) {
+    // Update filePath in index if provided and not already set
+    const entry = sessionIndex.get(sessionId);
+    if (filePath && entry && !entry.filePath) {
+      entry.filePath = filePath;
+      saveIndex();
+    }
+    return sessions.get(sessionId)!;
+  }
 
-  const knownPath = sessionIndex.get(sessionId);
+  const indexEntry = sessionIndex.get(sessionId);
+  const knownPath = indexEntry?.path;
   let sessionMgr: SessionManager;
 
   if (knownPath && existsSync(knownPath)) {
     sessionMgr = SessionManager.open(knownPath, SESSIONS_DIR);
   } else {
     sessionMgr = SessionManager.create(process.env.WORKING_DIR ?? process.cwd(), SESSIONS_DIR);
-    // Record the actual generated file path in the index
     const actualPath: string | undefined = (sessionMgr as any).getSessionFile?.();
     if (actualPath) {
-      sessionIndex.set(sessionId, actualPath);
+      sessionIndex.set(sessionId, { path: actualPath, filePath });
       saveIndex();
     }
   }
@@ -147,7 +173,7 @@ app.post("/chat", async (c) => {
     context?: DocContext;
   };
   const { sessionId, message, model, context } = body;
-  const { agent, sessionMgr } = getOrCreateSession(sessionId);
+  const { agent, sessionMgr } = getOrCreateSession(sessionId, context?.filePath);
 
   // Update model if specified
   if (model && agent.state.model.id !== model) {
@@ -235,7 +261,7 @@ app.delete("/session/:id", (c) => {
   const id = c.req.param("id");
   sessions.delete(id);
   // Look up actual file path from index
-  const actualPath = sessionIndex.get(id) ?? sessionFilePath(id);
+  const actualPath = sessionIndex.get(id)?.path ?? sessionFilePath(id);
   if (existsSync(actualPath)) {
     try { unlinkSync(actualPath); } catch {}
   }
@@ -247,7 +273,7 @@ app.delete("/session/:id", (c) => {
 // GET /session/:id/history — return session messages for resume
 app.get("/session/:id/history", (c) => {
   const id = c.req.param("id");
-  const actualPath = sessionIndex.get(id) ?? sessionFilePath(id);
+  const actualPath = sessionIndex.get(id)?.path ?? sessionFilePath(id);
   if (!existsSync(actualPath)) return c.json({ history: [] });
 
   try {
@@ -273,8 +299,9 @@ app.get("/sessions", async (c) => {
   try {
     const { stat } = await import("fs/promises");
     const results = await Promise.all(
-      Array.from(sessionIndex.entries()).map(async ([sessionId, filePath]) => {
-        const fileStat = await stat(filePath).catch(() => null);
+      Array.from(sessionIndex.entries()).map(async ([sessionId, indexEntry]) => {
+        const jsonlPath = indexEntry.path;
+        const fileStat = await stat(jsonlPath).catch(() => null);
         const created = fileStat?.birthtime?.toISOString() ?? null;
         const modified = fileStat?.mtime?.toISOString() ?? null;
 
@@ -284,7 +311,7 @@ app.get("/sessions", async (c) => {
         let model = "";
 
         try {
-          const sm = SessionManager.open(filePath, SESSIONS_DIR);
+          const sm = SessionManager.open(jsonlPath, SESSIONS_DIR);
           const entries = sm.getEntries();
           for (const entry of entries) {
             if ((entry as any).type === "message") {
@@ -310,7 +337,8 @@ app.get("/sessions", async (c) => {
 
         return {
           id: sessionId,
-          path: filePath,
+          path: jsonlPath,
+          filePath: indexEntry.filePath ?? null,
           created,
           modified,
           messageCount,

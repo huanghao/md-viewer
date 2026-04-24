@@ -1934,6 +1934,7 @@ async function renderSessionsTab(): Promise<void> {
       type SessionData = {
         id: string; messageCount: number; firstMessage: string; model: string;
         modified: string | null; created: string | null; active: boolean;
+        filePath: string | null;
         tokenUsage: { input: number; output: number; cacheRead: number; cacheWrite: number; total: number };
       };
       const data = await sessionsRes.json() as { sessions: SessionData[]; total: number };
@@ -1992,11 +1993,15 @@ async function renderSessionsTab(): Promise<void> {
               ${u.cacheWrite > 0 ? `<span style="color:#a855f7;">■ 缓存写入 ${fmt(u.cacheWrite)}</span>` : ''}
             </div>` : '';
 
+          const fileName = s.filePath ? s.filePath.split('/').pop() : null;
+          const canJump = !!s.filePath;
           return `
-            <div style="padding:7px 8px;margin-bottom:6px;background:${s.active ? 'var(--color-success-bg)' : '#fff'};border:1px solid ${s.active ? 'var(--color-success)' : 'var(--color-border)'};border-radius:var(--radius-md);font-size:12px;">
+            <div data-session-id="${s.id}" data-file-path="${s.filePath ?? ''}"
+              style="padding:7px 8px;margin-bottom:6px;background:${s.active ? 'var(--color-success-bg)' : '#fff'};border:1px solid ${s.active ? 'var(--color-success)' : 'var(--color-border)'};border-radius:var(--radius-md);font-size:12px;${canJump ? 'cursor:pointer;' : ''}">
               <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
                 <code style="font-size:10px;color:var(--color-text-muted);">${s.id.slice(0, 12)}…</code>
                 ${s.active ? '<span style="font-size:10px;color:var(--color-success);font-weight:600;">活跃</span>' : ''}
+                ${fileName ? `<span style="font-size:10px;color:var(--color-accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100px;" title="${s.filePath}">📄 ${fileName}</span>` : ''}
                 <span style="margin-left:auto;font-size:10px;color:var(--color-text-muted);">${modified}</span>
               </div>
               <div style="color:var(--color-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;">${s.firstMessage || '(空)'}</div>
@@ -2007,6 +2012,7 @@ async function renderSessionsTab(): Promise<void> {
                 ${s.model ? `<span>${s.model.replace('claude-', '')}</span>` : ''}
               </div>
               ${barHtml}
+              ${canJump ? `<div style="font-size:10px;color:var(--color-accent);margin-top:3px;">点击跳转到文件并切换到此 Session →</div>` : ''}
             </div>`;
         }).join('');
 
@@ -2020,9 +2026,40 @@ async function renderSessionsTab(): Promise<void> {
   el.innerHTML = `
     <div style="padding:8px 0;">
       ${statusHtml}
-      <div style="font-size:11px;font-weight:600;color:var(--color-text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Sessions (${monitorActiveTab === 'sessions' ? '自动刷新' : ''})</div>
+      <div style="font-size:11px;font-weight:600;color:var(--color-text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Sessions</div>
       ${sessionsHtml}
     </div>`;
+
+  // Wire up click-to-jump on session cards
+  el.querySelectorAll('[data-session-id]').forEach((card) => {
+    const sessionId = (card as HTMLElement).dataset.sessionId;
+    const filePath = (card as HTMLElement).dataset.filePath;
+    if (!sessionId || !filePath) return;
+    card.addEventListener('click', async () => {
+      // Close monitor panel
+      toggleMonitorPanel();
+      // Open the file
+      const fileData = state.sessionFiles.get(filePath);
+      if (fileData) {
+        await switchFile(filePath);
+      } else {
+        // File not open yet — load it
+        try {
+          const data = await loadFile(filePath, true);
+          if (data) await onFileLoaded(data, true);
+        } catch { /* file might not exist */ }
+      }
+      // Resume the session in chat panel
+      import('./ui/chat-panel.js').then(({ renderChatPanel }) => {
+        // Set the sessionId in localStorage for this file, then re-init
+        localStorage.setItem(`md-viewer:chat-session:${filePath}`, sessionId);
+        // Switch to chat tab
+        switchAnnotationTab('chat');
+        // Force re-render chat panel with new session
+        setTimeout(() => renderChatPanel(), 100);
+      });
+    });
+  });
 }
 
 function toggleMonitorPanel(): void {

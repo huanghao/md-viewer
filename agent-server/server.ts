@@ -7,39 +7,16 @@ import type { AgentEvent } from "@mariozechner/pi-agent-core";
 import { registerBuiltInApiProviders } from "@mariozechner/pi-ai";
 registerBuiltInApiProviders();
 import type { Model } from "@mariozechner/pi-ai";
-import { readFileSync, existsSync, mkdirSync, appendFileSync } from "fs";
-import { join, dirname } from "path";
+import { SessionManager } from "@mariozechner/pi-coding-agent";
+import { existsSync, mkdirSync } from "fs";
+import { join } from "path";
 import { homedir } from "os";
 import { getAuthToken } from "./auth.ts";
 import { AGENT_TOOLS } from "./tools.ts";
 
-// ── Session persistence (JSONL) ───────────────────────────────────────────────
+// ── Session storage directory ─────────────────────────────────────────────────
 const SESSIONS_DIR = join(homedir(), ".mdv", "agent-sessions");
-
-interface SessionEntry {
-  role: "user" | "assistant";
-  content: string;
-  timestamp: number;
-}
-
-function sessionPath(sessionId: string): string {
-  return join(SESSIONS_DIR, `${sessionId}.jsonl`);
-}
-
-function loadSessionHistory(sessionId: string): SessionEntry[] {
-  const path = sessionPath(sessionId);
-  if (!existsSync(path)) return [];
-  return readFileSync(path, "utf-8")
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as SessionEntry);
-}
-
-function appendSessionEntry(sessionId: string, entry: SessionEntry): void {
-  const path = sessionPath(sessionId);
-  mkdirSync(dirname(path), { recursive: true });
-  appendFileSync(path, JSON.stringify(entry) + "\n", "utf-8");
-}
+mkdirSync(SESSIONS_DIR, { recursive: true });
 
 // ── Model descriptor ──────────────────────────────────────────────────────────
 function buildModel(): Model<"anthropic-messages"> {
@@ -67,44 +44,50 @@ const BASE_SYSTEM_PROMPT = process.env.SYSTEM_PROMPT ??
 // ── Context injection ─────────────────────────────────────────────────────────
 interface DocContext {
   filePath?: string;
-  quotePrefix?: string;   // 选中文字前 ~200 字
-  quote?: string;         // 选中文字
-  quoteSuffix?: string;   // 选中文字后 ~200 字
+  quotePrefix?: string;
+  quote?: string;
+  quoteSuffix?: string;
   lineNumber?: number;
 }
 
 function buildSystemPrompt(ctx: DocContext): string {
   if (!ctx.filePath) return BASE_SYSTEM_PROMPT;
-
   let prompt = BASE_SYSTEM_PROMPT;
   prompt += `\n\n# 当前文档\n路径：${ctx.filePath}`;
   if (ctx.lineNumber) prompt += `（第 ${ctx.lineNumber} 行附近）`;
   prompt += `\n如需查看文件内容，使用 read_file 工具读取 ${ctx.filePath}。`;
-
-  // 仅注入选中文字及其前后上下文，不主动读取全文
   if (ctx.quote) {
     prompt += `\n\n## 用户选中内容`;
     if (ctx.quotePrefix) prompt += `\n[前文]\n${ctx.quotePrefix}`;
     prompt += `\n[选中内容]\n${ctx.quote}`;
     if (ctx.quoteSuffix) prompt += `\n[后文]\n${ctx.quoteSuffix}`;
   }
-
   return prompt;
 }
 
 // ── Session store ─────────────────────────────────────────────────────────────
-const sessions = new Map<string, Agent>();
+interface SessionEntry {
+  agent: Agent;
+  sessionMgr: SessionManager;
+}
 
-function getOrCreateAgent(sessionId: string): Agent {
+const sessions = new Map<string, SessionEntry>();
+
+function sessionFilePath(sessionId: string): string {
+  return join(SESSIONS_DIR, `${sessionId}.jsonl`);
+}
+
+function getOrCreateSession(sessionId: string): SessionEntry {
   if (sessions.has(sessionId)) return sessions.get(sessionId)!;
 
-  // Restore history from JSONL
-  const history = loadSessionHistory(sessionId);
-  const messages = history.map((e) => ({
-    role: e.role,
-    content: e.content,
-    timestamp: e.timestamp,
-  }));
+  const filePath = sessionFilePath(sessionId);
+  const sessionMgr = existsSync(filePath)
+    ? SessionManager.open(filePath, SESSIONS_DIR)
+    : SessionManager.create(process.env.WORKING_DIR ?? process.cwd(), SESSIONS_DIR);
+
+  // Restore messages from SessionManager
+  const context = sessionMgr.buildSessionContext();
+  const messages = context.messages;
 
   const agent = new Agent({
     initialState: {
@@ -118,8 +101,9 @@ function getOrCreateAgent(sessionId: string): Agent {
     getApiKey: async () => getAuthToken(),
   });
 
-  sessions.set(sessionId, agent);
-  return agent;
+  const entry: SessionEntry = { agent, sessionMgr };
+  sessions.set(sessionId, entry);
+  return entry;
 }
 
 // ── SSE event types (frontend protocol) ──────────────────────────────────────
@@ -142,20 +126,24 @@ app.post("/chat", async (c) => {
     context?: DocContext;
   };
   const { sessionId, message, model, context } = body;
-  const agent = getOrCreateAgent(sessionId);
+  const { agent, sessionMgr } = getOrCreateSession(sessionId);
 
   // Update model if specified
   if (model && agent.state.model.id !== model) {
     agent.state.model = { ...agent.state.model, id: model };
   }
 
-  // Update system prompt with current doc context on every message
+  // Update system prompt with current doc context
   if (context) {
     agent.state.systemPrompt = buildSystemPrompt(context);
   }
 
-  // Persist user message
-  appendSessionEntry(sessionId, { role: "user", content: message, timestamp: Date.now() });
+  // Persist user message via SessionManager
+  sessionMgr.appendMessage({
+    role: "user",
+    content: message,
+    timestamp: Date.now(),
+  } as any);
 
   return streamSSE(c, async (stream) => {
     const emit = async (ev: ChatEvent) => {
@@ -163,7 +151,6 @@ app.post("/chat", async (c) => {
     };
 
     let streamingText = "";
-    let finalAssistantText = "";
 
     const unsubscribe = agent.subscribe(async (event: AgentEvent) => {
       try {
@@ -177,11 +164,19 @@ app.post("/chat", async (c) => {
                 if (newText.length > streamingText.length) {
                   const delta = newText.slice(streamingText.length);
                   streamingText = newText;
-                  finalAssistantText = newText;
                   await emit({ type: "text_delta", delta });
                 }
               }
             }
+            break;
+          }
+          case "message_end": {
+            // Persist completed assistant/toolResult messages with usage data
+            const msg = event.message as any;
+            if (msg?.role === "assistant" || msg?.role === "toolResult") {
+              try { sessionMgr.appendMessage(msg); } catch { /* ignore type mismatch */ }
+            }
+            streamingText = "";
             break;
           }
           case "tool_execution_start":
@@ -196,11 +191,6 @@ app.post("/chat", async (c) => {
             });
             break;
           case "agent_end":
-            streamingText = "";
-            // Persist assistant response
-            if (finalAssistantText) {
-              appendSessionEntry(sessionId, { role: "assistant", content: finalAssistantText, timestamp: Date.now() });
-            }
             await emit({ type: "done" });
             break;
         }
@@ -219,21 +209,119 @@ app.post("/chat", async (c) => {
   });
 });
 
-// DELETE /session/:id — clear session (memory + JSONL)
+// DELETE /session/:id — remove session from memory and delete JSONL
 app.delete("/session/:id", (c) => {
   const id = c.req.param("id");
   sessions.delete(id);
-  const path = sessionPath(id);
-  if (existsSync(path)) {
-    import("fs").then(({ unlinkSync }) => unlinkSync(path));
+  const fp = sessionFilePath(id);
+  if (existsSync(fp)) {
+    import("fs").then(({ unlinkSync }) => { try { unlinkSync(fp); } catch {} });
   }
   return c.json({ ok: true });
 });
 
-// GET /session/:id/history — return session history for resume
+// GET /session/:id/history — return session messages for resume
 app.get("/session/:id/history", (c) => {
-  const history = loadSessionHistory(c.req.param("id"));
-  return c.json({ history });
+  const id = c.req.param("id");
+  const fp = sessionFilePath(id);
+  if (!existsSync(fp)) return c.json({ history: [] });
+
+  try {
+    const sm = SessionManager.open(fp, SESSIONS_DIR);
+    const context = sm.buildSessionContext();
+    const history = context.messages
+      .filter((m: any) => m.role === "user" || m.role === "assistant")
+      .map((m: any) => ({
+        role: m.role,
+        content: typeof m.content === "string" ? m.content
+          : Array.isArray(m.content)
+            ? m.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("")
+            : "",
+      }));
+    return c.json({ history });
+  } catch {
+    return c.json({ history: [] });
+  }
+});
+
+// GET /sessions — list all sessions with metadata and token usage
+app.get("/sessions", async (c) => {
+  try {
+    const { readdir, stat } = await import("fs/promises");
+    const files = await readdir(SESSIONS_DIR).catch(() => [] as string[]);
+    const sessionFiles = files.filter((f) => f.endsWith(".jsonl"));
+
+    const results = await Promise.all(sessionFiles.map(async (filename) => {
+      const fp = join(SESSIONS_DIR, filename);
+      const sessionId = filename.replace(".jsonl", "");
+      const fileStat = await stat(fp).catch(() => null);
+
+      let messageCount = 0;
+      let tokenUsage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 };
+      let firstMessage = "";
+      let model = "";
+      const created = fileStat?.birthtime?.toISOString() ?? null;
+      const modified = fileStat?.mtime?.toISOString() ?? null;
+
+      try {
+        const sm = SessionManager.open(fp, SESSIONS_DIR);
+        const entries = sm.getEntries();
+        for (const entry of entries) {
+          if ((entry as any).type === "message") {
+            messageCount++;
+            const msg = (entry as any).message;
+            if (!firstMessage && msg?.role === "user") {
+              const cont = msg.content;
+              firstMessage = typeof cont === "string" ? cont.slice(0, 80)
+                : Array.isArray(cont) ? cont.filter((b: any) => b.type === "text").map((b: any) => b.text).join("").slice(0, 80)
+                : "";
+            }
+            if (msg?.role === "assistant" && msg?.usage) {
+              tokenUsage.input += msg.usage.input ?? 0;
+              tokenUsage.output += msg.usage.output ?? 0;
+              tokenUsage.cacheRead += msg.usage.cacheRead ?? 0;
+              tokenUsage.cacheWrite += msg.usage.cacheWrite ?? 0;
+              tokenUsage.total += msg.usage.totalTokens ?? 0;
+            }
+            if (msg?.model) model = msg.model;
+          }
+        }
+      } catch { /* unreadable session */ }
+
+      return {
+        id: sessionId,
+        path: fp,
+        created,
+        modified,
+        messageCount,
+        firstMessage,
+        model,
+        tokenUsage,
+        active: sessions.has(sessionId),
+      };
+    }));
+
+    results.sort((a, b) => (b.modified ?? "").localeCompare(a.modified ?? ""));
+    return c.json({ sessions: results, total: results.length });
+  } catch (e: any) {
+    return c.json({ sessions: [], total: 0, error: e.message });
+  }
+});
+
+// GET /status — health check with active session summary
+app.get("/status", (c) => {
+  const activeSessions = Array.from(sessions.entries()).map(([id, { agent }]) => ({
+    id: id.slice(0, 8),
+    messages: agent.state.messages.length,
+    streaming: agent.state.isStreaming,
+    model: agent.state.model.id,
+  }));
+  return c.json({
+    ok: true,
+    activeSessions,
+    totalActive: sessions.size,
+    sessionsDir: SESSIONS_DIR,
+  });
 });
 
 // Serve frontend

@@ -161,12 +161,14 @@ export function generateClientHTML(): string {
           <div class="monitor-tabs">
             <button class="monitor-tab is-active" onclick="switchMonitorTab('memory')">内存</button>
             <button class="monitor-tab" onclick="switchMonitorTab('translation')">翻译</button>
+            <button class="monitor-tab" onclick="switchMonitorTab('sessions')">Agent Sessions</button>
           </div>
           <button class="monitor-close" onclick="toggleMonitorPanel()" title="关闭">×</button>
         </div>
         <div class="monitor-body">
           <div class="monitor-tab-panel" id="monitorTabMemory"></div>
           <div class="monitor-tab-panel" id="monitorTabTranslation" style="display:none;"></div>
+          <div class="monitor-tab-panel" id="monitorTabSessions" style="display:none;"></div>
         </div>
       </div>
 

@@ -1984,7 +1984,7 @@ function copyFileName(fileName: string, event?: Event) {
 // ==================== 系统监控浮窗 ====================
 const MEM_PER_PAGE_MB = 27; // A4 @ scale=1.5, dpr=2
 let monitorPollTimer: ReturnType<typeof setInterval> | null = null;
-let monitorActiveTab: 'memory' | 'translation' = 'memory';
+let monitorActiveTab: 'memory' | 'translation' | 'sessions' = 'memory';
 
 function getPdfMemStats(): Array<{ path: string; rendered: number; total: number; memMB: number; idleMins: number | null }> {
   return Array.from(pdfViewerRegistry.entries()).map(([path, entry]) => {
@@ -2062,19 +2062,89 @@ function renderTranslationTab(): void {
 
 function updateMonitorPanel(): void {
   if (monitorActiveTab === 'memory') renderMemoryTab();
-  else renderTranslationTab();
+  else if (monitorActiveTab === 'translation') renderTranslationTab();
+  else if (monitorActiveTab === 'sessions') void renderSessionsTab();
 }
 
-function switchMonitorTab(tab: 'memory' | 'translation'): void {
+function switchMonitorTab(tab: 'memory' | 'translation' | 'sessions'): void {
   monitorActiveTab = tab;
+  const labels: Record<string, string> = { memory: '内存', translation: '翻译', sessions: 'Agent Sessions' };
   document.querySelectorAll('.monitor-tab').forEach(btn => {
-    btn.classList.toggle('is-active', (btn as HTMLElement).textContent?.trim() === (tab === 'memory' ? '内存' : '翻译'));
+    btn.classList.toggle('is-active', (btn as HTMLElement).textContent?.trim() === labels[tab]);
   });
   const memEl = document.getElementById('monitorTabMemory');
   const trEl = document.getElementById('monitorTabTranslation');
+  const sessEl = document.getElementById('monitorTabSessions');
   if (memEl) memEl.style.display = tab === 'memory' ? '' : 'none';
   if (trEl) trEl.style.display = tab === 'translation' ? '' : 'none';
+  if (sessEl) sessEl.style.display = tab === 'sessions' ? '' : 'none';
   updateMonitorPanel();
+}
+
+async function renderSessionsTab(): Promise<void> {
+  const el = document.getElementById('monitorTabSessions');
+  if (!el) return;
+
+  const agentUrl = localStorage.getItem('md-viewer:agent-url') || 'http://localhost:3003';
+
+  // Status check
+  let statusHtml = '';
+  let sessionsHtml = '';
+
+  try {
+    const [statusRes, sessionsRes] = await Promise.all([
+      fetch(`${agentUrl}/status`, { signal: AbortSignal.timeout(3000) }),
+      fetch(`${agentUrl}/sessions`, { signal: AbortSignal.timeout(3000) }),
+    ]);
+
+    if (statusRes.ok) {
+      const status = await statusRes.json() as { ok: boolean; totalActive: number; sessionsDir: string; activeSessions: Array<{id: string; messages: number; streaming: boolean; model: string}> };
+      statusHtml = `
+        <div style="margin-bottom:10px;padding:8px;background:var(--color-bg-subtle);border-radius:var(--radius-md);border:1px solid var(--color-border);">
+          <div style="font-size:11px;color:var(--color-text-muted);margin-bottom:4px;">Agent Server: <span style="color:var(--color-success);font-weight:600;">● 在线</span> · 活跃 ${status.totalActive} 个</div>
+          <div style="font-size:10px;color:var(--color-text-muted);word-break:break-all;">${status.sessionsDir}</div>
+          ${status.activeSessions.map(s => `
+            <div style="font-size:11px;margin-top:4px;color:var(--color-text-secondary);">
+              ${s.streaming ? '⏳' : '💬'} <code style="font-size:10px;">${s.id}…</code> · ${s.messages} 条 · ${s.model}
+            </div>`).join('')}
+        </div>`;
+    }
+
+    if (sessionsRes.ok) {
+      const data = await sessionsRes.json() as { sessions: Array<{id: string; messageCount: number; firstMessage: string; model: string; modified: string | null; tokenUsage: {input: number; output: number; total: number}; active: boolean}>; total: number };
+      if (data.sessions.length === 0) {
+        sessionsHtml = `<div style="color:var(--color-text-muted);font-size:12px;padding:8px 0;">暂无 session</div>`;
+      } else {
+        sessionsHtml = data.sessions.map(s => {
+          const modified = s.modified ? new Date(s.modified).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+          const tokens = s.tokenUsage.total > 0 ? `${(s.tokenUsage.total / 1000).toFixed(1)}k tokens` : '';
+          return `
+            <div style="padding:7px 8px;margin-bottom:6px;background:${s.active ? 'var(--color-success-bg)' : '#fff'};border:1px solid ${s.active ? 'var(--color-success)' : 'var(--color-border)'};border-radius:var(--radius-md);font-size:12px;">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+                <span style="color:var(--color-text-muted);font-size:10px;font-family:monospace;">${s.id.slice(0, 12)}…</span>
+                ${s.active ? '<span style="font-size:10px;color:var(--color-success);font-weight:600;">活跃</span>' : ''}
+                <span style="margin-left:auto;font-size:10px;color:var(--color-text-muted);">${modified}</span>
+              </div>
+              <div style="color:var(--color-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.firstMessage || '(空)'}</div>
+              <div style="display:flex;gap:8px;margin-top:3px;font-size:10px;color:var(--color-text-muted);">
+                <span>${s.messageCount} 条消息</span>
+                ${tokens ? `<span>${tokens}</span>` : ''}
+                ${s.model ? `<span>${s.model}</span>` : ''}
+              </div>
+            </div>`;
+        }).join('');
+      }
+    }
+  } catch {
+    statusHtml = `<div style="color:var(--color-error);font-size:12px;padding:8px 0;">Agent Server 未连接 (${agentUrl})</div>`;
+  }
+
+  el.innerHTML = `
+    <div style="padding:8px 0;">
+      ${statusHtml}
+      <div style="font-size:11px;font-weight:600;color:var(--color-text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Sessions (${monitorActiveTab === 'sessions' ? '自动刷新' : ''})</div>
+      ${sessionsHtml}
+    </div>`;
 }
 
 function toggleMonitorPanel(): void {
@@ -2378,7 +2448,7 @@ declare global {
     showToast?: (message: string, type: string) => void;
     showSettingsDialog: () => void;
     toggleMonitorPanel: () => void;
-    switchMonitorTab: (tab: 'memory' | 'translation') => void;
+    switchMonitorTab: (tab: 'memory' | 'translation' | 'sessions') => void;
     clearMonitorTranslationStats: () => void;
     switchAnnotationTab: (tab: 'comments' | 'translation' | 'chat') => void;
     zoomReset: () => void;

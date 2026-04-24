@@ -8,7 +8,7 @@ import { registerBuiltInApiProviders } from "@mariozechner/pi-ai";
 registerBuiltInApiProviders();
 import type { Model } from "@mariozechner/pi-ai";
 import { SessionManager } from "@mariozechner/pi-coding-agent";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { getAuthToken } from "./auth.ts";
@@ -237,7 +237,7 @@ app.delete("/session/:id", (c) => {
   // Look up actual file path from index
   const actualPath = sessionIndex.get(id) ?? sessionFilePath(id);
   if (existsSync(actualPath)) {
-    try { require("fs").unlinkSync(actualPath); } catch {}
+    try { unlinkSync(actualPath); } catch {}
   }
   sessionIndex.delete(id);
   saveIndex();
@@ -271,59 +271,56 @@ app.get("/session/:id/history", (c) => {
 // GET /sessions — list all sessions with metadata and token usage
 app.get("/sessions", async (c) => {
   try {
-    const { readdir, stat } = await import("fs/promises");
-    const files = await readdir(SESSIONS_DIR).catch(() => [] as string[]);
-    const sessionFiles = files.filter((f) => f.endsWith(".jsonl"));
+    const { stat } = await import("fs/promises");
+    const results = await Promise.all(
+      Array.from(sessionIndex.entries()).map(async ([sessionId, filePath]) => {
+        const fileStat = await stat(filePath).catch(() => null);
+        const created = fileStat?.birthtime?.toISOString() ?? null;
+        const modified = fileStat?.mtime?.toISOString() ?? null;
 
-    const results = await Promise.all(sessionFiles.map(async (filename) => {
-      const fp = join(SESSIONS_DIR, filename);
-      const sessionId = filename.replace(".jsonl", "");
-      const fileStat = await stat(fp).catch(() => null);
+        let messageCount = 0;
+        let tokenUsage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 };
+        let firstMessage = "";
+        let model = "";
 
-      let messageCount = 0;
-      let tokenUsage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 };
-      let firstMessage = "";
-      let model = "";
-      const created = fileStat?.birthtime?.toISOString() ?? null;
-      const modified = fileStat?.mtime?.toISOString() ?? null;
-
-      try {
-        const sm = SessionManager.open(fp, SESSIONS_DIR);
-        const entries = sm.getEntries();
-        for (const entry of entries) {
-          if ((entry as any).type === "message") {
-            messageCount++;
-            const msg = (entry as any).message;
-            if (!firstMessage && msg?.role === "user") {
-              const cont = msg.content;
-              firstMessage = typeof cont === "string" ? cont.slice(0, 80)
-                : Array.isArray(cont) ? cont.filter((b: any) => b.type === "text").map((b: any) => b.text).join("").slice(0, 80)
-                : "";
+        try {
+          const sm = SessionManager.open(filePath, SESSIONS_DIR);
+          const entries = sm.getEntries();
+          for (const entry of entries) {
+            if ((entry as any).type === "message") {
+              messageCount++;
+              const msg = (entry as any).message;
+              if (!firstMessage && msg?.role === "user") {
+                const cont = msg.content;
+                firstMessage = typeof cont === "string" ? cont.slice(0, 80)
+                  : Array.isArray(cont) ? cont.filter((b: any) => b.type === "text").map((b: any) => b.text).join("").slice(0, 80)
+                  : "";
+              }
+              if (msg?.role === "assistant" && msg?.usage) {
+                tokenUsage.input += msg.usage.input ?? 0;
+                tokenUsage.output += msg.usage.output ?? 0;
+                tokenUsage.cacheRead += msg.usage.cacheRead ?? 0;
+                tokenUsage.cacheWrite += msg.usage.cacheWrite ?? 0;
+                tokenUsage.total = tokenUsage.input + tokenUsage.output + tokenUsage.cacheRead + tokenUsage.cacheWrite;
+              }
+              if (msg?.model) model = msg.model;
             }
-            if (msg?.role === "assistant" && msg?.usage) {
-              tokenUsage.input += msg.usage.input ?? 0;
-              tokenUsage.output += msg.usage.output ?? 0;
-              tokenUsage.cacheRead += msg.usage.cacheRead ?? 0;
-              tokenUsage.cacheWrite += msg.usage.cacheWrite ?? 0;
-              tokenUsage.total += msg.usage.totalTokens ?? 0;
-            }
-            if (msg?.model) model = msg.model;
           }
-        }
-      } catch { /* unreadable session */ }
+        } catch { /* unreadable session */ }
 
-      return {
-        id: sessionId,
-        path: fp,
-        created,
-        modified,
-        messageCount,
-        firstMessage,
-        model,
-        tokenUsage,
-        active: sessions.has(sessionId),
-      };
-    }));
+        return {
+          id: sessionId,
+          path: filePath,
+          created,
+          modified,
+          messageCount,
+          firstMessage,
+          model,
+          tokenUsage,
+          active: sessions.has(sessionId),
+        };
+      })
+    );
 
     results.sort((a, b) => (b.modified ?? "").localeCompare(a.modified ?? ""));
     return c.json({ sessions: results, total: results.length });

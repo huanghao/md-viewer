@@ -359,7 +359,7 @@ function clampSidebarWidth(width: number): number {
 function setAnnotationSidebarWidth(width: number): void {
   const clamped = clampSidebarWidth(width);
   document.documentElement.style.setProperty('--annotation-sidebar-width', `${clamped}px`);
-  storageSet(ANNOTATION_WIDTH_KEY, String(clamped));
+  storageSet(ANNOTATION_WIDTH_KEY, clamped);
 }
 
 function initAnnotationSidebarWidth(): void {
@@ -1733,7 +1733,7 @@ export function initAnnotationElements(): void {
   function setChatSidebarWidth(width: number): void {
     const clamped = Math.max(CHAT_SPLIT_WIDTH_MIN, Math.min(CHAT_SPLIT_WIDTH_MAX, Math.round(width)));
     document.documentElement.style.setProperty('--chat-sidebar-width', `${clamped}px`);
-    storageSet(CHAT_SPLIT_WIDTH_KEY, String(clamped));
+    storageSet(CHAT_SPLIT_WIDTH_KEY, clamped);
   }
 
   function syncChatSidebarLayout(): void {

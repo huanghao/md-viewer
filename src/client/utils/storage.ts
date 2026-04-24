@@ -29,8 +29,13 @@ export function storageSet<T>(key: string, value: T, onQuota?: () => void): void
 export function storageGetNumber(key: string, fallback: number): number {
   const raw = localStorage.getItem(key);
   if (raw === null) return fallback;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : fallback;
+  try {
+    const n = Number(JSON.parse(raw));
+    return Number.isFinite(n) ? n : fallback;
+  } catch {
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : fallback;
+  }
 }
 
 export function getAllStorageKeys(): string[] {

@@ -138,10 +138,16 @@ app.post("/chat", async (c) => {
   const body = await c.req.json() as {
     sessionId: string;
     message: string;
+    model?: string;
     context?: DocContext;
   };
-  const { sessionId, message, context } = body;
+  const { sessionId, message, model, context } = body;
   const agent = getOrCreateAgent(sessionId);
+
+  // Update model if specified
+  if (model && agent.state.model.id !== model) {
+    agent.state.model = { ...agent.state.model, id: model };
+  }
 
   // Update system prompt with current doc context on every message
   if (context) {

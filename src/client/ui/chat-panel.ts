@@ -4,7 +4,22 @@ import { storageGet, storageSet } from '../utils/storage.js';
 const AGENT_URL_KEY = 'md-viewer:agent-url';
 const SESSION_ID_KEY = 'md-viewer:chat-session-id';
 const PROMPTS_KEY = 'md-viewer:chat-quick-prompts';
+const MODEL_KEY = 'md-viewer:chat-model';
 const DEFAULT_AGENT_URL = 'http://localhost:3003';
+const DEFAULT_MODEL = 'claude-haiku-4-5';
+
+const CLAUDE_MODELS = [
+  { id: 'claude-haiku-4-5',  label: 'Haiku 4.5  (快·省)' },
+  { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6 (均衡)' },
+  { id: 'claude-opus-4-6',   label: 'Opus 4.6   (最强)' },
+];
+
+function getModel(): string {
+  return storageGet<string>(MODEL_KEY, DEFAULT_MODEL);
+}
+function setModel(id: string): void {
+  storageSet(MODEL_KEY, id);
+}
 
 const DEFAULT_QUICK_PROMPTS = [
   '查看当前文档的评论并更新',
@@ -135,10 +150,14 @@ export function renderChatPanel(): void {
   const agentUrl = getAgentUrl();
 
   const shortId = state.sessionId.slice(0, 8);
+  const currentModel = getModel();
   container.innerHTML = `
     <div class="chat-config-bar">
       <span>Agent:</span>
       <input id="chatAgentUrlInput" type="text" value="${escapeHtml(agentUrl)}" placeholder="${DEFAULT_AGENT_URL}" />
+      <select id="chatModelSelect" style="background:#fff;border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:2px 4px;font-size:11px;color:var(--color-text-secondary);cursor:pointer;outline:none;max-width:110px;">
+        ${CLAUDE_MODELS.map(m => `<option value="${m.id}"${m.id === currentModel ? ' selected' : ''}>${m.label}</option>`).join('')}
+      </select>
       <button id="chatNewSessionBtn" title="新建会话" style="background:none;border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:2px 6px;cursor:pointer;font-size:11px;color:var(--color-text-muted);white-space:nowrap;">+ 新建</button>
     </div>
     <div class="chat-config-bar" style="border-top:none;padding-top:0;gap:4px;">
@@ -204,6 +223,11 @@ function wireEvents(): void {
   const urlInput = document.getElementById('chatAgentUrlInput') as HTMLInputElement | null;
   if (urlInput) {
     urlInput.addEventListener('change', () => setAgentUrl(urlInput.value.trim() || DEFAULT_AGENT_URL));
+  }
+
+  const modelSelect = document.getElementById('chatModelSelect') as HTMLSelectElement | null;
+  if (modelSelect) {
+    modelSelect.addEventListener('change', () => setModel(modelSelect.value));
   }
 
   // Quick prompt buttons — click fills input, focus ready for Cmd+Enter
@@ -326,6 +350,7 @@ async function sendMessage(): Promise<void> {
       body: JSON.stringify({
         sessionId: state.sessionId,
         message: text,
+        model: getModel(),
         context: Object.keys(contextPayload).length ? contextPayload : undefined,
       }),
     });

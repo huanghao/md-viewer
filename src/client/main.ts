@@ -2111,28 +2111,86 @@ async function renderSessionsTab(): Promise<void> {
     }
 
     if (sessionsRes.ok) {
-      const data = await sessionsRes.json() as { sessions: Array<{id: string; messageCount: number; firstMessage: string; model: string; modified: string | null; tokenUsage: {input: number; output: number; total: number}; active: boolean}>; total: number };
+      type SessionData = {
+        id: string; messageCount: number; firstMessage: string; model: string;
+        modified: string | null; created: string | null; active: boolean;
+        tokenUsage: { input: number; output: number; cacheRead: number; cacheWrite: number; total: number };
+      };
+      const data = await sessionsRes.json() as { sessions: SessionData[]; total: number };
+
       if (data.sessions.length === 0) {
         sessionsHtml = `<div style="color:var(--color-text-muted);font-size:12px;padding:8px 0;">暂无 session</div>`;
       } else {
-        sessionsHtml = data.sessions.map(s => {
+        // 汇总统计
+        const allSessions = data.sessions;
+        const totalInput = allSessions.reduce((s, x) => s + x.tokenUsage.input, 0);
+        const totalOutput = allSessions.reduce((s, x) => s + x.tokenUsage.output, 0);
+        const totalCacheRead = allSessions.reduce((s, x) => s + x.tokenUsage.cacheRead, 0);
+        const totalCacheWrite = allSessions.reduce((s, x) => s + x.tokenUsage.cacheWrite, 0);
+        const totalAll = allSessions.reduce((s, x) => s + x.tokenUsage.total, 0);
+        const cacheHitRate = (totalCacheRead + totalCacheWrite) > 0
+          ? Math.round(totalCacheRead / (totalCacheRead + totalCacheWrite) * 100) : 0;
+
+        const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+
+        const summaryHtml = `
+          <div style="margin-bottom:10px;padding:8px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:var(--radius-md);">
+            <div style="font-size:11px;font-weight:600;color:#0369a1;margin-bottom:6px;">全部 ${data.total} 个 Session 汇总</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:11px;">
+              <div style="color:var(--color-text-secondary);">总 tokens</div>
+              <div style="font-weight:600;color:var(--color-text-primary);">${fmt(totalAll)}</div>
+              <div style="color:var(--color-text-secondary);">输入</div>
+              <div style="color:var(--color-text-primary);">${fmt(totalInput)}</div>
+              <div style="color:var(--color-text-secondary);">输出</div>
+              <div style="color:var(--color-text-primary);">${fmt(totalOutput)}</div>
+              <div style="color:var(--color-text-secondary);">缓存命中</div>
+              <div style="color:${cacheHitRate > 50 ? 'var(--color-success)' : 'var(--color-text-muted)'};">${fmt(totalCacheRead)} (${cacheHitRate}%)</div>
+              <div style="color:var(--color-text-secondary);">缓存写入</div>
+              <div style="color:var(--color-text-primary);">${fmt(totalCacheWrite)}</div>
+            </div>
+          </div>`;
+
+        const sessionRows = allSessions.map(s => {
+          const u = s.tokenUsage;
           const modified = s.modified ? new Date(s.modified).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
-          const tokens = s.tokenUsage.total > 0 ? `${(s.tokenUsage.total / 1000).toFixed(1)}k tokens` : '';
+          const sessionCacheHit = (u.cacheRead + u.cacheWrite) > 0
+            ? Math.round(u.cacheRead / (u.cacheRead + u.cacheWrite) * 100) : null;
+
+          // token bar: input / output / cacheRead / cacheWrite
+          const barTotal = u.input + u.output + u.cacheRead + u.cacheWrite;
+          const barHtml = barTotal > 0 ? `
+            <div style="display:flex;height:4px;border-radius:2px;overflow:hidden;margin-top:4px;gap:1px;">
+              <div style="flex:${u.input};background:#93c5fd;" title="输入 ${fmt(u.input)}"></div>
+              <div style="flex:${u.output};background:#86efac;" title="输出 ${fmt(u.output)}"></div>
+              <div style="flex:${u.cacheRead};background:#fde68a;" title="缓存命中 ${fmt(u.cacheRead)}"></div>
+              <div style="flex:${u.cacheWrite};background:#e9d5ff;" title="缓存写入 ${fmt(u.cacheWrite)}"></div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:2px;font-size:9px;color:var(--color-text-muted);">
+              <span style="color:#3b82f6;">■ 输入 ${fmt(u.input)}</span>
+              <span style="color:#22c55e;">■ 输出 ${fmt(u.output)}</span>
+              ${u.cacheRead > 0 ? `<span style="color:#f59e0b;">■ 缓存命中 ${fmt(u.cacheRead)}</span>` : ''}
+              ${u.cacheWrite > 0 ? `<span style="color:#a855f7;">■ 缓存写入 ${fmt(u.cacheWrite)}</span>` : ''}
+            </div>` : '';
+
           return `
             <div style="padding:7px 8px;margin-bottom:6px;background:${s.active ? 'var(--color-success-bg)' : '#fff'};border:1px solid ${s.active ? 'var(--color-success)' : 'var(--color-border)'};border-radius:var(--radius-md);font-size:12px;">
-              <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
-                <span style="color:var(--color-text-muted);font-size:10px;font-family:monospace;">${s.id.slice(0, 12)}…</span>
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+                <code style="font-size:10px;color:var(--color-text-muted);">${s.id.slice(0, 12)}…</code>
                 ${s.active ? '<span style="font-size:10px;color:var(--color-success);font-weight:600;">活跃</span>' : ''}
                 <span style="margin-left:auto;font-size:10px;color:var(--color-text-muted);">${modified}</span>
               </div>
-              <div style="color:var(--color-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.firstMessage || '(空)'}</div>
+              <div style="color:var(--color-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;">${s.firstMessage || '(空)'}</div>
               <div style="display:flex;gap:8px;margin-top:3px;font-size:10px;color:var(--color-text-muted);">
-                <span>${s.messageCount} 条消息</span>
-                ${tokens ? `<span>${tokens}</span>` : ''}
-                ${s.model ? `<span>${s.model}</span>` : ''}
+                <span>${s.messageCount} 条</span>
+                <span>总 ${fmt(u.total)} tokens</span>
+                ${sessionCacheHit !== null ? `<span style="color:${sessionCacheHit > 50 ? 'var(--color-success)' : 'inherit'};">缓存 ${sessionCacheHit}%</span>` : ''}
+                ${s.model ? `<span>${s.model.replace('claude-', '')}</span>` : ''}
               </div>
+              ${barHtml}
             </div>`;
         }).join('');
+
+        sessionsHtml = summaryHtml + sessionRows;
       }
     }
   } catch {

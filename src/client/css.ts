@@ -3588,8 +3588,8 @@ export const styles = `
       padding: 12px 16px;
       font-style: italic;
     }
-    /* Pin button in full tree view — show on hover */
-    .tree-item .tree-pin-btn {
+    /* Pin button — show on hover, works in all views */
+    .tree-item .tree-pin-btn, .file-item .tree-pin-btn {
       display: none;
       border: none;
       background: transparent;
@@ -3600,8 +3600,8 @@ export const styles = `
       line-height: 1;
       margin-left: auto;
     }
-    .tree-item:hover .tree-pin-btn { display: inline; }
-    .tree-item .tree-pin-btn.active { display: inline; opacity: 1; }
+    .tree-item:hover .tree-pin-btn, .file-item:hover .tree-pin-btn { display: inline; }
+    .tree-item .tree-pin-btn.active, .file-item .tree-pin-btn.active { display: inline; opacity: 1; }
 
     /* ==================== Sync / Settings Dialog ==================== */
     .sync-dialog-overlay {

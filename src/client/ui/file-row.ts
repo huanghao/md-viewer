@@ -93,7 +93,7 @@ export function renderFileRow(
     const pinned = isPinned(path);
     pinBtn = `<button
       class="tree-pin-btn${pinned ? ' active' : ''}"
-      title="${pinned ? '取消固定到焦点视图' : '固定到焦点视图'}"
+      title="${pinned ? '取消固定' : '固定到最近视图'}"
       onclick="event.stopPropagation();${pinned ? `handleUnpinFile` : `handlePinFile`}('${escapeAttr(path)}')"
     >📌</button>`;
   }

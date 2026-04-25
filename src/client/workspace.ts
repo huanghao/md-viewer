@@ -252,13 +252,6 @@ function collectFilePaths(node: FileTreeNode | undefined): string[] {
   return paths;
 }
 
-function collectFileNodes(node: FileTreeNode): FileTreeNode[] {
-  if (node.type === 'file') return [node];
-  const result: FileTreeNode[] = [];
-  for (const child of node.children || []) result.push(...collectFileNodes(child));
-  return result;
-}
-
 function collectMtimes(node: FileTreeNode): Map<string, number> {
   const map = new Map<string, number>();
   for (const f of collectFileNodes(node)) {

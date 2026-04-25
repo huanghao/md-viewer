@@ -73,9 +73,8 @@ export function saveFocusCollapsed(s: Set<string>): void {
 
 const FOCUS_WINDOW_MS: Record<string, number> = {
   '8h':  8  * 3600 * 1000,
+  '1d':  1  * 86400 * 1000,
   '2d':  2  * 86400 * 1000,
-  '1w':  7  * 86400 * 1000,
-  '1m':  30 * 86400 * 1000,
 };
 
 // Collect all file nodes from a tree recursively
@@ -134,9 +133,8 @@ function renderFilterBar(): string {
   const current = state.config.focusWindowKey || '8h';
   const timeOptions: Array<{ key: string; label: string }> = [
     { key: '8h', label: '8h' },
+    { key: '1d', label: '1d' },
     { key: '2d', label: '2d' },
-    { key: '1w', label: '1w' },
-    { key: '1m', label: '1m' },
   ];
   const timePills = timeOptions.map(o =>
     `<button class="focus-time-pill${current === o.key ? ' active' : ''}"

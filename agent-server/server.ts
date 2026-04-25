@@ -275,20 +275,17 @@ app.delete("/session/:id", (c) => {
   return c.json({ ok: true });
 });
 
-// PATCH /session/:id/context — update current file context (called on file switch)
 app.patch("/session/:id/context", async (c) => {
   const id = c.req.param("id");
   const { filePath } = await c.req.json() as { filePath?: string };
   if (!filePath) return c.json({ ok: true });
 
-  // Update index with latest filePath
   const entry = sessionIndex.get(id);
   if (entry) {
     entry.filePath = filePath;
     saveIndex();
   }
 
-  // Update system prompt in active session if loaded
   const session = sessions.get(id);
   if (session) {
     session.agent.state.systemPrompt = buildSystemPrompt({ filePath });

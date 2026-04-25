@@ -23,7 +23,7 @@ import { showSettingsDialog, closeSettingsDialog } from './ui/settings';
 import { renderJsonContent } from './ui/json-viewer';
 import { mountScrollbar, unmountScrollbar, updateScrollbar, updateDiffMarkers, clearDiffMarkers } from './ui/doc-scrollbar';
 import { shouldRefreshDiff, refreshDiffBannerLabel } from './ui/diff-refresh';
-import { initChatPanel, onChatFileSwitch } from './ui/chat-panel.js';
+import { initChatPanel, onChatFileSwitch, getAgentUrl } from './ui/chat-panel.js';
 
 import { getMdThemeCss, getHlThemeCss } from './themes/index';
 
@@ -51,7 +51,7 @@ import { createPdfViewer, type PdfViewerInstance } from "./pdf-viewer.js";
 import { createPdfAnnotationBridge } from "./pdf-annotation.js";
 import { extractMdToc, extractPdfOutline, loadSidecar, saveSidecar, scanPdfHeadings } from './toc-extractor.js';
 import { renderTocPanel, setActiveTocItem } from './ui/toc-panel.js';
-import { storageGet, storageSet, storageGetNumber } from './utils/storage';
+import { storageGet, storageSet, storageGetNumber, getAllStorageKeys } from './utils/storage';
 import { createResizer } from './utils/resizer';
 import { setupKeyboardShortcuts } from './keyboard-shortcuts';
 import { initZoom, zoomIn, zoomOut, zoomReset, updateZoomDisplay, setPdfZoomValue, getPdfZoom } from './zoom-controller';
@@ -1857,24 +1857,19 @@ let monitorActiveTab: 'memory' | 'sessions' = 'memory';
 export const activeAgentSessions = new Map<string, { sessionId: string; messages: number; model: string; streaming: boolean }>();
 
 async function refreshActiveAgentSessions(): Promise<void> {
-  const agentUrl = storageGet<string>('md-viewer:agent-url', 'http://localhost:3003');
   try {
-    const res = await fetch(`${agentUrl}/status`, { signal: AbortSignal.timeout(2000) });
+    const res = await fetch(`${getAgentUrl()}/status`, { signal: AbortSignal.timeout(2000) });
     if (!res.ok) { activeAgentSessions.clear(); return; }
     const status = await res.json() as { activeSessions: Array<{ id: string; messages: number; model: string; streaming: boolean }> };
-    // Rebuild map: sessionId → file path (from localStorage reverse lookup)
     activeAgentSessions.clear();
     for (const s of status.activeSessions) {
-      // Find which file this sessionId belongs to
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key?.startsWith('md-viewer:chat-session:') && storageGet<string>(key, '') === s.id) {
-          const filePath = key.replace('md-viewer:chat-session:', '');
-          activeAgentSessions.set(filePath, { sessionId: s.id, messages: s.messages, model: s.model, streaming: s.streaming });
+      for (const key of getAllStorageKeys()) {
+        if (key.startsWith('md-viewer:chat-session:') && storageGet<string>(key, '') === s.id) {
+          activeAgentSessions.set(key.replace('md-viewer:chat-session:', ''), { sessionId: s.id, messages: s.messages, model: s.model, streaming: s.streaming });
         }
       }
     }
-    renderSidebar(); // re-render file list with updated indicators
+    renderSidebar();
   } catch {
     activeAgentSessions.clear();
   }
@@ -1925,7 +1920,6 @@ function switchMonitorTab(tab: 'memory' | 'sessions'): void {
   const sessEl = document.getElementById('monitorTabSessions');
   if (memEl) memEl.style.display = tab === 'memory' ? '' : 'none';
   if (sessEl) sessEl.style.display = tab === 'sessions' ? '' : 'none';
-  // Manage polling: only memory tab needs frequent refresh
   if (monitorPollTimer) { clearInterval(monitorPollTimer); monitorPollTimer = null; }
   if (tab === 'memory') monitorPollTimer = setInterval(updateMonitorPanel, 2000);
   updateMonitorPanel();
@@ -1935,9 +1929,7 @@ async function renderSessionsTab(): Promise<void> {
   const el = document.getElementById('monitorTabSessions');
   if (!el) return;
 
-  const agentUrl = storageGet<string>('md-viewer:agent-url', 'http://localhost:3003');
-
-  // Status check
+  const agentUrl = getAgentUrl();
   let statusHtml = '';
   let sessionsHtml = '';
 
@@ -2081,11 +2073,8 @@ async function renderSessionsTab(): Promise<void> {
       }
       // Resume the session in chat panel
       import('./ui/chat-panel.js').then(({ renderChatPanel }) => {
-        // Set the sessionId in localStorage for this file, then re-init
-        localStorage.setItem(`md-viewer:chat-session:${filePath}`, JSON.stringify(sessionId));
-        // Switch to chat tab
+        storageSet(`md-viewer:chat-session:${filePath}`, sessionId);
         switchAnnotationTab('chat');
-        // Force re-render chat panel with new session
         setTimeout(() => renderChatPanel(), 100);
       });
     });
@@ -2102,7 +2091,6 @@ function toggleMonitorPanel(): void {
   } else {
     panel.style.display = 'block';
     updateMonitorPanel();
-    // Only poll for memory tab (PDF stats change frequently); sessions tab loads once
     if (monitorActiveTab === 'memory') {
       monitorPollTimer = setInterval(updateMonitorPanel, 2000);
     }
@@ -2425,8 +2413,6 @@ window.toggleMonitorPanel = toggleMonitorPanel;
 window.switchMonitorTab = switchMonitorTab;
 window.switchAnnotationTab = switchAnnotationTab;
 // Expose active agent sessions for file-row indicators
-(window as any).__activeAgentSessions = activeAgentSessions;
-// Poll active sessions every 5s to keep file indicators fresh
 setInterval(() => void refreshActiveAgentSessions(), 5000);
 void refreshActiveAgentSessions();
 window.zoomReset = zoomReset;

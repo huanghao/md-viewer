@@ -82,9 +82,9 @@ export function setAgentUrl(url: string): void {
 
 export function setChatSelectedText(text: string | null): void {
   state.selectedText = text;
-  // Update docContext.quote for server-side context injection
   state.docContext = { ...state.docContext, quote: text ?? undefined };
   renderSelBar();
+
 }
 
 export function clearChatSelectedText(): void {
@@ -125,16 +125,20 @@ export function onChatFileSwitch(filePath: string | null): void {
   }
 }
 
-async function notifyFileContext(filePath: string): Promise<void> {
-  // Tell agent-server which file is currently open so system prompt stays current
-  try {
-    await fetch(`${getAgentUrl()}/session/${state.sessionId}/context`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filePath }),
-      signal: AbortSignal.timeout(3000),
-    });
-  } catch { /* agent-server not running, ignore */ }
+let _notifyTimer: ReturnType<typeof setTimeout> | null = null;
+function notifyFileContext(filePath: string): void {
+  if (_notifyTimer) clearTimeout(_notifyTimer);
+  _notifyTimer = setTimeout(async () => {
+    _notifyTimer = null;
+    try {
+      await fetch(`${getAgentUrl()}/session/${state.sessionId}/context`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath }),
+        signal: AbortSignal.timeout(3000),
+      });
+    } catch { /* agent-server not running, ignore */ }
+  }, 300);
 }
 
 export function initChatPanel(): void {
@@ -262,7 +266,6 @@ function wireEvents(): void {
     navigator.clipboard.writeText(state.sessionId);
   });
 
-  // Load token HUD for current session
   void (async () => {
     try {
       const res = await fetch(`${getAgentUrl()}/sessions`, { signal: AbortSignal.timeout(2000) });

@@ -1857,7 +1857,7 @@ let monitorActiveTab: 'memory' | 'sessions' = 'memory';
 export const activeAgentSessions = new Map<string, { sessionId: string; messages: number; model: string; streaming: boolean }>();
 
 async function refreshActiveAgentSessions(): Promise<void> {
-  const agentUrl = localStorage.getItem('md-viewer:agent-url') || 'http://localhost:3003';
+  const agentUrl = storageGet<string>('md-viewer:agent-url', 'http://localhost:3003');
   try {
     const res = await fetch(`${agentUrl}/status`, { signal: AbortSignal.timeout(2000) });
     if (!res.ok) { activeAgentSessions.clear(); return; }
@@ -1935,7 +1935,7 @@ async function renderSessionsTab(): Promise<void> {
   const el = document.getElementById('monitorTabSessions');
   if (!el) return;
 
-  const agentUrl = localStorage.getItem('md-viewer:agent-url') || 'http://localhost:3003';
+  const agentUrl = storageGet<string>('md-viewer:agent-url', 'http://localhost:3003');
 
   // Status check
   let statusHtml = '';

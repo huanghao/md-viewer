@@ -1868,7 +1868,7 @@ async function refreshActiveAgentSessions(): Promise<void> {
       // Find which file this sessionId belongs to
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key?.startsWith('md-viewer:chat-session:') && localStorage.getItem(key) === s.id) {
+        if (key?.startsWith('md-viewer:chat-session:') && storageGet<string>(key, '') === s.id) {
           const filePath = key.replace('md-viewer:chat-session:', '');
           activeAgentSessions.set(filePath, { sessionId: s.id, messages: s.messages, model: s.model, streaming: s.streaming });
         }
@@ -2082,7 +2082,7 @@ async function renderSessionsTab(): Promise<void> {
       // Resume the session in chat panel
       import('./ui/chat-panel.js').then(({ renderChatPanel }) => {
         // Set the sessionId in localStorage for this file, then re-init
-        localStorage.setItem(`md-viewer:chat-session:${filePath}`, sessionId);
+        localStorage.setItem(`md-viewer:chat-session:${filePath}`, JSON.stringify(sessionId));
         // Switch to chat tab
         switchAnnotationTab('chat');
         // Force re-render chat panel with new session

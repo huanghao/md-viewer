@@ -128,6 +128,19 @@ app.post("/api/session-state", handleUpdateSessionState);
 // API: 客户端配置
 app.get("/api/config", (c) => handleGetClientConfig());
 
+// API: 焦点信号采集（写本地日志，用于 frecency 策略评估）
+import { appendFileSync, mkdirSync } from "fs";
+const FOCUS_SIGNALS_PATH = "logs/focus-signals.jsonl";
+app.post("/api/focus-signal", async (c) => {
+  try {
+    const { type, file } = await c.req.json<{ type: string; file: string }>();
+    if (!type || !file) return c.json({ ok: false }, 400);
+    const line = JSON.stringify({ ts: Date.now(), type, file }) + "\n";
+    mkdirSync("logs", { recursive: true });
+    appendFileSync(FOCUS_SIGNALS_PATH, line);
+  } catch { /* 静默失败，不影响主流程 */ }
+  return c.json({ ok: true });
+});
 
 // ==================== 启动服务 ====================
 

@@ -22,6 +22,7 @@ import { createResizer } from './utils/resizer';
 import { getTextNodes, globalOffsetForPosition, positionForGlobalOffset, clamp, placeFloating, getReaderText } from './annotation/position';
 import { isResolvedAnn, getAnchorTrack, matchesFilter, getVisibleAnnotations as getVisibleAnnotationsUtil } from './annotation/query';
 import { handleEmacsKeys } from './utils/emacs-keys';
+import { recordSignal } from './utils/focus-signals';
 
 // ==================== 类型定义 ====================
 export interface Annotation {
@@ -1528,6 +1529,11 @@ export function initAnnotationElements(): void {
   _cachedElements = null;
   initAnnotationSidebarWidth();
   setSidebarCollapsed(true);
+
+  document.addEventListener('annotation:created', (e: Event) => {
+    const { filePath } = (e as CustomEvent).detail;
+    if (filePath) recordSignal(filePath, 'annotate');
+  });
 
   // 绑定全局事件
   document.getElementById('composerSaveBtn')?.addEventListener('click', () => {

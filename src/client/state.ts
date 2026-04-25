@@ -1,6 +1,7 @@
 import type { AppState, FileInfo, FileData } from './types';
 import { loadConfig } from './config';
 import { storageGet, storageSet } from './utils/storage';
+import { recordSignal } from './utils/focus-signals';
 import {
   clearListDiff,
   clearWorkspacePathMissing,
@@ -211,6 +212,7 @@ export function switchToFile(path: string): void {
   clearListDiff(path);
   clearWorkspacePathMissing(path);
   saveState();
+  recordSignal(path, 'open');
 }
 
 export function markFileMissing(path: string, switchTo: boolean = false): void {

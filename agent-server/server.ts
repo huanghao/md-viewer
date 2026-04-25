@@ -69,7 +69,12 @@ function buildModel(): Model<"anthropic-messages"> {
 
 // ── Base system prompt ────────────────────────────────────────────────────────
 const BASE_SYSTEM_PROMPT = process.env.SYSTEM_PROMPT ??
-  "你是 mdv 的 AI 助手，帮助用户阅读和编辑文档。优先根据提供的文档上下文直接回答，需要更多信息时使用 read_file 工具。修改文件前先确认。";
+  `你是 mdv 的 AI 助手，帮助用户阅读和编辑文档。优先根据提供的文档上下文直接回答，需要更多信息时使用 read_file 工具。修改文件前先确认。
+
+# Bash 工具使用规范
+- 命令中使用单引号而不是双引号来避免转义问题，例如：find . -name '*.md'
+- 避免在命令参数中使用反斜杠转义，改用单引号包裹
+- 路径中有空格时用单引号包裹整个路径`;
 
 // ── Context injection ─────────────────────────────────────────────────────────
 interface DocContext {
@@ -267,6 +272,28 @@ app.delete("/session/:id", (c) => {
   }
   sessionIndex.delete(id);
   saveIndex();
+  return c.json({ ok: true });
+});
+
+// PATCH /session/:id/context — update current file context (called on file switch)
+app.patch("/session/:id/context", async (c) => {
+  const id = c.req.param("id");
+  const { filePath } = await c.req.json() as { filePath?: string };
+  if (!filePath) return c.json({ ok: true });
+
+  // Update index with latest filePath
+  const entry = sessionIndex.get(id);
+  if (entry) {
+    entry.filePath = filePath;
+    saveIndex();
+  }
+
+  // Update system prompt in active session if loaded
+  const session = sessions.get(id);
+  if (session) {
+    session.agent.state.systemPrompt = buildSystemPrompt({ filePath });
+  }
+
   return c.json({ ok: true });
 });
 

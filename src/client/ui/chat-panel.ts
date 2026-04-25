@@ -118,8 +118,23 @@ export function onChatFileSwitch(filePath: string | null): void {
   // Stable session per file — same file always gets same sessionId
   state.sessionId = filePath ? sessionIdForFile(filePath) : crypto.randomUUID();
   renderChatPanel();
-  // Load history for this file's session
-  if (filePath) void loadHistory().then(() => renderChatPanel());
+  if (filePath) {
+    // Load history and notify server of current file context
+    void loadHistory().then(() => renderChatPanel());
+    void notifyFileContext(filePath);
+  }
+}
+
+async function notifyFileContext(filePath: string): Promise<void> {
+  // Tell agent-server which file is currently open so system prompt stays current
+  try {
+    await fetch(`${getAgentUrl()}/session/${state.sessionId}/context`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filePath }),
+      signal: AbortSignal.timeout(3000),
+    });
+  } catch { /* agent-server not running, ignore */ }
 }
 
 export function initChatPanel(): void {

@@ -6,6 +6,7 @@ import { generateDistinctNames } from '../utils/file-names';
 import { getFileListStatus } from '../utils/file-status';
 import { isJsonFile, isJsonlFile } from '../utils/file-type';
 import { renderFileRow } from './file-row';
+import { isPinned } from '../utils/pinned-files';
 import { getTabBatchTargets, type TabBatchAction } from '../utils/tab-batch';
 import { renderWorkspaceSidebar, bindWorkspaceEvents } from './sidebar-workspace';
 import { syncAnnotationSidebarLayout } from '../annotation';
@@ -171,7 +172,7 @@ export function renderSearchBox(): void {
   const placeholder = tab === 'list'
     ? '搜索已打开的文件'
     : tab === 'focus'
-    ? '搜索焦点文件'
+    ? '搜索最近文件'
     : '搜索或输入路径（Enter补全，Cmd/Ctrl+Enter添加）';
 
   if (!input || !clearBtn) {
@@ -287,9 +288,9 @@ function renderViewTabs(): void {
 
   const tab = state.config.sidebarTab;
   const tabs: Array<{ key: 'focus' | 'full' | 'list'; label: string }> = [
-    { key: 'focus', label: '焦点' },
-    { key: 'full', label: '全量' },
-    { key: 'list', label: '列表' },
+    { key: 'focus', label: '最近' },
+    { key: 'full', label: '工作区' },
+    { key: 'list', label: '打开' },
   ];
 
   container.innerHTML = `
@@ -328,7 +329,7 @@ export function renderFiles(): void {
     return renderFileRow(file.path, file.displayName || file.name, undefined, {
       containerClass: 'file-item',
       onClickJs: (p) => `window.switchFile('${escapeAttr(p)}')`,
-      showPin: false,
+      showPin: true,
       showTime: false,
       indentPx: 0,
       query: state.searchQuery.toLowerCase().trim(),
@@ -465,6 +466,9 @@ export function renderTabs(): void {
       return displayName.toLowerCase().includes(query) || file.path.toLowerCase().includes(query);
     })
     .sort((a, b) => {
+      const aPinned = isPinned(a.path);
+      const bPinned = isPinned(b.path);
+      if (aPinned !== bPinned) return aPinned ? -1 : 1;
       const nameA = a.displayName || a.name;
       const nameB = b.displayName || b.name;
       if (tabManagerSort === 'name') {

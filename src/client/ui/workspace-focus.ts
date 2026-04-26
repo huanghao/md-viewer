@@ -77,6 +77,59 @@ const FOCUS_WINDOW_MS: Record<string, number> = {
   '2d':  2  * 86400 * 1000,
 };
 
+// ── Frecency ──────────────────────────────────────────────────────────────────
+
+const FRECENCY_WEIGHTS = { open: 10, annotate: 15, mtime: 1 } as const;
+const FRECENCY_HALF_LIFE_HOURS = { open: 48, annotate: 48, mtime: 8 } as const;
+type FrecencySignalType = keyof typeof FRECENCY_WEIGHTS;
+
+interface FrecencySignal { ts: number; type: string; file: string; }
+
+// In-memory signal cache, refreshed periodically
+let signalCache: FrecencySignal[] = [];
+let signalCacheTs = 0;
+const SIGNAL_CACHE_TTL = 30_000; // refresh every 30s
+
+export async function refreshFrecencySignals(): Promise<void> {
+  try {
+    const res = await fetch('/api/focus-signals?days=7');
+    if (!res.ok) return;
+    const data = await res.json() as { signals: FrecencySignal[] };
+    signalCache = data.signals;
+    signalCacheTs = Date.now();
+  } catch { /* server not available */ }
+}
+
+function getSignalCache(): FrecencySignal[] {
+  if (Date.now() - signalCacheTs > SIGNAL_CACHE_TTL) {
+    void refreshFrecencySignals();
+  }
+  return signalCache;
+}
+
+// Compute frecency score for a single file
+function computeFrecencyScore(filePath: string, signals: FrecencySignal[]): number {
+  const now = Date.now();
+  return signals
+    .filter((s) => s.file === filePath)
+    .reduce((sum, s) => {
+      const type = (s.type in FRECENCY_WEIGHTS ? s.type : 'mtime') as FrecencySignalType;
+      const ageHours = (now - s.ts) / 3_600_000;
+      const lambda = Math.LN2 / FRECENCY_HALF_LIFE_HOURS[type];
+      return sum + FRECENCY_WEIGHTS[type] * Math.exp(-lambda * ageHours);
+    }, 0);
+}
+
+// Build a score map for all files that appear in signals
+export function buildFrecencyMap(signals: FrecencySignal[]): Map<string, number> {
+  const files = new Set(signals.map((s) => s.file));
+  const map = new Map<string, number>();
+  for (const f of files) {
+    map.set(f, computeFrecencyScore(f, signals));
+  }
+  return map;
+}
+
 // Collect all file nodes from a tree recursively
 function collectFiles(node: FileTreeNode): FileTreeNode[] {
   if (node.type === 'file') return [node];
@@ -130,17 +183,6 @@ function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>, query: str
 }
 
 function renderFilterBar(): string {
-  const current = state.config.focusWindowKey || '8h';
-  const timeOptions: Array<{ key: string; label: string }> = [
-    { key: '8h', label: '8h' },
-    { key: '1d', label: '1d' },
-    { key: '2d', label: '2d' },
-  ];
-  const timePills = timeOptions.map(o =>
-    `<button class="focus-time-pill${current === o.key ? ' active' : ''}"
-             onclick="setFocusWindowKey('${o.key}')">${o.label}</button>`
-  ).join('');
-
   const typeOptions: Array<{ ext: string; label: string }> = [
     { ext: 'md', label: 'MD' },
     { ext: 'pdf', label: 'PDF' },
@@ -155,8 +197,6 @@ function renderFilterBar(): string {
   return `
     <div class="focus-filter-bar">
       <span class="focus-filter-label">最近</span>
-      <div class="focus-time-pills">${timePills}</div>
-      <span class="focus-filter-sep">│</span>
       <div class="focus-type-pills">${typePills}</div>
     </div>
   `;
@@ -194,21 +234,34 @@ function renderFocusWorkspaceGroup(
   `;
 }
 
+const FOCUS_TOP_N = 15;
+const FOCUS_EXPANDED_KEY = 'md-viewer:focus-expanded';
+
+function isFocusExpanded(): boolean {
+  return storageGet<boolean>(FOCUS_EXPANDED_KEY, false);
+}
+
+export function toggleFocusExpanded(): void {
+  storageSet(FOCUS_EXPANDED_KEY, !isFocusExpanded());
+  import('./sidebar').then(({ renderSidebar }) => renderSidebar());
+}
+
 export function renderFocusView(): string {
   const workspaces = state.config.workspaces;
   if (workspaces.length === 0) {
     return '<div class="focus-empty">暂无工作区</div>';
   }
 
-  const windowMs = FOCUS_WINDOW_MS[state.config.focusWindowKey || '8h'] ?? FOCUS_WINDOW_MS['8h'];
   const pinned = getPinnedFiles();
   const query = state.searchQuery.trim().toLowerCase();
-
+  const signals = getSignalCache();
+  const frecencyMap = buildFrecencyMap(signals);
   const collapsed = getFocusCollapsed();
 
-  const groups = workspaces.map((ws) => {
+  // Collect all files across workspaces, trigger scans as needed
+  const allCandidates: Array<{ file: FileTreeNode; ws: typeof workspaces[0] }> = [];
+  for (const ws of workspaces) {
     const tree = state.fileTree.get(ws.id);
-    const loading = !tree;
     if (!tree && !pendingScanIds.has(ws.id) && !isWorkspaceFailed(ws.id)) {
       pendingScanIds.add(ws.id);
       void scanWorkspace(ws.id).then((scanned) => {
@@ -221,29 +274,73 @@ export function renderFocusView(): string {
         }
       });
     }
-    let activeFiles = getActiveFiles(ws.path, tree, windowMs, pinned, state.annotationSummaries);
-    // Apply search filter: match against file name or path
-    if (query) {
-      activeFiles = activeFiles.filter((f) => {
+    if (!tree) continue;
+    const ignored = buildIgnoredSet(tree, ws.path);
+    for (const f of collectFiles(tree)) {
+      if (ignored.has(f.path)) continue;
+      // Type filter (pinned bypass)
+      if (!pinned.has(f.path)) {
+        const ext = getFileExtension(f.path);
+        const norm = ext === 'markdown' ? 'md' : ext === 'htm' ? 'html' : ext === 'jsonl' ? 'json' : ext;
+        if (!activeTypes.has(norm)) continue;
+      }
+      allCandidates.push({ file: f, ws });
+    }
+  }
+
+  // Sort: pinned first, then by frecency score desc, fallback to mtime
+  allCandidates.sort((a, b) => {
+    const aPinned = pinned.has(a.file.path);
+    const bPinned = pinned.has(b.file.path);
+    if (aPinned !== bPinned) return aPinned ? -1 : 1;
+    const aScore = frecencyMap.get(a.file.path) ?? 0;
+    const bScore = frecencyMap.get(b.file.path) ?? 0;
+    if (bScore !== aScore) return bScore - aScore;
+    return (b.file.lastModified || 0) - (a.file.lastModified || 0);
+  });
+
+  // Search filter
+  let filtered = query
+    ? allCandidates.filter(({ file: f }) => {
         const name = (stripWorkspaceTreeDisplayExtension(f.name) || f.name).toLowerCase();
         return name.includes(query) || f.path.toLowerCase().includes(query);
-      });
-    }
-    // Apply type filter: pinned files bypass type filter
-    activeFiles = activeFiles.filter((f) => {
-      if (pinned.has(f.path)) return true;
-      const ext = getFileExtension(f.path);
-      const normalizedExt = ext === 'markdown' ? 'md' : ext === 'htm' ? 'html' : ext === 'jsonl' ? 'json' : ext;
-      return activeTypes.has(normalizedExt);
-    });
-    if (!loading && activeFiles.length === 0) return '';
-    return renderFocusWorkspaceGroup(ws, activeFiles, pinned, loading, query, collapsed);
+      })
+    : allCandidates;
+
+  if (filtered.length === 0) {
+    return `<div class="focus-view">${renderFilterBar()}<div class="focus-empty">暂无最近文件</div></div>`;
+  }
+
+  const expanded = isFocusExpanded();
+  const visible = expanded ? filtered : filtered.slice(0, FOCUS_TOP_N);
+  const hasMore = filtered.length > FOCUS_TOP_N;
+
+  // Group visible files by workspace for display
+  const byWs = new Map<string, Array<{ file: FileTreeNode; score: number }>>();
+  for (const { file, ws } of visible) {
+    const arr = byWs.get(ws.id) ?? [];
+    arr.push({ file, score: frecencyMap.get(file.path) ?? 0 });
+    byWs.set(ws.id, arr);
+  }
+
+  const groups = workspaces.map((ws) => {
+    const files = byWs.get(ws.id);
+    if (!files?.length) return '';
+    return renderFocusWorkspaceGroup(ws, files.map(x => x.file), pinned, false, query, collapsed);
   }).join('');
 
-  const allEmpty = !groups.replace(/\s/g, '');
-  return `<div class="focus-view">${renderFilterBar()}${allEmpty ? '<div class="focus-empty">暂无最近文件</div>' : groups}</div>`;
+  const moreBtn = hasMore && !expanded
+    ? `<button class="focus-more-btn" onclick="toggleFocusExpanded()">显示更多 (${filtered.length - FOCUS_TOP_N} 个)</button>`
+    : expanded && hasMore
+    ? `<button class="focus-more-btn" onclick="toggleFocusExpanded()">收起</button>`
+    : '';
+
+  return `<div class="focus-view">${renderFilterBar()}${groups}${moreBtn}</div>`;
 }
 
 if (typeof window !== 'undefined') {
   (window as any).toggleFocusTypeFilter = toggleFocusTypeFilter;
+  (window as any).toggleFocusExpanded = toggleFocusExpanded;
+  // Load signals on startup
+  void refreshFrecencySignals();
 }

@@ -129,7 +129,7 @@ app.post("/api/session-state", handleUpdateSessionState);
 app.get("/api/config", (c) => handleGetClientConfig());
 
 // API: 焦点信号采集（写本地日志，用于 frecency 策略评估）
-import { appendFileSync, mkdirSync } from "fs";
+import { appendFileSync, mkdirSync, readFileSync, existsSync } from "fs";
 const FOCUS_SIGNALS_PATH = "logs/focus-signals.jsonl";
 app.post("/api/focus-signal", async (c) => {
   try {
@@ -140,6 +140,22 @@ app.post("/api/focus-signal", async (c) => {
     appendFileSync(FOCUS_SIGNALS_PATH, line);
   } catch { /* 静默失败，不影响主流程 */ }
   return c.json({ ok: true });
+});
+
+// API: 读取焦点信号（最近 N 天）
+app.get("/api/focus-signals", (c) => {
+  const days = Number(c.req.query("days") ?? "7");
+  const cutoff = Date.now() - days * 86400 * 1000;
+  if (!existsSync(FOCUS_SIGNALS_PATH)) return c.json({ signals: [] });
+  try {
+    const signals = readFileSync(FOCUS_SIGNALS_PATH, "utf-8")
+      .split("\n").filter(Boolean)
+      .map((l) => { try { return JSON.parse(l); } catch { return null; } })
+      .filter((s) => s && s.ts >= cutoff && s.file && s.type);
+    return c.json({ signals });
+  } catch {
+    return c.json({ signals: [] });
+  }
 });
 
 // ==================== 启动服务 ====================

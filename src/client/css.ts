@@ -3588,6 +3588,24 @@ export const styles = `
       padding: 12px 16px;
       font-style: italic;
     }
+    .focus-more-btn {
+      display: block;
+      width: calc(100% - 16px);
+      margin: 4px 8px 8px;
+      padding: 5px 0;
+      background: none;
+      border: 1px dashed var(--color-border);
+      border-radius: var(--radius-md);
+      color: var(--color-text-muted);
+      font-size: var(--text-xs);
+      cursor: pointer;
+      text-align: center;
+    }
+    .focus-more-btn:hover {
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+      background: rgba(9,105,218,0.04);
+    }
     /* Pin button — show on hover, works in all views */
     .tree-item .tree-pin-btn, .file-item .tree-pin-btn {
       display: none;

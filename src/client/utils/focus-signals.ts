@@ -1,4 +1,4 @@
-export type SignalType = 'open' | 'annotate' | 'mtime';
+export type SignalType = 'open' | 'annotate' | 'mtime' | 'dwell' | 'scroll';
 
 export function recordSignal(filePath: string, type: SignalType): void {
   fetch('/api/focus-signal', {

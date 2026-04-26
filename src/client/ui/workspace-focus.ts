@@ -79,8 +79,8 @@ const FOCUS_WINDOW_MS: Record<string, number> = {
 
 // ── Frecency ──────────────────────────────────────────────────────────────────
 
-const FRECENCY_WEIGHTS = { open: 10, annotate: 15, mtime: 1 } as const;
-const FRECENCY_HALF_LIFE_HOURS = { open: 48, annotate: 48, mtime: 8 } as const;
+const FRECENCY_WEIGHTS = { open: 10, annotate: 15, mtime: 1, dwell: 8, scroll: 4 } as const;
+const FRECENCY_HALF_LIFE_HOURS = { open: 48, annotate: 48, mtime: 8, dwell: 48, scroll: 24 } as const;
 type FrecencySignalType = keyof typeof FRECENCY_WEIGHTS;
 
 interface FrecencySignal { ts: number; type: string; file: string; }

@@ -356,7 +356,8 @@ export function renderFocusView(): string {
       if (ignored.has(f.path)) continue;
       if (!pinned.has(f.path)) {
         const ext = getFileExtension(f.path);
-        const norm = ext === 'markdown' ? 'md' : ext === 'htm' ? 'html' : ext === 'jsonl' ? 'json' : ext;
+        if (ext === 'jsonl' || ext === 'log') continue; // always exclude log/jsonl noise
+        const norm = ext === 'markdown' ? 'md' : ext === 'htm' ? 'html' : ext;
         if (!activeTypes.has(norm)) continue;
       }
       const score = frecencyMap.get(f.path) ?? 0;

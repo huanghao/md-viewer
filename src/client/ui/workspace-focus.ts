@@ -236,10 +236,12 @@ export function renderFocusView(): string {
       const normalizedExt = ext === 'markdown' ? 'md' : ext === 'htm' ? 'html' : ext === 'jsonl' ? 'json' : ext;
       return activeTypes.has(normalizedExt);
     });
+    if (!loading && activeFiles.length === 0) return '';
     return renderFocusWorkspaceGroup(ws, activeFiles, pinned, loading, query, collapsed);
   }).join('');
 
-  return `<div class="focus-view">${renderFilterBar()}${groups}</div>`;
+  const allEmpty = !groups.replace(/\s/g, '');
+  return `<div class="focus-view">${renderFilterBar()}${allEmpty ? '<div class="focus-empty">暂无最近文件</div>' : groups}</div>`;
 }
 
 if (typeof window !== 'undefined') {

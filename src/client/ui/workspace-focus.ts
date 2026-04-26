@@ -87,8 +87,6 @@ interface FrecencySignal { ts: number; type: string; file: string; }
 
 // In-memory signal cache, refreshed periodically
 let signalCache: FrecencySignal[] = [];
-let signalCacheTs = 0;
-const SIGNAL_CACHE_TTL = 30_000; // refresh every 30s
 
 export async function refreshFrecencySignals(): Promise<void> {
   try {
@@ -96,14 +94,10 @@ export async function refreshFrecencySignals(): Promise<void> {
     if (!res.ok) return;
     const data = await res.json() as { signals: FrecencySignal[] };
     signalCache = data.signals;
-    signalCacheTs = Date.now();
   } catch { /* server not available */ }
 }
 
 function getSignalCache(): FrecencySignal[] {
-  if (Date.now() - signalCacheTs > SIGNAL_CACHE_TTL) {
-    void refreshFrecencySignals();
-  }
   return signalCache;
 }
 

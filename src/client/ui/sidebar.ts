@@ -46,7 +46,13 @@ function scrollCurrentFileIntoView(container: HTMLElement): void {
 export function setSidebarTab(tab: 'focus' | 'full' | 'list'): void {
   state.config.sidebarTab = tab;
   saveConfig(state.config);
-  renderSidebar();
+  if (tab === 'focus') {
+    import('./workspace-focus').then(({ refreshFrecencySignals, renderFocusView: _ }) => {
+      void refreshFrecencySignals().then(() => renderSidebar());
+    });
+  } else {
+    renderSidebar();
+  }
 }
 
 if (typeof window !== 'undefined') {

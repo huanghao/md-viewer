@@ -107,6 +107,18 @@ function renderSettingsDialog(): void {
     </div>
 
     <div class="settings-group">
+      <div class="settings-group-title">最近视图</div>
+      <div class="settings-section-desc">「最近」视图的文件排序策略。</div>
+      <div class="settings-row">
+        <label class="settings-label">排序策略</label>
+        <select id="focusStrategySelect" class="settings-select">
+          <option value="frecency"${(state.config.focusStrategy ?? 'frecency') === 'frecency' ? ' selected' : ''}>频率衰减（Frecency）— 综合打开次数和时间衰减</option>
+          <option value="mtime"${state.config.focusStrategy === 'mtime' ? ' selected' : ''}>修改时间 — 按文件最近修改时间筛选</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="settings-group">
       <div class="settings-group-title">工作区</div>
       <div class="settings-section-desc">工作区文件树的轮询间隔，用于感知新增/删除文件。文件内容变化由 SSE 实时推送，不受此设置影响。修改后刷新页面生效。</div>
       <div class="settings-row">
@@ -189,10 +201,12 @@ export function saveSettings(): void {
   const hlSelect = document.getElementById('codeThemeSelect') as HTMLSelectElement | null;
   const mathInlineCheckbox = document.getElementById('mathInlineCheckbox') as HTMLInputElement | null;
   const pollIntervalSelect = document.getElementById('pollIntervalSelect') as HTMLSelectElement | null;
+  const focusStrategySelect = document.getElementById('focusStrategySelect') as HTMLSelectElement | null;
   if (mdSelect) state.config.markdownTheme = mdSelect.value;
   if (hlSelect) state.config.codeTheme = hlSelect.value;
   if (mathInlineCheckbox) state.config.mathInline = mathInlineCheckbox.checked;
   if (pollIntervalSelect) state.config.workspacePollInterval = parseInt(pollIntervalSelect.value, 10);
+  if (focusStrategySelect) state.config.focusStrategy = focusStrategySelect.value as 'frecency' | 'mtime';
   saveConfig(state.config);
   renderSidebar();
   // 清掉 saved 值，避免 closeSettingsDialog 误恢复

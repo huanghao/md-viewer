@@ -35,8 +35,9 @@ export interface FileTreeNode {
 
 // 应用配置类型
 export interface AppConfig {
-  sidebarTab: 'focus' | 'full' | 'list';  // replaces sidebarMode + sidebarView
-  focusWindowKey: '8h' | '2d' | '1w' | '1m';  // replaces focusWindowHours
+  sidebarTab: 'focus' | 'full' | 'list';
+  focusWindowKey: '8h' | '2d' | '1w' | '1m';
+  focusStrategy: 'frecency' | 'mtime'; // 最近视图排序策略，默认 frecency
   markdownTheme: string;  // 'github' | 'notion' | 'bear'
   codeTheme: string;      // 'github' | 'github-dark' | 'atom-one-dark'
   mathInline: boolean;    // render $...$ inline math (disable if $ is used as currency)

@@ -182,7 +182,14 @@ function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>, query: str
   });
 }
 
+export function setFocusStrategy(strategy: 'frecency' | 'mtime'): void {
+  state.config.focusStrategy = strategy;
+  import('../config').then(({ saveConfig }) => saveConfig(state.config));
+  import('./sidebar').then(({ renderSidebar }) => renderSidebar());
+}
+
 function renderFilterBar(): string {
+  const strategy = state.config.focusStrategy ?? 'frecency';
   const typeOptions: Array<{ ext: string; label: string }> = [
     { ext: 'md', label: 'MD' },
     { ext: 'pdf', label: 'PDF' },
@@ -194,9 +201,24 @@ function renderFilterBar(): string {
              onclick="toggleFocusTypeFilter('${o.ext}')">${o.label}</button>`
   ).join('');
 
+  // Time window pills (only shown in mtime strategy)
+  const timeOptions: Array<{ key: string; label: string }> = [
+    { key: '8h', label: '8h' },
+    { key: '1d', label: '1d' },
+    { key: '2d', label: '2d' },
+  ];
+  const current = state.config.focusWindowKey || '8h';
+  const timePills = strategy === 'mtime' ? `
+    <div class="focus-time-pills">${timeOptions.map(o =>
+      `<button class="focus-time-pill${current === o.key ? ' active' : ''}"
+               onclick="setFocusWindowKey('${o.key}')">${o.label}</button>`
+    ).join('')}</div>
+    <span class="focus-filter-sep">│</span>` : '';
+
   return `
     <div class="focus-filter-bar">
       <span class="focus-filter-label">最近</span>
+      ${timePills}
       <div class="focus-type-pills">${typePills}</div>
     </div>
   `;
@@ -234,22 +256,68 @@ function renderFocusWorkspaceGroup(
   `;
 }
 
-const FOCUS_TOP_N = 15;
-const FOCUS_EXPANDED_KEY = 'md-viewer:focus-expanded';
+const FOCUS_PAGE_SIZE = 15;
+let focusPage = 1; // in-memory only, resets on page refresh
 
-function isFocusExpanded(): boolean {
-  return storageGet<boolean>(FOCUS_EXPANDED_KEY, false);
+export function loadMoreFocus(): void {
+  focusPage += 1;
+  import('./sidebar').then(({ renderSidebar }) => renderSidebar());
 }
 
-export function toggleFocusExpanded(): void {
-  storageSet(FOCUS_EXPANDED_KEY, !isFocusExpanded());
-  import('./sidebar').then(({ renderSidebar }) => renderSidebar());
+function renderFocusViewMtime(): string {
+  const workspaces = state.config.workspaces;
+  const windowMs = FOCUS_WINDOW_MS[state.config.focusWindowKey || '8h'] ?? FOCUS_WINDOW_MS['8h'];
+  const pinned = getPinnedFiles();
+  const query = state.searchQuery.trim().toLowerCase();
+  const collapsed = getFocusCollapsed();
+
+  const groups = workspaces.map((ws) => {
+    const tree = state.fileTree.get(ws.id);
+    const loading = !tree;
+    if (!tree && !pendingScanIds.has(ws.id) && !isWorkspaceFailed(ws.id)) {
+      pendingScanIds.add(ws.id);
+      void scanWorkspace(ws.id).then((scanned) => {
+        pendingScanIds.delete(ws.id);
+        if (scanned) {
+          import('./sidebar').then(({ renderSidebar }) => renderSidebar());
+        } else {
+          markWorkspaceFailed(ws.id);
+          import('./sidebar').then(({ renderSidebar }) => renderSidebar());
+        }
+      });
+    }
+    let activeFiles = getActiveFiles(ws.path, tree, windowMs, pinned, state.annotationSummaries);
+    if (query) {
+      activeFiles = activeFiles.filter((f) => {
+        const name = (stripWorkspaceTreeDisplayExtension(f.name) || f.name).toLowerCase();
+        return name.includes(query) || f.path.toLowerCase().includes(query);
+      });
+    }
+    activeFiles = activeFiles.filter((f) => {
+      if (pinned.has(f.path)) return true;
+      const ext = getFileExtension(f.path);
+      const norm = ext === 'markdown' ? 'md' : ext === 'htm' ? 'html' : ext === 'jsonl' ? 'json' : ext;
+      return activeTypes.has(norm);
+    });
+    if (!loading && activeFiles.length === 0) return '';
+    return renderFocusWorkspaceGroup(ws, activeFiles, pinned, loading, query, collapsed);
+  }).join('');
+
+  const allEmpty = !groups.replace(/\s/g, '');
+  return `<div class="focus-view">${renderFilterBar()}${allEmpty ? '<div class="focus-empty">暂无最近文件</div>' : groups}</div>`;
 }
 
 export function renderFocusView(): string {
   const workspaces = state.config.workspaces;
   if (workspaces.length === 0) {
     return '<div class="focus-empty">暂无工作区</div>';
+  }
+
+  const strategy = state.config.focusStrategy ?? 'frecency';
+
+  // mtime strategy: delegate to original time-window logic
+  if (strategy === 'mtime') {
+    return renderFocusViewMtime();
   }
 
   const pinned = getPinnedFiles();
@@ -314,28 +382,26 @@ export function renderFocusView(): string {
     return `<div class="focus-view">${renderFilterBar()}<div class="focus-empty">暂无最近文件</div></div>`;
   }
 
-  const expanded = isFocusExpanded();
-  const visible = expanded ? filtered : filtered.slice(0, FOCUS_TOP_N);
-  const hasMore = filtered.length > FOCUS_TOP_N;
+  const limit = focusPage * FOCUS_PAGE_SIZE;
+  const visible = filtered.slice(0, limit);
+  const remaining = filtered.length - visible.length;
 
   // Group visible files by workspace for display
-  const byWs = new Map<string, Array<{ file: FileTreeNode; score: number }>>();
+  const byWs = new Map<string, FileTreeNode[]>();
   for (const { file, ws } of visible) {
     const arr = byWs.get(ws.id) ?? [];
-    arr.push({ file, score: frecencyMap.get(file.path) ?? 0 });
+    arr.push(file);
     byWs.set(ws.id, arr);
   }
 
   const groups = workspaces.map((ws) => {
     const files = byWs.get(ws.id);
     if (!files?.length) return '';
-    return renderFocusWorkspaceGroup(ws, files.map(x => x.file), pinned, false, query, collapsed);
+    return renderFocusWorkspaceGroup(ws, files, pinned, false, query, collapsed);
   }).join('');
 
-  const moreBtn = hasMore && !expanded
-    ? `<button class="focus-more-btn" onclick="toggleFocusExpanded()">显示更多 (${filtered.length - FOCUS_TOP_N} 个)</button>`
-    : expanded && hasMore
-    ? `<button class="focus-more-btn" onclick="toggleFocusExpanded()">收起</button>`
+  const moreBtn = remaining > 0
+    ? `<button class="focus-more-btn" onclick="loadMoreFocus()">显示更多 (还有 ${remaining} 个)</button>`
     : '';
 
   return `<div class="focus-view">${renderFilterBar()}${groups}${moreBtn}</div>`;
@@ -343,7 +409,7 @@ export function renderFocusView(): string {
 
 if (typeof window !== 'undefined') {
   (window as any).toggleFocusTypeFilter = toggleFocusTypeFilter;
-  (window as any).toggleFocusExpanded = toggleFocusExpanded;
-  // Load signals on startup
+  (window as any).loadMoreFocus = loadMoreFocus;
+  (window as any).setFocusStrategy = setFocusStrategy;
   void refreshFrecencySignals();
 }

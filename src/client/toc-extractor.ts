@@ -103,8 +103,9 @@ export async function loadSidecar(pdfPath: string): Promise<TocItem[] | null> {
   try {
     const res = await fetch(`/api/file?path=${encodeURIComponent(sidecarPath(pdfPath))}`);
     if (!res.ok) return null;
-    const text = await res.text();
-    const parsed = JSON.parse(text) as TocItem[];
+    const json = await res.json() as { content?: string };
+    if (!json.content) return null;
+    const parsed = JSON.parse(json.content) as TocItem[];
     if (!Array.isArray(parsed)) { console.warn('[TOC] sidecar not an array:', pdfPath); return null; }
     return parsed;
   } catch (err) {

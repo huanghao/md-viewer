@@ -16,7 +16,8 @@ describe('loadSidecar', () => {
 
   it('returns parsed TocItem[] on success', async () => {
     const toc: TocItem[] = [{ title: 'Intro', level: 1, pageNum: 1, children: [] }];
-    globalThis.fetch = mock(async () => new Response(JSON.stringify(toc), { status: 200 }));
+    const apiResponse = { content: JSON.stringify(toc), path: '/docs/report.pdf.toc.json' };
+    globalThis.fetch = mock(async () => new Response(JSON.stringify(apiResponse), { status: 200 }));
     const result = await loadSidecar('/docs/report.pdf');
     expect(result).toEqual(toc);
   });

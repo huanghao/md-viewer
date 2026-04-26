@@ -284,6 +284,9 @@ export function renderFocusView(): string {
         const norm = ext === 'markdown' ? 'md' : ext === 'htm' ? 'html' : ext === 'jsonl' ? 'json' : ext;
         if (!activeTypes.has(norm)) continue;
       }
+      // Only include files that have at least some frecency signal
+      const score = frecencyMap.get(f.path) ?? 0;
+      if (!pinned.has(f.path) && score === 0) continue;
       allCandidates.push({ file: f, ws });
     }
   }

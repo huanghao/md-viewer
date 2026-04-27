@@ -3566,14 +3566,6 @@ export const styles = `
     .focus-file-item {
       padding-left: 20px;
     }
-    .focus-file-new .tree-name::after {
-      content: '●';
-      font-size: 6px;
-      color: var(--color-accent);
-      vertical-align: super;
-      margin-left: 3px;
-      opacity: 0.8;
-    }
     .focus-file-time {
       font-size: 10px;
       color: #bbb;

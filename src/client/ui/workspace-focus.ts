@@ -164,9 +164,9 @@ export function getActiveFiles(
 }
 
 
-function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>, query: string, isNew = false): string {
+function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>, query: string): string {
   return renderFileRow(file.path, file.name, file.lastModified, {
-    containerClass: `tree-item file-node focus-file-item${isNew ? ' focus-file-new' : ''}`,
+    containerClass: 'tree-item file-node focus-file-item',
     onClickJs: (p) => `handleFocusFileClick('${escapeAttr(p)}')`,
     showPin: true,
     showTime: true,
@@ -224,8 +224,7 @@ function renderFocusWorkspaceGroup(
   pinned: Set<string>,
   loading: boolean,
   query: string,
-  collapsed: Set<string>,
-  newFiles?: Set<string>
+  collapsed: Set<string>
 ): string {
   const hasFiles = activeFiles.length > 0;
   const isCollapsed = collapsed.has(workspace.id);
@@ -236,7 +235,7 @@ function renderFocusWorkspaceGroup(
     : `<span class="focus-ws-badge empty">0</span>`;
 
   const filesHtml = hasFiles
-    ? activeFiles.map((f) => renderFocusFileItem(f, pinned, query, newFiles?.has(f.path))).join('')
+    ? activeFiles.map((f) => renderFocusFileItem(f, pinned, query)).join('')
     : '';
 
   return `
@@ -321,15 +320,11 @@ export function renderFocusView(): string {
   const frecencyMap = buildFrecencyMap(signals);
   const collapsed = getFocusCollapsed();
 
-  // Files with recent mtime signal (within 8h) but no frecency — "new/unread"
   const NEW_WINDOW_MS = 8 * 3600 * 1000;
   const newCutoff = Date.now() - NEW_WINDOW_MS;
-  const mtimeSignalFiles = new Set(
-    signals.filter((s) => s.type === 'mtime' && s.ts >= newCutoff).map((s) => s.file)
-  );
 
   // Collect all files across workspaces, trigger scans as needed
-  const allCandidates: Array<{ file: FileTreeNode; ws: typeof workspaces[0]; isNew: boolean }> = [];
+  const allCandidates: Array<{ file: FileTreeNode; ws: typeof workspaces[0] }> = [];
   for (const ws of workspaces) {
     const tree = state.fileTree.get(ws.id);
     if (!tree && !pendingScanIds.has(ws.id) && !isWorkspaceFailed(ws.id)) {
@@ -350,29 +345,23 @@ export function renderFocusView(): string {
       if (ignored.has(f.path)) continue;
       if (!pinned.has(f.path)) {
         const ext = getFileExtension(f.path);
-        if (ext === 'jsonl' || ext === 'log') continue; // always exclude log/jsonl noise
+        if (ext === 'jsonl' || ext === 'log') continue;
         const norm = ext === 'markdown' ? 'md' : ext === 'htm' ? 'html' : ext;
         if (!activeTypes.has(norm)) continue;
       }
       const score = frecencyMap.get(f.path) ?? 0;
-      // "New" = no frecency (never interacted) AND either:
-      //   a) has a recent mtime signal from agent/watcher, OR
-      //   b) file's lastModified is within the new-file window (catches moves/renames)
+      // Include if: pinned, has frecency score, or recently modified (new file — shown with existing new-dot)
       const recentlyModified = typeof f.lastModified === 'number' && f.lastModified >= newCutoff;
-      const isNew = score === 0 && (mtimeSignalFiles.has(f.path) || recentlyModified);
-      // Include if: pinned, has frecency score, or is a new unread file
-      if (!pinned.has(f.path) && score === 0 && !isNew) continue;
-      allCandidates.push({ file: f, ws, isNew });
+      if (!pinned.has(f.path) && score === 0 && !recentlyModified) continue;
+      allCandidates.push({ file: f, ws });
     }
   }
 
-  // Sort: pinned first, then frecency desc, then new files by mtime desc
+  // Sort: pinned first, then frecency desc (new files with score=0 sort last by mtime)
   allCandidates.sort((a, b) => {
     const aPinned = pinned.has(a.file.path);
     const bPinned = pinned.has(b.file.path);
     if (aPinned !== bPinned) return aPinned ? -1 : 1;
-    // New (unread) files sort after frecency files
-    if (a.isNew !== b.isNew) return a.isNew ? 1 : -1;
     const aScore = frecencyMap.get(a.file.path) ?? 0;
     const bScore = frecencyMap.get(b.file.path) ?? 0;
     if (bScore !== aScore) return bScore - aScore;
@@ -397,7 +386,6 @@ export function renderFocusView(): string {
 
   // Group visible files by workspace for display
   const byWs = new Map<string, FileTreeNode[]>();
-  const newFileSet = new Set(allCandidates.filter(c => c.isNew).map(c => c.file.path));
   for (const { file, ws } of visible) {
     const arr = byWs.get(ws.id) ?? [];
     arr.push(file);
@@ -407,7 +395,7 @@ export function renderFocusView(): string {
   const groups = workspaces.map((ws) => {
     const files = byWs.get(ws.id);
     if (!files?.length) return '';
-    return renderFocusWorkspaceGroup(ws, files, pinned, false, query, collapsed, newFileSet);
+    return renderFocusWorkspaceGroup(ws, files, pinned, false, query, collapsed);
   }).join('');
 
   const moreBtn = remaining > 0

@@ -179,7 +179,6 @@ function persistAnnotation(filePath: string, annotation: Annotation, errorPrefix
       if (state.currentFilePath !== filePath) return;
       replaceAnnotationInState(saved);
       renderAnnotationList(filePath);
-      applyAnnotations();
     })
     .catch((error) => {
       showError(`${errorPrefix}: ${error?.message || '未知错误'}`, 2600);

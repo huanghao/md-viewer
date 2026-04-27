@@ -57,6 +57,7 @@ import { flushAll as flushUndoQueue } from './utils/undo-queue';
 import { createResizer } from './utils/resizer';
 import { setupKeyboardShortcuts } from './keyboard-shortcuts';
 import { initZoom, zoomIn, zoomOut, zoomReset, updateZoomDisplay, setPdfZoomValue, getPdfZoom } from './zoom-controller';
+import { injectParaIds } from './translation';
 
 declare global {
   function cleanupAllExpiredRecords(): number;
@@ -1068,6 +1069,7 @@ function renderContent() {
 
   // 应用批注高亮
   applyAnnotations();
+  void injectParaIds();
 
   // 更新面包屑
   renderBreadcrumb();

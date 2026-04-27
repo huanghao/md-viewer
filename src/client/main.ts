@@ -1113,7 +1113,7 @@ function renderBreadcrumb() {
   // 显示面包屑路径和复制按钮
   container.innerHTML = `
     ${breadcrumbItems}
-    <button class="copy-filename-button" onclick="copyFilePath('${escapeAttr(file.path)}', event)" title="复制相对路径 / ⌥+点击复制绝对路径">
+    <button class="copy-filename-button" onclick="copyRelativePath('${escapeAttr(file.path)}', event)" title="复制相对路径">
       <span class="copy-icon"></span>
       <span class="check-icon">
         <svg viewBox="0 0 16 16" fill="currentColor">
@@ -1121,6 +1121,15 @@ function renderBreadcrumb() {
         </svg>
       </span>
       <span class="copy-tooltip">复制相对路径</span>
+    </button>
+    <button class="copy-filename-button" onclick="copyAbsolutePath('${escapeAttr(file.path)}', event)" title="复制绝对路径">
+      <span class="copy-icon"></span>
+      <span class="check-icon">
+        <svg viewBox="0 0 16 16" fill="currentColor">
+          <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path>
+        </svg>
+      </span>
+      <span class="copy-tooltip">复制绝对路径</span>
     </button>
   `;
 }
@@ -1826,11 +1835,6 @@ function copySingleText(text: string, e?: Event) {
 
 // 复制文件路径：默认复制相对工作区根目录的相对路径，Alt+Click 复制绝对路径
 function copyFilePath(filePath: string, event?: Event) {
-  const isAlt = event instanceof MouseEvent && event.altKey;
-  if (isAlt) {
-    copyTextWithFeedback(filePath, event, '已复制绝对路径');
-    return;
-  }
   // 找当前文件所属工作区，计算相对路径
   const workspaces = state.config.workspaces;
   let relPath = filePath;
@@ -1842,6 +1846,14 @@ function copyFilePath(filePath: string, event?: Event) {
     }
   }
   copyTextWithFeedback(relPath, event, '已复制相对路径');
+}
+
+function copyRelativePath(filePath: string, event?: Event) {
+  copyFilePath(filePath, event);
+}
+
+function copyAbsolutePath(filePath: string, event?: Event) {
+  copyTextWithFeedback(filePath, event, '已复制绝对路径');
 }
 
 // 兼容旧调用
@@ -2357,6 +2369,8 @@ declare global {
     copySingleText: (text: string, e?: Event) => void;
     copyFileName: (fileName: string, event?: Event) => void;
     copyFilePath: (filePath: string, event?: Event) => void;
+    copyRelativePath: (filePath: string, event?: Event) => void;
+    copyAbsolutePath: (filePath: string, event?: Event) => void;
     showToast?: (message: string, type: string) => void;
     showSettingsDialog: () => void;
     toggleMonitorPanel: () => void;
@@ -2409,6 +2423,8 @@ window.acceptDiffUpdate = acceptDiffUpdate;
 window.copySingleText = copySingleText;
 window.copyFileName = copyFileName;
 window.copyFilePath = copyFilePath;
+window.copyRelativePath = copyRelativePath;
+window.copyAbsolutePath = copyAbsolutePath;
 window.showToast = showToast;
 window.showSettingsDialog = showSettingsDialog;
 window.toggleMonitorPanel = toggleMonitorPanel;

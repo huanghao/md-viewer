@@ -11,7 +11,8 @@ import {
   deleteAnnotationRemote,
   updateAnnotationStatusRemote,
 } from './api/annotations';
-import { showError } from './ui/toast';
+import { showError, showToast } from './ui/toast';
+import { enqueueOp } from './utils/undo-queue';
 import { setChatContext, renderChatPanel } from './ui/chat-panel.js';
 import { resolveAnnotationAnchor } from './utils/annotation-anchor';
 import { isOpen, isResolved, isOrphan, type AnnotationStatus } from '../annotation-status';
@@ -935,33 +936,53 @@ export function savePendingAnnotation(filePath: string): void {
 
 export function removeAnnotation(id: string, filePath: string): void {
   const previous = state.annotations.slice();
-  state.annotations = state.annotations.filter((a) => a.id !== id);
-  if (state.pinnedAnnotationId === id) {
-    state.pinnedAnnotationId = null;
-    hidePopover(true);
-  }
-  if (state.activeAnnotationId === id) {
-    state.activeAnnotationId = null;
-  }
+  const removed = previous.find((a) => a.id === id);
   const isPdf = document.getElementById('content')?.hasAttribute('data-pdf');
+
+  // 乐观更新客户端状态
+  state.annotations = state.annotations.filter((a) => a.id !== id);
+  if (state.pinnedAnnotationId === id) { state.pinnedAnnotationId = null; hidePopover(true); }
+  if (state.activeAnnotationId === id) { state.activeAnnotationId = null; }
   if (!isPdf) applyAnnotations();
   renderAnnotationList(filePath);
   document.dispatchEvent(new CustomEvent('annotation:deleted', { detail: { id, filePath } }));
-  const removed = previous.find((a) => a.id === id);
   if (removed && isOpen(removed.status as AnnotationStatus)) {
     adjustAnnotationCount(filePath, -1);
     import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
   }
-  void deleteAnnotationRemote(filePath, { id }).catch((error) => {
+
+  const doDelete = () => {
+    void deleteAnnotationRemote(filePath, { id }).catch((error) => {
+      // 服务端失败：回滚
+      state.annotations = previous;
+      if (removed && isOpen(removed.status as AnnotationStatus)) {
+        adjustAnnotationCount(filePath, +1);
+        import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
+      }
+      showError(`删除评论失败: ${error?.message || '未知错误'}`, 2600);
+      if (!isPdf) applyAnnotations();
+      renderAnnotationList(filePath);
+    });
+  };
+
+  const doUndo = () => {
     state.annotations = previous;
     if (removed && isOpen(removed.status as AnnotationStatus)) {
       adjustAnnotationCount(filePath, +1);
       import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
     }
-    showError(`删除评论失败: ${error?.message || '未知错误'}`, 2600);
     if (!isPdf) applyAnnotations();
     renderAnnotationList(filePath);
-  });
+  };
+
+  if (state.config.optimisticUndo !== false) {
+    const label = `已删除评论${removed?.serial ? ` #${removed.serial}` : ''}`;
+    enqueueOp(doDelete, doUndo, label, (msg, cancel) => {
+      showToast({ message: msg, type: 'info', duration: 4000, action: { label: '撤销', onClick: cancel } });
+    });
+  } else {
+    doDelete();
+  }
 }
 
 function jumpToAnnotation(id: string, behavior: ScrollBehavior = 'smooth'): void {
@@ -1049,13 +1070,13 @@ function toggleResolved(id: string, filePath: string): void {
   const ann = state.annotations.find((item) => item.id === id);
   if (!ann) return;
   const previousStatus = ann.status;
-  if (ann.status === 'resolved') {
-    ann.status = (ann.confidence || 0) <= 0 ? 'unanchored' : 'anchored';
-  } else {
-    ann.status = 'resolved';
-  }
-  const nextStatus = ann.status || 'anchored';
+  const nextStatus = ann.status === 'resolved'
+    ? ((ann.confidence || 0) <= 0 ? 'unanchored' : 'anchored')
+    : 'resolved';
   const isPdf = document.getElementById('content')?.hasAttribute('data-pdf');
+
+  // 乐观更新客户端状态
+  ann.status = nextStatus;
   hidePopover(true);
   if (!isPdf) applyAnnotations();
   else document.dispatchEvent(new CustomEvent('annotation:highlights-changed'));
@@ -1066,19 +1087,44 @@ function toggleResolved(id: string, filePath: string): void {
     adjustAnnotationCount(filePath, +1);
   }
   import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
-  void updateAnnotationStatusRemote(filePath, { id }, nextStatus).catch((error) => {
+
+  const doUpdate = () => {
+    void updateAnnotationStatusRemote(filePath, { id }, nextStatus).catch((error) => {
+      ann.status = previousStatus;
+      if (isOpen(previousStatus as AnnotationStatus) && nextStatus === 'resolved') {
+        adjustAnnotationCount(filePath, +1);
+      } else if (previousStatus === 'resolved' && isOpen(nextStatus as AnnotationStatus)) {
+        adjustAnnotationCount(filePath, -1);
+      }
+      showError(`更新评论状态失败: ${error?.message || '未知错误'}`, 2600);
+      if (!isPdf) applyAnnotations();
+      else document.dispatchEvent(new CustomEvent('annotation:highlights-changed'));
+      renderAnnotationList(filePath);
+      import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
+    });
+  };
+
+  const doUndo = () => {
     ann.status = previousStatus;
     if (isOpen(previousStatus as AnnotationStatus) && nextStatus === 'resolved') {
       adjustAnnotationCount(filePath, +1);
     } else if (previousStatus === 'resolved' && isOpen(nextStatus as AnnotationStatus)) {
       adjustAnnotationCount(filePath, -1);
     }
-    showError(`更新评论状态失败: ${error?.message || '未知错误'}`, 2600);
     if (!isPdf) applyAnnotations();
     else document.dispatchEvent(new CustomEvent('annotation:highlights-changed'));
     renderAnnotationList(filePath);
     import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
-  });
+  };
+
+  if (state.config.optimisticUndo !== false && nextStatus === 'resolved') {
+    const serial = ann.serial ? ` #${ann.serial}` : '';
+    enqueueOp(doUpdate, doUndo, `已解决评论${serial}`, (msg, cancel) => {
+      showToast({ message: msg, type: 'info', duration: 4000, action: { label: '撤销', onClick: cancel } });
+    });
+  } else {
+    doUpdate();
+  }
 }
 
 // ==================== 渲染 ====================

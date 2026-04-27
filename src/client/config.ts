@@ -12,6 +12,7 @@ export const defaultConfig: AppConfig = {
   mathInline: true,
   workspacePollInterval: 5000,
   pdfIdleEviction: false,
+  optimisticUndo: true,
   workspaces: [],
 };
 

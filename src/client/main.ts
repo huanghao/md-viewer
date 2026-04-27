@@ -53,6 +53,7 @@ import { extractMdToc, extractPdfOutline, loadSidecar, saveSidecar, scanPdfHeadi
 import { renderTocPanel, setActiveTocItem } from './ui/toc-panel.js';
 import { storageGet, storageSet, storageGetNumber, getAllStorageKeys } from './utils/storage';
 import { recordSignal } from './utils/focus-signals';
+import { flushAll as flushUndoQueue } from './utils/undo-queue';
 import { createResizer } from './utils/resizer';
 import { setupKeyboardShortcuts } from './keyboard-shortcuts';
 import { initZoom, zoomIn, zoomOut, zoomReset, updateZoomDisplay, setPdfZoomValue, getPdfZoom } from './zoom-controller';
@@ -2573,6 +2574,10 @@ function startWorkspacePolling() {
   syncAnnotationSidebarLayout();
   window.addEventListener('resize', () => {
     syncAnnotationSidebarLayout();
+  });
+
+  window.addEventListener('beforeunload', () => {
+    flushUndoQueue();
   });
 
   await restoreState(loadFile);

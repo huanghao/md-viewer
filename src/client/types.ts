@@ -43,6 +43,7 @@ export interface AppConfig {
   mathInline: boolean;    // render $...$ inline math (disable if $ is used as currency)
   workspacePollInterval: number; // workspace tree polling interval in ms
   pdfIdleEviction: boolean;     // auto-evict idle PDF viewers after 30 min (default off)
+  optimisticUndo: boolean;      // delay destructive annotation ops to allow undo (default on)
   workspaces: Workspace[];
 }
 

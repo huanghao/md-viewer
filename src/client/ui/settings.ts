@@ -119,6 +119,17 @@ function renderSettingsDialog(): void {
     </div>
 
     <div class="settings-group">
+      <div class="settings-group-title">评论</div>
+      <div class="settings-row">
+        <label class="settings-label">乐观撤销</label>
+        <label class="settings-toggle">
+          <input type="checkbox" id="optimisticUndoCheckbox"${state.config.optimisticUndo !== false ? ' checked' : ''}>
+          <span class="settings-toggle-label">删除/解决评论后显示撤销按钮（4 秒内可撤销）</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="settings-group">
       <div class="settings-group-title">工作区</div>
       <div class="settings-section-desc">工作区文件树的轮询间隔，用于感知新增/删除文件。文件内容变化由 SSE 实时推送，不受此设置影响。修改后刷新页面生效。</div>
       <div class="settings-row">
@@ -202,11 +213,13 @@ export function saveSettings(): void {
   const mathInlineCheckbox = document.getElementById('mathInlineCheckbox') as HTMLInputElement | null;
   const pollIntervalSelect = document.getElementById('pollIntervalSelect') as HTMLSelectElement | null;
   const focusStrategySelect = document.getElementById('focusStrategySelect') as HTMLSelectElement | null;
+  const optimisticUndoCheckbox = document.getElementById('optimisticUndoCheckbox') as HTMLInputElement | null;
   if (mdSelect) state.config.markdownTheme = mdSelect.value;
   if (hlSelect) state.config.codeTheme = hlSelect.value;
   if (mathInlineCheckbox) state.config.mathInline = mathInlineCheckbox.checked;
   if (pollIntervalSelect) state.config.workspacePollInterval = parseInt(pollIntervalSelect.value, 10);
   if (focusStrategySelect) state.config.focusStrategy = focusStrategySelect.value as 'frecency' | 'mtime';
+  if (optimisticUndoCheckbox) state.config.optimisticUndo = optimisticUndoCheckbox.checked;
   saveConfig(state.config);
   renderSidebar();
   // 清掉 saved 值，避免 closeSettingsDialog 误恢复

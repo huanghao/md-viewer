@@ -1724,6 +1724,21 @@ export const styles = `
       line-height: 1.4;
     }
 
+    .toast-action {
+      flex-shrink: 0;
+      margin-left: 8px;
+      padding: 2px 10px;
+      border: 1px solid currentColor;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--color-accent);
+      font-size: var(--text-xs);
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .toast-action:hover { background: rgba(9,105,218,0.08); }
+
     /* Toast 类型样式 */
     .toast-success {
       border-left: 4px solid var(--color-success);

@@ -6,6 +6,7 @@ interface ToastOptions {
   message: string;
   type?: ToastType;
   duration?: number; // 毫秒，0 表示不自动关闭
+  action?: { label: string; onClick: () => void };
 }
 
 // Toast 容器
@@ -42,9 +43,13 @@ export function showToast(options: ToastOptions | string) {
     info: 'ℹ'
   };
 
+  const actionHtml = config.action
+    ? `<button class="toast-action">${config.action.label}</button>`
+    : '';
   toast.innerHTML = `
     <span class="toast-icon">${icons[config.type!]}</span>
     <span class="toast-message">${config.message}</span>
+    ${actionHtml}
   `;
 
   // 添加到容器
@@ -62,7 +67,17 @@ export function showToast(options: ToastOptions | string) {
     }, config.duration);
   }
 
-  // 点击关闭
+  // action 按钮
+  if (config.action) {
+    const btn = toast.querySelector('.toast-action') as HTMLButtonElement | null;
+    btn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      config.action!.onClick();
+      hideToast(toast);
+    });
+  }
+
+  // 点击 toast 本身关闭（不含 action 按钮）
   toast.addEventListener('click', () => {
     hideToast(toast);
   });

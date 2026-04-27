@@ -1069,7 +1069,7 @@ function renderContent() {
 
   // 应用批注高亮
   applyAnnotations();
-  void injectParaIds();
+  injectParaIds();
 
   // 更新面包屑
   renderBreadcrumb();

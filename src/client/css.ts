@@ -4114,7 +4114,7 @@ export const styles = `
       border-radius: 1px;
     }
 
-    .para-translation {
+    #reader .para-translation {
       font-size: 0.9em;
       color: var(--color-text-secondary);
       margin-top: 0.2em;

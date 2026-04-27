@@ -11,13 +11,13 @@ export function setTranslateUrl(url: string): void {
   localStorage.setItem(TRANSLATE_URL_KEY, url || DEFAULT_TRANSLATE_URL);
 }
 
-async function sha256Prefix(text: string): Promise<string> {
-  const bytes = new TextEncoder().encode(text.slice(0, 64));
-  const buf = await crypto.subtle.digest('SHA-256', bytes);
-  return Array.from(new Uint8Array(buf)).slice(0, 8).map(b => b.toString(16).padStart(2, '0')).join('');
+function paraId(text: string): string {
+  let h = 5381;
+  for (let i = 0; i < text.length; i++) h = (((h << 5) + h) ^ text.charCodeAt(i)) >>> 0;
+  return h.toString(16).padStart(8, '0');
 }
 
-export async function injectParaIds(): Promise<void> {
+export function injectParaIds(): void {
   const reader = document.getElementById('reader');
   if (!reader) return;
   const els = reader.querySelectorAll<HTMLElement>('p, blockquote, li');
@@ -25,6 +25,6 @@ export async function injectParaIds(): Promise<void> {
     if (el.dataset.paraId) continue;
     const text = el.textContent?.trim() ?? '';
     if (!text) continue;
-    el.dataset.paraId = await sha256Prefix(text);
+    el.dataset.paraId = paraId(text);
   }
 }

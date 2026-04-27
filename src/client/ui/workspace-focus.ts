@@ -297,13 +297,6 @@ function renderFocusWorkspaceGroup(
   `;
 }
 
-const FOCUS_PAGE_SIZE = 30;
-let focusPage = 1; // in-memory only, resets on page refresh
-
-export function loadMoreFocus(): void {
-  focusPage += 1;
-  import('./sidebar').then(({ renderSidebar }) => renderSidebar());
-}
 
 function renderFocusViewMtime(): string {
   const workspaces = state.config.workspaces;
@@ -427,13 +420,9 @@ export function renderFocusView(): string {
     return `<div class="focus-view">${renderFilterBar()}<div class="focus-empty">暂无最近文件</div></div>`;
   }
 
-  const limit = focusPage * FOCUS_PAGE_SIZE;
-  const visible = filtered.slice(0, limit);
-  const remaining = filtered.length - visible.length;
-
-  // Group visible files by workspace for display
+  // Group all files by workspace for display
   const byWs = new Map<string, FileTreeNode[]>();
-  for (const { file, ws } of visible) {
+  for (const { file, ws } of filtered) {
     const arr = byWs.get(ws.id) ?? [];
     arr.push(file);
     byWs.set(ws.id, arr);
@@ -445,16 +434,11 @@ export function renderFocusView(): string {
     return renderFocusWorkspaceGroup(ws, files, pinned, false, query, collapsed);
   }).join('');
 
-  const moreBtn = remaining > 0
-    ? `<button class="focus-more-btn" onclick="loadMoreFocus()">显示更多 (还有 ${remaining} 个)</button>`
-    : '';
-
-  return `<div class="focus-view">${renderFilterBar()}${groups}${moreBtn}</div>`;
+  return `<div class="focus-view">${renderFilterBar()}${groups}</div>`;
 }
 
 if (typeof window !== 'undefined') {
   (window as any).toggleFocusTypeFilter = toggleFocusTypeFilter;
-  (window as any).loadMoreFocus = loadMoreFocus;
   (window as any).setFocusStrategy = setFocusStrategy;
   (window as any).toggleFilterPopup = toggleFilterPopup;
   void refreshFrecencySignals();

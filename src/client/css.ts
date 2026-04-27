@@ -3603,8 +3603,7 @@ export const styles = `
     .focus-ws-group {
       border-bottom: 1px solid #f0f0f0;
     }
-    .focus-ws-group:last-child,
-    .focus-ws-group:has(+ .focus-more-btn) {
+    .focus-ws-group:last-child {
       border-bottom: none;
     }
     .focus-ws-header {
@@ -3677,22 +3676,6 @@ export const styles = `
       color: #aaa;
       padding: 12px 16px;
       font-style: italic;
-    }
-    .focus-more-btn {
-      display: block;
-      width: 100%;
-      padding: 6px 0;
-      background: none;
-      border: none;
-      color: var(--color-text-muted);
-      font-size: var(--text-xs);
-      cursor: pointer;
-      text-align: center;
-    }
-    .focus-more-btn:hover {
-      border-color: var(--color-accent);
-      color: var(--color-accent);
-      background: rgba(9,105,218,0.04);
     }
     /* Pin button — show on hover, works in all views */
     .tree-item .tree-pin-btn, .file-item .tree-pin-btn {

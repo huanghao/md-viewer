@@ -3603,7 +3603,8 @@ export const styles = `
     .focus-ws-group {
       border-bottom: 1px solid #f0f0f0;
     }
-    .focus-ws-group:last-child {
+    .focus-ws-group:last-child,
+    .focus-ws-group:has(+ .focus-more-btn) {
       border-bottom: none;
     }
     .focus-ws-header {
@@ -3679,12 +3680,10 @@ export const styles = `
     }
     .focus-more-btn {
       display: block;
-      width: calc(100% - 16px);
-      margin: 4px 8px 8px;
-      padding: 5px 0;
+      width: 100%;
+      padding: 6px 0;
       background: none;
-      border: 1px dashed var(--color-border);
-      border-radius: var(--radius-md);
+      border: none;
       color: var(--color-text-muted);
       font-size: var(--text-xs);
       cursor: pointer;

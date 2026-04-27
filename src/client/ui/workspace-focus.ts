@@ -297,7 +297,7 @@ function renderFocusWorkspaceGroup(
   `;
 }
 
-const FOCUS_PAGE_SIZE = 15;
+const FOCUS_PAGE_SIZE = 30;
 let focusPage = 1; // in-memory only, resets on page refresh
 
 export function loadMoreFocus(): void {

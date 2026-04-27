@@ -44,24 +44,27 @@ let _observer: IntersectionObserver | null = null;
 let _pendingQueue: HTMLElement[] = [];
 let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let _abortController: AbortController | null = null;
+let _flushing = false;
 
 async function flushQueue(): Promise<void> {
-  if (_pendingQueue.length === 0) return;
+  if (_flushing || _pendingQueue.length === 0) return;
+  _flushing = true;
   const batch = _pendingQueue.splice(0, 10);
   const segments = batch.map(el => ({
     id: el.dataset.paraId!,
     text: el.textContent?.trim() ?? '',
   })).filter(s => s.text);
 
-  if (segments.length === 0) return;
+  if (segments.length === 0) { _flushing = false; return; }
 
-  _abortController = new AbortController();
+  const controller = new AbortController();
+  _abortController = controller;
   try {
     const res = await fetch(`${getTranslateUrl()}/translate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ segments }),
-      signal: _abortController.signal,
+      signal: controller.signal,
     });
     if (!res.ok) return;
     const data = await res.json() as { results: Array<{ id: string; translation: string }> };
@@ -77,6 +80,9 @@ async function flushQueue(): Promise<void> {
     }
   } catch (e) {
     if ((e as Error).name !== 'AbortError') console.warn('[translate] fetch failed', e);
+  } finally {
+    _abortController = null;
+    _flushing = false;
   }
 
   if (_pendingQueue.length > 0) {
@@ -99,6 +105,7 @@ export function enableTranslation(): void {
       const el = entry.target as HTMLElement;
       if (el.dataset.translationDone) continue;
       if (!el.dataset.paraId) continue;
+      if (_pendingQueue.includes(el)) continue;
       _pendingQueue.push(el);
       scheduleFlush();
     }
@@ -116,6 +123,7 @@ export function disableTranslation(): void {
   _abortController = null;
   if (_debounceTimer) { clearTimeout(_debounceTimer); _debounceTimer = null; }
   _pendingQueue = [];
+  _flushing = false;
 
   document.querySelectorAll('.para-translation').forEach(el => el.remove());
   document.querySelectorAll<HTMLElement>('[data-translation-done]').forEach(el => {

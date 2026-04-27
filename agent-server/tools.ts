@@ -33,13 +33,6 @@ export const AGENT_TOOLS: AgentTool[] = [
     execute: async (_toolCallId, params) => {
       try {
         writeFileSync(params.path, params.content, "utf-8");
-        // Notify mdv to update focus signals for the written file
-        const mdvUrl = process.env.MDV_URL ?? 'http://localhost:3000';
-        fetch(`${mdvUrl}/api/focus-signal`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'mtime', file: params.path }),
-        }).catch(() => {});
         const text = `写入成功: ${params.path}`;
         return { content: [{ type: "text", text }], details: { path: params.path } };
       } catch (e: any) {

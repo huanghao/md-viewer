@@ -1,6 +1,6 @@
 ---
 name: mdv
-description: 查看本地 Markdown 文件上的批注，并根据批注修改文档
+description: Use when user says "看评论"、"处理批注"、"看文档评论并更新" or similar — reads and applies annotations on local Markdown files via mdv CLI. Not for 学城/Confluence/Word.
 ---
 
 `mdv` 是本地命令行工具，用于管理本地 Markdown 文件上的批注（人工标注的修改意见）。
@@ -61,3 +61,7 @@ mdv comments reply-batch --file /path/to/file.md --author claude --input '[
 
 - 获取批注后，**直接处理**，不要只展示给用户等待确认。逐条判断批注类型，立即行动
 - 用户说"继续下一轮"时，意思是对话上下文中的当前文档又有了新批注，继续用同样的流程处理即可，不需要去找其他文件
+
+## 文档选择
+
+上下文中有多个 md 文档时，优先处理最相关的 1-2 个（如刚创建或修改的），处理完告知用户操作了哪些文件。不确定时先 `mdv comments list` 再决定。

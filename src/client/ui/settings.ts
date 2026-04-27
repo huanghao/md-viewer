@@ -4,6 +4,7 @@ import { renderSidebar } from './sidebar';
 import { showError, showSuccess } from './toast';
 import { MD_THEMES, HL_THEMES } from '../themes/index';
 import { getAllStorageKeys, storageRemove } from '../utils/storage';
+import { getTranslateUrl, setTranslateUrl } from '../translation';
 
 // 打开对话框时保存的原始主题值，用于 Cancel 时恢复
 let _savedMarkdownTheme = '';
@@ -166,6 +167,16 @@ function renderSettingsDialog(): void {
         <button class="sync-dialog-button" id="clearClientStateBtn">清理客户端状态</button>
       </div>
     </div>
+
+    <div class="settings-group">
+      <div class="settings-group-title">翻译</div>
+      <div class="settings-row">
+        <label class="settings-label">翻译服务地址</label>
+        <input id="translateUrlInput" type="text" class="settings-select"
+          value="${escapeHtml(getTranslateUrl())}"
+          placeholder="http://localhost:5050" style="flex:1;font-size:12px;" />
+      </div>
+    </div>
   `;
 
   const clearClientStateBtn = document.getElementById('clearClientStateBtn');
@@ -188,6 +199,11 @@ function renderSettingsDialog(): void {
   hlSelect?.addEventListener('change', () => {
     state.config.codeTheme = hlSelect!.value;
     (window as any).applyTheme?.();
+  });
+
+  const translateUrlInput = document.getElementById('translateUrlInput') as HTMLInputElement | null;
+  translateUrlInput?.addEventListener('change', () => {
+    setTranslateUrl(translateUrlInput!.value.trim());
   });
 }
 

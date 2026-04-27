@@ -46,18 +46,29 @@ export function showToast(options: ToastOptions | string) {
   const actionHtml = config.action
     ? `<button class="toast-action">${config.action.label}</button>`
     : '';
+  const progressHtml = config.duration && config.duration > 0
+    ? `<div class="toast-progress"><div class="toast-progress-bar"></div></div>`
+    : '';
   toast.innerHTML = `
     <span class="toast-icon">${icons[config.type!]}</span>
     <span class="toast-message">${config.message}</span>
     ${actionHtml}
+    ${progressHtml}
   `;
 
   // 添加到容器
   toastContainer!.appendChild(toast);
 
-  // 触发动画
+  // 触发入场动画，然后启动进度条
   requestAnimationFrame(() => {
     toast.classList.add('toast-show');
+    if (config.duration && config.duration > 0) {
+      const bar = toast.querySelector('.toast-progress-bar') as HTMLElement | null;
+      if (bar) {
+        bar.style.transitionDuration = `${config.duration}ms`;
+        requestAnimationFrame(() => { bar.style.width = '0%'; });
+      }
+    }
   });
 
   // 自动关闭

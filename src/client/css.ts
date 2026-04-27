@@ -1694,6 +1694,8 @@ export const styles = `
       opacity: 0;
       transform: translateX(100%);
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
     }
 
     .toast-show {
@@ -1722,6 +1724,24 @@ export const styles = `
       flex: 1;
       color: #24292f;
       line-height: 1.4;
+    }
+
+    .toast-progress {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: rgba(0,0,0,0.06);
+      border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+      overflow: hidden;
+    }
+    .toast-progress-bar {
+      height: 100%;
+      width: 100%;
+      background: var(--color-accent);
+      transition: width linear;
+      opacity: 0.6;
     }
 
     .toast-action {

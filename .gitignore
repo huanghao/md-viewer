@@ -196,6 +196,9 @@ src/client/embedded-client.ts
 models/
 dist-server/
 
+# Translation server runtime files
+translate-server/cache.db
+
 # Build artifacts
 mdv-server-arm64
 mdv-server-*

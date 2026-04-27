@@ -131,31 +131,69 @@ export function disableTranslation(): void {
   });
 }
 
+// 'off' | 'connecting' | 'on' | 'error'
+type TranslateStatus = 'off' | 'connecting' | 'on' | 'error';
+
+function setButtonStatus(status: TranslateStatus): void {
+  const span = document.getElementById('translateButtonText');
+  if (!span) return;
+  const labels: Record<TranslateStatus, string> = {
+    off: '[译]',
+    connecting: '[译…]',
+    on: '[译 ✓]',
+    error: '[译 ✗]',
+  };
+  span.textContent = labels[status];
+}
+
+async function checkServerAndEnable(): Promise<void> {
+  setButtonStatus('connecting');
+  try {
+    const res = await fetch(`${getTranslateUrl()}/health`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) throw new Error('unhealthy');
+    setButtonStatus('on');
+    enableTranslation();
+  } catch {
+    setButtonStatus('error');
+    // revert state so next click retries
+    const filePath = _currentFilePath;
+    if (filePath) {
+      localStorage.removeItem(TRANSLATE_STATE_PREFIX + filePath);
+    }
+  }
+}
+
+let _currentFilePath: string | null = null;
+
 export function updateTranslateButton(filePath: string): void {
   const btn = document.getElementById('translateButton');
   if (!btn) return;
   const enabled = isTranslateEnabled(filePath);
   btn.classList.toggle('active', enabled);
-  const span = document.getElementById('translateButtonText');
-  if (span) span.textContent = enabled ? '[译 ✓]' : '[译]';
+  setButtonStatus(enabled ? 'on' : 'off');
 }
 
 export function handleTranslateButtonClick(filePath: string | null): void {
   if (!filePath) return;
   const nowEnabled = !isTranslateEnabled(filePath);
   setTranslateEnabled(filePath, nowEnabled);
-  updateTranslateButton(filePath);
+  const btn = document.getElementById('translateButton');
+  if (btn) btn.classList.toggle('active', nowEnabled);
   if (nowEnabled) {
-    enableTranslation();
+    void checkServerAndEnable();
   } else {
     disableTranslation();
+    setButtonStatus('off');
   }
 }
 
 export function initTranslation(filePath: string): void {
+  _currentFilePath = filePath;
   disableTranslation();
   updateTranslateButton(filePath);
   if (isTranslateEnabled(filePath)) {
-    enableTranslation();
+    void checkServerAndEnable();
   }
 }

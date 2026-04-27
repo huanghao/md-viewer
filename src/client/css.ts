@@ -4098,11 +4098,9 @@ export const styles = `
     }
 
     #reader .para-translation {
-      font-size: 0.9em;
       color: var(--color-text-secondary);
       margin-top: 0.2em;
       margin-bottom: 1em;
-      font-style: italic;
     }
 
 `;

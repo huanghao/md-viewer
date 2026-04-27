@@ -6,7 +6,7 @@ const CONFIG_KEY = 'md-viewer:config';
 export const defaultConfig: AppConfig = {
   sidebarTab: 'focus',
   focusWindowKey: '8h',
-  focusStrategy: 'frecency',
+  focusStrategy: 'mtime',
   markdownTheme: 'github',
   codeTheme: 'github',
   mathInline: true,

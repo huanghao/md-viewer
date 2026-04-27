@@ -182,38 +182,85 @@ export function setFocusStrategy(strategy: 'frecency' | 'mtime'): void {
   import('./sidebar').then(({ renderSidebar }) => renderSidebar());
 }
 
+let filterPopupOpen = false;
+
+export function toggleFilterPopup(): void {
+  filterPopupOpen = !filterPopupOpen;
+  import('./sidebar').then(({ renderSidebar }) => renderSidebar());
+}
+
+export function closeFilterPopup(): void {
+  if (!filterPopupOpen) return;
+  filterPopupOpen = false;
+  import('./sidebar').then(({ renderSidebar }) => renderSidebar());
+}
+
 function renderFilterBar(): string {
-  const strategy = state.config.focusStrategy ?? 'frecency';
+  const strategy = state.config.focusStrategy ?? 'mtime';
+  const currentWindow = state.config.focusWindowKey || '8h';
   const typeOptions: Array<{ ext: string; label: string }> = [
     { ext: 'md', label: 'MD' },
     { ext: 'pdf', label: 'PDF' },
     { ext: 'html', label: 'HTML' },
     { ext: 'json', label: 'JSON' },
   ];
-  const typePills = typeOptions.map(o =>
-    `<button class="focus-type-pill${activeTypes.has(o.ext) ? ' active' : ''}"
-             onclick="toggleFocusTypeFilter('${o.ext}')">${o.label}</button>`
-  ).join('');
-
-  // Time window pills (only shown in mtime strategy)
   const timeOptions: Array<{ key: string; label: string }> = [
     { key: '8h', label: '8h' },
     { key: '1d', label: '1d' },
     { key: '2d', label: '2d' },
   ];
-  const current = state.config.focusWindowKey || '8h';
-  const timePills = strategy === 'mtime' ? `
-    <div class="focus-time-pills">${timeOptions.map(o =>
-      `<button class="focus-time-pill${current === o.key ? ' active' : ''}"
-               onclick="setFocusWindowKey('${o.key}')">${o.label}</button>`
-    ).join('')}</div>
-    <span class="focus-filter-sep">│</span>` : '';
+
+  // 当前生效的标签（只展示已选中的）
+  const activeTimeLabel = strategy === 'mtime'
+    ? `<span class="focus-active-tag">${currentWindow}</span>` : '';
+  const activeTypeTags = typeOptions
+    .filter(o => activeTypes.has(o.ext))
+    .map(o => `<span class="focus-active-tag">${o.label}</span>`)
+    .join('');
+
+  // popup 内容
+  const timeSection = strategy === 'mtime' ? `
+    <div class="focus-popup-section">
+      <div class="focus-popup-label">时间窗口</div>
+      <div class="focus-popup-options">
+        ${timeOptions.map(o => `
+          <button class="focus-popup-option${currentWindow === o.key ? ' active' : ''}"
+                  onclick="setFocusWindowKey('${o.key}');toggleFilterPopup()">${o.label}</button>
+        `).join('')}
+      </div>
+    </div>
+    <div class="focus-popup-divider"></div>` : '';
+
+  const typeSection = `
+    <div class="focus-popup-section">
+      <div class="focus-popup-label">文件类型</div>
+      <div class="focus-popup-options">
+        ${typeOptions.map(o => `
+          <button class="focus-popup-option${activeTypes.has(o.ext) ? ' active' : ''}"
+                  onclick="toggleFocusTypeFilter('${o.ext}')">${o.label}</button>
+        `).join('')}
+      </div>
+    </div>`;
+
+  const popup = filterPopupOpen ? `
+    <div class="focus-filter-popup">
+      ${timeSection}
+      ${typeSection}
+    </div>` : '';
 
   return `
     <div class="focus-filter-bar">
       <span class="focus-filter-label">最近</span>
-      ${timePills}
-      <div class="focus-type-pills">${typePills}</div>
+      <div class="focus-active-tags">${activeTimeLabel}${activeTypeTags}</div>
+      <div class="focus-filter-popup-wrap">
+        <button class="focus-filter-btn${filterPopupOpen ? ' active' : ''}"
+                onclick="toggleFilterPopup()" title="筛选">
+          <svg viewBox="0 0 16 16" fill="currentColor" width="11" height="11">
+            <path d="M2 3h12L9.5 8v4.5l-3-1.5V8z"/>
+          </svg>
+        </button>
+        ${popup}
+      </div>
     </div>
   `;
 }
@@ -409,5 +456,13 @@ if (typeof window !== 'undefined') {
   (window as any).toggleFocusTypeFilter = toggleFocusTypeFilter;
   (window as any).loadMoreFocus = loadMoreFocus;
   (window as any).setFocusStrategy = setFocusStrategy;
+  (window as any).toggleFilterPopup = toggleFilterPopup;
   void refreshFrecencySignals();
+
+  // 点击 popup 外部关闭
+  document.addEventListener('click', (e) => {
+    if (!filterPopupOpen) return;
+    if ((e.target as HTMLElement).closest('.focus-filter-popup-wrap')) return;
+    closeFilterPopup();
+  });
 }

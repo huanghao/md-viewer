@@ -198,6 +198,7 @@ dist-server/
 
 # Translation server runtime files
 translate-server/cache.db
+translate-server/__pycache__/
 
 # Build artifacts
 mdv-server-arm64

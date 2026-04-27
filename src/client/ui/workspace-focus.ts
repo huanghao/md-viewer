@@ -355,7 +355,11 @@ export function renderFocusView(): string {
         if (!activeTypes.has(norm)) continue;
       }
       const score = frecencyMap.get(f.path) ?? 0;
-      const isNew = score === 0 && mtimeSignalFiles.has(f.path);
+      // "New" = no frecency (never interacted) AND either:
+      //   a) has a recent mtime signal from agent/watcher, OR
+      //   b) file's lastModified is within the new-file window (catches moves/renames)
+      const recentlyModified = typeof f.lastModified === 'number' && f.lastModified >= newCutoff;
+      const isNew = score === 0 && (mtimeSignalFiles.has(f.path) || recentlyModified);
       // Include if: pinned, has frecency score, or is a new unread file
       if (!pinned.has(f.path) && score === 0 && !isNew) continue;
       allCandidates.push({ file: f, ws, isNew });

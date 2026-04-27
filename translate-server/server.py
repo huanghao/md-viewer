@@ -43,12 +43,16 @@ def ensure_model():
         print("Downloading en->zh language package (~100MB)...")
         argostranslate.package.update_package_index()
         available = argostranslate.package.get_available_packages()
-        pkg = next(p for p in available if p.from_code == "en" and p.to_code == "zh")
+        pkg = next((p for p in available if p.from_code == "en" and p.to_code == "zh"), None)
+        if pkg is None:
+            raise RuntimeError("en->zh package not found in argostranslate index")
         argostranslate.package.install_from_path(pkg.download())
         print("Download complete.")
     installed_langs = argostranslate.translate.get_installed_languages()
-    from_lang = next(l for l in installed_langs if l.code == "en")
-    to_lang = next(l for l in installed_langs if l.code == "zh")
+    from_lang = next((l for l in installed_langs if l.code == "en"), None)
+    to_lang = next((l for l in installed_langs if l.code == "zh"), None)
+    if from_lang is None or to_lang is None:
+        raise RuntimeError("en or zh language not found after package install")
     _translator = from_lang.get_translation(to_lang)
 
 class Segment(BaseModel):
@@ -75,20 +79,25 @@ def translate(req: TranslateRequest):
     ensure_model()
     db = get_db()
     results = []
-    for seg in req.segments:
-        h = hashlib.sha256(seg.text.encode()).hexdigest()
-        row = db.execute("SELECT translation FROM cache WHERE hash=?", (h,)).fetchone()
-        if row:
-            results.append(TranslateResult(id=seg.id, translation=row[0]))
-        else:
-            translation = _translator.translate(seg.text)
-            db.execute(
-                "INSERT OR REPLACE INTO cache (hash, source, translation, created_at) VALUES (?,?,?,?)",
-                (h, seg.text, translation, int(time.time()))
-            )
-            db.commit()
-            results.append(TranslateResult(id=seg.id, translation=translation))
-    db.close()
+    try:
+        for seg in req.segments:
+            if not seg.text.strip():
+                results.append(TranslateResult(id=seg.id, translation=""))
+                continue
+            h = hashlib.sha256(seg.text.encode()).hexdigest()
+            row = db.execute("SELECT translation FROM cache WHERE hash=?", (h,)).fetchone()
+            if row:
+                results.append(TranslateResult(id=seg.id, translation=row[0]))
+            else:
+                translation = _translator.translate(seg.text)
+                db.execute(
+                    "INSERT OR REPLACE INTO cache (hash, source, translation, created_at) VALUES (?,?,?,?)",
+                    (h, seg.text, translation, int(time.time()))
+                )
+                db.commit()
+                results.append(TranslateResult(id=seg.id, translation=translation))
+    finally:
+        db.close()
     return TranslateResponse(results=results)
 
 @app.get("/health")
@@ -111,4 +120,4 @@ if __name__ == "__main__":
         db.close()
         print(f"Deleted {deleted} cache entries older than {args.clear_before} days.")
     else:
-        uvicorn.run(app, host="127.0.0.1", port=args.port)
+        uvicorn.run(app, host="127.0.0.1", port=args.port, workers=1)

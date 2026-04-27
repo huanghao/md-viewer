@@ -6,7 +6,7 @@ import { stripWorkspaceTreeDisplayExtension } from '../utils/workspace-file-name
 import { formatRelativeTimeShort } from '../utils/format';
 import { escapeHtml, escapeAttr } from '../utils/escape';
 import { isPinned } from '../utils/pinned-files';
-import { activeAgentSessions } from '../main';
+import { activeAgentSessions } from '../agent-sessions';
 
 export interface FileRowOptions {
   /** 外层 div 的 class（各视图不同，如 'tree-item file-node' 或 'file-item'） */

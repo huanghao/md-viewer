@@ -1872,7 +1872,7 @@ let monitorPollTimer: ReturnType<typeof setInterval> | null = null;
 let monitorActiveTab: 'memory' | 'sessions' = 'memory';
 
 // Active agent sessions cache — keyed by filePath, used by file-row indicators
-export const activeAgentSessions = new Map<string, { sessionId: string; messages: number; model: string; streaming: boolean }>();
+import { activeAgentSessions } from './agent-sessions';
 
 async function refreshActiveAgentSessions(): Promise<void> {
   try {
@@ -2444,7 +2444,7 @@ window.renderContent = renderContent;
 (window as any).applyTheme = applyTheme;
 
 // ── Browsing signals: dwell + scroll ─────────────────────────────────────────
-{
+if (typeof window !== 'undefined') {
   const DWELL_THRESHOLD_MS = 30_000; // 30s 算作一次 dwell
   const SCROLL_DEBOUNCE_MS = 10_000; // 每 10s 最多发一次 scroll 信号
   const SCROLL_MIN_PX = 200;         // 至少滚动 200px 才算

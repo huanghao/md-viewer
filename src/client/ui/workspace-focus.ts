@@ -248,10 +248,12 @@ function renderFilterBar(): string {
       ${typeSection}
     </div>` : '';
 
+  const sep = activeTimeLabel && activeTypeTags
+    ? `<span class="focus-active-sep"></span>` : '';
+
   return `
     <div class="focus-filter-bar">
-      <span class="focus-filter-label">最近</span>
-      <div class="focus-active-tags">${activeTimeLabel}${activeTypeTags}</div>
+      <div class="focus-active-tags">${activeTimeLabel}${sep}${activeTypeTags}</div>
       <div class="focus-filter-popup-wrap">
         <button class="focus-filter-btn${filterPopupOpen ? ' active' : ''}"
                 onclick="toggleFilterPopup()" title="筛选">

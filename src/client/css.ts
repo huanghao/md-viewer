@@ -3475,11 +3475,6 @@ export const styles = `
       gap: 6px;
       flex-shrink: 0;
     }
-    .focus-filter-label {
-      font-size: var(--text-xs);
-      color: #999;
-      flex-shrink: 0;
-    }
     .focus-active-tags {
       display: flex;
       gap: 3px;
@@ -3493,6 +3488,13 @@ export const styles = `
       background: var(--color-accent);
       color: #fff;
       font-weight: 500;
+    }
+    .focus-active-sep {
+      width: 1px;
+      height: 10px;
+      background: #d8d8d8;
+      align-self: center;
+      flex-shrink: 0;
     }
     .focus-filter-popup-wrap {
       position: relative;

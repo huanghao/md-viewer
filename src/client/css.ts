@@ -1468,6 +1468,21 @@ export const styles = `
       color: var(--color-success);
     }
 
+    .copy-abspath-icon {
+      font-size: 11px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      line-height: 1;
+      color: var(--color-text-muted);
+      width: 13px;
+      height: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .copy-abspath-button.success .copy-abspath-icon { display: none; }
+    .copy-abspath-button:not(.success) .check-icon { display: none; }
+
     /* 加载动画 */
     @keyframes spin {
       to { transform: rotate(360deg); }

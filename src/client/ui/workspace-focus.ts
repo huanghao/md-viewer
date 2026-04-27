@@ -320,7 +320,7 @@ export function renderFocusView(): string {
   const frecencyMap = buildFrecencyMap(signals);
   const collapsed = getFocusCollapsed();
 
-  const NEW_WINDOW_MS = 8 * 3600 * 1000;
+  const NEW_WINDOW_MS = 2 * 86400 * 1000;
   const newCutoff = Date.now() - NEW_WINDOW_MS;
 
   // Collect all files across workspaces, trigger scans as needed

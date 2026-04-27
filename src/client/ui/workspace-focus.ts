@@ -196,7 +196,6 @@ export function closeFilterPopup(): void {
 }
 
 function renderFilterBar(): string {
-  const strategy = state.config.focusStrategy ?? 'mtime';
   const currentWindow = state.config.focusWindowKey || '8h';
   const typeOptions: Array<{ ext: string; label: string }> = [
     { ext: 'md', label: 'MD' },
@@ -211,15 +210,14 @@ function renderFilterBar(): string {
   ];
 
   // 当前生效的标签（只展示已选中的）
-  const activeTimeLabel = strategy === 'mtime'
-    ? `<span class="focus-active-tag">${currentWindow}</span>` : '';
+  const activeTimeLabel = `<span class="focus-active-tag">${currentWindow}</span>`;
   const activeTypeTags = typeOptions
     .filter(o => activeTypes.has(o.ext))
     .map(o => `<span class="focus-active-tag">${o.label}</span>`)
     .join('');
 
   // popup 内容
-  const timeSection = strategy === 'mtime' ? `
+  const timeSection = `
     <div class="focus-popup-section">
       <div class="focus-popup-label">时间窗口</div>
       <div class="focus-popup-options">
@@ -229,7 +227,7 @@ function renderFilterBar(): string {
         `).join('')}
       </div>
     </div>
-    <div class="focus-popup-divider"></div>` : '';
+    <div class="focus-popup-divider"></div>`;
 
   const typeSection = `
     <div class="focus-popup-section">
@@ -369,7 +367,7 @@ export function renderFocusView(): string {
   const frecencyMap = buildFrecencyMap(signals);
   const collapsed = getFocusCollapsed();
 
-  const NEW_WINDOW_MS = 2 * 86400 * 1000;
+  const NEW_WINDOW_MS = FOCUS_WINDOW_MS[state.config.focusWindowKey || '8h'] ?? FOCUS_WINDOW_MS['8h'];
   const newCutoff = Date.now() - NEW_WINDOW_MS;
 
   // Collect all files across workspaces, trigger scans as needed

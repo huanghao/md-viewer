@@ -8,6 +8,9 @@ export function getTextNodes(root: Node): Text[] {
         nodes.push(node as Text);
       }
     } else {
+      // Skip KaTeX elements entirely — their internal DOM is fragmented and
+      // causes offset miscalculation and surroundContents failures.
+      if (node.nodeType === 1 && (node as Element).classList?.contains('katex')) return;
       for (let i = 0; i < node.childNodes.length; i++) {
         walk(node.childNodes[i]);
       }

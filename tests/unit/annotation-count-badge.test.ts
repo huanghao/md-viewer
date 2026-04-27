@@ -1,8 +1,8 @@
 /**
  * Tests for badge count consistency:
- * adjustAnnotationCount should only change when isOpen(status) is true.
- * This guards against the bug where unanchored annotations were incorrectly
- * counted in the badge (same as open/anchored).
+ * adjustAnnotationCount should change when isOpen(status) is true.
+ * isOpen now includes both anchored AND unanchored (lost-anchor annotations
+ * remain visible in the open list rather than silently disappearing).
  */
 import { describe, expect, it, beforeEach } from 'bun:test';
 import { adjustAnnotationCount, setAnnotationSummaries } from '../../src/client/state';
@@ -40,16 +40,12 @@ describe('badge count 一致性约束', () => {
     // count 回到 0，不报错
   });
 
-  it('删除 unanchored 批注时不应 -1（isOpen=false）', () => {
+  it('删除 unanchored 批注时应 -1（isOpen=true，失锚评论也计入 open）', () => {
     const status: AnnotationStatus = 'unanchored';
-    expect(isOpen(status)).toBe(false);
-    // 模拟：badge 初始为 1（有一个 anchored）
+    expect(isOpen(status)).toBe(true);
     adjustAnnotationCount('/a.md', +1);
-    // 删除一个 unanchored，不应改变计数
     if (isOpen(status)) adjustAnnotationCount('/a.md', -1);
-    // count 仍为 1，再 -1 应归零
-    adjustAnnotationCount('/a.md', -1);
-    // 不报错 = pass
+    // count 回到 0，不报错
   });
 
   it('删除 resolved 批注时不应 -1（isOpen=false）', () => {
@@ -60,10 +56,10 @@ describe('badge count 一致性约束', () => {
     adjustAnnotationCount('/a.md', -1);
   });
 
-  it('所有状态的 isOpen 结果与预期一致（防止 annotation-status 被误改）', () => {
+  it('所有状态的 isOpen 结果与预期一致', () => {
     const expected: Record<AnnotationStatus, boolean> = {
       anchored: true,
-      unanchored: false,
+      unanchored: true,   // 失锚评论也是 open，不应消失
       resolved: false,
     };
     for (const s of statuses) {
@@ -82,14 +78,13 @@ describe('toggleResolved badge 计数语义', () => {
     // count 归零，不报错
   });
 
-  it('unanchored → resolved：badge 不变', () => {
+  it('unanchored → resolved：badge -1（失锚评论也计入 open，resolve 时应减）', () => {
     const prev: AnnotationStatus = 'unanchored';
     const next: AnnotationStatus = 'resolved';
-    adjustAnnotationCount('/a.md', +1); // 先放一个 anchored 的计数
-    // 正确逻辑：isOpen(prev) 为 false，不触发
+    adjustAnnotationCount('/a.md', +1);
+    // isOpen(prev) 为 true，触发 -1
     if (isOpen(prev) && next === 'resolved') adjustAnnotationCount('/a.md', -1);
-    // count 仍为 1
-    adjustAnnotationCount('/a.md', -1); // 手动归零
+    // count 归零，不报错
   });
 
   it('resolved → anchored：badge +1', () => {
@@ -100,11 +95,11 @@ describe('toggleResolved badge 计数语义', () => {
     adjustAnnotationCount('/a.md', -1); // 归零
   });
 
-  it('resolved → unanchored：badge 不变', () => {
+  it('resolved → unanchored：badge +1（失锚评论也计入 open，reopen 时应加）', () => {
     const prev: AnnotationStatus = 'resolved';
     const next: AnnotationStatus = 'unanchored';
-    // 正确逻辑：isOpen(next) 为 false，不触发
+    // isOpen(next) 为 true，触发 +1
     if (prev === 'resolved' && isOpen(next)) adjustAnnotationCount('/a.md', +1);
-    // count 仍为 0，不报错
+    adjustAnnotationCount('/a.md', -1); // 归零
   });
 });

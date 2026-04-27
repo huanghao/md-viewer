@@ -22,8 +22,8 @@ describe('isOpen', () => {
     expect(isOpen('anchored')).toBe(true);
   });
 
-  it('unanchored 状态不是 open', () => {
-    expect(isOpen('unanchored')).toBe(false);
+  it('unanchored 状态也是 open（失锚评论不应消失）', () => {
+    expect(isOpen('unanchored')).toBe(true);
   });
 
   it('resolved 状态不是 open', () => {
@@ -32,15 +32,15 @@ describe('isOpen', () => {
 });
 
 describe('calculateOpenCount', () => {
-  it('只计算 anchoredCount', () => {
-    expect(calculateOpenCount(5, 3, 2)).toBe(5);
+  it('anchored + unanchored 都计入 open', () => {
+    expect(calculateOpenCount(5, 3, 2)).toBe(8);
   });
 
-  it('unanchoredCount 不计入 open', () => {
-    expect(calculateOpenCount(0, 10, 0)).toBe(0);
+  it('只有 unanchored 时计入 open', () => {
+    expect(calculateOpenCount(0, 10, 0)).toBe(10);
   });
 
-  it('混合状态只计 anchored', () => {
-    expect(calculateOpenCount(3, 5, 7)).toBe(3);
+  it('混合状态：anchored + unanchored 之和', () => {
+    expect(calculateOpenCount(3, 5, 7)).toBe(8);
   });
 });

@@ -57,7 +57,7 @@ import { flushAll as flushUndoQueue } from './utils/undo-queue';
 import { createResizer } from './utils/resizer';
 import { setupKeyboardShortcuts } from './keyboard-shortcuts';
 import { initZoom, zoomIn, zoomOut, zoomReset, updateZoomDisplay, setPdfZoomValue, getPdfZoom } from './zoom-controller';
-import { injectParaIds } from './translation';
+import { injectParaIds, initTranslation, handleTranslateButtonClick } from './translation';
 
 declare global {
   function cleanupAllExpiredRecords(): number;
@@ -1081,6 +1081,7 @@ function renderContent() {
 
   // 更新工具栏按钮
   updateToolbarButtons();
+  if (file.path) initTranslation(file.path);
 }
 
 // ==================== 面包屑导航 ====================
@@ -2420,6 +2421,7 @@ window.addFileByPath = addFileByPath;
 window.refreshFile = refreshFile;
 window.handleRefreshButtonClick = handleRefreshButtonClick;
 window.handleDiffButtonClick = handleDiffButtonClick;
+(window as any).handleTranslateButtonClick = () => handleTranslateButtonClick(state.currentFile ?? null);
 window.closeDiffView = closeDiffView;
 (window as any).navigateDiffBlock = navigateDiffBlock;
 window.acceptDiffUpdate = acceptDiffUpdate;

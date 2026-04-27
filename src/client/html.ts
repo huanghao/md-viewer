@@ -133,6 +133,9 @@ export function generateClientHTML(): string {
         <button class="toolbar-text-button" onclick="showSettingsDialog()" title="设置">
           <span id="settingsButtonText">[⚙ 设置]</span>
         </button>
+        <button class="toolbar-text-button" id="translateButton" onclick="handleTranslateButtonClick()" title="切换段落翻译（英→中）">
+          <span id="translateButtonText">[译]</span>
+        </button>
         <button class="toolbar-text-button" id="diffButton" onclick="handleDiffButtonClick()" style="display: none;" title="查看修改内容">
           <span id="diffButtonText">[± Diff]</span>
         </button>

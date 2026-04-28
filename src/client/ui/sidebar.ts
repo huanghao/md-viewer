@@ -16,14 +16,10 @@ let lastEscAt = 0;
 let lastEscValue = '';
 let hasAutoAnchoredCurrentFile = false;
 let tabManagerOpen = false;
-let tabManagerQuery = '';
-let tabManagerSort: 'recent' | 'name' = 'name';
 let tabManagerGlobalBound = false;
-let tabManagerListScrollTop = 0;
 let tabsScrollLeft = 0;
 let tabsScrollHandlerBound = false;
 let lastTabsRenderKey = '';
-const tabAccessOrder: string[] = [];
 import { attachPathAutocomplete } from './path-autocomplete';
 
 // 将当前打开的文件滚动到侧边栏40%位置
@@ -59,22 +55,7 @@ export function setSidebarTab(tab: 'focus' | 'full' | 'list'): void {
 if (typeof window !== 'undefined') {
   (window as any).setSidebarTab = setSidebarTab;
   (window as any).toggleTabManager = toggleTabManager;
-  (window as any).setTabManagerQuery = setTabManagerQuery;
-  (window as any).setTabManagerSort = setTabManagerSort;
   (window as any).applyTabBatchAction = applyTabBatchAction;
-}
-
-function touchTabAccess(path: string | null): void {
-  if (!path) return;
-  const index = tabAccessOrder.indexOf(path);
-  if (index >= 0) tabAccessOrder.splice(index, 1);
-  tabAccessOrder.unshift(path);
-  if (tabAccessOrder.length > 300) tabAccessOrder.length = 300;
-}
-
-function getTabRecentRank(path: string): number {
-  const index = tabAccessOrder.indexOf(path);
-  return index >= 0 ? index : Number.MAX_SAFE_INTEGER;
 }
 
 function toggleTabManager(): void {
@@ -85,17 +66,6 @@ function toggleTabManager(): void {
 function closeTabManager(): void {
   if (!tabManagerOpen) return;
   tabManagerOpen = false;
-  renderTabs();
-}
-
-function setTabManagerQuery(query: string): void {
-  tabManagerQuery = (query || '').trimStart();
-  if (!tabManagerOpen) tabManagerOpen = true;
-  renderTabs();
-}
-
-function setTabManagerSort(sort: string): void {
-  tabManagerSort = sort === 'name' ? 'name' : 'recent';
   renderTabs();
 }
 
@@ -122,8 +92,6 @@ function ensureTabsScrollHandler(): void {
     const target = event.target as HTMLElement;
     if (target.classList.contains('tabs-scroll')) {
       tabsScrollLeft = target.scrollLeft;
-    } else if (target.classList.contains('tab-manager-list')) {
-      tabManagerListScrollTop = target.scrollTop;
     }
   }, { passive: true, capture: true });
 }
@@ -401,12 +369,6 @@ export function renderTabs(): void {
   ensureTabManagerGlobalEvents();
   ensureTabsScrollHandler();
 
-  // 保存 tab-manager-list 的滚动位置
-  const prevList = container.querySelector('.tab-manager-list') as HTMLElement | null;
-  if (prevList) {
-    tabManagerListScrollTop = prevList.scrollTop;
-  }
-
   // 保存 tabs-scroll 的滚动位置
   const prevTabsScroll = container.querySelector('.tabs-scroll') as HTMLElement | null;
   if (prevTabsScroll) {
@@ -438,8 +400,6 @@ export function renderTabs(): void {
   const nextTabsRenderKey = [
     state.currentFile || '',
     tabManagerOpen ? '1' : '0',
-    tabManagerSort,
-    tabManagerQuery,
     tabsRenderSnapshot
   ].join('###');
 
@@ -451,8 +411,6 @@ export function renderTabs(): void {
     return;
   }
   lastTabsRenderKey = nextTabsRenderKey;
-
-  touchTabAccess(state.currentFile);
 
   const tabsHtml = filesWithDisplay
     .map(file => {
@@ -470,47 +428,6 @@ export function renderTabs(): void {
         </div>
       `;
     }).join('');
-
-  const query = tabManagerQuery.toLowerCase().trim();
-  const managedFiles = filesWithDisplay
-    .filter((file) => {
-      const displayName = file.displayName || file.name;
-      if (!query) return true;
-      return displayName.toLowerCase().includes(query) || file.path.toLowerCase().includes(query);
-    })
-    .sort((a, b) => {
-      const aPinned = isPinned(a.path);
-      const bPinned = isPinned(b.path);
-      if (aPinned !== bPinned) return aPinned ? -1 : 1;
-      const nameA = a.displayName || a.name;
-      const nameB = b.displayName || b.name;
-      if (tabManagerSort === 'name') {
-        return compareFileNames(nameA, nameB);
-      }
-      const recentDiff = getTabRecentRank(a.path) - getTabRecentRank(b.path);
-      if (recentDiff !== 0) return recentDiff;
-      return compareFileNames(nameA, nameB);
-    });
-
-  const managerListHtml = managedFiles.length === 0
-    ? '<div class="tab-manager-empty">没有匹配的已打开文件</div>'
-    : managedFiles.map((file) => {
-        const displayName = file.displayName || file.name;
-        const isCurrent = file.path === state.currentFile;
-        const status = getFileListStatus(file, hasListDiff(file.path));
-        const statusBadge = status.badge
-          ? `<span class="tab-manager-status status-${status.type}">${escapeHtml(status.badge)}</span>`
-          : '';
-        return `
-          <div class="tab-manager-item ${isCurrent ? 'active' : ''}" onclick="window.switchFile('${escapeAttr(file.path)}')">
-            <span class="tab-manager-name" title="${escapeAttr(file.path)}">${escapeHtml(displayName)}</span>
-            <span class="tab-manager-actions">
-              ${statusBadge}
-              <button class="tab-manager-close" type="button" title="关闭" onclick="event.stopPropagation();window.removeFile('${escapeAttr(file.path)}')">×</button>
-            </span>
-          </div>
-        `;
-      }).join('');
 
   const batchCount = {
     others: getTabBatchTargets('close-others', filesWithDisplay, state.currentFile, () => false).length,
@@ -535,25 +452,11 @@ export function renderTabs(): void {
           <button class="tab-manager-action" type="button" data-action="close-unmodified" onclick="window.applyTabBatchAction('close-unmodified')">关闭未修改 (${batchCount.unmodified})</button>
           <button class="tab-manager-action danger" type="button" data-action="close-all" onclick="window.applyTabBatchAction('close-all')">关闭全部 (${batchCount.all})</button>
         </div>
-        <div class="tab-manager-row">
-          <input class="tab-manager-search" placeholder="搜索已打开文件" value="${escapeAttr(tabManagerQuery)}" oninput="window.setTabManagerQuery(this.value)">
-        </div>
-        <div class="tab-manager-row">
-          <button class="tab-manager-sort ${tabManagerSort === 'recent' ? 'active' : ''}" type="button" onclick="window.setTabManagerSort('recent')">最近使用</button>
-          <button class="tab-manager-sort ${tabManagerSort === 'name' ? 'active' : ''}" type="button" onclick="window.setTabManagerSort('name')">按名称</button>
-        </div>
-        <div class="tab-manager-list">${managerListHtml}</div>
       </div>
     </div>
   `;
 
-  // 使用 requestAnimationFrame 延迟恢复滚动位置，避免闪烁
   requestAnimationFrame(() => {
-    const listEl = container.querySelector('.tab-manager-list') as HTMLElement | null;
-    if (listEl && tabManagerListScrollTop > 0) {
-      listEl.scrollTop = tabManagerListScrollTop;
-    }
-
     const tabsScrollEl = container.querySelector('.tabs-scroll') as HTMLElement | null;
     if (tabsScrollEl && tabsScrollLeft > 0) {
       tabsScrollEl.scrollLeft = tabsScrollLeft;

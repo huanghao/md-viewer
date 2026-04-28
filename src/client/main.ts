@@ -660,6 +660,8 @@ function rewriteMarkdownAssetUrls(container: HTMLElement, currentFilePath: strin
   });
 }
 
+import { protectMath } from './utils/math-protect';
+
 function renderMath(container: HTMLElement): void {
   const renderMathInElement = (window as any).renderMathInElement;
   if (!renderMathInElement) return;
@@ -1051,7 +1053,8 @@ function renderContent() {
   }
 
   // 使用 marked 渲染 Markdown
-  const html = (window as any).marked.parse(file.content);
+  const mathGuard = protectMath(file.content);
+  const html = mathGuard.restore((window as any).marked.parse(mathGuard.protected));
   const deletedNotice = file.isMissing
     ? `
       <div class="content-file-status deleted">
@@ -1527,7 +1530,10 @@ function renderInlineDiffHTML(lines: import('./utils/diff').DiffLine[]): { html:
     }
   }
 
-  const md = (s: string) => (window as any).marked.parse(s);
+  const md = (s: string) => {
+    const g = protectMath(s);
+    return g.restore((window as any).marked.parse(g.protected));
+  };
 
   // 将严格相邻（无 equal 间隔）的变更段合并为 group
   type Group = { segments: Segment[]; hasChange: boolean };
@@ -1615,6 +1621,7 @@ function renderDiffView(oldContent: string, newContent: string): void {
   }
 
   container.innerHTML = bodyHTML;
+  renderMath(container);
 
   // 更新滚动条 diff 标记
   unmountScrollbar();

@@ -6,8 +6,31 @@ function segKind(s: string): SegKind {
   return 2;
 }
 
-/** Natural sort for file names: numbers numerically, ASCII before CJK, case-insensitive. */
+const EXT_GROUP: Record<string, number> = {
+  md: 0, mdx: 0, markdown: 0,
+  pdf: 1,
+  html: 2, htm: 2,
+  json: 3, jsonl: 3,
+};
+
+function extGroup(name: string): number {
+  const dot = name.lastIndexOf('.');
+  if (dot < 0) return 4;
+  const ext = name.slice(dot + 1).toLowerCase();
+  return EXT_GROUP[ext] ?? 4;
+}
+
+/** Natural sort for file names: group by extension first, then numbers numerically, ASCII before CJK, case-insensitive. */
 export function compareFileNames(a: string, b: string): number {
+  const ga = extGroup(a), gb = extGroup(b);
+  if (ga !== gb) return ga - gb;
+  if (ga === 4) {
+    const dotA = a.lastIndexOf('.');
+    const dotB = b.lastIndexOf('.');
+    const extA = dotA < 0 ? '' : a.slice(dotA + 1).toLowerCase();
+    const extB = dotB < 0 ? '' : b.slice(dotB + 1).toLowerCase();
+    if (extA !== extB) return extA.localeCompare(extB);
+  }
   const re = /(\d+)|(\D+)/g;
   const segsA = a.match(re) ?? [];
   const segsB = b.match(re) ?? [];

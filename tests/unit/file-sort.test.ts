@@ -44,4 +44,19 @@ describe('compareFileNames', () => {
     const files = ['10', '2', '1', '20'];
     expect(files.sort(compareFileNames)).toEqual(['1', '2', '10', '20']);
   });
+
+  it('groups by extension: md before pdf before html before json', () => {
+    const files = ['c.json', 'a.pdf', 'b.md', 'd.html'];
+    expect(files.sort(compareFileNames)).toEqual(['b.md', 'a.pdf', 'd.html', 'c.json']);
+  });
+
+  it('sorts within the same extension group naturally', () => {
+    const files = ['report2.pdf', 'report10.pdf', 'report1.pdf'];
+    expect(files.sort(compareFileNames)).toEqual(['report1.pdf', 'report2.pdf', 'report10.pdf']);
+  });
+
+  it('groups unknown extensions together and sorts them by extension name', () => {
+    const files = ['a.txt', 'b.csv', 'c.txt'];
+    expect(files.sort(compareFileNames)).toEqual(['b.csv', 'a.txt', 'c.txt']);
+  });
 });

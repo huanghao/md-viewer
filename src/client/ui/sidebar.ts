@@ -328,9 +328,15 @@ export function renderFiles(): void {
     return;
   }
 
-  // 将过滤后的文件转换为 Map 以便生成显示名称
+  // 将过滤后的文件转换为 Map 以便生成显示名称，按文件名排序
   const filteredMap = new Map(filteredFiles.map(f => [f.path, f]));
-  const filesWithDisplay = generateDistinctNames(filteredMap);
+  const filesWithDisplay = generateDistinctNames(filteredMap)
+    .sort((a, b) => {
+      const aPinned = isPinned(a.path);
+      const bPinned = isPinned(b.path);
+      if (aPinned !== bPinned) return aPinned ? -1 : 1;
+      return compareFileNames(a.displayName || a.name, b.displayName || b.name);
+    });
 
   container.innerHTML = filesWithDisplay.map(file => {
     return renderFileRow(file.path, file.displayName || file.name, undefined, {

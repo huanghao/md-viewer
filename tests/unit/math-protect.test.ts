@@ -2,18 +2,27 @@ import { describe, expect, it } from 'bun:test';
 import { protectMath } from '../../src/client/utils/math-protect';
 
 describe('protectMath', () => {
-  it('restores $$ block unchanged', () => {
+  it('restores $$ block with HTML-escaped content', () => {
     const src = 'before $$a_b + c_d$$ after';
+    const g = protectMath(src);
+    expect(g.protected).not.toContain('_');
+    // restore produces HTML-safe version (no < or > in this case, so identical)
+    expect(g.restore(g.protected)).toBe(src);
+  });
+
+  it('restores inline $ block with HTML-escaped content', () => {
+    const src = 'text $p_\\theta(y_t)$ end';
     const g = protectMath(src);
     expect(g.protected).not.toContain('_');
     expect(g.restore(g.protected)).toBe(src);
   });
 
-  it('restores inline $ block unchanged', () => {
-    const src = 'text $p_\\theta(y_t)$ end';
+  it('escapes < and > inside math blocks so innerHTML is safe', () => {
+    const src = '$$y_{<t}$$';
     const g = protectMath(src);
-    expect(g.protected).not.toContain('_');
-    expect(g.restore(g.protected)).toBe(src);
+    const restored = g.restore(g.protected);
+    expect(restored).toBe('$$y_{&lt;t}$$');
+    expect(restored).not.toContain('<t');
   });
 
   it('restores \\[...\\] block unchanged', () => {

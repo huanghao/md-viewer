@@ -6,7 +6,9 @@ export function protectMath(src: string): { protected: string; restore: (html: s
   let idx = 0;
   const placeholder = (content: string) => {
     const key = `\x02MATH${idx++}\x03`;
-    map.set(key, content);
+    // Escape < and > so they survive innerHTML assignment after restore.
+    // KaTeX auto-render reads text nodes and handles &lt; correctly.
+    map.set(key, content.replace(/</g, '&lt;').replace(/>/g, '&gt;'));
     return key;
   };
   // Order matters: match $$ before $ to avoid double-consuming

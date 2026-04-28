@@ -7,6 +7,7 @@ import { getFileListStatus } from '../utils/file-status';
 import { isJsonFile, isJsonlFile } from '../utils/file-type';
 import { renderFileRow } from './file-row';
 import { isPinned } from '../utils/pinned-files';
+import { compareFileNames } from '../utils/file-sort';
 import { getTabBatchTargets, type TabBatchAction } from '../utils/tab-batch';
 import { renderWorkspaceSidebar, bindWorkspaceEvents } from './sidebar-workspace';
 import { syncAnnotationSidebarLayout } from '../annotation';
@@ -16,7 +17,7 @@ let lastEscValue = '';
 let hasAutoAnchoredCurrentFile = false;
 let tabManagerOpen = false;
 let tabManagerQuery = '';
-let tabManagerSort: 'recent' | 'name' = 'recent';
+let tabManagerSort: 'recent' | 'name' = 'name';
 let tabManagerGlobalBound = false;
 let tabManagerListScrollTop = 0;
 let tabsScrollLeft = 0;
@@ -478,11 +479,11 @@ export function renderTabs(): void {
       const nameA = a.displayName || a.name;
       const nameB = b.displayName || b.name;
       if (tabManagerSort === 'name') {
-        return nameA.localeCompare(nameB, 'zh-CN');
+        return compareFileNames(nameA, nameB);
       }
       const recentDiff = getTabRecentRank(a.path) - getTabRecentRank(b.path);
       if (recentDiff !== 0) return recentDiff;
-      return nameA.localeCompare(nameB, 'zh-CN');
+      return compareFileNames(nameA, nameB);
     });
 
   const managerListHtml = managedFiles.length === 0

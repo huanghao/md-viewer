@@ -3113,12 +3113,12 @@ export const styles = `
     }
     .todo-floating-btn {
       position: fixed;
-      right: var(--annotation-sidebar-width, 320px);
-      bottom: 68px;
+      right: calc(var(--annotation-sidebar-width, 320px) + 10px);
+      bottom: 100px;
       width: 36px;
       height: 36px;
       border: 1px solid var(--color-border-subtle);
-      border-radius: var(--radius-lg);
+      border-radius: 999px;
       background: #fff;
       color: var(--color-text-secondary);
       cursor: pointer;

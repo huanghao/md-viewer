@@ -140,7 +140,7 @@ function mapRowToAnnotation(row: any): StoredAnnotation {
   };
 }
 
-function getDb(): Database {
+export function getDb(): Database {
   if (db) return db;
 
   const dir = getConfigDir();
@@ -171,6 +171,22 @@ function getDb(): Database {
     );
     CREATE INDEX IF NOT EXISTS idx_annotations_doc_path ON annotations(doc_path);
     CREATE INDEX IF NOT EXISTS idx_annotations_doc_status ON annotations(doc_path, status);
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS todos (
+      id TEXT PRIMARY KEY,
+      file_path TEXT NOT NULL,
+      quote TEXT NOT NULL,
+      quote_prefix TEXT,
+      quote_suffix TEXT,
+      note TEXT NOT NULL DEFAULT '',
+      done INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      done_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_todos_created_at ON todos(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_todos_done ON todos(done);
   `);
 
   const columns = db.query(`PRAGMA table_info(annotations)`).all() as Array<{ name: string }>;

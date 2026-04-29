@@ -1691,19 +1691,12 @@ export function initAnnotationElements(): void {
     return (annotationCopyMenu as any)?._ann ?? null;
   }
   function formatAnnotationFull(ann: Annotation): string {
-    const serial = ann.serial && ann.serial > 0 ? ann.serial : 0;
-    const header = serial > 0 ? `#${serial}` : ann.id;
     const quoted = (ann.quote || '').split('\n').map(l => `> ${l}`).join('\n');
-    const prefix = typeof ann.quotePrefix === 'string' ? ann.quotePrefix.replace(/\s+/g, ' ').trim() : '';
-    const suffix = typeof ann.quoteSuffix === 'string' ? ann.quoteSuffix.replace(/\s+/g, ' ').trim() : '';
-    const cxtLine = (prefix || suffix)
-      ? `cxt: ${[prefix, ann.quote?.trim(), suffix].filter(Boolean).join(' … ')}`
-      : '';
     const thread = Array.isArray(ann.thread) ? ann.thread : [];
     const root = thread.find(t => t.type === 'comment') || thread[0];
     const rootLine = root ? `me: ${root.note}` : (ann.note ? `me: ${ann.note}` : '');
     const replies = thread.filter(t => t.type === 'reply').map(r => `- me: ${r.note}`);
-    return [header, quoted, cxtLine, rootLine, ...replies].filter(Boolean).join('\n');
+    return [quoted, rootLine, ...replies].filter(Boolean).join('\n');
   }
   document.getElementById('annotationCopyAll')?.addEventListener('click', () => {
     const ann = getMenuAnn();

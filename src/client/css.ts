@@ -3111,27 +3111,6 @@ export const styles = `
     body.annotation-sidebar-collapsed .annotation-floating-open-btn {
       display: inline-flex;
     }
-    .todo-floating-open-btn {
-      top: 130px !important;
-    }
-    .todo-floating-badge {
-      position: absolute;
-      top: -5px;
-      right: -5px;
-      background: var(--color-accent);
-      color: #fff;
-      font-size: 10px;
-      font-weight: 700;
-      min-width: 16px;
-      height: 16px;
-      padding: 0 3px;
-      border-radius: 999px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 2px solid #fff;
-    }
-    .todo-floating-badge.hidden { display: none; }
     .annotation-btn-icon {
       padding: 2px 6px;
       font-size: 16px;

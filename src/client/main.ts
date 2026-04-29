@@ -2388,7 +2388,7 @@ declare global {
     showSettingsDialog: () => void;
     toggleMonitorPanel: () => void;
     switchMonitorTab: (tab: 'memory' | 'sessions') => void;
-    switchAnnotationTab: (tab: 'comments' | 'chat') => void;
+    switchAnnotationTab: (tab: 'comments' | 'chat' | 'todo') => void;
     zoomReset: () => void;
     openExternalFile?: (path: string) => void | Promise<void>;
     renderContent?: () => void;

@@ -400,6 +400,7 @@ export function openAnnotationSidebar(): void {
   persistCurrentFilePanelOpen(true);
   syncAnnotationSidebarLayout();
   syncAnnotationScrollWithContent();
+  import('./ui/todo-panel').then(m => m.updateTodoTabCount());
 }
 
 export function closeAnnotationSidebar(): void {
@@ -415,9 +416,9 @@ export function toggleAnnotationSidebar(): void {
 
 // ==================== Tab ====================
 
-let _currentAnnotationTab: 'comments' | 'chat' = 'comments';
+let _currentAnnotationTab: 'comments' | 'chat' | 'todo' = 'comments';
 
-export function switchAnnotationTab(tab: 'comments' | 'chat'): void {
+export function switchAnnotationTab(tab: 'comments' | 'chat' | 'todo'): void {
   _currentAnnotationTab = tab;
   const commentsList = document.getElementById('annotationList');
   const commentsActions = document.getElementById('annotationCommentsActions');
@@ -430,7 +431,14 @@ export function switchAnnotationTab(tab: 'comments' | 'chat'): void {
   const chatList = document.getElementById('chatList');
   if (commentsList) commentsList.style.display = tab === 'comments' ? '' : 'none';
   if (chatList) chatList.style.display = tab === 'chat' ? '' : 'none';
+  const todoPanel = document.getElementById('todoPanel');
+  if (todoPanel) todoPanel.style.display = tab === 'todo' ? '' : 'none';
   if (commentsActions) commentsActions.classList.toggle('hidden', tab !== 'comments');
+
+  if (tab === 'todo') {
+    // Dynamic import to avoid circular deps
+    import('./ui/todo-panel').then(m => m.loadAndRenderTodos());
+  }
 }
 
 export function openChatTab(): void {

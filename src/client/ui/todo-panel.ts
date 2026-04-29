@@ -54,16 +54,20 @@ function renderTodoItem(todo: ClientTodo): string {
   const fileName = todo.filePath.split('/').pop() ?? todo.filePath;
   const time = relativeTime(todo.createdAt);
   const fullTime = new Date(todo.createdAt).toLocaleString();
+  const missingClass = todo.fileMissing ? ' missing' : '';
+  const fileTitle = todo.fileMissing ? `${todo.filePath}（文件已删除）` : todo.filePath;
+  const fileOnclick = todo.fileMissing ? '' : `onclick="window._todoJump('${escapeAttr(todo.id)}')"`;
 
   return `
     <div class="todo-item${todo.done ? ' done' : ''}${isLong ? ' todo-item-long' : ''}" data-todo-id="${escapeAttr(todo.id)}">
       <div class="todo-cb${todo.done ? ' checked' : ''}" onclick="window._todoCheck('${escapeAttr(todo.id)}')" title="标记完成"></div>
       <div class="todo-item-body">
         <div class="todo-item-top">
-          <span class="todo-item-file" title="${escapeAttr(todo.filePath)}" onclick="window._todoJump('${escapeAttr(todo.id)}')">${escapeHtml(fileName)}</span>
+          <span class="todo-item-file${missingClass}" title="${escapeAttr(fileTitle)}" ${fileOnclick}>${escapeHtml(fileName)}</span>
+          ${todo.fileMissing ? '<span class="todo-item-missing-badge">已删除</span>' : ''}
           <span class="todo-item-time" title="${escapeAttr(fullTime)}">${escapeHtml(time)}</span>
         </div>
-        <div class="todo-item-quote${''}" id="tq-${escapeAttr(todo.id)}">"${escapeHtml(todo.quote)}"</div>
+        <div class="todo-item-quote" id="tq-${escapeAttr(todo.id)}">"${escapeHtml(todo.quote)}"</div>
         ${isLong ? `<button class="todo-item-expand" onclick="window._todoExpandQuote('${escapeAttr(todo.id)}')">展开 ↓</button>` : ''}
         ${todo.note ? `<div class="todo-item-note">${escapeHtml(todo.note)}</div>` : ''}
       </div>
@@ -92,34 +96,34 @@ async function todoCheck(id: string): Promise<void> {
   const todo = _todos.find(t => t.id === id);
   if (!todo || todo.done) return;
 
-  // Optimistic UI: animate out
+  // Immediately mark done in memory so re-clicks are ignored
+  todo.done = true;
+
+  // Optimistic UI: strikethrough + checked
   const itemEl = document.querySelector(`.todo-item[data-todo-id="${CSS.escape(id)}"]`) as HTMLElement | null;
   if (itemEl) {
     itemEl.classList.add('done');
-    const cb = itemEl.querySelector('.todo-cb');
-    cb?.classList.add('checked');
+    itemEl.querySelector('.todo-cb')?.classList.add('checked');
   }
 
   // Cancel any existing undo timer for this id
-  if (_pendingUndoTimers.has(id)) {
-    clearTimeout(_pendingUndoTimers.get(id)!);
-  }
+  if (_pendingUndoTimers.has(id)) clearTimeout(_pendingUndoTimers.get(id)!);
 
   showToast({
     message: '已完成',
     type: 'success',
     duration: 4500,
-    action: {
-      label: '撤销',
-      onClick: () => undoCheck(id),
-    },
+    action: { label: '撤销', onClick: () => undoCheck(id) },
   });
 
+  // After undo window: persist to server, then move item into done section
   const timer = setTimeout(async () => {
     _pendingUndoTimers.delete(id);
     await apiUpdateTodo(id, { done: true });
-    await loadAndRenderTodos();
-  }, 600);
+    // Re-render to move item into the done section (without animation)
+    renderTodoList();
+    updateTodoTabCount();
+  }, 1500);
   _pendingUndoTimers.set(id, timer);
 }
 
@@ -128,6 +132,9 @@ async function undoCheck(id: string): Promise<void> {
   if (timer === undefined) return;
   clearTimeout(timer);
   _pendingUndoTimers.delete(id);
+  // Revert in-memory state
+  const todo = _todos.find(t => t.id === id);
+  if (todo) todo.done = false;
   // Revert UI
   const itemEl = document.querySelector(`.todo-item[data-todo-id="${CSS.escape(id)}"]`) as HTMLElement | null;
   if (itemEl) {
@@ -157,11 +164,16 @@ function todoExpandQuote(id: string): void {
 
 function todoJump(id: string): void {
   const todo = _todos.find(t => t.id === id);
-  if (!todo) return;
-  // Try to open the file; if it exists, switch to it
-  const switchFile = (window as any).switchFile as ((path: string) => void) | undefined;
-  if (switchFile) switchFile(todo.filePath);
-  // TODO: after file loads, attempt anchor jump using quotePrefix/quoteSuffix
+  if (!todo || todo.fileMissing) return;
+  // Use open-file API so the file is added to session even if not already open
+  fetch('/api/open-file', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: todo.filePath }),
+  }).catch(() => {
+    // Fallback: try switchFile if the file is already in session
+    (window as any).switchFile?.(todo.filePath);
+  });
 }
 
 function todoCopyMenu(e: MouseEvent, id: string): void {

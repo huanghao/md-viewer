@@ -4,6 +4,7 @@ import { getDb, resetDbForTesting as resetAnnotationDb } from './annotation-stor
 export interface StoredTodo {
   id: string;
   filePath: string;
+  fileMissing?: boolean;
   quote: string;
   quotePrefix?: string;
   quoteSuffix?: string;
@@ -50,13 +51,18 @@ export function createTodo(input: {
   return rowToTodo(getDb().query('SELECT * FROM todos WHERE id = ?').get(id));
 }
 
+function withFileMissing(todo: StoredTodo): StoredTodo {
+  if (/^https?:\/\//i.test(todo.filePath)) return todo;
+  return { ...todo, fileMissing: !existsSync(todo.filePath) };
+}
+
 export function listTodos(filter: { done?: boolean } = {}): StoredTodo[] {
   if (filter.done === undefined) {
     const rows = getDb().query('SELECT * FROM todos ORDER BY created_at DESC').all();
-    return (rows as any[]).map(rowToTodo);
+    return (rows as any[]).map(rowToTodo).map(withFileMissing);
   }
   const rows = getDb().query('SELECT * FROM todos WHERE done = ? ORDER BY created_at DESC').all(filter.done ? 1 : 0);
-  return (rows as any[]).map(rowToTodo);
+  return (rows as any[]).map(rowToTodo).map(withFileMissing);
 }
 
 export function updateTodo(id: string, patch: { done?: boolean; note?: string }): StoredTodo | null {

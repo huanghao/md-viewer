@@ -1,6 +1,7 @@
 export interface ClientTodo {
   id: string;
   filePath: string;
+  fileMissing?: boolean;
   quote: string;
   quotePrefix?: string;
   quoteSuffix?: string;

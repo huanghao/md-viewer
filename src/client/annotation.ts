@@ -1586,8 +1586,13 @@ export function handleSelectionForAnnotation(filePath: string | null): void {
     quoteSuffix,
   });
 
-  const rect = range.getBoundingClientRect();
-  showQuickAdd(rect.right + 6, rect.top - 8, {
+  // For multi-line selections getBoundingClientRect().right is the rightmost edge
+  // of the entire selection box (often the content area edge), not the end of the
+  // selected text. Use the last client rect so the toolbar appears near where the
+  // selection actually ends.
+  const rects = range.getClientRects();
+  const lastRect = rects.length > 0 ? rects[rects.length - 1] : range.getBoundingClientRect();
+  showQuickAdd(lastRect.right + 6, lastRect.top - 8, {
     id: `ann-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
     start,
     length: positionValid ? end - start : 0,

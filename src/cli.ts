@@ -11,6 +11,15 @@ import { loadConfig, getConfigDir, getConfigPath, initConfig } from "./config.ts
 import { appendAnnotationReply, getAnnotationsByDocument, listAnnotatedDocuments, tidyAnnotations, tidyMissingFiles } from "./annotation-storage.ts";
 import { findGitRoot, filterCommentDocsByWorkspace } from "./comments-filter.ts";
 
+function formatRelativeTime(ts: number): string {
+  const diff = Date.now() - ts;
+  const min = 60_000, hour = 60 * min, day = 24 * hour;
+  if (diff < hour) return `${Math.floor(diff / min)}m ago`;
+  if (diff < day) return `${Math.floor(diff / hour)}h ago`;
+  if (diff < 7 * day) return `${Math.floor(diff / day)}d ago`;
+  return new Date(ts).toLocaleDateString();
+}
+
 // ==================== 配置 ====================
 
 const config = loadConfig();
@@ -869,6 +878,12 @@ MD Viewer CLI - 命令行工具
                                        批量回复评论
   mdv comments stats                   评论统计
   mdv comments tidy [--days <N>] [--missing]  清理过期评论；--missing 同时清理已删除文件的评论
+  mdv todos [list]                    列出所有 Todo（默认全部）
+  mdv todos list --done false         只看未完成
+  mdv todos list --done true          只看已完成
+  mdv todos list --json               JSON 格式输出
+  mdv todos tidy [--days <N>]         清理 N 天前已完成的 Todo（默认 30 天）
+  mdv todos tidy --missing            同时清理来源文件已删除的 Todo
   mdv --help                           显示帮助
 
 选项:
@@ -926,6 +941,7 @@ interface CliOptions {
   daemon: boolean;
   days?: number;
   missing?: boolean;
+  done?: string;
 }
 
 function parseArgs(args: string[]): {
@@ -944,7 +960,7 @@ function parseArgs(args: string[]): {
 
   const command: string[] = [];
   let filePath: string | undefined;
-  const topLevelCommands = new Set(["tabs", "config", "comments"]);
+  const topLevelCommands = new Set(["tabs", "config", "comments", "todos"]);
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -980,6 +996,8 @@ function parseArgs(args: string[]): {
       options.days = parseInt(args[++i], 10);
     } else if (arg === "--missing") {
       options.missing = true;
+    } else if (arg === "--done") {
+      options.done = args[++i];
     } else if (arg === "--all") {
       options.all = true;
     } else if (!arg.startsWith("-")) {
@@ -1135,6 +1153,47 @@ async function main() {
     } else {
       console.error(`❌ 未知的 comments 子命令: ${subcmd}`);
       console.error(`   可用: list, get, reply, reply-batch, stats, tidy`);
+      process.exit(1);
+    }
+  } else if (cmd === "todos") {
+    const todosSubcmd = subcmd || "list";
+
+    if (todosSubcmd === "list") {
+      const { listTodos } = await import("./todo-storage.ts");
+      const doneFlag = options.done;
+      const filter = doneFlag === "true" ? { done: true }
+                   : doneFlag === "false" ? { done: false }
+                   : {};
+      const todos = listTodos(filter);
+      if (options.json) {
+        console.log(JSON.stringify(todos, null, 2));
+      } else {
+        if (todos.length === 0) {
+          console.log("暂无 Todo");
+        } else {
+          for (const t of todos) {
+            const status = t.done ? "[x]" : "[ ]";
+            const file = t.filePath.split("/").pop() ?? t.filePath;
+            const quote = t.quote.length > 60 ? t.quote.slice(0, 60) + "..." : t.quote;
+            const note = t.note ? `  备注: ${t.note}` : "";
+            const ago = formatRelativeTime(t.createdAt);
+            console.log(`${status}  ${file}  "${quote}"  (${ago})${note}`);
+          }
+        }
+      }
+    } else if (todosSubcmd === "tidy") {
+      const { tidyTodos } = await import("./todo-storage.ts");
+      const days = Number.isFinite(Number(options.days)) && Number(options.days) >= 0
+        ? Number(options.days) : 30;
+      const result = tidyTodos({ olderThanDays: days, missingFiles: options.missing === true });
+      if (options.json) {
+        console.log(JSON.stringify(result));
+      } else {
+        console.log(`✅ 已清理 ${result.deleted} 条 Todo`);
+      }
+    } else {
+      console.error(`❌ 未知的 todos 子命令: ${todosSubcmd}`);
+      console.error("   可用: list, tidy");
       process.exit(1);
     }
   } else {

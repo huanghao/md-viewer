@@ -53,7 +53,7 @@ import { createPdfViewer, type PdfViewerInstance } from "./pdf-viewer.js";
 import { createPdfAnnotationBridge } from "./pdf-annotation.js";
 import { extractMdToc, extractPdfOutline, loadSidecar, saveSidecar, scanPdfHeadings } from './toc-extractor.js';
 import { renderTocPanel, setActiveTocItem } from './ui/toc-panel.js';
-import { storageGet, storageSet, storageGetNumber, getAllStorageKeys } from './utils/storage';
+import { storageGet, storageSet, storageGetNumber } from './utils/storage';
 import { recordSignal } from './utils/focus-signals';
 import { flushAll as flushUndoQueue } from './utils/undo-queue';
 import { createResizer } from './utils/resizer';
@@ -1880,27 +1880,6 @@ const MEM_PER_PAGE_MB = 27; // A4 @ scale=1.5, dpr=2
 let monitorPollTimer: ReturnType<typeof setInterval> | null = null;
 let monitorActiveTab: 'memory' | 'sessions' = 'memory';
 
-// Active agent sessions cache — keyed by filePath, used by file-row indicators
-import { activeAgentSessions } from './agent-sessions';
-
-async function refreshActiveAgentSessions(): Promise<void> {
-  try {
-    const res = await fetch(`${getAgentUrl()}/status`, { signal: AbortSignal.timeout(2000) });
-    if (!res.ok) { activeAgentSessions.clear(); return; }
-    const status = await res.json() as { activeSessions: Array<{ id: string; messages: number; model: string; streaming: boolean }> };
-    activeAgentSessions.clear();
-    for (const s of status.activeSessions) {
-      for (const key of getAllStorageKeys()) {
-        if (key.startsWith('md-viewer:chat-session:') && storageGet<string>(key, '') === s.id) {
-          activeAgentSessions.set(key.replace('md-viewer:chat-session:', ''), { sessionId: s.id, messages: s.messages, model: s.model, streaming: s.streaming });
-        }
-      }
-    }
-    renderSidebar();
-  } catch {
-    activeAgentSessions.clear();
-  }
-}
 
 function getPdfMemStats(): Array<{ path: string; rendered: number; total: number; memMB: number; idleMins: number | null }> {
   return Array.from(pdfViewerRegistry.entries()).map(([path, entry]) => {
@@ -2099,8 +2078,8 @@ async function renderSessionsTab(): Promise<void> {
         } catch { /* file might not exist */ }
       }
       // Resume the session in chat panel
-      import('./ui/chat-panel.js').then(({ renderChatPanel }) => {
-        storageSet(`md-viewer:chat-session:${filePath}`, sessionId);
+      import('./ui/chat-panel.js').then(({ resumeSession, renderChatPanel }) => {
+        resumeSession(sessionId);
         switchAnnotationTab('chat');
         setTimeout(() => renderChatPanel(), 100);
       });
@@ -2444,9 +2423,6 @@ window.showSettingsDialog = showSettingsDialog;
 window.toggleMonitorPanel = toggleMonitorPanel;
 window.switchMonitorTab = switchMonitorTab;
 window.switchAnnotationTab = switchAnnotationTab;
-// Expose active agent sessions for file-row indicators
-setInterval(() => void refreshActiveAgentSessions(), 5000);
-void refreshActiveAgentSessions();
 window.zoomReset = zoomReset;
 window.openExternalFile = openFileInBrowser;
 window.renderContent = renderContent;

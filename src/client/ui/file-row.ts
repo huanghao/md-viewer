@@ -6,7 +6,6 @@ import { stripWorkspaceTreeDisplayExtension } from '../utils/workspace-file-name
 import { formatRelativeTimeShort } from '../utils/format';
 import { escapeHtml, escapeAttr } from '../utils/escape';
 import { isPinned } from '../utils/pinned-files';
-import { activeAgentSessions } from '../agent-sessions';
 
 export interface FileRowOptions {
   /** 外层 div 的 class（各视图不同，如 'tree-item file-node' 或 'file-item'） */
@@ -77,11 +76,7 @@ export function renderFileRow(
     ? `<span class="annotation-count-badge">${annotationCount}</span>`
     : '';
 
-  // Chat session 标识（该文件有活跃的 agent session）
-  const activeSession = activeAgentSessions.get(path);
-  const chatBadge = activeSession
-    ? `<span class="chat-session-dot${activeSession.streaming ? ' streaming' : ''}" title="Agent Session 活跃${activeSession.streaming ? ' · 正在响应' : ''}"></span>`
-    : '';
+  const chatBadge = '';
 
   // 相对修改时间（仅焦点视图）
   const timeStr = opts.showTime && lastModified

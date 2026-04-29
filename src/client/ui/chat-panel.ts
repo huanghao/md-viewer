@@ -54,7 +54,6 @@ interface ChatState {
   docContext: DocContext;
 }
 
-// Persist sessionId across page reloads so history can be resumed
 function loadOrCreateSessionId(): string {
   const stored = storageGet<string>(SESSION_ID_KEY, '');
   if (stored) return stored;
@@ -100,29 +99,13 @@ export function setChatContext(ctx: DocContext): void {
   renderSelBar();
 }
 
-// Stable sessionId per file path, stored in localStorage
-function sessionIdForFile(filePath: string): string {
-  const key = `md-viewer:chat-session:${filePath}`;
-  const stored = storageGet<string>(key, '');
-  if (stored) return stored;
-  const id = crypto.randomUUID();
-  storageSet(key, id);
-  return id;
-}
-
 export function onChatFileSwitch(filePath: string | null): void {
   state.currentFilePath = filePath;
-  state.history = [];
   state.selectedText = null;
   state.docContext = filePath ? { filePath } : {};
-  // Stable session per file — same file always gets same sessionId
-  state.sessionId = filePath ? sessionIdForFile(filePath) : crypto.randomUUID();
+  // Session is global — just update the doc context on the server
+  if (filePath) void notifyFileContext(filePath);
   renderChatPanel();
-  if (filePath) {
-    // Load history and notify server of current file context
-    void loadHistory().then(() => renderChatPanel());
-    void notifyFileContext(filePath);
-  }
 }
 
 let _notifyTimer: ReturnType<typeof setTimeout> | null = null;
@@ -142,6 +125,14 @@ function notifyFileContext(filePath: string): void {
 }
 
 export function initChatPanel(): void {
+  void loadHistory().then(() => renderChatPanel());
+}
+
+export function resumeSession(sessionId: string): void {
+  if (sessionId === state.sessionId) return;
+  state.sessionId = sessionId;
+  state.history = [];
+  storageSet(SESSION_ID_KEY, sessionId);
   void loadHistory().then(() => renderChatPanel());
 }
 
@@ -291,7 +282,7 @@ function wireEvents(): void {
       if (!id || id === state.sessionId) return;
       state.sessionId = id;
       state.history = [];
-      if (state.currentFilePath) storageSet(`md-viewer:chat-session:${state.currentFilePath}`, id);
+      storageSet(SESSION_ID_KEY, id);
       await loadHistory();
       renderChatPanel();
     };
@@ -304,10 +295,7 @@ function wireEvents(): void {
     state.sessionId = id;
     state.history = [];
     state.selectedText = null;
-    // Clear the per-file session so next switch creates a fresh one
-    if (state.currentFilePath) {
-      storageSet(`md-viewer:chat-session:${state.currentFilePath}`, id);
-    }
+    storageSet(SESSION_ID_KEY, id);
     renderChatPanel();
   });
 

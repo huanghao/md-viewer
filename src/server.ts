@@ -36,6 +36,11 @@ import {
   handleUpdateSessionState,
   handleWriteFile,
   handleGetClientConfig,
+  handleListTodos,
+  handleCreateTodo,
+  handleUpdateTodo,
+  handleDeleteTodo,
+  handleTidyTodos,
 } from "./handlers.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
 
@@ -120,6 +125,13 @@ app.post("/api/annotations/delete", handleDeleteAnnotation);
 app.post("/api/annotations/status", handleUpdateAnnotationStatus);
 app.post("/api/annotations/migrate", handleMigrateAnnotations);
 app.post("/api/annotations/clear", handleClearAllAnnotations);
+
+// API: Todos
+app.get('/api/todos', handleListTodos);
+app.post('/api/todos', handleCreateTodo);
+app.post('/api/todos/update', handleUpdateTodo);
+app.post('/api/todos/delete', handleDeleteTodo);
+app.post('/api/todos/tidy', handleTidyTodos);
 
 // API: 会话状态（标签页）
 app.get("/api/session-state", handleGetSessionState);

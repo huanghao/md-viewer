@@ -26,6 +26,7 @@ import {
   deleteAnnotation,
   updateAnnotationStatus,
 } from "./annotation-storage.ts";
+import { createTodo, listTodos, updateTodo, deleteTodo, tidyTodos } from './todo-storage.ts';
 import { calculateOpenCount } from "./annotation-status.ts";
 
 function expandHomePath(input: string): string {
@@ -914,4 +915,60 @@ export function handleGetClientConfig(): Response {
   return new Response(JSON.stringify(clientConfig), {
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+export async function handleListTodos(c: any): Promise<Response> {
+  const done = c.req.query('done');
+  const filter = done === undefined ? {} : { done: done === 'true' };
+  return c.json({ todos: listTodos(filter) });
+}
+
+export async function handleCreateTodo(c: any): Promise<Response> {
+  let body: any;
+  try { body = await c.req.json(); } catch { return c.json({ error: 'invalid JSON' }, 400); }
+  const filePath = String(body.filePath || '').trim();
+  const quote = String(body.quote || '').trim();
+  if (!filePath || !quote) return c.json({ error: '缺少 filePath 或 quote' }, 400);
+  try {
+    const todo = createTodo({
+      filePath, quote,
+      quotePrefix: body.quotePrefix,
+      quoteSuffix: body.quoteSuffix,
+      note: body.note,
+    });
+    return c.json({ todo });
+  } catch (e: any) {
+    return c.json({ error: e?.message || 'failed' }, 400);
+  }
+}
+
+export async function handleUpdateTodo(c: any): Promise<Response> {
+  let body: any;
+  try { body = await c.req.json(); } catch { return c.json({ error: 'invalid JSON' }, 400); }
+  const id = String(body.id || '').trim();
+  if (!id) return c.json({ error: '缺少 id' }, 400);
+  const patch: { done?: boolean; note?: string } = {};
+  if (body.done !== undefined) patch.done = Boolean(body.done);
+  if (body.note !== undefined) patch.note = String(body.note);
+  const updated = updateTodo(id, patch);
+  if (!updated) return c.json({ error: '未找到' }, 404);
+  return c.json({ todo: updated });
+}
+
+export async function handleDeleteTodo(c: any): Promise<Response> {
+  let body: any;
+  try { body = await c.req.json(); } catch { return c.json({ error: 'invalid JSON' }, 400); }
+  const id = String(body.id || '').trim();
+  if (!id) return c.json({ error: '缺少 id' }, 400);
+  deleteTodo(id);
+  return c.json({ ok: true });
+}
+
+export async function handleTidyTodos(c: any): Promise<Response> {
+  let body: any = {};
+  try { body = await c.req.json(); } catch { /* body stays {} */ }
+  const olderThanDays = Number.isFinite(Number(body.olderThanDays))
+    ? Number(body.olderThanDays) : undefined;
+  const result = tidyTodos({ olderThanDays, missingFiles: body.missingFiles === true });
+  return c.json(result);
 }

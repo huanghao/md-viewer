@@ -36,6 +36,9 @@ export function createTodo(input: {
   quoteSuffix?: string;
   note?: string;
 }): StoredTodo {
+  if (!input.filePath?.trim() || !input.quote?.trim()) {
+    throw new Error('filePath and quote are required');
+  }
   const id = `todo-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
   const now = Date.now();
   getDb().prepare(`
@@ -48,10 +51,11 @@ export function createTodo(input: {
 }
 
 export function listTodos(filter: { done?: boolean } = {}): StoredTodo[] {
-  const where = filter.done === undefined
-    ? ''
-    : `WHERE done = ${filter.done ? 1 : 0}`;
-  const rows = getDb().query(`SELECT * FROM todos ${where} ORDER BY created_at DESC`).all();
+  if (filter.done === undefined) {
+    const rows = getDb().query('SELECT * FROM todos ORDER BY created_at DESC').all();
+    return (rows as any[]).map(rowToTodo);
+  }
+  const rows = getDb().query('SELECT * FROM todos WHERE done = ? ORDER BY created_at DESC').all(filter.done ? 1 : 0);
   return (rows as any[]).map(rowToTodo);
 }
 

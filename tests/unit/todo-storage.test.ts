@@ -52,6 +52,14 @@ describe('createTodo', () => {
     expect(todo.note).toBe('');
     expect(todo.done).toBe(false);
   });
+
+  it('throws when filePath is empty', () => {
+    expect(() => createTodo({ filePath: '', quote: 'x' })).toThrow();
+  });
+
+  it('throws when quote is empty', () => {
+    expect(() => createTodo({ filePath: '/a.md', quote: '' })).toThrow();
+  });
 });
 
 describe('listTodos', () => {

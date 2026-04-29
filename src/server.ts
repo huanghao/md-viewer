@@ -142,29 +142,6 @@ app.get("/api/config", (c) => handleGetClientConfig());
 
 // API: 焦点信号采集（写 SQLite DB，用于 frecency 策略评估）
 import { insertFocusSignal, queryFocusSignals, pruneFocusSignals } from "./annotation-storage.ts";
-import { existsSync, readFileSync } from "fs";
-
-// One-time migration: import legacy jsonl into DB then delete the file
-const LEGACY_SIGNALS_PATH = "logs/focus-signals.jsonl";
-if (existsSync(LEGACY_SIGNALS_PATH)) {
-  try {
-    const lines = readFileSync(LEGACY_SIGNALS_PATH, "utf-8").split("\n").filter(Boolean);
-    for (const line of lines) {
-      try {
-        const { ts, type, file } = JSON.parse(line);
-        if (ts && type && file) {
-          // Use original timestamp from jsonl, insert directly
-          try {
-            const db = (await import("./annotation-storage.ts")).getDb();
-            db.prepare(`INSERT INTO focus_signals (ts, type, file) VALUES (?, ?, ?)`).run(ts, type, file);
-          } catch { /* skip duplicates */ }
-        }
-      } catch { /* skip malformed lines */ }
-    }
-    // Remove legacy file after migration
-    import("fs").then(({ unlinkSync }) => { try { unlinkSync(LEGACY_SIGNALS_PATH); } catch {} });
-  } catch { /* migration best-effort */ }
-}
 
 app.post("/api/focus-signal", async (c) => {
   try {

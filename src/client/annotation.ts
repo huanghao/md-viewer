@@ -434,6 +434,11 @@ export function switchAnnotationTab(tab: 'comments' | 'chat' | 'todo'): void {
   const todoPanel = document.getElementById('todoPanel');
   if (todoPanel) todoPanel.style.display = tab === 'todo' ? '' : 'none';
   if (commentsActions) commentsActions.classList.toggle('hidden', tab !== 'comments');
+  const todoActions = document.getElementById('annotationTodoActions');
+  if (todoActions) todoActions.classList.toggle('hidden', tab !== 'todo');
+  // Close both filter menus when switching tabs
+  document.getElementById('annotationFilterMenu')?.classList.add('hidden');
+  document.getElementById('todoFilterMenu')?.classList.add('hidden');
 
   if (tab === 'todo') {
     // Dynamic import to avoid circular deps
@@ -1778,6 +1783,25 @@ export function initAnnotationElements(): void {
     menu.classList.toggle('hidden');
   });
 
+  document.getElementById('todoFilterToggle')?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const menu = document.getElementById('todoFilterMenu');
+    if (!menu) return;
+    menu.classList.toggle('hidden');
+  });
+
+  document.getElementById('todoFilterMenu')?.querySelectorAll('.annotation-filter-item[data-todo-filter]').forEach((node) => {
+    const button = node as HTMLButtonElement;
+    button.addEventListener('click', () => {
+      const filter = button.getAttribute('data-todo-filter') as 'open' | 'all';
+      document.getElementById('todoFilterMenu')?.querySelectorAll('.annotation-filter-item').forEach(b =>
+        b.classList.toggle('is-active', b === button)
+      );
+      document.getElementById('todoFilterMenu')?.classList.add('hidden');
+      import('./ui/todo-panel').then(m => m.setTodoFilter(filter));
+    });
+  });
+
   getElements().densityToggle?.addEventListener('click', () => {
     state.density = state.density === 'default' ? 'simple' : 'default';
     storageSet('md-viewer:annotation-density', state.density);
@@ -1985,6 +2009,16 @@ export function initAnnotationElements(): void {
       !((target as HTMLElement).closest('#annotationFilterToggle'))
     ) {
       els.filterMenu.classList.add('hidden');
+    }
+
+    const todoFilterMenu = document.getElementById('todoFilterMenu');
+    if (
+      todoFilterMenu &&
+      !todoFilterMenu.classList.contains('hidden') &&
+      !todoFilterMenu.contains(target) &&
+      !((target as HTMLElement).closest('#todoFilterToggle'))
+    ) {
+      todoFilterMenu.classList.add('hidden');
     }
 
     if (

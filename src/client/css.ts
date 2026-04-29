@@ -4006,10 +4006,6 @@ export const styles = `
 
     /* ── Todo panel ── */
     .todo-panel { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
-    .todo-panel-toolbar { display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--color-border-subtle); flex-shrink: 0; }
-    .todo-filter-pill { font-size: 11px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--color-border-subtle); background: #fff; color: var(--color-text-secondary); cursor: pointer; font-weight: 500; transition: all 0.1s; }
-    .todo-filter-pill.active { background: var(--color-text-primary); color: #fff; border-color: var(--color-text-primary); }
-    .todo-filter-pill:hover:not(.active) { border-color: #a8a29e; }
 
     /* ── Todo list ── */
     .todo-list-container { flex: 1; overflow-y: auto; }

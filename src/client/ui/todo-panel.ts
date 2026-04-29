@@ -267,9 +267,6 @@ async function saveTodoFromComposer(): Promise<void> {
 
 export function setTodoFilter(filter: 'open' | 'all'): void {
   _filter = filter;
-  document.querySelectorAll('.todo-filter-pill').forEach(pill => {
-    pill.classList.toggle('active', (pill as HTMLElement).dataset.filter === filter);
-  });
   loadAndRenderTodos();
 }
 

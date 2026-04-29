@@ -208,6 +208,11 @@ export function generateClientHTML(): string {
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12L9.5 8v4.5l-3-1.5V8z"/></svg>
             </button>
           </div>
+          <div class="annotation-tab-actions-group hidden" id="annotationTodoActions">
+            <button class="annotation-icon-btn" id="todoFilterToggle" title="筛选" aria-label="筛选">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12L9.5 8v4.5l-3-1.5V8z"/></svg>
+            </button>
+          </div>
           <button class="annotation-icon-btn" id="annotationSplitToggle" title="拆分 Chat 面板" aria-label="拆分 Chat 面板">
             <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><rect x="2" y="3" width="5" height="10" rx=".5"/><rect x="9" y="3" width="5" height="10" rx=".5"/></svg>
           </button>
@@ -221,16 +226,16 @@ export function generateClientHTML(): string {
           <button class="annotation-filter-item" data-filter="resolved">已解决</button>
           <button class="annotation-filter-item" data-filter="orphan">定位失败</button>
         </div>
+        <div class="annotation-filter-menu hidden" id="todoFilterMenu">
+          <button class="annotation-filter-item is-active" data-todo-filter="open">未完成</button>
+          <button class="annotation-filter-item" data-todo-filter="all">全部</button>
+        </div>
       </div>
       <div class="annotation-list" id="annotationList">
         <div class="annotation-empty">无评论（选中文本即可添加）</div>
       </div>
       <div class="chat-list" id="chatList" style="display:none;"></div>
       <div class="todo-panel" id="todoPanel" style="display:none;">
-        <div class="todo-panel-toolbar">
-          <button class="todo-filter-pill active" data-filter="open" onclick="setTodoFilter('open')">未完成</button>
-          <button class="todo-filter-pill" data-filter="all" onclick="setTodoFilter('all')">全部</button>
-        </div>
         <div class="todo-list-container" id="todoListContainer"></div>
       </div>
     </aside>

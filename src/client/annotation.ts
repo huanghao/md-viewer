@@ -1821,6 +1821,11 @@ export function initAnnotationElements(): void {
     openAnnotationSidebar();
   });
 
+  document.getElementById('todoFloatingOpenBtn')?.addEventListener('click', () => {
+    openAnnotationSidebar();
+    switchAnnotationTab('todo');
+  });
+
   const resizerEl = getElements().sidebarResizer;
   if (resizerEl) {
     createResizer({

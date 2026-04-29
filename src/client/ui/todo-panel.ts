@@ -84,10 +84,14 @@ function renderTodoItem(todo: ClientTodo): string {
 }
 
 export function updateTodoTabCount(): void {
-  const el = document.getElementById('todoTabCount');
-  if (!el) return;
   const openCount = _todos.filter(t => !t.done).length;
-  el.textContent = openCount > 0 ? ` ${openCount}` : '';
+  const tabCount = document.getElementById('todoTabCount');
+  if (tabCount) tabCount.textContent = openCount > 0 ? ` ${openCount}` : '';
+  const badge = document.getElementById('todoFloatingBadge');
+  if (badge) {
+    badge.textContent = String(openCount);
+    badge.classList.toggle('hidden', openCount === 0);
+  }
 }
 
 // ── Actions ───────────────────────────────────────────────────────────────

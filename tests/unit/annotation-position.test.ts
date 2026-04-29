@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
 import { Window } from 'happy-dom';
-import { getTextNodes, globalOffsetForPosition, positionForGlobalOffset, clamp, placeFloating, getReaderText } from '../../src/client/annotation/position';
+import { getTextNodes, globalOffsetForPosition, globalOffsetForPositionEnd, positionForGlobalOffset, clamp, placeFloating, getReaderText } from '../../src/client/annotation/position';
 
 let doc: Document;
 beforeEach(() => {
@@ -111,6 +111,110 @@ describe('positionForGlobalOffset', () => {
     expect(result).not.toBeNull();
     expect(result!.node.nodeValue).toBe('def');
     expect(result!.offset).toBe(1);
+  });
+});
+
+describe('getTextNodes with katex', () => {
+  it('skips text nodes inside .katex element', () => {
+    const div = makeDiv('before<span class="katex"><span>formula</span></span>after') as HTMLElement;
+    const nodes = getTextNodes(div);
+    expect(nodes.length).toBe(2);
+    expect(nodes[0].nodeValue).toBe('before');
+    expect(nodes[1].nodeValue).toBe('after');
+  });
+
+  it('offset of text after katex ignores katex text length', () => {
+    // "before" = 6 chars, katex is skipped, "after" starts at offset 6
+    const div = makeDiv('before<span class="katex"><span>formula</span></span>after') as HTMLElement;
+    const nodes = getTextNodes(div);
+    expect(globalOffsetForPosition(div, nodes[1], 0)).toBe(6);
+    expect(globalOffsetForPosition(div, nodes[1], 5)).toBe(11);
+  });
+});
+
+describe('globalOffsetForPosition with element boundary node', () => {
+  // Simulates browser Range where startContainer is a <p> element, not a text node.
+  // e.g. <p>before<span class="katex">...</span>after</p>
+  // Range.setStart(p, 0) means "before all children" → offset 0
+  it('returns 0 when boundary is before all text', () => {
+    const div = makeDiv('<p>hello world</p>') as HTMLElement;
+    const p = div.querySelector('p')!;
+    // childIndex=0: before "hello world" text node
+    expect(globalOffsetForPosition(div, p, 0)).toBe(0);
+  });
+
+  it('returns full length when boundary is after all children', () => {
+    const div = makeDiv('<p>hello</p>') as HTMLElement;
+    const p = div.querySelector('p')!;
+    expect(globalOffsetForPosition(div, p, p.childNodes.length)).toBe(5);
+  });
+
+  it('snaps start to text node start after katex span', () => {
+    // <p>before<span class="katex">X</span>after</p>
+    // childIndex=2 means after the katex span, before "after" text node
+    const div = makeDiv('<p>before<span class="katex"><span>X</span></span>after</p>') as HTMLElement;
+    const p = div.querySelector('p')!;
+    // p.childNodes: [#text"before", span.katex, #text"after"]
+    // childIndex=2 = after katex span → should snap to start of "after" = offset 6
+    expect(globalOffsetForPosition(div, p, 2)).toBe(6);
+  });
+});
+
+describe('globalOffsetForPositionEnd with element boundary node', () => {
+  it('returns full length when boundary is after all children', () => {
+    const div = makeDiv('<p>hello</p>') as HTMLElement;
+    const p = div.querySelector('p')!;
+    expect(globalOffsetForPositionEnd(div, p, p.childNodes.length)).toBe(5);
+  });
+
+  it('snaps end to text node end before katex span', () => {
+    // <p>before<span class="katex">X</span>after</p>
+    // childIndex=1 means after "before" text node, before katex span → snap to end of "before" = 6
+    const div = makeDiv('<p>before<span class="katex"><span>X</span></span>after</p>') as HTMLElement;
+    const p = div.querySelector('p')!;
+    // p.childNodes: [#text"before", span.katex, #text"after"]
+    // childIndex=1 = after "before", before katex → end of "before" = offset 6
+    expect(globalOffsetForPositionEnd(div, p, 1)).toBe(6);
+  });
+
+  it('produces valid start < end spanning inline formula', () => {
+    // Simulate selection: start="before"[2], end=<p>[2] (after katex, before "after")
+    const div = makeDiv('<p>before<span class="katex"><span>X</span></span>after</p>') as HTMLElement;
+    const p = div.querySelector('p')!;
+    const nodes = getTextNodes(div);
+    const beforeNode = nodes[0]; // "before"
+    const start = globalOffsetForPosition(div, beforeNode, 2); // offset 2 in "before" → global 2
+    const end = globalOffsetForPositionEnd(div, p, 2);          // after katex → global 6
+    expect(start).toBe(2);
+    expect(end).toBe(6);
+    expect(end).toBeGreaterThan(start);
+  });
+});
+
+describe('globalOffsetForPosition/End with selection endpoint inside katex', () => {
+  // Browser sometimes sets Range endpoints inside KaTeX internal nodes
+  it('start inside katex snaps forward to text after katex', () => {
+    const div = makeDiv('<p>before<span class="katex"><span>formula</span></span>after</p>') as HTMLElement;
+    const katexInner = (div.querySelector('span.katex span') as any)?.childNodes[0] as Text;
+    // "before" = 6 chars; katex snaps to start of "after" = offset 6
+    expect(globalOffsetForPosition(div, katexInner, 0)).toBe(6);
+  });
+
+  it('end inside katex snaps backward to text before katex', () => {
+    const div = makeDiv('<p>before<span class="katex"><span>formula</span></span>after</p>') as HTMLElement;
+    const katexInner = (div.querySelector('span.katex span') as any)?.childNodes[0] as Text;
+    // snap to end of "before" = offset 6
+    expect(globalOffsetForPositionEnd(div, katexInner, 3)).toBe(6);
+  });
+
+  it('start/end from katex interior produce valid positionValid range', () => {
+    const div = makeDiv('<p>before<span class="katex"><span>formula</span></span>after</p>') as HTMLElement;
+    const katexInner = (div.querySelector('span.katex span') as any)?.childNodes[0] as Text;
+    const start = globalOffsetForPosition(div, katexInner, 0);
+    const end = globalOffsetForPositionEnd(div, katexInner, 3);
+    // Both snap to offset 6 (boundary of katex), end >= start is acceptable
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThanOrEqual(0);
   });
 });
 

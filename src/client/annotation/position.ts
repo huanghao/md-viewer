@@ -32,9 +32,96 @@ export function globalOffsetForPositionInternal(nodes: Text[], targetNode: Node,
   return -1;
 }
 
+// When a Range boundary lands on an element node (rather than a text node),
+// convert it to the nearest text node offset using document-order comparison.
+// elementNode.childNodes[childIndex] is the "boundary child": nodes before it
+// are considered "before" the boundary; nodes at or after are "after".
+// side='start': return start of the first text node at/after boundary.
+// side='end':   return end of the last text node before boundary.
+function resolveElementBoundary(
+  nodes: Text[],
+  elementNode: Node,
+  childIndex: number,
+  side: 'start' | 'end',
+): number {
+  // The boundary child is elementNode.childNodes[childIndex] (may be undefined if at end).
+  const boundaryChild: Node | undefined = elementNode.childNodes[childIndex];
+
+  let accumulated = 0;
+  for (const n of nodes) {
+    const len = n.nodeValue?.length || 0;
+    // Is this text node before the boundary child in document order?
+    const isBeforeBoundary = boundaryChild
+      // DOCUMENT_POSITION_PRECEDING(2): n precedes boundaryChild → n is before boundary
+      ? !!(boundaryChild.compareDocumentPosition(n) & 2)
+      : true; // no boundary child means childIndex >= childNodes.length → all nodes are before
+
+    if (isBeforeBoundary) {
+      accumulated += len;
+    } else {
+      // n is at or after the boundary
+      if (side === 'start') return accumulated;
+      // side='end': boundary is before this node, return what we have so far
+      return accumulated;
+    }
+  }
+  return accumulated;
+}
+
+// If a text node is inside a skipped subtree (e.g. .katex), find the .katex
+// root element, then use its position in its parent to snap the boundary.
+function resolveSkippedTextNode(
+  nodes: Text[],
+  textNode: Text,
+  side: 'start' | 'end',
+): number {
+  // Walk up to find the .katex root element
+  let katexRoot: Element | null = null;
+  let node: Node | null = textNode;
+  while (node) {
+    if (node.nodeType === 1 && (node as Element).classList?.contains('katex')) {
+      katexRoot = node as Element;
+      break;
+    }
+    node = node.parentNode;
+  }
+  if (!katexRoot) return -1;
+
+  const parent = katexRoot.parentElement;
+  if (!parent) return -1;
+
+  let idx = 0;
+  for (let i = 0; i < parent.childNodes.length; i++) {
+    if (parent.childNodes[i] === katexRoot) { idx = i; break; }
+  }
+  if (side === 'start') {
+    // snap to after the katex element: first text node starting at idx+1
+    return resolveElementBoundary(nodes, parent, idx + 1, 'start');
+  } else {
+    // snap to before the katex element: end of text before it
+    return resolveElementBoundary(nodes, parent, idx, 'end');
+  }
+}
+
 export function globalOffsetForPosition(root: HTMLElement, targetNode: Node, targetOffset: number): number {
   const nodes = getTextNodes(root);
-  return globalOffsetForPositionInternal(nodes, targetNode, targetOffset);
+  if (targetNode.nodeType !== 3) {
+    return resolveElementBoundary(nodes, targetNode, targetOffset, 'start');
+  }
+  const offset = globalOffsetForPositionInternal(nodes, targetNode, targetOffset);
+  if (offset >= 0) return offset;
+  // Text node not in nodes list — it's inside a skipped subtree (e.g. .katex)
+  return resolveSkippedTextNode(nodes, targetNode as Text, 'start');
+}
+
+export function globalOffsetForPositionEnd(root: HTMLElement, targetNode: Node, targetOffset: number): number {
+  const nodes = getTextNodes(root);
+  if (targetNode.nodeType !== 3) {
+    return resolveElementBoundary(nodes, targetNode, targetOffset, 'end');
+  }
+  const offset = globalOffsetForPositionInternal(nodes, targetNode, targetOffset);
+  if (offset >= 0) return offset;
+  return resolveSkippedTextNode(nodes, targetNode as Text, 'end');
 }
 
 // Internal helper for testing - accepts pre-computed nodes

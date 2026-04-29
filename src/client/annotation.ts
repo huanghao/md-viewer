@@ -87,6 +87,13 @@ const state: AnnotationState = {
 };
 const ANNOTATION_PANEL_OPEN_KEY = 'md-viewer:annotation-panel-open';
 
+let _lastQuickAddX = 0;
+let _lastQuickAddY = 0;
+
+export function getLastQuickAddPosition(): { x: number; y: number } {
+  return { x: _lastQuickAddX, y: _lastQuickAddY };
+}
+
 export function nextAnnotationSerial(annotations: Annotation[]): number {
   const maxSerial = annotations.reduce((max, ann) => {
     if (typeof ann.serial !== 'number' || !Number.isFinite(ann.serial)) return max;
@@ -251,7 +258,9 @@ function queryAnnotationElements() {
     composer: document.getElementById('annotationComposer'),
     composerHeader: document.getElementById('annotationComposerHeader'),
     composerNote: document.getElementById('composerNote') as HTMLTextAreaElement | null,
-    quickAdd: document.getElementById('annotationQuickAdd') as HTMLButtonElement | null,
+    quickAddWrap: document.getElementById('annotationQuickAddWrap') as HTMLElement | null,
+    quickAddComment: document.getElementById('quickAddComment') as HTMLButtonElement | null,
+    quickAddTodo: document.getElementById('quickAddTodo') as HTMLButtonElement | null,
     popover: document.getElementById('annotationPopover'),
     popoverTitle: document.getElementById('popoverTitle'),
     popoverNote: document.getElementById('popoverNote'),
@@ -437,7 +446,7 @@ export function dismissAnnotationPopupByEscape(): boolean {
     el.filterMenu.classList.add('hidden');
     return true;
   }
-  if (el.quickAdd && !el.quickAdd.classList.contains('hidden')) {
+  if (el.quickAddWrap && !el.quickAddWrap.classList.contains('hidden')) {
     hideQuickAdd(true);
     return true;
   }
@@ -464,26 +473,28 @@ export function mergeAnnotationStatus(
 // ==================== UI 操作 ====================
 export function showQuickAdd(x: number, y: number, pendingData: Omit<Annotation, 'note' | 'createdAt'>): void {
   const el = getElements();
-  if (!el.quickAdd) return;
+  if (!el.quickAddWrap) return;
   // 新划词时关闭旧的 composer（明确的焦点转移）
   if (el.composer && !el.composer.classList.contains('hidden')) {
     hideComposer();
   }
   state.pendingAnnotation = { ...pendingData, note: '', createdAt: Date.now() };
   state.pendingAnnotationFilePath = el.content?.getAttribute('data-current-file') || state.currentFilePath;
-  const width = 30;
+  const width = 80;
   const height = 30;
   const left = clamp(x, 8, window.innerWidth - width - 8);
   const top = clamp(y, 8, window.innerHeight - height - 8);
-  el.quickAdd.style.left = `${left}px`;
-  el.quickAdd.style.top = `${top}px`;
-  el.quickAdd.classList.remove('hidden');
+  _lastQuickAddX = left;
+  _lastQuickAddY = top;
+  el.quickAddWrap.style.left = `${left}px`;
+  el.quickAddWrap.style.top = `${top}px`;
+  el.quickAddWrap.classList.remove('hidden');
 }
 
 function hideQuickAdd(clearPending = false): void {
   const el = getElements();
-  if (!el.quickAdd) return;
-  el.quickAdd.classList.add('hidden');
+  if (!el.quickAddWrap) return;
+  el.quickAddWrap.classList.add('hidden');
   if (clearPending) {
     clearTempSelectionMark();
     state.pendingAnnotation = null;
@@ -508,8 +519,8 @@ export function openComposerFromPending(x?: number, y?: number): void {
   }
   el.composerNote.value = '';
   autoResizeComposerInput(el.composerNote);
-  const left = typeof x === 'number' ? x : (el.quickAdd ? Number.parseFloat(el.quickAdd.style.left || '0') : 0);
-  const top = typeof y === 'number' ? y : (el.quickAdd ? Number.parseFloat(el.quickAdd.style.top || '0') : 0);
+  const left = typeof x === 'number' ? x : (el.quickAddWrap ? Number.parseFloat(el.quickAddWrap.style.left || '0') : 0);
+  const top = typeof y === 'number' ? y : (el.quickAddWrap ? Number.parseFloat(el.quickAddWrap.style.top || '0') : 0);
   placeFloating(el.composer, left, top + 34);
   el.composer.classList.remove('hidden');
   hideQuickAdd(false);
@@ -1541,14 +1552,19 @@ export function handleSelectionForAnnotation(filePath: string | null): void {
   const quote = selection.toString().trim();
   if (!quote) return;
 
-  const start = globalOffsetForPosition(el.reader, range.startContainer, range.startOffset);
-  const end = globalOffsetForPosition(el.reader, range.endContainer, range.endOffset);
-  if (start < 0 || end <= start) return;
+  let start = globalOffsetForPosition(el.reader, range.startContainer, range.startOffset);
+  let end = globalOffsetForPosition(el.reader, range.endContainer, range.endOffset);
+  // Degraded: position failed (formula/table), but keep quote for Todo
+  const positionValid = start >= 0 && end > start;
+  if (!positionValid) {
+    start = -1;
+    end = 0;
+  }
   const fullText = getReaderText(el.reader);
   const prefixWindow = 200;
   const suffixWindow = 200;
-  const quotePrefix = fullText.slice(Math.max(0, start - prefixWindow), start);
-  const quoteSuffix = fullText.slice(end, Math.min(fullText.length, end + suffixWindow));
+  const quotePrefix = positionValid ? fullText.slice(Math.max(0, start - prefixWindow), start) : '';
+  const quoteSuffix = positionValid ? fullText.slice(end, Math.min(fullText.length, end + suffixWindow)) : '';
 
   setChatContext({
     filePath: state.currentFilePath ?? undefined,
@@ -1561,12 +1577,12 @@ export function handleSelectionForAnnotation(filePath: string | null): void {
   showQuickAdd(rect.right + 6, rect.top - 8, {
     id: `ann-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
     start,
-    length: end - start,
+    length: positionValid ? end - start : 0,
     quote,
     quotePrefix,
-    quoteSuffix,
+    quoteSuffix: positionValid ? fullText.slice(end, Math.min(fullText.length, end + suffixWindow)) : '',
     status: 'anchored',
-    confidence: 1,
+    confidence: positionValid ? 1 : 0,
   });
 }
 
@@ -1603,9 +1619,33 @@ export function initAnnotationElements(): void {
     const input = event.currentTarget as HTMLTextAreaElement;
     autoResizeComposerInput(input);
   });
-  getElements().quickAdd?.addEventListener('click', (event) => {
+  getElements().quickAddComment?.addEventListener('click', (event) => {
     event.stopPropagation();
+    const pending = state.pendingAnnotation;
+    if (!pending || pending.start < 0) {
+      hideQuickAdd(true);
+      return;
+    }
+    hideQuickAdd(false);
     openComposerFromPending();
+  });
+
+  getElements().quickAddTodo?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const pending = state.pendingAnnotation;
+    const filePath = state.pendingAnnotationFilePath;
+    hideQuickAdd(true);
+    if (!pending || !filePath) return;
+    document.dispatchEvent(new CustomEvent('todo:open-composer', {
+      detail: {
+        quote: pending.quote,
+        filePath,
+        quotePrefix: pending.quotePrefix,
+        quoteSuffix: pending.quoteSuffix,
+        x: _lastQuickAddX,
+        y: _lastQuickAddY,
+      },
+    }));
   });
 
   document.getElementById('popoverCloseBtn')?.addEventListener('click', () => {
@@ -1908,7 +1948,7 @@ export function initAnnotationElements(): void {
       els.composer &&
       !els.composer.classList.contains('hidden') &&
       !els.composer.contains(target) &&
-      !(els.quickAdd && els.quickAdd.contains(target))
+      !(els.quickAddWrap?.contains(target))
     ) {
       collapseComposer();
     }
@@ -1932,9 +1972,9 @@ export function initAnnotationElements(): void {
     }
 
     if (
-      els.quickAdd &&
-      !els.quickAdd.classList.contains('hidden') &&
-      !els.quickAdd.contains(target) &&
+      els.quickAddWrap &&
+      !els.quickAddWrap.classList.contains('hidden') &&
+      !els.quickAddWrap.contains(target) &&
       !(target as HTMLElement).closest('#annotationComposer')
     ) {
       hideQuickAdd(true);

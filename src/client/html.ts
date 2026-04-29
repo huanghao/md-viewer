@@ -198,6 +198,7 @@ export function generateClientHTML(): string {
       <div class="annotation-tabs" id="annotationTabs">
         <button class="annotation-tab is-active" data-tab="comments" onclick="switchAnnotationTab('comments')">评论<span class="annotation-tab-count" id="annotationTabCount"></span></button>
         <button class="annotation-tab" data-tab="chat" onclick="switchAnnotationTab('chat')">✨ Chat</button>
+        <button class="annotation-tab" data-tab="todo" onclick="switchAnnotationTab('todo')">Todo<span class="annotation-tab-count" id="todoTabCount"></span></button>
         <div class="annotation-tab-actions">
           <div class="annotation-tab-actions-group" id="annotationCommentsActions">
             <button class="annotation-icon-btn" id="annotationDensityToggle" title="切换默认/极简" aria-label="切换默认/极简">
@@ -225,6 +226,13 @@ export function generateClientHTML(): string {
         <div class="annotation-empty">无评论（选中文本即可添加）</div>
       </div>
       <div class="chat-list" id="chatList" style="display:none;"></div>
+      <div class="todo-panel" id="todoPanel" style="display:none;">
+        <div class="todo-panel-toolbar">
+          <button class="todo-filter-pill active" data-filter="open" onclick="setTodoFilter('open')">未完成</button>
+          <button class="todo-filter-pill" data-filter="all" onclick="setTodoFilter('all')">全部</button>
+        </div>
+        <div class="todo-list-container" id="todoListContainer"></div>
+      </div>
     </aside>
     <div class="annotation-sidebar-resizer" id="annotationSidebarResizer" title="拖拽调整评论栏宽度"></div>
     <!-- 拆分模式下独立的 Chat 面板 -->
@@ -266,13 +274,36 @@ export function generateClientHTML(): string {
     </div>
   </div>
 
+  <!-- Todo 创建浮窗 -->
+  <div id="todoComposer" class="todo-composer hidden">
+    <div class="todo-composer-header">
+      <span class="todo-composer-title">添加 Todo</span>
+      <button class="annotation-icon-action" id="todoComposerClose" title="取消" aria-label="取消">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.2 4.2L8 8l3.8-3.8 1 1L9 9l3.8 3.8-1 1L8 10l-3.8 3.8-1-1L7 9 3.2 5.2z"/></svg>
+      </button>
+    </div>
+    <div class="todo-composer-quote-label">划词内容</div>
+    <div class="todo-composer-quote" id="todoComposerQuote"></div>
+    <div class="todo-composer-note-label">备注（可选）</div>
+    <textarea id="todoComposerNote" class="todo-composer-note" rows="2" placeholder="记录下一步要做什么…"></textarea>
+    <div class="todo-composer-actions">
+      <span class="todo-composer-hint">⌘↵ 提交</span>
+      <button class="annotation-icon-action" id="todoComposerCancel" aria-label="取消">取消</button>
+      <button class="annotation-icon-action resolve" id="todoComposerSave" aria-label="添加">添加</button>
+    </div>
+  </div>
+
   <!-- 划词后快速评论入口 -->
-  <button id="annotationQuickAdd" class="annotation-quick-add hidden" title="添加评论" aria-label="添加评论">
-    <svg viewBox="0 0 16 16" aria-hidden="true">
-      <rect x="2.6" y="2.6" width="10.8" height="10.8" rx="2.4" fill="none" stroke="currentColor" stroke-width="1.5"/>
-      <path d="M8 5.4v5.2M5.4 8h5.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-    </svg>
-  </button>
+  <div id="annotationQuickAddWrap" class="annotation-quick-add-wrap hidden">
+    <button id="quickAddComment" class="quick-add-btn" title="添加评论" aria-label="添加评论">
+      <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M5 6h6M5 9h4"/></svg>
+      评论
+    </button>
+    <button id="quickAddTodo" class="quick-add-btn todo" title="添加 Todo" aria-label="添加 Todo">
+      <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 8l3.5 3.5L13 4.5"/></svg>
+      Todo
+    </button>
+  </div>
 
   <!-- 评论查看浮窗 -->
   <div id="annotationPopover" class="annotation-popover hidden">

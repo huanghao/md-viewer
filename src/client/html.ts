@@ -256,6 +256,10 @@ export function generateClientHTML(): string {
     <button class="annotation-floating-open-btn" id="annotationFloatingOpenBtn" title="打开评论侧边栏" aria-label="打开评论侧边栏">
       <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5" fill="none"/><path d="M6 2.5v11"/><path d="M9 6l-2 2 2 2"/></svg>
     </button>
+    <button class="todo-floating-btn" id="todoFloatingBtn" title="打开 Todo" aria-label="打开 Todo">
+      <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 8l3.5 3.5L13 4.5"/></svg>
+      <span class="todo-floating-badge hidden" id="todoFloatingBadge"></span>
+    </button>
   </div>
 
 

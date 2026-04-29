@@ -3111,6 +3111,45 @@ export const styles = `
     body.annotation-sidebar-collapsed .annotation-floating-open-btn {
       display: inline-flex;
     }
+    .todo-floating-btn {
+      position: fixed;
+      right: var(--annotation-sidebar-width, 320px);
+      bottom: 68px;
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-lg);
+      background: #fff;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      z-index: var(--z-floating-btn);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(15,23,42,0.1), 0 1px 2px rgba(15,23,42,0.06);
+      transition: all 0.15s;
+    }
+    .todo-floating-btn:hover {
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+      box-shadow: 0 4px 12px rgba(9,105,218,0.15);
+    }
+    .todo-floating-btn svg { width: 15px; height: 15px; }
+    body.annotation-sidebar-collapsed .todo-floating-btn {
+      right: 8px;
+      bottom: 104px;
+    }
+    .todo-floating-badge {
+      position: absolute;
+      top: -5px; right: -5px;
+      background: var(--color-accent); color: #fff;
+      font-size: 10px; font-weight: 700;
+      min-width: 16px; height: 16px; padding: 0 3px;
+      border-radius: 999px;
+      display: flex; align-items: center; justify-content: center;
+      border: 2px solid #fff;
+    }
+    .todo-floating-badge.hidden { display: none; }
     .annotation-btn-icon {
       padding: 2px 6px;
       font-size: 16px;

@@ -932,8 +932,8 @@ export async function handleCreateTodo(c: any): Promise<Response> {
   try {
     const todo = createTodo({
       filePath, quote,
-      quotePrefix: body.quotePrefix,
-      quoteSuffix: body.quoteSuffix,
+      quotePrefix: typeof body.quotePrefix === 'string' ? body.quotePrefix : undefined,
+      quoteSuffix: typeof body.quoteSuffix === 'string' ? body.quoteSuffix : undefined,
       note: body.note,
     });
     return c.json({ todo });

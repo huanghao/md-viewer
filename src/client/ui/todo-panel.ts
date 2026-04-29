@@ -7,7 +7,7 @@ const LONG_QUOTE_THRESHOLD = 80;
 
 let _todos: ClientTodo[] = [];
 let _filter: 'open' | 'all' = 'open';
-let _pendingUndo: { id: string; wasIndex: number } | null = null;
+const _pendingUndoTimers = new Map<string, ReturnType<typeof setTimeout>>();
 let _copyTargetId: string | null = null;
 
 // ── Data ──────────────────────────────────────────────────────────────────
@@ -100,7 +100,10 @@ async function todoCheck(id: string): Promise<void> {
     cb?.classList.add('checked');
   }
 
-  _pendingUndo = { id, wasIndex: _todos.findIndex(t => t.id === id) };
+  // Cancel any existing undo timer for this id
+  if (_pendingUndoTimers.has(id)) {
+    clearTimeout(_pendingUndoTimers.get(id)!);
+  }
 
   showToast({
     message: '已完成',
@@ -108,24 +111,24 @@ async function todoCheck(id: string): Promise<void> {
     duration: 4500,
     action: {
       label: '撤销',
-      onClick: () => undoCheck(),
+      onClick: () => undoCheck(id),
     },
   });
 
-  // After animation delay, persist and re-render
-  setTimeout(async () => {
-    if (!_pendingUndo || _pendingUndo.id !== id) return; // user undid
-    _pendingUndo = null;
+  const timer = setTimeout(async () => {
+    _pendingUndoTimers.delete(id);
     await apiUpdateTodo(id, { done: true });
     await loadAndRenderTodos();
   }, 600);
+  _pendingUndoTimers.set(id, timer);
 }
 
-async function undoCheck(): Promise<void> {
-  if (!_pendingUndo) return;
-  const { id } = _pendingUndo;
-  _pendingUndo = null;
-  // Re-render immediately (optimistic undo)
+async function undoCheck(id: string): Promise<void> {
+  const timer = _pendingUndoTimers.get(id);
+  if (timer === undefined) return;
+  clearTimeout(timer);
+  _pendingUndoTimers.delete(id);
+  // Revert UI
   const itemEl = document.querySelector(`.todo-item[data-todo-id="${CSS.escape(id)}"]`) as HTMLElement | null;
   if (itemEl) {
     itemEl.classList.remove('done', 'removing');
@@ -212,8 +215,8 @@ export function showTodoComposer(data: ComposerPending & { x?: number; y?: numbe
 
   // Position near selection
   if (data.x !== undefined && data.y !== undefined) {
-    const left = Math.min(data.x, window.innerWidth - 360);
-    const top = Math.min(data.y, window.innerHeight - 260);
+    const left = Math.max(8, Math.min(data.x, window.innerWidth - 360));
+    const top = Math.max(8, Math.min(data.y, window.innerHeight - 260));
     composer.style.left = `${left}px`;
     composer.style.top = `${top}px`;
   } else {
@@ -237,7 +240,7 @@ async function saveTodoFromComposer(): Promise<void> {
   const noteEl = document.getElementById('todoComposerNote') as HTMLTextAreaElement | null;
   const note = noteEl?.value.trim() ?? '';
   hideTodoComposer();
-  await apiCreateTodo({ ...(_composerPending as any), note });
+  await apiCreateTodo({ ..._composerPending, note });
   await loadAndRenderTodos();
   // Switch to todo tab so user sees the new item
   const switchTab = (window as any).switchAnnotationTab as ((tab: string) => void) | undefined;

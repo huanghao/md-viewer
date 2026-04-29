@@ -103,32 +103,10 @@ async function todoCheck(id: string): Promise<void> {
   // Immediately mark done in memory so re-clicks are ignored
   todo.done = true;
 
-  // Optimistic UI: strikethrough + checked
-  const itemEl = document.querySelector(`.todo-item[data-todo-id="${CSS.escape(id)}"]`) as HTMLElement | null;
-  if (itemEl) {
-    itemEl.classList.add('done');
-    itemEl.querySelector('.todo-cb')?.classList.add('checked');
-  }
-
-  // Cancel any existing undo timer for this id
-  if (_pendingUndoTimers.has(id)) clearTimeout(_pendingUndoTimers.get(id)!);
-
-  showToast({
-    message: '已完成',
-    type: 'success',
-    duration: 4500,
-    action: { label: '撤销', onClick: () => undoCheck(id) },
-  });
-
-  // After undo window: persist to server, then move item into done section
-  const timer = setTimeout(async () => {
-    _pendingUndoTimers.delete(id);
-    await apiUpdateTodo(id, { done: true });
-    // Re-render to move item into the done section (without animation)
-    renderTodoList();
-    updateTodoTabCount();
-  }, 1500);
-  _pendingUndoTimers.set(id, timer);
+  // Persist and re-render immediately — no delay needed, item moves to done section below
+  await apiUpdateTodo(id, { done: true });
+  renderTodoList();
+  updateTodoTabCount();
 }
 
 async function undoCheck(id: string): Promise<void> {

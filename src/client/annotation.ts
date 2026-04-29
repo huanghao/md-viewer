@@ -1871,6 +1871,10 @@ export function initAnnotationElements(): void {
     document.body.classList.add('sidebar-split');
     storageSet(CHAT_SPLIT_KEY, '1');
 
+    // 隐藏主侧边栏的 Chat tab（chat 已移到独立面板）
+    const chatTabEl = document.getElementById('annotationChatTab');
+    if (chatTabEl) chatTabEl.style.display = 'none';
+
     // 切换 annotation sidebar 到评论 tab（chat tab 已移走）
     switchAnnotationTab('comments');
     syncChatSidebarLayout();
@@ -1890,6 +1894,10 @@ export function initAnnotationElements(): void {
     splitBtn?.classList.remove('is-active');
     document.body.classList.remove('sidebar-split');
     storageSet(CHAT_SPLIT_KEY, '0');
+
+    // 恢复主侧边栏的 Chat tab
+    const chatTabEl = document.getElementById('annotationChatTab');
+    if (chatTabEl) chatTabEl.style.display = '';
 
     // 恢复 chatList 显示
     if (chatList) chatList.style.display = '';

@@ -197,8 +197,8 @@ export function generateClientHTML(): string {
     <aside class="annotation-sidebar" id="annotationSidebar">
       <div class="annotation-tabs" id="annotationTabs">
         <button class="annotation-tab is-active" data-tab="comments" onclick="switchAnnotationTab('comments')">评论<span class="annotation-tab-count" id="annotationTabCount"></span></button>
-        <button class="annotation-tab" data-tab="chat" onclick="switchAnnotationTab('chat')">✨ Chat</button>
         <button class="annotation-tab" data-tab="todo" onclick="switchAnnotationTab('todo')">Todo<span class="annotation-tab-count" id="todoTabCount"></span></button>
+        <button class="annotation-tab" id="annotationChatTab" data-tab="chat" onclick="switchAnnotationTab('chat')">✨ Chat</button>
         <div class="annotation-tab-actions">
           <div class="annotation-tab-actions-group" id="annotationCommentsActions">
             <button class="annotation-icon-btn" id="annotationDensityToggle" title="切换默认/极简" aria-label="切换默认/极简">

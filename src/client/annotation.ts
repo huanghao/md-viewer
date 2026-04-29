@@ -21,7 +21,7 @@ import { loadConfig } from './config';
 import { formatRelativeTimeShort } from './utils/format';
 import { storageGet, storageSet, storageGetNumber } from './utils/storage';
 import { createResizer } from './utils/resizer';
-import { getTextNodes, globalOffsetForPosition, positionForGlobalOffset, clamp, placeFloating, getReaderText } from './annotation/position';
+import { getTextNodes, globalOffsetForPosition, globalOffsetForPositionEnd, positionForGlobalOffset, clamp, placeFloating, getReaderText } from './annotation/position';
 import { isResolvedAnn, getAnchorTrack, matchesFilter, getVisibleAnnotations as getVisibleAnnotationsUtil } from './annotation/query';
 import { handleEmacsKeys } from './utils/emacs-keys';
 import { recordSignal } from './utils/focus-signals';
@@ -632,7 +632,9 @@ function applyTempSelectionMark(): void {
       if (compareStart > 0 || compareEnd < 0) continue;
       const nodeStart = node === startPos.node ? startPos.offset : 0;
       const nodeEnd = node === endPos.node ? endPos.offset : (node.nodeValue?.length || 0);
-      if (nodeStart < nodeEnd) textNodes.push({ node: node as Text, start: nodeStart, end: nodeEnd });
+      if (nodeStart < nodeEnd && !(node as Text).parentElement?.closest('.katex')) {
+        textNodes.push({ node: node as Text, start: nodeStart, end: nodeEnd });
+      }
     }
     for (let i = textNodes.length - 1; i >= 0; i--) {
       const { node, start, end } = textNodes[i];
@@ -862,16 +864,17 @@ export function showPopover(ann: Annotation, x: number, y: number): void {
   if (copyBtn) {
     const fresh = copyBtn.cloneNode(true) as HTMLButtonElement;
     copyBtn.replaceWith(fresh);
-    const copyIconSvg = fresh.innerHTML;
-    fresh.addEventListener('click', () => {
-      navigator.clipboard.writeText(ann.quote).then(() => {
-        fresh.innerHTML = iconSvg('check');
-        fresh.classList.add('is-copied');
-        setTimeout(() => {
-          fresh.innerHTML = copyIconSvg;
-          fresh.classList.remove('is-copied');
-        }, 1500);
-      });
+    fresh.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const menu = document.getElementById('annotationCopyMenu');
+      if (!menu) return;
+      // Position menu near button
+      const btnRect = fresh.getBoundingClientRect();
+      menu.style.left = `${Math.max(8, btnRect.left - 140)}px`;
+      menu.style.top = `${btnRect.bottom + 4}px`;
+      menu.classList.toggle('hidden');
+      // Store current annotation for menu handlers
+      (menu as any)._ann = ann;
     });
   }
   const askAiBtn = document.getElementById('popoverAskAiBtn') as HTMLButtonElement | null;
@@ -1211,7 +1214,7 @@ function applySingleAnnotation(ann: Annotation, index?: TextNodeIndex): void {
       const nodeStart = node === startPos.node ? startPos.offset : 0;
       const nodeEnd = node === endPos.node ? endPos.offset : (node.nodeValue?.length || 0);
 
-      if (nodeStart < nodeEnd) {
+      if (nodeStart < nodeEnd && !(node as Text).parentElement?.closest('.katex')) {
         textNodes.push({ node: node as Text, start: nodeStart, end: nodeEnd });
       }
     }
@@ -1566,7 +1569,7 @@ export function handleSelectionForAnnotation(filePath: string | null): void {
   if (!quote) return;
 
   let start = globalOffsetForPosition(el.reader, range.startContainer, range.startOffset);
-  let end = globalOffsetForPosition(el.reader, range.endContainer, range.endOffset);
+  let end = globalOffsetForPositionEnd(el.reader, range.endContainer, range.endOffset);
   // Degraded: position failed (formula/table), but keep quote for Todo
   const positionValid = start >= 0 && end > start;
   if (!positionValid) {
@@ -1669,6 +1672,59 @@ export function initAnnotationElements(): void {
   document.getElementById('popoverCloseBtn')?.addEventListener('click', () => {
     state.pinnedAnnotationId = null;
     hidePopover(true);
+  });
+
+  // Annotation copy menu
+  const annotationCopyMenu = document.getElementById('annotationCopyMenu');
+  function hideAnnotationCopyMenu() {
+    annotationCopyMenu?.classList.add('hidden');
+  }
+  document.addEventListener('click', (e) => {
+    if (annotationCopyMenu && !annotationCopyMenu.classList.contains('hidden')) {
+      const btn = document.getElementById('popoverCopyBtn');
+      if (!annotationCopyMenu.contains(e.target as Node) && e.target !== btn) {
+        hideAnnotationCopyMenu();
+      }
+    }
+  });
+  function getMenuAnn(): Annotation | null {
+    return (annotationCopyMenu as any)?._ann ?? null;
+  }
+  function formatAnnotationFull(ann: Annotation): string {
+    const serial = ann.serial && ann.serial > 0 ? ann.serial : 0;
+    const header = serial > 0 ? `#${serial}` : ann.id;
+    const quoted = (ann.quote || '').split('\n').map(l => `> ${l}`).join('\n');
+    const prefix = typeof ann.quotePrefix === 'string' ? ann.quotePrefix.replace(/\s+/g, ' ').trim() : '';
+    const suffix = typeof ann.quoteSuffix === 'string' ? ann.quoteSuffix.replace(/\s+/g, ' ').trim() : '';
+    const cxtLine = (prefix || suffix)
+      ? `cxt: ${[prefix, ann.quote?.trim(), suffix].filter(Boolean).join(' … ')}`
+      : '';
+    const thread = Array.isArray(ann.thread) ? ann.thread : [];
+    const root = thread.find(t => t.type === 'comment') || thread[0];
+    const rootLine = root ? `me: ${root.note}` : (ann.note ? `me: ${ann.note}` : '');
+    const replies = thread.filter(t => t.type === 'reply').map(r => `- me: ${r.note}`);
+    return [header, quoted, cxtLine, rootLine, ...replies].filter(Boolean).join('\n');
+  }
+  document.getElementById('annotationCopyAll')?.addEventListener('click', () => {
+    const ann = getMenuAnn();
+    if (!ann) return;
+    navigator.clipboard.writeText(formatAnnotationFull(ann)).catch(() => {});
+    hideAnnotationCopyMenu();
+  });
+  document.getElementById('annotationCopyQuote')?.addEventListener('click', () => {
+    const ann = getMenuAnn();
+    if (!ann) return;
+    navigator.clipboard.writeText(ann.quote || '').catch(() => {});
+    hideAnnotationCopyMenu();
+  });
+  document.getElementById('annotationCopyNote')?.addEventListener('click', () => {
+    const ann = getMenuAnn();
+    if (!ann) return;
+    const thread = Array.isArray(ann.thread) ? ann.thread : [];
+    const root = thread.find(t => t.type === 'comment') || thread[0];
+    const note = root?.note || ann.note || '';
+    navigator.clipboard.writeText(note).catch(() => {});
+    hideAnnotationCopyMenu();
   });
 
   document.getElementById('popoverDeleteBtn')?.addEventListener('click', () => {

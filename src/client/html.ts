@@ -302,6 +302,22 @@ export function generateClientHTML(): string {
     </div>
   </div>
 
+  <!-- 评论复制菜单 -->
+  <div id="annotationCopyMenu" class="todo-copy-menu hidden">
+    <div class="todo-copy-menu-item" id="annotationCopyAll">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="5" y="4" width="8" height="10" rx="1.5"/><path d="M3 11V3a1 1 0 011-1h7"/></svg>
+      复制全部
+    </div>
+    <div class="todo-copy-menu-item" id="annotationCopyQuote">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M5 6h6M5 9h4"/></svg>
+      仅划词
+    </div>
+    <div class="todo-copy-menu-item" id="annotationCopyNote">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 4h10M3 7h10M3 10h6"/></svg>
+      仅评论
+    </div>
+  </div>
+
   <!-- Todo 复制菜单 -->
   <div id="todoCopyMenu" class="todo-copy-menu hidden">
     <div class="todo-copy-menu-item" id="todoCopyFile">

@@ -251,8 +251,10 @@ async function saveTodoFromComposer(): Promise<void> {
   if (!_composerPending) return;
   const noteEl = document.getElementById('todoComposerNote') as HTMLTextAreaElement | null;
   const note = noteEl?.value.trim() ?? '';
+  // Snapshot before hideTodoComposer clears _composerPending
+  const pending = { ..._composerPending };
   hideTodoComposer();
-  await apiCreateTodo({ ..._composerPending, note });
+  await apiCreateTodo({ ...pending, note });
   await loadAndRenderTodos();
   // Switch to todo tab so user sees the new item
   const switchTab = (window as any).switchAnnotationTab as ((tab: string) => void) | undefined;

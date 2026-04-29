@@ -293,6 +293,22 @@ export function generateClientHTML(): string {
     </div>
   </div>
 
+  <!-- Todo 复制菜单 -->
+  <div id="todoCopyMenu" class="todo-copy-menu hidden">
+    <div class="todo-copy-menu-item" id="todoCopyFile">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 3H3a1 1 0 00-1 1v9a1 1 0 001 1h7a1 1 0 001-1v-3"/><rect x="7" y="2" width="7" height="7" rx="1"/></svg>
+      复制文件名
+    </div>
+    <div class="todo-copy-menu-item" id="todoCopyQuote">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M5 6h6M5 9h4"/></svg>
+      复制划词原文
+    </div>
+    <div class="todo-copy-menu-item" id="todoCopyBoth">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="5" y="4" width="8" height="10" rx="1.5"/><path d="M3 11V3a1 1 0 011-1h7"/></svg>
+      复制文件名 + 原文
+    </div>
+  </div>
+
   <!-- 划词后快速评论入口 -->
   <div id="annotationQuickAddWrap" class="annotation-quick-add-wrap hidden">
     <button id="quickAddComment" class="quick-add-btn" title="添加评论" aria-label="添加评论">

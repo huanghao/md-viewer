@@ -4004,4 +4004,87 @@ export const styles = `
       margin-bottom: 1em;
     }
 
+    /* ── Todo panel ── */
+    .todo-panel { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+    .todo-panel-toolbar { display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--color-border-subtle); flex-shrink: 0; }
+    .todo-filter-pill { font-size: 11px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--color-border-subtle); background: #fff; color: var(--color-text-secondary); cursor: pointer; font-weight: 500; transition: all 0.1s; }
+    .todo-filter-pill.active { background: var(--color-text-primary); color: #fff; border-color: var(--color-text-primary); }
+    .todo-filter-pill:hover:not(.active) { border-color: #a8a29e; }
+
+    /* ── Todo list ── */
+    .todo-list-container { flex: 1; overflow-y: auto; }
+    .todo-item { display: flex; align-items: flex-start; gap: 9px; padding: 10px 12px; border-bottom: 1px solid #f5f5f4; position: relative; }
+    .todo-item:hover { background: #fafaf9; }
+    .todo-item:hover .todo-item-actions { opacity: 1; }
+    .todo-item.done .todo-item-quote { text-decoration: line-through; color: var(--color-text-secondary); }
+    .todo-item.done .todo-item-note { opacity: 0.5; }
+    .todo-item.removing { animation: todoFadeOut 0.28s ease forwards; }
+    @keyframes todoFadeOut { 0% { opacity: 1; max-height: 100px; } 40% { opacity: 0; } 100% { opacity: 0; max-height: 0; padding: 0; border: none; } }
+
+    /* ── Checkbox ── */
+    .todo-cb { width: 16px; height: 16px; flex-shrink: 0; margin-top: 2px; border: 1.5px solid #d6d3d1; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; background: #fff; transition: all 0.12s; }
+    .todo-cb:hover { border-color: var(--color-accent); background: #eff6ff; }
+    .todo-cb.checked { background: var(--color-accent); border-color: var(--color-accent); }
+    .todo-cb.checked::after { content: ''; width: 8px; height: 5px; border-left: 1.5px solid #fff; border-bottom: 1.5px solid #fff; transform: rotate(-45deg) translate(1px,-1px); display: block; }
+
+    /* ── Item body ── */
+    .todo-item-body { flex: 1; min-width: 0; }
+    .todo-item-top { display: flex; align-items: baseline; gap: 5px; margin-bottom: 2px; flex-wrap: nowrap; }
+    .todo-item-file { font-size: 11px; color: var(--color-accent); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; cursor: pointer; flex-shrink: 1; }
+    .todo-item-file:hover { text-decoration: underline; }
+    .todo-item-file.missing { color: var(--color-text-secondary); }
+    .todo-item-missing-badge { font-size: 10px; background: #fee2e2; color: #b91c1c; padding: 1px 5px; border-radius: 3px; flex-shrink: 0; font-weight: 500; }
+    .todo-item-time { font-size: 11px; color: #c4b5b0; margin-left: auto; flex-shrink: 0; white-space: nowrap; }
+    .todo-item-quote { font-size: 12.5px; color: var(--color-text-secondary); line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-style: italic; }
+    .todo-item-quote.expanded { white-space: normal; overflow: visible; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; }
+    .todo-item-note { font-size: 12px; color: var(--color-text-secondary); margin-top: 3px; line-height: 1.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .todo-item-expand { display: none; font-size: 11px; color: var(--color-text-secondary); cursor: pointer; background: none; border: none; padding: 0; font-family: inherit; margin-top: 2px; }
+    .todo-item-expand:hover { color: var(--color-text-primary); }
+    .todo-item-long .todo-item-expand { display: inline-block; }
+
+    /* ── Item hover actions ── */
+    .todo-item-actions { opacity: 0; position: absolute; right: 8px; top: 8px; display: flex; gap: 2px; transition: opacity 0.12s; }
+    .todo-item-action { width: 24px; height: 24px; border-radius: 5px; background: #fff; border: 1px solid var(--color-border-subtle); color: var(--color-text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.1s; }
+    .todo-item-action:hover { color: var(--color-text-primary); border-color: #a8a29e; }
+    .todo-item-action.del:hover { color: #ef4444; border-color: #fca5a5; background: #fff5f5; }
+    .todo-item-action svg { width: 12px; height: 12px; }
+
+    /* ── Done section ── */
+    .todo-done-section { border-top: 1px solid #f5f5f4; }
+    .todo-done-toggle { padding: 8px 14px; font-size: 11.5px; color: var(--color-text-secondary); cursor: pointer; display: flex; align-items: center; gap: 5px; user-select: none; transition: color 0.1s; }
+    .todo-done-toggle:hover { color: var(--color-text-primary); }
+    .todo-done-toggle svg { width: 11px; height: 11px; transition: transform 0.15s; flex-shrink: 0; }
+    .todo-done-toggle.open svg { transform: rotate(90deg); }
+    .todo-done-items { display: none; }
+    .todo-done-items.visible { display: block; }
+
+    /* ── Todo composer ── */
+    .todo-composer { position: fixed; z-index: var(--z-quick-add); width: 340px; background: #fff; border: 1px solid var(--color-border-subtle); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06); padding: 14px; }
+    .todo-composer.hidden { display: none; }
+    .todo-composer-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .todo-composer-title { font-size: 13px; font-weight: 600; color: var(--color-text-primary); }
+    .todo-composer-quote-label, .todo-composer-note-label { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 4px; font-weight: 500; letter-spacing: 0.2px; }
+    .todo-composer-note-label { margin-top: 10px; }
+    .todo-composer-quote { background: #f5f5f4; border-left: 3px solid var(--color-accent); padding: 7px 10px; border-radius: 0 6px 6px 0; font-size: 12px; color: var(--color-text-secondary); line-height: 1.55; font-style: italic; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .todo-composer-note { width: 100%; border: 1px solid var(--color-border-subtle); border-radius: 7px; padding: 8px 10px; font-size: 13px; resize: none; font-family: inherit; color: var(--color-text-primary); outline: none; min-height: 56px; margin-bottom: 10px; transition: border-color 0.12s; }
+    .todo-composer-note:focus { border-color: var(--color-accent); box-shadow: 0 0 0 3px rgba(9,105,218,0.08); }
+    .todo-composer-note::placeholder { color: #d6d3d1; }
+    .todo-composer-actions { display: flex; align-items: center; gap: 6px; }
+    .todo-composer-hint { font-size: 11px; color: var(--color-text-secondary); margin-right: auto; }
+
+    /* ── Quick-add two-button wrap ── */
+    .annotation-quick-add-wrap { position: fixed; z-index: var(--z-quick-add); display: flex; gap: 3px; background: #1c1917; border-radius: 8px; padding: 4px 5px; box-shadow: 0 4px 16px rgba(0,0,0,0.25), 0 1px 4px rgba(0,0,0,0.15); align-items: center; }
+    .annotation-quick-add-wrap.hidden { display: none; }
+    .quick-add-btn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 5px; border: none; font-size: 12px; cursor: pointer; font-weight: 500; color: #e7e5e4; background: transparent; transition: background 0.1s; font-family: inherit; }
+    .quick-add-btn:hover { background: rgba(255,255,255,0.12); }
+    .quick-add-btn.todo { color: #93c5fd; }
+    .quick-add-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+    /* ── Copy menu ── */
+    .todo-copy-menu { position: fixed; background: #1c1917; border-radius: 8px; padding: 4px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); z-index: calc(var(--z-quick-add) + 1); min-width: 180px; }
+    .todo-copy-menu.hidden { display: none; }
+    .todo-copy-menu-item { padding: 7px 10px; color: #e7e5e4; font-size: 12px; border-radius: 5px; cursor: pointer; display: flex; align-items: center; gap: 7px; }
+    .todo-copy-menu-item:hover { background: rgba(255,255,255,0.1); }
+    .todo-copy-menu-item svg { width: 12px; height: 12px; color: #a8a29e; flex-shrink: 0; }
+
 `;

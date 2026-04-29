@@ -68,7 +68,7 @@ export async function detectPathType(path: string): Promise<PathDetectResponse> 
 
 // 打开文件（通知服务端）
 export async function openFile(path: string, focus: boolean = true): Promise<void> {
-  await fetch('/api/open', {
+  await fetch('/api/open-file', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path, focus })

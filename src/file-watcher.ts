@@ -161,12 +161,7 @@ export function watchWorkspace(rootPath: string) {
   watchedWorkspaceRoots.add(resolved);
   ensureWatcher();
 
-  watcher?.add([
-    `${resolved}/**/*.md`,
-    `${resolved}/**/*.markdown`,
-    `${resolved}/**/*.html`,
-    `${resolved}/**/*.htm`,
-  ]);
+  watcher?.add(resolved);
 }
 
 /**

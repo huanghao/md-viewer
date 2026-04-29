@@ -356,12 +356,14 @@ export function renderFocusView(): string {
 
   const pinned = getPinnedFiles();
   const query = state.searchQuery.trim().toLowerCase();
-  const signals = getSignalCache();
-  const frecencyMap = buildFrecencyMap(signals);
+  const allSignals = getSignalCache();
   const collapsed = getFocusCollapsed();
 
   const NEW_WINDOW_MS = FOCUS_WINDOW_MS[state.config.focusWindowKey || '8h'] ?? FOCUS_WINDOW_MS['8h'];
   const newCutoff = Date.now() - NEW_WINDOW_MS;
+  // Only count signals within the selected time window for frecency scoring
+  const signals = allSignals.filter((s) => s.ts >= newCutoff);
+  const frecencyMap = buildFrecencyMap(signals);
 
   // Collect all files across workspaces, trigger scans as needed
   const allCandidates: Array<{ file: FileTreeNode; ws: typeof workspaces[0] }> = [];

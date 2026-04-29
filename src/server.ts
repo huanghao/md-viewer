@@ -140,16 +140,39 @@ app.post("/api/session-state", handleUpdateSessionState);
 // API: 客户端配置
 app.get("/api/config", (c) => handleGetClientConfig());
 
-// API: 焦点信号采集（写本地日志，用于 frecency 策略评估）
-import { appendFileSync, mkdirSync, readFileSync, existsSync } from "fs";
-const FOCUS_SIGNALS_PATH = "logs/focus-signals.jsonl";
+// API: 焦点信号采集（写 SQLite DB，用于 frecency 策略评估）
+import { insertFocusSignal, queryFocusSignals, pruneFocusSignals } from "./annotation-storage.ts";
+import { existsSync, readFileSync } from "fs";
+
+// One-time migration: import legacy jsonl into DB then delete the file
+const LEGACY_SIGNALS_PATH = "logs/focus-signals.jsonl";
+if (existsSync(LEGACY_SIGNALS_PATH)) {
+  try {
+    const lines = readFileSync(LEGACY_SIGNALS_PATH, "utf-8").split("\n").filter(Boolean);
+    for (const line of lines) {
+      try {
+        const { ts, type, file } = JSON.parse(line);
+        if (ts && type && file) {
+          // Use original timestamp from jsonl, insert directly
+          try {
+            const db = (await import("./annotation-storage.ts")).getDb();
+            db.prepare(`INSERT INTO focus_signals (ts, type, file) VALUES (?, ?, ?)`).run(ts, type, file);
+          } catch { /* skip duplicates */ }
+        }
+      } catch { /* skip malformed lines */ }
+    }
+    // Remove legacy file after migration
+    import("fs").then(({ unlinkSync }) => { try { unlinkSync(LEGACY_SIGNALS_PATH); } catch {} });
+  } catch { /* migration best-effort */ }
+}
+
 app.post("/api/focus-signal", async (c) => {
   try {
     const { type, file } = await c.req.json<{ type: string; file: string }>();
     if (!type || !file) return c.json({ ok: false }, 400);
-    const line = JSON.stringify({ ts: Date.now(), type, file }) + "\n";
-    mkdirSync("logs", { recursive: true });
-    appendFileSync(FOCUS_SIGNALS_PATH, line);
+    insertFocusSignal(type, file);
+    // Prune old signals (keep 7 days) — run occasionally, not every request
+    if (Math.random() < 0.01) pruneFocusSignals(7);
   } catch { /* 静默失败，不影响主流程 */ }
   return c.json({ ok: true });
 });
@@ -157,14 +180,8 @@ app.post("/api/focus-signal", async (c) => {
 // API: 读取焦点信号（最近 N 天）
 app.get("/api/focus-signals", (c) => {
   const days = Number(c.req.query("days") ?? "7");
-  const cutoff = Date.now() - days * 86400 * 1000;
-  if (!existsSync(FOCUS_SIGNALS_PATH)) return c.json({ signals: [] });
   try {
-    const signals = readFileSync(FOCUS_SIGNALS_PATH, "utf-8")
-      .split("\n").filter(Boolean)
-      .map((l) => { try { return JSON.parse(l); } catch { return null; } })
-      .filter((s) => s && s.ts >= cutoff && s.file && s.type);
-    return c.json({ signals });
+    return c.json({ signals: queryFocusSignals(days) });
   } catch {
     return c.json({ signals: [] });
   }

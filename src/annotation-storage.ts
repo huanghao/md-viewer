@@ -189,6 +189,17 @@ export function getDb(): Database {
     CREATE INDEX IF NOT EXISTS idx_todos_done ON todos(done);
   `);
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS focus_signals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ts INTEGER NOT NULL,
+      type TEXT NOT NULL,
+      file TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_focus_signals_ts ON focus_signals(ts);
+    CREATE INDEX IF NOT EXISTS idx_focus_signals_file ON focus_signals(file);
+  `);
+
   const columns = db.query(`PRAGMA table_info(annotations)`).all() as Array<{ name: string }>;
   const hasSerial = columns.some((col) => col.name === "serial");
   const hasThreadJson = columns.some((col) => col.name === "thread_json");
@@ -672,4 +683,22 @@ export function tidyAnnotations(olderThanDays = 7): { deleted: number; documents
     .query(`DELETE FROM annotations WHERE status IN ('resolved', 'unanchored') AND updated_at < ?`)
     .run(cutoff);
   return { deleted, documents };
+}
+
+// ── Focus signals ──────────────────────────────────────────────────────────────
+
+export function insertFocusSignal(type: string, file: string): void {
+  getDb().prepare(`INSERT INTO focus_signals (ts, type, file) VALUES (?, ?, ?)`).run(Date.now(), type, file);
+}
+
+export function queryFocusSignals(days: number): Array<{ ts: number; type: string; file: string }> {
+  const cutoff = Date.now() - days * 86400 * 1000;
+  return getDb()
+    .query(`SELECT ts, type, file FROM focus_signals WHERE ts >= ? ORDER BY ts ASC`)
+    .all(cutoff) as Array<{ ts: number; type: string; file: string }>;
+}
+
+export function pruneFocusSignals(olderThanDays = 7): void {
+  const cutoff = Date.now() - olderThanDays * 86400 * 1000;
+  getDb().prepare(`DELETE FROM focus_signals WHERE ts < ?`).run(cutoff);
 }

@@ -14,8 +14,13 @@ install:
     bash scripts/build-and-install.sh
 
 # ── 测试 ──────────────────────────────────────────────
-test:
-    bun test tests/unit/
+test coverage="":
+    #!/usr/bin/env bash
+    if [[ "{{coverage}}" == "coverage" || "{{coverage}}" == "--coverage" ]]; then
+        bun test --coverage tests/unit/
+    else
+        bun test tests/unit/
+    fi
 
 e2e:
     bun run test:e2e

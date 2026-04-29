@@ -868,6 +868,11 @@ export function bindWorkspaceEvents(): void {
   (window as any).setFocusWindowKey = (key: string) => {
     state.config.focusWindowKey = key as any;
     import('../config').then(({ saveConfig }) => saveConfig(state.config));
-    import('./sidebar').then(({ renderSidebar }) => renderSidebar());
+    // Refresh signals so the new window filter picks up the latest data, then re-render
+    import('./workspace-focus').then(({ refreshFrecencySignals }) => {
+      refreshFrecencySignals().then(() =>
+        import('./sidebar').then(({ renderSidebar }) => renderSidebar())
+      );
+    });
   };
 }

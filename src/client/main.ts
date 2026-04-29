@@ -47,6 +47,8 @@ import {
   openComposerFromPending,
 } from './annotation';
 
+import { initTodoPanel } from './ui/todo-panel';
+
 import { createPdfViewer, type PdfViewerInstance } from "./pdf-viewer.js";
 import { createPdfAnnotationBridge } from "./pdf-annotation.js";
 import { extractMdToc, extractPdfOutline, loadSidecar, saveSidecar, scanPdfHeadings } from './toc-extractor.js';
@@ -2580,6 +2582,7 @@ function startWorkspacePolling() {
 
   // 初始化批注功能
   initAnnotationElements();
+  initTodoPanel();
   initChatPanel();
   (window as any).__setPendingAnnotation = setPendingAnnotation;
   syncAnnotationSidebarLayout();

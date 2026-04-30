@@ -212,8 +212,10 @@ export const styles = `
     }
 
     #searchBox {
+      height: 34px;
       padding: 0;
-      display: block;
+      display: flex;
+      align-items: center;
     }
     .search-mode-toggle {
       display: flex;
@@ -938,9 +940,6 @@ export const styles = `
       gap: 2px;
       flex-shrink: 0;
       margin-left: auto;
-      position: sticky;
-      right: 0;
-      background: inherit;
       padding-left: 4px;
     }
     .empty-tip {

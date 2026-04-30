@@ -230,31 +230,36 @@ export function renderSearchBox(): void {
         />
         <button class=”search-clear” id=”searchClear”>×</button>
       </div>
-      <div class=”search-mode-toggle” id=”searchModeToggle”>
-        <button class=”search-mode-btn ${searchMode === 'filename' ? 'active' : ''}” data-mode=”filename”>文件名</button>
-        <button class=”search-mode-btn ${searchMode === 'content' ? 'active' : ''}” data-mode=”content”>内容</button>
-      </div>
     `;
 
     input = container.querySelector('#searchInput') as HTMLInputElement | null;
     clearBtn = container.querySelector('#searchClear') as HTMLButtonElement | null;
     if (!input || !clearBtn) return;
 
-    const modeToggle = container.querySelector('#searchModeToggle');
-    modeToggle?.querySelectorAll('.search-mode-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        searchMode = (btn as HTMLElement).dataset.mode as 'filename' | 'content';
-        modeToggle.querySelectorAll('.search-mode-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        if (searchMode === 'content' && state.searchQuery.trim()) {
-          triggerRagSearch(state.searchQuery);
-        } else {
-          ragResults = [];
-          ragLoading = false;
-          rerenderByMode();
-        }
+    // Render mode toggle into the dedicated modeSwitchRow slot (outside searchBox)
+    const modeRow = document.getElementById('modeSwitchRow');
+    if (modeRow && !modeRow.querySelector('#searchModeToggle')) {
+      modeRow.innerHTML = `
+        <div class=”search-mode-toggle” id=”searchModeToggle”>
+          <button class=”search-mode-btn ${searchMode === 'filename' ? 'active' : ''}” data-mode=”filename”>文件名</button>
+          <button class=”search-mode-btn ${searchMode === 'content' ? 'active' : ''}” data-mode=”content”>内容</button>
+        </div>
+      `;
+      modeRow.querySelector('#searchModeToggle')?.querySelectorAll('.search-mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          searchMode = (btn as HTMLElement).dataset.mode as 'filename' | 'content';
+          modeRow.querySelectorAll('.search-mode-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          if (searchMode === 'content' && state.searchQuery.trim()) {
+            triggerRagSearch(state.searchQuery);
+          } else {
+            ragResults = [];
+            ragLoading = false;
+            rerenderByMode();
+          }
+        });
       });
-    });
+    }
 
     // 路径补全仅在”像路径”的输入下触发，避免干扰普通搜索
     attachPathAutocomplete(input, {

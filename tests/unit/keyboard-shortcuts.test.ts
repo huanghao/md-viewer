@@ -25,6 +25,9 @@ function makeDeps(overrides: Partial<KeyboardShortcutDeps> = {}): KeyboardShortc
     navigateDiff: mock(),
     getCurrentFile: () => '/test/file.md',
     isDiffActive: () => false,
+    toggleShortcutsHelp: mock(),
+    hideShortcutsHelp: mock(),
+    isShortcutsHelpVisible: () => false,
     ...overrides,
   };
 }

@@ -5,6 +5,9 @@ export interface KeyboardShortcutDeps {
   navigateDiff: (dir: 1 | -1) => void;
   getCurrentFile: () => string | undefined;
   isDiffActive: () => boolean;
+  toggleShortcutsHelp: () => void;
+  hideShortcutsHelp: () => void;
+  isShortcutsHelpVisible: () => boolean;
 }
 
 export function setupKeyboardShortcuts(deps: KeyboardShortcutDeps): void {
@@ -12,6 +15,11 @@ export function setupKeyboardShortcuts(deps: KeyboardShortcutDeps): void {
     if (e.key === 'Escape') {
       if (deps.dismissAnnotationPopup()) {
         e.preventDefault();
+        return;
+      }
+      if (deps.isShortcutsHelpVisible()) {
+        e.preventDefault();
+        deps.hideShortcutsHelp();
         return;
       }
       const settingsOverlay = document.getElementById('settingsDialogOverlay');
@@ -26,6 +34,14 @@ export function setupKeyboardShortcuts(deps: KeyboardShortcutDeps): void {
         addWorkspaceOverlay.classList.remove('show');
         return;
       }
+    }
+
+    if (e.key === '?' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      const tag = (document.activeElement as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea') return;
+      e.preventDefault();
+      deps.toggleShortcutsHelp();
+      return;
     }
 
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {

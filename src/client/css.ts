@@ -4094,18 +4094,7 @@ export const styles = `
     .todo-done-items.visible { display: block; }
 
     /* ── Todo composer ── */
-    .todo-composer { position: fixed; z-index: var(--z-quick-add); width: 340px; background: #fff; border: 1px solid var(--color-border-subtle); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06); padding: 14px; }
-    .todo-composer.hidden { display: none; }
-    .todo-composer-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-    .todo-composer-title { font-size: 13px; font-weight: 600; color: var(--color-text-primary); }
-    .todo-composer-quote-label, .todo-composer-note-label { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 4px; font-weight: 500; letter-spacing: 0.2px; }
-    .todo-composer-note-label { margin-top: 10px; }
-    .todo-composer-quote { background: #f5f5f4; border-left: 3px solid var(--color-accent); padding: 7px 10px; border-radius: 0 6px 6px 0; font-size: 12px; color: var(--color-text-secondary); line-height: 1.55; font-style: italic; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-    .todo-composer-note { width: 100%; border: 1px solid var(--color-border-subtle); border-radius: 7px; padding: 8px 10px; font-size: 13px; resize: none; font-family: inherit; color: var(--color-text-primary); outline: none; min-height: 56px; margin-bottom: 10px; transition: border-color 0.12s; }
-    .todo-composer-note:focus { border-color: var(--color-accent); box-shadow: 0 0 0 3px rgba(9,105,218,0.08); }
-    .todo-composer-note::placeholder { color: #d6d3d1; }
-    .todo-composer-actions { display: flex; align-items: center; gap: 6px; }
-    .todo-composer-hint { font-size: 11px; color: var(--color-text-secondary); margin-right: auto; }
+    .todo-composer-quote { background: #f5f5f4; border-left: 3px solid var(--color-accent); padding: 7px 10px; border-radius: 0 6px 6px 0; font-size: 12px; color: var(--color-text-secondary); line-height: 1.55; font-style: italic; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 8px; }
 
     /* ── Quick-add two-button wrap ── */
     .annotation-quick-add-wrap { position: fixed; z-index: var(--z-quick-add); display: flex; gap: 3px; background: #1c1917; border-radius: 8px; padding: 4px 5px; box-shadow: 0 4px 16px rgba(0,0,0,0.25), 0 1px 4px rgba(0,0,0,0.15); align-items: center; }
@@ -4121,5 +4110,18 @@ export const styles = `
     .todo-copy-menu-item { padding: 7px 10px; color: #e7e5e4; font-size: 12px; border-radius: 5px; cursor: pointer; display: flex; align-items: center; gap: 7px; }
     .todo-copy-menu-item:hover { background: rgba(255,255,255,0.1); }
     .todo-copy-menu-item svg { width: 12px; height: 12px; color: #a8a29e; flex-shrink: 0; }
+
+    /* ── Shortcuts help popover ── */
+    .shortcuts-help-popover { position: fixed; z-index: var(--z-popover); background: #fff; border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md); box-shadow: 0 8px 24px rgba(0,0,0,0.16); width: 260px; font-size: var(--text-sm); }
+    .shortcuts-help-popover.hidden { display: none; }
+    .shortcuts-help-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 8px; border-bottom: 1px solid var(--color-border-subtle); font-weight: 600; color: var(--color-text-primary); }
+    .shortcuts-help-close { background: none; border: none; cursor: pointer; font-size: 16px; color: var(--color-text-secondary); padding: 0 2px; line-height: 1; }
+    .shortcuts-help-close:hover { color: var(--color-text-primary); }
+    .shortcuts-help-body { padding: 8px 12px 12px; }
+    .shortcuts-help-group { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-secondary); margin: 10px 0 4px; }
+    .shortcuts-help-group:first-child { margin-top: 2px; }
+    .shortcuts-help-row { display: flex; align-items: center; justify-content: space-between; padding: 3px 0; color: var(--color-text-primary); }
+    .shortcuts-help-row kbd { font-family: var(--font-mono, monospace); font-size: 11px; background: var(--color-bg-subtle, #f6f8fa); border: 1px solid var(--color-border); border-radius: 4px; padding: 1px 6px; color: var(--color-text-secondary); white-space: nowrap; }
+    .shortcuts-help-row span { color: var(--color-text-secondary); font-size: var(--text-sm); }
 
 `;

@@ -133,6 +133,9 @@ export function generateClientHTML(): string {
         <button class="toolbar-text-button" onclick="showSettingsDialog()" title="设置">
           <span id="settingsButtonText">[⚙ 设置]</span>
         </button>
+        <button class="toolbar-text-button" id="shortcutsHelpBtn" onclick="toggleShortcutsHelp()" title="键盘快捷键 (?)">
+          <span>[? 快捷键]</span>
+        </button>
         <button class="toolbar-text-button" id="translateButton" onclick="handleTranslateButtonClick()" title="切换段落翻译（英→中）">
           <span id="translateButtonText">[译]</span>
         </button>
@@ -284,21 +287,23 @@ export function generateClientHTML(): string {
   </div>
 
   <!-- Todo 创建浮窗 -->
-  <div id="todoComposer" class="todo-composer hidden">
-    <div class="todo-composer-header">
-      <span class="todo-composer-title">添加 Todo</span>
-      <button class="annotation-icon-action" id="todoComposerClose" title="取消" aria-label="取消">
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.2 4.2L8 8l3.8-3.8 1 1L9 9l3.8 3.8-1 1L8 10l-3.8 3.8-1-1L7 9 3.2 5.2z"/></svg>
-      </button>
+  <div id="todoComposer" class="annotation-composer hidden">
+    <div id="todoComposerHeader" class="annotation-composer-header">
+      <div class="annotation-row-top">
+        <div class="annotation-row-title">添加 Todo</div>
+        <div class="annotation-row-actions">
+          <button id="todoComposerCancel" class="annotation-icon-action" title="取消" aria-label="取消">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.2 4.2L8 8l3.8-3.8 1 1L9 9l3.8 3.8-1 1L8 10l-3.8 3.8-1-1L7 9 3.2 5.2z"/></svg>
+          </button>
+          <button id="todoComposerSave" class="annotation-icon-action resolve" title="添加" aria-label="添加">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.4 11.2L3.5 8.3l1.1-1.1 1.8 1.8 5-5 1.1 1.1z"/></svg>
+          </button>
+        </div>
+      </div>
     </div>
-    <div class="todo-composer-quote-label">划词内容</div>
     <div class="todo-composer-quote" id="todoComposerQuote"></div>
-    <div class="todo-composer-note-label">备注（可选）</div>
-    <textarea id="todoComposerNote" class="todo-composer-note" rows="2" placeholder="记录下一步要做什么…"></textarea>
-    <div class="todo-composer-actions">
-      <span class="todo-composer-hint">⌘↵ 提交</span>
-      <button class="annotation-icon-action" id="todoComposerCancel" aria-label="取消">取消</button>
-      <button class="annotation-icon-action resolve" id="todoComposerSave" aria-label="添加">添加</button>
+    <div class="annotation-reply-entry annotation-composer-input">
+      <textarea id="todoComposerNote" rows="2" placeholder="记录下一步要做什么…（Cmd+Enter 提交）"></textarea>
     </div>
   </div>
 

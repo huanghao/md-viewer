@@ -582,8 +582,9 @@ export async function handleScanWorkspace(c: Context) {
       return c.json({ error: `目录不存在: ${resolvedPath}` }, 404);
     }
 
-    // 扫描后开启目录级监听，保证“未打开文件”也能收到删除事件。
+    // 扫描后开启目录级监听，保证”未打开文件”也能收到删除事件。
     watchWorkspace(resolvedPath);
+    registerWorkspacePath(resolvedPath);
 
     const tree = scanDirectory(resolvedPath);
 
@@ -915,6 +916,31 @@ export function handleGetClientConfig(): Response {
   return new Response(JSON.stringify(clientConfig), {
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+// In-memory workspace path registry — populated when client calls /api/scan-workspace
+const registeredWorkspacePaths = new Set<string>();
+
+export function registerWorkspacePath(path: string): void {
+  registeredWorkspacePaths.add(resolve(path));
+}
+
+export function handleGetWorkspaces(c: Context) {
+  return c.json({ paths: Array.from(registeredWorkspacePaths) });
+}
+
+export async function handleRagSearch(c: Context) {
+  const q = c.req.query("q");
+  const limit = c.req.query("limit") ?? "10";
+  if (!q) return c.json({ results: [] });
+
+  try {
+    const url = `http://localhost:3001/search?q=${encodeURIComponent(q)}&limit=${limit}`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    return c.json(await resp.json());
+  } catch {
+    return c.json({ results: [], error: "rag_unavailable" });
+  }
 }
 
 export async function handleListTodos(c: any): Promise<Response> {

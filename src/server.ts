@@ -41,6 +41,8 @@ import {
   handleUpdateTodo,
   handleDeleteTodo,
   handleTidyTodos,
+  handleGetWorkspaces,
+  handleRagSearch,
 } from "./handlers.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
 
@@ -139,6 +141,12 @@ app.post("/api/session-state", handleUpdateSessionState);
 
 // API: 客户端配置
 app.get("/api/config", (c) => handleGetClientConfig());
+
+// API: 工作区路径列表（供 RAG server 消费）
+app.get("/api/workspaces", handleGetWorkspaces);
+
+// API: RAG 语义搜索（代理到 localhost:3001）
+app.get("/api/rag-search", handleRagSearch);
 
 // API: 焦点信号采集（写 SQLite DB，用于 frecency 策略评估）
 import { insertFocusSignal, queryFocusSignals, pruneFocusSignals } from "./annotation-storage.ts";

@@ -257,8 +257,32 @@ export const styles = `
     .rag-card-preview { font-size: 11px; color: var(--color-text-secondary); line-height: 1.4; }
     .rag-status { padding: 14px 12px; color: var(--color-text-secondary); font-size: 12px; }
     #modeSwitchRow {
+      display: flex;
+      flex-direction: column;
       padding: 0;
       margin: 0;
+    }
+    #modeSwitchRow .search-mode-toggle {
+      display: flex;
+      gap: 4px;
+      padding: 3px 8px;
+      border-bottom: 1px solid #e8e8e8;
+      background: #fafafa;
+    }
+    #modeSwitchRow .search-mode-btn {
+      padding: 1px 8px;
+      border: 1px solid var(--color-border-subtle);
+      background: transparent;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 11px;
+      color: var(--color-text-secondary);
+      font-family: inherit;
+    }
+    #modeSwitchRow .search-mode-btn.active {
+      background: var(--color-accent);
+      color: #fff;
+      border-color: transparent;
     }
     .mode-switch-row {
       height: 28px;
@@ -303,41 +327,13 @@ export const styles = `
     }
 
     /* ==================== Three-Tab View Switcher ==================== */
-    .view-tabs-row {
-      display: flex;
-      align-items: stretch;
-      border-bottom: 1px solid #e8e8e8;
-      background: #fafafa;
-    }
     .view-tabs {
       display: flex;
+      border-bottom: 1px solid #e8e8e8;
+      background: #fafafa;
       padding: 0;
-      flex: 1;
-      min-width: 0;
-    }
-    .view-tabs-row .search-mode-toggle {
-      display: flex;
-      gap: 2px;
-      padding: 4px 6px;
-      align-items: center;
-      border-left: 1px solid #e8e8e8;
       flex-shrink: 0;
-    }
-    .view-tabs-row .search-mode-btn {
-      padding: 2px 5px;
-      border: 1px solid var(--color-border-subtle);
-      background: transparent;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      font-size: 10px;
-      color: var(--color-text-secondary);
-      font-family: inherit;
-      white-space: nowrap;
-    }
-    .view-tabs-row .search-mode-btn.active {
-      background: var(--color-accent);
-      color: #fff;
-      border-color: transparent;
+      width: 100%;
     }
     .view-tab {
       flex: 1;

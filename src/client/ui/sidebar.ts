@@ -347,17 +347,15 @@ function renderViewTabs(): void {
   ];
 
   container.innerHTML = `
-    <div class="view-tabs-row">
-      <div class="view-tabs">
-        ${tabs.map(t => `
-          <button class="view-tab${tab === t.key ? ' active' : ''}"
-                  onclick="setSidebarTab('${t.key}')">${t.label}</button>
-        `).join('')}
-      </div>
-      <div class="search-mode-toggle" id="searchModeToggle">
-        <button class="search-mode-btn${searchMode === 'filename' ? ' active' : ''}" data-mode="filename">文件名</button>
-        <button class="search-mode-btn${searchMode === 'content' ? ' active' : ''}" data-mode="content">内容</button>
-      </div>
+    <div class="view-tabs">
+      ${tabs.map(t => `
+        <button class="view-tab${tab === t.key ? ' active' : ''}"
+                onclick="setSidebarTab('${t.key}')">${t.label}</button>
+      `).join('')}
+    </div>
+    <div class="search-mode-toggle" id="searchModeToggle">
+      <button class="search-mode-btn${searchMode === 'filename' ? ' active' : ''}" data-mode="filename">文件名</button>
+      <button class="search-mode-btn${searchMode === 'content' ? ' active' : ''}" data-mode="content">内容</button>
     </div>
   `;
 

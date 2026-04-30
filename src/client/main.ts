@@ -11,6 +11,7 @@ import { loadFile, searchFiles, getNearbyFiles, openFile, detectPathType } from 
 
 // 导入工具函数
 import { escapeHtml, escapeAttr } from './utils/escape';
+import { normalizeJoinedPath, resolveMarkdownLinkPath } from './utils/md-link';
 import { diffLines } from './utils/diff';
 import { formatRelativeTime } from './utils/format';
 import { generateDistinctNames } from './utils/file-names';
@@ -20,6 +21,7 @@ import { getFileTypeIcon, getFileTypeLabel, isJsonFile, isJsonlFile } from './ut
 import { renderSidebar } from './ui/sidebar';
 import { showToast, showSuccess, showError, showWarning, showInfo } from './ui/toast';
 import { showSettingsDialog, closeSettingsDialog } from './ui/settings';
+import { toggleShortcutsHelp, hideShortcutsHelp, isShortcutsHelpVisible } from './ui/shortcuts-help';
 import { renderJsonContent } from './ui/json-viewer';
 import { mountScrollbar, unmountScrollbar, updateScrollbar, updateDiffMarkers, clearDiffMarkers } from './ui/doc-scrollbar';
 import { shouldRefreshDiff, refreshDiffBannerLabel } from './ui/diff-refresh';
@@ -597,22 +599,6 @@ export function renderAll() {
 function isMarkdownContent(file: { name: string; path: string }): boolean {
   const lower = `${file.name} ${file.path}`.toLowerCase();
   return lower.includes('.md') || lower.includes('.markdown');
-}
-
-function normalizeJoinedPath(baseDir: string, relativePath: string): string {
-  const merged = `${baseDir}/${relativePath}`;
-  const isAbsolute = merged.startsWith('/');
-  const parts = merged.split('/');
-  const stack: string[] = [];
-  for (const part of parts) {
-    if (!part || part === '.') continue;
-    if (part === '..') {
-      if (stack.length > 0) stack.pop();
-      continue;
-    }
-    stack.push(part);
-  }
-  return `${isAbsolute ? '/' : ''}${stack.join('/')}`;
 }
 
 function resolveMarkdownAssetSrc(src: string, currentFilePath: string): string | null {
@@ -2365,6 +2351,7 @@ declare global {
     copyAbsolutePath: (filePath: string, event?: Event) => void;
     showToast?: (message: string, type: string) => void;
     showSettingsDialog: () => void;
+    toggleShortcutsHelp: () => void;
     toggleMonitorPanel: () => void;
     switchMonitorTab: (tab: 'memory' | 'sessions') => void;
     switchAnnotationTab: (tab: 'comments' | 'chat' | 'todo') => void;
@@ -2420,6 +2407,7 @@ window.copyRelativePath = copyRelativePath;
 window.copyAbsolutePath = copyAbsolutePath;
 window.showToast = showToast;
 window.showSettingsDialog = showSettingsDialog;
+window.toggleShortcutsHelp = toggleShortcutsHelp;
 window.toggleMonitorPanel = toggleMonitorPanel;
 window.switchMonitorTab = switchMonitorTab;
 window.switchAnnotationTab = switchAnnotationTab;
@@ -2612,6 +2600,9 @@ function startWorkspacePolling() {
     navigateDiff: navigateDiffBlock,
     getCurrentFile: () => state.currentFile,
     isDiffActive: () => diffViewActive,
+    toggleShortcutsHelp,
+    hideShortcutsHelp,
+    isShortcutsHelpVisible,
   });
 
   // 添加批注文本选中监听
@@ -2647,6 +2638,18 @@ function startWorkspacePolling() {
         }
       }, 500);
     });
+  });
+
+  // 拦截 markdown 内部 .md 链接点击，在 mdv 内打开
+  document.getElementById('content')?.addEventListener('click', (e) => {
+    const target = (e.target as HTMLElement).closest('a[href]') as HTMLAnchorElement | null;
+    if (!target) return;
+    const href = target.getAttribute('href') || '';
+    const currentFile = state.currentFile;
+    const absPath = resolveMarkdownLinkPath(href, currentFile);
+    if (!absPath) return;
+    e.preventDefault();
+    addFileByPath(absPath, true);
   });
 
   // App-level PDF annotation event listeners (registered once, delegate to current bridge)

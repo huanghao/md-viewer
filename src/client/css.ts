@@ -257,7 +257,6 @@ export const styles = `
     .rag-card-preview { font-size: 11px; color: var(--color-text-secondary); line-height: 1.4; }
     .rag-status { padding: 14px 12px; color: var(--color-text-secondary); font-size: 12px; }
     #modeSwitchRow {
-      display: block;
       padding: 0;
       margin: 0;
     }
@@ -304,13 +303,41 @@ export const styles = `
     }
 
     /* ==================== Three-Tab View Switcher ==================== */
-    .view-tabs {
+    .view-tabs-row {
       display: flex;
+      align-items: stretch;
       border-bottom: 1px solid #e8e8e8;
       background: #fafafa;
+    }
+    .view-tabs {
+      display: flex;
       padding: 0;
+      flex: 1;
+      min-width: 0;
+    }
+    .view-tabs-row .search-mode-toggle {
+      display: flex;
+      gap: 2px;
+      padding: 4px 6px;
+      align-items: center;
+      border-left: 1px solid #e8e8e8;
       flex-shrink: 0;
-      width: 100%;
+    }
+    .view-tabs-row .search-mode-btn {
+      padding: 2px 5px;
+      border: 1px solid var(--color-border-subtle);
+      background: transparent;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 10px;
+      color: var(--color-text-secondary);
+      font-family: inherit;
+      white-space: nowrap;
+    }
+    .view-tabs-row .search-mode-btn.active {
+      background: var(--color-accent);
+      color: #fff;
+      border-color: transparent;
     }
     .view-tab {
       flex: 1;
@@ -918,14 +945,10 @@ export const styles = `
       min-width: 0;
       white-space: nowrap;
     }
-    .file-item .tree-status-inline {
-      order: 2;
-    }
     .file-item .close {
       opacity: 0;
       padding: 2px 6px;
       border-radius: var(--radius-sm);
-      order: 3;
     }
     .file-item:hover .close {
       opacity: 1;

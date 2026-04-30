@@ -347,13 +347,34 @@ function renderViewTabs(): void {
   ];
 
   container.innerHTML = `
-    <div class="view-tabs">
-      ${tabs.map(t => `
-        <button class="view-tab${tab === t.key ? ' active' : ''}"
-                onclick="setSidebarTab('${t.key}')">${t.label}</button>
-      `).join('')}
+    <div class="view-tabs-row">
+      <div class="view-tabs">
+        ${tabs.map(t => `
+          <button class="view-tab${tab === t.key ? ' active' : ''}"
+                  onclick="setSidebarTab('${t.key}')">${t.label}</button>
+        `).join('')}
+      </div>
+      <div class="search-mode-toggle" id="searchModeToggle">
+        <button class="search-mode-btn${searchMode === 'filename' ? ' active' : ''}" data-mode="filename">文件名</button>
+        <button class="search-mode-btn${searchMode === 'content' ? ' active' : ''}" data-mode="content">内容</button>
+      </div>
     </div>
   `;
+
+  container.querySelectorAll<HTMLElement>('.search-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      searchMode = btn.dataset.mode as 'filename' | 'content';
+      container.querySelectorAll('.search-mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (searchMode === 'content' && state.searchQuery.trim()) {
+        triggerRagSearch(state.searchQuery);
+      } else {
+        ragResults = [];
+        ragLoading = false;
+        rerenderByMode();
+      }
+    });
+  });
 }
 
 // 渲染文件列表
@@ -422,32 +443,6 @@ export function renderFiles(): void {
   scrollCurrentFileIntoView(container);
 }
 
-function renderSearchModeToggle(): void {
-  const modeRow = document.getElementById('modeSwitchRow');
-  if (!modeRow) return;
-  if (modeRow.querySelector('#searchModeToggle')) return;
-  modeRow.innerHTML = `
-    <div class="search-mode-toggle" id="searchModeToggle">
-      <button class="search-mode-btn ${searchMode === 'filename' ? 'active' : ''}" data-mode="filename">文件名</button>
-      <button class="search-mode-btn ${searchMode === 'content' ? 'active' : ''}" data-mode="content">内容</button>
-    </div>
-  `;
-  modeRow.querySelectorAll('.search-mode-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      searchMode = (btn as HTMLElement).dataset.mode as 'filename' | 'content';
-      modeRow.querySelectorAll('.search-mode-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      if (searchMode === 'content' && state.searchQuery.trim()) {
-        triggerRagSearch(state.searchQuery);
-      } else {
-        ragResults = [];
-        ragLoading = false;
-        rerenderByMode();
-      }
-    });
-  });
-}
-
 // 渲染整个侧边栏（根据模式选择）
 export function renderSidebar(): void {
   const tab = state.config.sidebarTab;
@@ -457,7 +452,6 @@ export function renderSidebar(): void {
   }
 
   renderSearchBox();
-  renderSearchModeToggle();
   renderViewTabs();
 
   if (tab === 'list') {

@@ -164,8 +164,8 @@ export function getActiveFiles(
 }
 
 
-function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>, query: string): string {
-  return renderFileRow(file.path, file.name, file.lastModified, {
+function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>, query: string, lastActivity?: number): string {
+  return renderFileRow(file.path, file.name, lastActivity ?? file.lastModified, {
     containerClass: 'tree-item file-node focus-file-item',
     onClickJs: (p) => `handleFocusFileClick('${escapeAttr(p)}')`,
     showPin: true,
@@ -271,7 +271,8 @@ function renderFocusWorkspaceGroup(
   pinned: Set<string>,
   loading: boolean,
   query: string,
-  collapsed: Set<string>
+  collapsed: Set<string>,
+  lastActivityMap?: Map<string, number>
 ): string {
   const hasFiles = activeFiles.length > 0;
   const isCollapsed = collapsed.has(workspace.id);
@@ -282,7 +283,7 @@ function renderFocusWorkspaceGroup(
     : `<span class="focus-ws-badge empty">0</span>`;
 
   const filesHtml = hasFiles
-    ? activeFiles.map((f) => renderFocusFileItem(f, pinned, query)).join('')
+    ? activeFiles.map((f) => renderFocusFileItem(f, pinned, query, lastActivityMap?.get(f.path))).join('')
     : '';
 
   return `
@@ -365,6 +366,13 @@ export function renderFocusView(): string {
   const signals = allSignals.filter((s) => s.ts >= newCutoff);
   const frecencyMap = buildFrecencyMap(signals);
 
+  // Latest signal ts per file (for display — shows last activity time instead of mtime)
+  const lastActivityMap = new Map<string, number>();
+  for (const s of signals) {
+    const prev = lastActivityMap.get(s.file);
+    if (prev === undefined || s.ts > prev) lastActivityMap.set(s.file, s.ts);
+  }
+
   // Collect all files across workspaces, trigger scans as needed
   const allCandidates: Array<{ file: FileTreeNode; ws: typeof workspaces[0] }> = [];
   for (const ws of workspaces) {
@@ -433,7 +441,7 @@ export function renderFocusView(): string {
   const groups = workspaces.map((ws) => {
     const files = byWs.get(ws.id);
     if (!files?.length) return '';
-    return renderFocusWorkspaceGroup(ws, files, pinned, false, query, collapsed);
+    return renderFocusWorkspaceGroup(ws, files, pinned, false, query, collapsed, lastActivityMap);
   }).join('');
 
   return `<div class="focus-view">${renderFilterBar()}${groups}</div>`;

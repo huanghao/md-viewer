@@ -33,6 +33,8 @@ export interface Annotation {
   start: number;
   length: number;
   quote: string;
+  /** Original selection text for display; may include KaTeX chars absent in quote. */
+  displayQuote?: string;
   note: string;
   createdAt: number;
   quotePrefix?: string;
@@ -831,11 +833,16 @@ export function showPopoverBottomRight(ann: Annotation): void {
   el.popover.style.bottom = '12px';
 }
 
+function displayQuoteOf(ann: Annotation): string {
+  return ann.displayQuote ?? ann.quote;
+}
+
 export function showPopover(ann: Annotation, x: number, y: number): void {
   const el = getElements();
   if (!el.popover || !el.popoverTitle || !el.popoverNote) return;
-  const snippet = ann.quote.substring(0, 22);
-  el.popoverTitle.textContent = `#${ann.serial || 0} | ${snippet}${ann.quote.length > 22 ? '...' : ''}`;
+  const dq = displayQuoteOf(ann);
+  const snippet = dq.substring(0, 22);
+  el.popoverTitle.textContent = `#${ann.serial || 0} | ${snippet}${dq.length > 22 ? '...' : ''}`;
   const threadHTML = renderThreadListHTML(ann, false);
   // 保存 popover reply input 草稿，重建 HTML 后恢复
   const existingReplyInput = el.popoverNote.querySelector<HTMLTextAreaElement>(`[data-popover-reply-input="${ann.id}"]`);
@@ -884,7 +891,7 @@ export function showPopover(ann: Annotation, x: number, y: number): void {
     fresh.addEventListener('click', () => {
       setChatContext({
         filePath: state.currentFilePath ?? undefined,
-        quote: ann.quote,
+        quote: displayQuoteOf(ann),
         quotePrefix: ann.quotePrefix,
         quoteSuffix: ann.quoteSuffix,
       });
@@ -1405,7 +1412,7 @@ export function renderAnnotationList(filePath: string | null): void {
   const renderItem = (ann: Annotation, index: number, positioned = false, top = 0) => `
     <div class="annotation-item ${state.activeAnnotationId === ann.id ? 'is-active' : ''} status-${getAnchorTrack(ann)}${isResolvedAnn(ann) ? ' is-resolved' : ''}${positioned ? ' positioned' : ''}" data-annotation-id="${ann.id}"${positioned ? ` data-anchor-top="${Math.max(0, Math.round(top))}" style="top:${Math.max(0, Math.round(top))}px"` : ''}>
       <div class="annotation-row-top">
-        <div class="annotation-row-title">#${ann.serial || index + 1} | ${escapeHtml(ann.quote.substring(0, 28))}${ann.quote.length > 28 ? '...' : ''}</div>
+        <div class="annotation-row-title">#${ann.serial || index + 1} | ${escapeHtml(displayQuoteOf(ann).substring(0, 28))}${displayQuoteOf(ann).length > 28 ? '...' : ''}</div>
         <div class="annotation-row-actions">
           <button class="annotation-icon-action" data-action="prev" data-id="${ann.id}" title="上一条">${iconSvg('up')}</button>
           <button class="annotation-icon-action" data-action="next" data-id="${ann.id}" title="下一条">${iconSvg('down')}</button>
@@ -1565,18 +1572,23 @@ export function handleSelectionForAnnotation(filePath: string | null): void {
   const range = selection.getRangeAt(0);
   if (!el.reader.contains(range.commonAncestorContainer)) return;
 
-  const quote = selection.toString().trim();
-  if (!quote) return;
+  const selectionText = selection.toString().trim();
+  if (!selectionText) return;
 
   let start = globalOffsetForPosition(el.reader, range.startContainer, range.startOffset);
   let end = globalOffsetForPositionEnd(el.reader, range.endContainer, range.endOffset);
-  // Degraded: position failed (formula/table), but keep quote for Todo
+  // Degraded: position failed (formula/table), but keep selection text for Todo
   const positionValid = start >= 0 && end > start;
   if (!positionValid) {
     start = -1;
     end = 0;
   }
   const fullText = getReaderText(el.reader);
+  // Use fullText slice as quote so it matches the anchor text (katex skipped).
+  // quote = fullText slice for stable anchor matching (katex skipped).
+  // displayQuote = original selection text so the formula renders in the UI.
+  const quote = positionValid ? fullText.slice(start, end) : selectionText;
+  const displayQuote = positionValid && selectionText !== quote ? selectionText : undefined;
   const prefixWindow = 200;
   const suffixWindow = 200;
   const quotePrefix = positionValid ? fullText.slice(Math.max(0, start - prefixWindow), start) : '';
@@ -1600,6 +1612,7 @@ export function handleSelectionForAnnotation(filePath: string | null): void {
     start,
     length: positionValid ? end - start : 0,
     quote,
+    displayQuote,
     quotePrefix,
     quoteSuffix: positionValid ? fullText.slice(end, Math.min(fullText.length, end + suffixWindow)) : '',
     status: 'anchored',
@@ -1659,7 +1672,7 @@ export function initAnnotationElements(): void {
     if (!pending || !filePath) return;
     document.dispatchEvent(new CustomEvent('todo:open-composer', {
       detail: {
-        quote: pending.quote,
+        quote: displayQuoteOf(pending),
         filePath,
         quotePrefix: pending.quotePrefix,
         quoteSuffix: pending.quoteSuffix,
@@ -1691,7 +1704,7 @@ export function initAnnotationElements(): void {
     return (annotationCopyMenu as any)?._ann ?? null;
   }
   function formatAnnotationFull(ann: Annotation): string {
-    const quoted = (ann.quote || '').split('\n').map(l => `> ${l}`).join('\n');
+    const quoted = (displayQuoteOf(ann) || '').split('\n').map(l => `> ${l}`).join('\n');
     const thread = Array.isArray(ann.thread) ? ann.thread : [];
     const root = thread.find(t => t.type === 'comment') || thread[0];
     const rootLine = root ? `me: ${root.note}` : (ann.note ? `me: ${ann.note}` : '');
@@ -1707,7 +1720,7 @@ export function initAnnotationElements(): void {
   document.getElementById('annotationCopyQuote')?.addEventListener('click', () => {
     const ann = getMenuAnn();
     if (!ann) return;
-    navigator.clipboard.writeText(ann.quote || '').catch(() => {});
+    navigator.clipboard.writeText(displayQuoteOf(ann) || '').catch(() => {});
     hideAnnotationCopyMenu();
   });
   document.getElementById('annotationCopyNote')?.addEventListener('click', () => {

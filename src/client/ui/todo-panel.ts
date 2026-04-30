@@ -256,7 +256,6 @@ export function setTodoFilter(filter: 'open' | 'all'): void {
 
 export function initTodoPanel(): void {
   // Composer buttons
-  document.getElementById('todoComposerClose')?.addEventListener('click', hideTodoComposer);
   document.getElementById('todoComposerCancel')?.addEventListener('click', hideTodoComposer);
   document.getElementById('todoComposerSave')?.addEventListener('click', saveTodoFromComposer);
   document.getElementById('todoComposerNote')?.addEventListener('keydown', (e) => {

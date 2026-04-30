@@ -212,14 +212,8 @@ export const styles = `
     }
 
     #searchBox {
-      min-height: 34px;
       padding: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-    }
-    #searchBox .search-wrapper {
-      height: 34px;
+      display: block;
     }
     .search-mode-toggle {
       display: flex;

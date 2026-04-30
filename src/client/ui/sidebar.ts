@@ -11,6 +11,8 @@ import { compareFileNames } from '../utils/file-sort';
 import { getTabBatchTargets, type TabBatchAction } from '../utils/tab-batch';
 import { renderWorkspaceSidebar, bindWorkspaceEvents } from './sidebar-workspace';
 import { syncAnnotationSidebarLayout } from '../annotation';
+import { ragSearch } from '../api/rag';
+import type { RagResult } from '../api/rag';
 
 let lastEscAt = 0;
 let lastEscValue = '';
@@ -20,6 +22,69 @@ let tabManagerGlobalBound = false;
 let tabsScrollLeft = 0;
 let tabsScrollHandlerBound = false;
 let lastTabsRenderKey = '';
+
+// RAG search state
+let searchMode: 'filename' | 'content' = 'filename';
+let ragResults: RagResult[] = [];
+let ragLoading = false;
+let ragDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+function triggerRagSearch(query: string): void {
+  if (ragDebounceTimer) clearTimeout(ragDebounceTimer);
+  ragResults = [];
+  ragLoading = true;
+  rerenderByMode();
+  ragDebounceTimer = setTimeout(async () => {
+    const resp = await ragSearch(query);
+    ragResults = resp.results;
+    ragLoading = false;
+    rerenderByMode();
+  }, 300);
+}
+
+function renderRagCard(r: RagResult): string {
+  const name = r.path.split('/').pop() ?? r.path;
+  const preview = escapeHtml(r.text.slice(0, 120));
+  const score = Math.round(r.score * 100);
+  const heading = r.heading ? `<span class="rag-heading">${escapeHtml(r.heading)}</span>` : '';
+  return `
+    <div class="rag-card" data-path="${escapeAttr(r.path)}" data-char-start="${r.charStart}">
+      <div class="rag-card-title">
+        <span class="rag-filename">${escapeHtml(name)}</span>
+        ${heading}
+        <span class="rag-score">${score}%</span>
+      </div>
+      <div class="rag-card-preview">${preview}</div>
+    </div>
+  `;
+}
+
+async function openRagResult(path: string, charStart: number): Promise<void> {
+  const { loadFile } = await import('../api/files');
+  const { addOrUpdateFile, switchToFile } = await import('../state');
+  const data = await loadFile(path);
+  if (!data) return;
+  addOrUpdateFile(data, true);
+  switchToFile(path);
+
+  // Scroll to charStart position after content renders
+  setTimeout(() => {
+    const content = document.getElementById('content');
+    const reader = document.getElementById('reader');
+    if (!content || !reader) return;
+    let walked = 0;
+    const walker = document.createTreeWalker(reader, NodeFilter.SHOW_TEXT);
+    let node: Text | null;
+    while ((node = walker.nextNode() as Text | null)) {
+      if (walked + node.length >= charStart) {
+        const el = node.parentElement;
+        if (el) content.scrollTo({ top: el.offsetTop - 90, behavior: 'smooth' });
+        break;
+      }
+      walked += node.length;
+    }
+  }, 300);
+}
 import { attachPathAutocomplete } from './path-autocomplete';
 
 // 将当前打开的文件滚动到侧边栏40%位置
@@ -155,15 +220,19 @@ export function renderSearchBox(): void {
 
   if (!input || !clearBtn) {
     container.innerHTML = `
-      <div class="search-wrapper">
-        <span class="search-icon">🔍</span>
+      <div class=”search-wrapper”>
+        <span class=”search-icon”>🔍</span>
         <input
-          type="text"
-          class="search-input"
-          placeholder="${placeholder}"
-          id="searchInput"
+          type=”text”
+          class=”search-input”
+          placeholder=”${placeholder}”
+          id=”searchInput”
         />
-        <button class="search-clear" id="searchClear">×</button>
+        <button class=”search-clear” id=”searchClear”>×</button>
+      </div>
+      <div class=”search-mode-toggle” id=”searchModeToggle”>
+        <button class=”search-mode-btn ${searchMode === 'filename' ? 'active' : ''}” data-mode=”filename”>文件名</button>
+        <button class=”search-mode-btn ${searchMode === 'content' ? 'active' : ''}” data-mode=”content”>内容</button>
       </div>
     `;
 
@@ -171,7 +240,23 @@ export function renderSearchBox(): void {
     clearBtn = container.querySelector('#searchClear') as HTMLButtonElement | null;
     if (!input || !clearBtn) return;
 
-    // 路径补全仅在“像路径”的输入下触发，避免干扰普通搜索
+    const modeToggle = container.querySelector('#searchModeToggle');
+    modeToggle?.querySelectorAll('.search-mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        searchMode = (btn as HTMLElement).dataset.mode as 'filename' | 'content';
+        modeToggle.querySelectorAll('.search-mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        if (searchMode === 'content' && state.searchQuery.trim()) {
+          triggerRagSearch(state.searchQuery);
+        } else {
+          ragResults = [];
+          ragLoading = false;
+          rerenderByMode();
+        }
+      });
+    });
+
+    // 路径补全仅在”像路径”的输入下触发，避免干扰普通搜索
     attachPathAutocomplete(input, {
       kind: 'file',
       markdownOnly: false,
@@ -187,7 +272,17 @@ export function renderSearchBox(): void {
       if (clearBtn) {
         clearBtn.style.display = query ? 'block' : 'none';
       }
-      rerenderByMode();
+      if (searchMode === 'content') {
+        if (query.trim()) {
+          triggerRagSearch(query);
+        } else {
+          ragResults = [];
+          ragLoading = false;
+          rerenderByMode();
+        }
+      } else {
+        rerenderByMode();
+      }
       // If current file is JSON, re-render with new query
       if (state.currentFile && (isJsonFile(state.currentFile) || isJsonlFile(state.currentFile))) {
         (window as any).renderContent?.();
@@ -285,6 +380,27 @@ function renderViewTabs(): void {
 export function renderFiles(): void {
   const container = document.getElementById('fileList');
   if (!container) return;
+
+  // Content search mode: show RAG results
+  if (searchMode === 'content' && state.searchQuery.trim()) {
+    if (ragLoading) {
+      container.innerHTML = '<div class="rag-status">搜索中...</div>';
+      return;
+    }
+    if (ragResults.length === 0) {
+      container.innerHTML = '<div class="rag-status">无结果</div>';
+      return;
+    }
+    container.innerHTML = ragResults.map(r => renderRagCard(r)).join('');
+    container.querySelectorAll<HTMLElement>('.rag-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const path = card.dataset.path!;
+        const charStart = parseInt(card.dataset.charStart ?? '0');
+        openRagResult(path, charStart);
+      });
+    });
+    return;
+  }
 
   if (state.sessionFiles.size === 0) {
     container.innerHTML = '<div class="empty-tip">点击上方添加 Markdown/HTML 文件</div>';

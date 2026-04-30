@@ -110,11 +110,12 @@ function applyTabBatchAction(action: TabBatchAction): void {
     }
   );
   const removeHandler = (window as any).removeFile as ((path: string) => void) | undefined;
-  if (!removeHandler || targets.length === 0) {
+  const closeable = targets.filter((path) => !isPinned(path));
+  if (!removeHandler || closeable.length === 0) {
     renderTabs();
     return;
   }
-  targets.forEach((path) => removeHandler(path));
+  closeable.forEach((path) => removeHandler(path));
 }
 
 function rerenderByMode(): void {
@@ -144,10 +145,12 @@ export function renderSearchBox(): void {
   let clearBtn = container.querySelector('#searchClear') as HTMLButtonElement | null;
 
   const tab = state.config.sidebarTab;
+  const isMac = navigator.platform.toUpperCase().includes('MAC');
+  const kKey = isMac ? '⌘K' : 'Ctrl+K';
   const placeholder = tab === 'list'
-    ? '搜索已打开的文件'
+    ? `搜索已打开的文件 (${kKey})`
     : tab === 'focus'
-    ? '搜索最近文件'
+    ? `搜索最近文件 (${kKey})`
     : '搜索或输入路径（Enter补全，Cmd/Ctrl+Enter添加）';
 
   if (!input || !clearBtn) {

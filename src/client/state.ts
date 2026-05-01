@@ -15,6 +15,7 @@ export const state: AppState = {
   sessionFiles: new Map(),
   currentFile: null,
   searchQuery: '', // 搜索关键词
+  tabOrder: [],
 
   // 配置
   config: loadConfig(),
@@ -54,7 +55,8 @@ function buildStateData() {
       displayedModified: file.displayedModified,
       lastAccessed: file.lastAccessed || Date.now()
     }]),
-    currentFile: state.currentFile
+    currentFile: state.currentFile,
+    tabOrder: state.tabOrder
   };
 }
 
@@ -78,15 +80,16 @@ function cleanupOldFiles(): void {
 
   // 保留最近的 MAX_FILES 个
   const filesToKeep = sortedFiles.slice(0, MAX_FILES);
-  const filesToRemove = sortedFiles.slice(MAX_FILES);
+  const keepPaths = new Set(filesToKeep.map(([path]) => path));
 
   // 清理旧文件
   state.sessionFiles.clear();
   filesToKeep.forEach(([path, file]) => {
     state.sessionFiles.set(path, file);
   });
+  state.tabOrder = state.tabOrder.filter(p => keepPaths.has(p));
 
-  console.log(`已清理 ${filesToRemove.length} 个旧文件`);
+  console.log(`已清理 ${sortedFiles.length - MAX_FILES} 个旧文件`);
 }
 
 export async function restoreState(loadFile: (path: string, silent: boolean) => Promise<FileData | null>): Promise<void> {
@@ -122,21 +125,38 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
       }
     }
 
+    // 恢复 tabOrder：过滤掉不存在的路径，追加 sessionFiles 中有但 tabOrder 中没有的路径
+    const restoredOrder: string[] = [];
+    const seenPaths = new Set<string>();
+    if (data.tabOrder && Array.isArray(data.tabOrder)) {
+      for (const p of data.tabOrder) {
+        if (state.sessionFiles.has(p) && !seenPaths.has(p)) {
+          restoredOrder.push(p);
+          seenPaths.add(p);
+        }
+      }
+    }
+    for (const path of state.sessionFiles.keys()) {
+      if (!seenPaths.has(path)) {
+        restoredOrder.push(path);
+      }
+    }
+    state.tabOrder = restoredOrder;
+
     // 清理不存在的文件：用实际存在的文件覆盖 localStorage
     if (validFiles.length !== data.files.length) {
       const currentFile = state.sessionFiles.has(data.currentFile)
         ? data.currentFile
         : null;
-      storageSet(STORAGE_KEY, { files: validFiles, currentFile });
+      storageSet(STORAGE_KEY, { files: validFiles, currentFile, tabOrder: state.tabOrder });
     }
 
     // 恢复当前文件
     if (data.currentFile && state.sessionFiles.has(data.currentFile)) {
       state.currentFile = data.currentFile;
     } else {
-      // 如果保存的当前文件不存在了，切换到第一个文件
-      const firstFile = Array.from(state.sessionFiles.values())[0];
-      state.currentFile = firstFile ? firstFile.path : null;
+      // 如果保存的当前文件不存在了，切换到 tabOrder 第一个文件
+      state.currentFile = state.tabOrder.length > 0 ? state.tabOrder[0] : null;
     }
   } catch (e) {
     console.error('恢复状态失败:', e);
@@ -186,21 +206,21 @@ export function addOrUpdateFile(fileData: FileData, switchTo: boolean = false): 
     if (!switchTo) {
       markListDiff(fileData.path);
     }
+    state.tabOrder.push(fileData.path);
   }
 
   saveState();
 }
 
 export function removeFile(path: string): void {
-  const allFiles = Array.from(state.sessionFiles.keys());
-  const idx = allFiles.indexOf(path);
+  const idx = state.tabOrder.indexOf(path);
   state.sessionFiles.delete(path);
+  state.tabOrder = state.tabOrder.filter(p => p !== path);
   clearListDiff(path);
   clearWorkspacePathMissing(path);
   if (state.currentFile === path) {
     // 切换到被关闭文件左边（前一个）的文件，若无则取右边第一个
-    const remainingFiles = Array.from(state.sessionFiles.values());
-    state.currentFile = remainingFiles.length > 0 ? remainingFiles[Math.max(0, idx - 1)].path : null;
+    state.currentFile = state.tabOrder.length > 0 ? state.tabOrder[Math.max(0, idx - 1)] : null;
   }
   saveState();
 }
@@ -236,6 +256,13 @@ export function markFileMissing(path: string, switchTo: boolean = false): void {
   }
   markWorkspacePathMissing(path);
 
+  saveState();
+}
+
+export function moveTabOrder(fromIndex: number, toIndex: number): void {
+  if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
+  const [path] = state.tabOrder.splice(fromIndex, 1);
+  state.tabOrder.splice(toIndex, 0, path);
   saveState();
 }
 

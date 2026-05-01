@@ -1,4 +1,4 @@
-import { state, setSearchQuery, getFilteredFiles } from '../state';
+import { state, setSearchQuery, getFilteredFiles, saveState, moveTabOrder } from '../state';
 import { hasListDiff } from '../workspace-state';
 import { saveConfig } from '../config';
 import { escapeAttr, escapeHtml } from '../utils/escape';
@@ -7,7 +7,6 @@ import { getFileListStatus } from '../utils/file-status';
 import { isJsonFile, isJsonlFile } from '../utils/file-type';
 import { renderFileRow } from './file-row';
 import { isPinned } from '../utils/pinned-files';
-import { compareFileNames } from '../utils/file-sort';
 import { getTabBatchTargets, type TabBatchAction } from '../utils/tab-batch';
 import { renderWorkspaceSidebar, bindWorkspaceEvents } from './sidebar-workspace';
 import { syncAnnotationSidebarLayout } from '../annotation';
@@ -20,6 +19,24 @@ let tabManagerGlobalBound = false;
 let tabsScrollLeft = 0;
 let tabsScrollHandlerBound = false;
 let lastTabsRenderKey = '';
+interface TabDragState {
+  fromIdx: number;
+  insertIdx: number;
+  ghost: HTMLElement;
+  srcEl: HTMLElement;
+  offsetX: number;
+  offsetY: number;
+}
+interface FileDragState {
+  fromPath: string;
+  insertIdx: number;
+  ghost: HTMLElement;
+  srcEl: HTMLElement;
+  offsetX: number;
+  offsetY: number;
+}
+let tabDragState: TabDragState | null = null;
+let fileDragState: FileDragState | null = null;
 import { attachPathAutocomplete } from './path-autocomplete';
 
 // 将当前打开的文件滚动到侧边栏40%位置
@@ -281,6 +298,253 @@ function renderViewTabs(): void {
   `;
 }
 
+const DRAG_THRESHOLD = 4; // px，小于此移动距离视为 click，不启动拖拽
+
+function bindTabDragEvents(tabsScrollEl: HTMLElement): void {
+  tabsScrollEl.addEventListener('pointerdown', (e: PointerEvent) => {
+    if (e.button !== 0) return;
+    const tab = (e.target as HTMLElement).closest('.tab') as HTMLElement | null;
+    if (!tab) return;
+    if ((e.target as HTMLElement).classList.contains('tab-close')) return;
+
+    const fromIdx = parseInt(tab.dataset.index || '-1', 10);
+    if (fromIdx < 0) return;
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let dragging = false;
+    let ghost: HTMLElement | null = null;
+
+    const tabRect = tab.getBoundingClientRect();
+    const offsetX = e.clientX - tabRect.left;
+    const offsetY = e.clientY - tabRect.top;
+
+    // 记录所有 tab 的原始位置（拖拽开始时快照，之后不再变），用于阈值判断
+    let tabOrigRects: Array<{ origIdx: number; left: number; width: number }> = [];
+
+    function startDrag(): void {
+      dragging = true;
+      ghost = document.createElement('div');
+      ghost.className = 'tab-drag-ghost';
+      ghost.innerHTML = tab!.querySelector('.tab-name')?.outerHTML || tab!.innerHTML;
+      ghost.style.width = tabRect.width + 'px';
+      ghost.style.left  = tabRect.left + 'px';
+      ghost.style.top   = tabRect.top  + 'px';
+      document.body.appendChild(ghost);
+      tab!.classList.add('tab-dragging');
+      // 快照原始位置（此时 transform 还没加）
+      tabOrigRects = [...tabsScrollEl.querySelectorAll<HTMLElement>('.tab')].map(el => ({
+        origIdx: parseInt(el.dataset.index || '0', 10),
+        left: el.getBoundingClientRect().left,
+        width: el.getBoundingClientRect().width,
+      }));
+      tabDragState = { fromIdx, insertIdx: fromIdx, ghost, srcEl: tab!, offsetX, offsetY };
+    }
+
+    function cleanup(): void {
+      tabsScrollEl.querySelectorAll<HTMLElement>('.tab').forEach(el => { el.style.transform = ''; });
+      if (ghost) { ghost.remove(); ghost = null; }
+      tab!.classList.remove('tab-dragging');
+      tabDragState = null;
+    }
+
+    function onMove(e: PointerEvent): void {
+      if (!dragging) {
+        if (Math.abs(e.clientX - startX) < DRAG_THRESHOLD && Math.abs(e.clientY - startY) < DRAG_THRESHOLD) return;
+        e.preventDefault();
+        startDrag();
+      }
+      if (!tabDragState || !ghost) return;
+      const { srcEl } = tabDragState;
+
+      ghost.style.left = (e.clientX - offsetX) + 'px';
+      ghost.style.top  = (e.clientY - offsetY) + 'px';
+
+      // 用原始位置（拖拽开始时快照）判断阈值，避免 translateX 偏移导致来回体感不一致
+      const mouseX = e.clientX;
+      // 按原始 left 升序遍历（快照已按 DOM 顺序，即原始顺序）
+      const others = tabOrigRects.filter(t => t.origIdx !== fromIdx);
+
+      let newInsertIdx = fromIdx;
+      let found = false;
+      for (let i = 0; i < others.length; i++) {
+        const t = others[i];
+        if (mouseX < t.left + t.width) {
+          const movingRight = t.origIdx > fromIdx;
+          // 向右拖：越过目标原始左边 1/3；向左拖：越过目标原始右边 1/3
+          const trigger = movingRight ? t.left + t.width / 3 : t.left + t.width * 2 / 3;
+          newInsertIdx = mouseX < trigger ? t.origIdx : t.origIdx + 1;
+          if (t.origIdx >= fromIdx) newInsertIdx -= 1;
+          found = true;
+          break;
+        }
+      }
+      if (!found) newInsertIdx = state.tabOrder.length - 1;
+
+      tabDragState.insertIdx = newInsertIdx;
+
+      const allTabEls = [...tabsScrollEl.querySelectorAll<HTMLElement>('.tab')];
+      const ghostW = ghost.offsetWidth;
+      allTabEls.forEach((el, i) => {
+        if (el === srcEl) return;
+        let dx = 0;
+        if (newInsertIdx < fromIdx) {
+          if (i >= newInsertIdx && i < fromIdx) dx = ghostW;
+        } else {
+          if (i > fromIdx && i <= newInsertIdx) dx = -ghostW;
+        }
+        el.style.transform = dx !== 0 ? `translateX(${dx}px)` : '';
+      });
+    }
+
+    function onUp(): void {
+      tab!.removeEventListener('pointermove', onMove);
+      tab!.removeEventListener('pointerup', onUp);
+      tab!.removeEventListener('pointercancel', onCancel);
+
+      if (!dragging) return; // 没拖过阈值，视为 click，不处理排序
+
+      const insertIdx = tabDragState?.insertIdx ?? fromIdx;
+      cleanup();
+      lastTabsRenderKey = '';
+      if (fromIdx !== insertIdx) moveTabOrder(fromIdx, insertIdx);
+      renderTabs();
+      renderFiles();
+    }
+
+    function onCancel(): void {
+      tab!.removeEventListener('pointermove', onMove);
+      tab!.removeEventListener('pointerup', onUp);
+      tab!.removeEventListener('pointercancel', onCancel);
+      if (dragging) cleanup();
+    }
+
+    tab.setPointerCapture(e.pointerId);
+    tab.addEventListener('pointermove', onMove);
+    tab.addEventListener('pointerup', onUp);
+    tab.addEventListener('pointercancel', onCancel);
+  });
+}
+
+function bindFileDragEvents(fileListEl: HTMLElement): void {
+  if ((fileListEl as any).__fileDragBound) return;
+  (fileListEl as any).__fileDragBound = true;
+
+  fileListEl.addEventListener('pointerdown', (e: PointerEvent) => {
+    if (e.button !== 0) return;
+    const item = (e.target as HTMLElement).closest('.file-item') as HTMLElement | null;
+    if (!item) return;
+    if ((e.target as HTMLElement).closest('.close, .tree-pin-btn')) return;
+
+    const fromPath = item.dataset.path || '';
+    if (!fromPath) return;
+    const fromIdx = state.tabOrder.indexOf(fromPath);
+    if (fromIdx < 0) return;
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let dragging = false;
+    let ghost: HTMLElement | null = null;
+
+    const itemRect = item.getBoundingClientRect();
+    const offsetX = e.clientX - itemRect.left;
+    const offsetY = e.clientY - itemRect.top;
+
+    function startDrag(): void {
+      dragging = true;
+      ghost = document.createElement('div');
+      ghost.className = 'file-drag-ghost';
+      ghost.textContent = item!.querySelector('.tree-name-full')?.textContent || fromPath.split('/').pop() || fromPath;
+      ghost.style.width = itemRect.width + 'px';
+      ghost.style.left  = itemRect.left + 'px';
+      ghost.style.top   = itemRect.top  + 'px';
+      document.body.appendChild(ghost);
+      item!.classList.add('file-item-dragging');
+      fileDragState = { fromPath, insertIdx: fromIdx, ghost, srcEl: item!, offsetX, offsetY };
+    }
+
+    function cleanup(): void {
+      fileListEl.querySelectorAll<HTMLElement>('.file-item').forEach(el => { el.style.transform = ''; });
+      if (ghost) { ghost.remove(); ghost = null; }
+      item!.classList.remove('file-item-dragging');
+      fileDragState = null;
+    }
+
+    function onMove(e: PointerEvent): void {
+      if (!dragging) {
+        if (Math.abs(e.clientX - startX) < DRAG_THRESHOLD && Math.abs(e.clientY - startY) < DRAG_THRESHOLD) return;
+        e.preventDefault();
+        startDrag();
+      }
+      if (!fileDragState || !ghost) return;
+      const { srcEl } = fileDragState;
+
+      ghost.style.left = (e.clientX - offsetX) + 'px';
+      ghost.style.top  = (e.clientY - offsetY) + 'px';
+
+      const mouseY = e.clientY;
+      const itemEls = [...fileListEl.querySelectorAll<HTMLElement>('.file-item:not(.file-item-dragging)')];
+
+      let newInsertIdx = fromIdx;
+      let found = false;
+      for (let i = 0; i < itemEls.length; i++) {
+        const r = itemEls[i].getBoundingClientRect();
+        if (mouseY < r.bottom) {
+          const itemPath = itemEls[i].dataset.path || '';
+          const origIdx = state.tabOrder.indexOf(itemPath);
+          if (origIdx < 0) continue;
+          newInsertIdx = mouseY < r.top + r.height / 2 ? origIdx : origIdx + 1;
+          if (origIdx >= fromIdx) newInsertIdx -= 1;
+          found = true;
+          break;
+        }
+      }
+      if (!found) newInsertIdx = state.tabOrder.length - 1;
+
+      fileDragState.insertIdx = newInsertIdx;
+
+      const allItemEls = [...fileListEl.querySelectorAll<HTMLElement>('.file-item')];
+      const ghostH = ghost.offsetHeight;
+      allItemEls.forEach((el, i) => {
+        if (el === srcEl) return;
+        let dy = 0;
+        if (newInsertIdx < fromIdx) {
+          if (i >= newInsertIdx && i < fromIdx) dy = ghostH;
+        } else {
+          if (i > fromIdx && i <= newInsertIdx) dy = -ghostH;
+        }
+        el.style.transform = dy !== 0 ? `translateY(${dy}px)` : '';
+      });
+    }
+
+    function onUp(): void {
+      item!.removeEventListener('pointermove', onMove);
+      item!.removeEventListener('pointerup', onUp);
+      item!.removeEventListener('pointercancel', onCancel);
+
+      if (!dragging) return;
+
+      const insertIdx = fileDragState?.insertIdx ?? fromIdx;
+      cleanup();
+      if (fromIdx >= 0 && fromIdx !== insertIdx) moveTabOrder(fromIdx, insertIdx);
+      renderTabs();
+      renderFiles();
+    }
+
+    function onCancel(): void {
+      item!.removeEventListener('pointermove', onMove);
+      item!.removeEventListener('pointerup', onUp);
+      item!.removeEventListener('pointercancel', onCancel);
+      if (dragging) cleanup();
+    }
+
+    item.setPointerCapture(e.pointerId);
+    item.addEventListener('pointermove', onMove);
+    item.addEventListener('pointerup', onUp);
+    item.addEventListener('pointercancel', onCancel);
+  });
+}
+
 // 渲染文件列表
 export function renderFiles(): void {
   const container = document.getElementById('fileList');
@@ -299,15 +563,16 @@ export function renderFiles(): void {
     return;
   }
 
-  // 将过滤后的文件转换为 Map 以便生成显示名称，按文件名排序
-  const filteredMap = new Map(filteredFiles.map(f => [f.path, f]));
-  const filesWithDisplay = generateDistinctNames(filteredMap)
-    .sort((a, b) => {
-      const aPinned = isPinned(a.path);
-      const bPinned = isPinned(b.path);
-      if (aPinned !== bPinned) return aPinned ? -1 : 1;
-      return compareFileNames(a.displayName || a.name, b.displayName || b.name);
-    });
+  // 按 tabOrder 排序（过滤掉不在 filteredFiles 中的）
+  const filteredPaths = new Set(filteredFiles.map(f => f.path));
+  const orderedPaths = state.tabOrder.filter(p => filteredPaths.has(p));
+  // 如果有不在 tabOrder 中的（理论上不应发生），追加到末尾
+  for (const f of filteredFiles) {
+    if (!orderedPaths.includes(f.path)) orderedPaths.push(f.path);
+  }
+
+  const orderedMap = new Map(orderedPaths.map(p => [p, state.sessionFiles.get(p)!]));
+  const filesWithDisplay = generateDistinctNames(orderedMap);
 
   container.innerHTML = filesWithDisplay.map(file => {
     return renderFileRow(file.path, file.displayName || file.name, undefined, {
@@ -322,6 +587,7 @@ export function renderFiles(): void {
     });
   }).join('');
 
+  bindFileDragEvents(container);
   // 滚动当前文件到侧边栏40%位置
   scrollCurrentFileIntoView(container);
 }
@@ -386,7 +652,11 @@ export function renderTabs(): void {
     return;
   }
 
-  const filesWithDisplay = generateDistinctNames(state.sessionFiles);
+  // 按 tabOrder 排序
+  const orderedFiles = state.tabOrder
+    .map(p => state.sessionFiles.get(p))
+    .filter((f): f is FileInfo => !!f);
+  const filesWithDisplay = generateDistinctNames(new Map(orderedFiles.map(f => [f.path, f])));
   const tabsRenderSnapshot = filesWithDisplay
     .map((file) => {
       const status = getFileListStatus(file, hasListDiff(file.path));
@@ -416,7 +686,7 @@ export function renderTabs(): void {
   lastTabsRenderKey = nextTabsRenderKey;
 
   const tabsHtml = filesWithDisplay
-    .map(file => {
+    .map((file, index) => {
       const isCurrent = file.path === state.currentFile;
       const isMissing = file.isMissing || false;
       const classes = ['tab'];
@@ -424,7 +694,7 @@ export function renderTabs(): void {
       if (isMissing) classes.push('deleted');
 
       return `
-        <div class="${classes.join(' ')}"
+        <div class="${classes.join(' ')}" data-index="${index}" data-path="${escapeAttr(file.path)}"
              onclick="window.switchFile('${escapeAttr(file.path)}')">
           <span class="tab-name">${escapeHtml(file.displayName)}</span>
           <span class="tab-close" onclick="event.stopPropagation();window.removeFile('${escapeAttr(file.path)}')">×</span>
@@ -461,8 +731,9 @@ export function renderTabs(): void {
 
   requestAnimationFrame(() => {
     const tabsScrollEl = container.querySelector('.tabs-scroll') as HTMLElement | null;
-    if (tabsScrollEl && tabsScrollLeft > 0) {
-      tabsScrollEl.scrollLeft = tabsScrollLeft;
+    if (tabsScrollEl) {
+      if (tabsScrollLeft > 0) tabsScrollEl.scrollLeft = tabsScrollLeft;
+      bindTabDragEvents(tabsScrollEl);
     }
     syncAnnotationSidebarLayout();
   });

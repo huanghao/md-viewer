@@ -109,7 +109,7 @@ export function renderFileRow(
   const typeIcon = getFileTypeIcon(path);
 
   return `
-    <div class="${classes}" onclick="${opts.onClickJs(path)}">
+    <div class="${classes}" data-path="${escapeAttr(path)}" onclick="${opts.onClickJs(path)}">
       <span class="tree-indent" style="width: ${opts.indentPx}px"></span>
       <span class="tree-toggle"></span>
       <span class="file-type-icon ${typeIcon.cls}">${escapeHtml(typeIcon.label)}</span>

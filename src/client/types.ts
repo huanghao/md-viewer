@@ -53,6 +53,7 @@ export interface AppState {
   sessionFiles: Map<string, FileInfo>;
   currentFile: string | null;
   searchQuery: string;
+  tabOrder: string[];  // 已打开文件的路径顺序（用于 tab 和 list 视图排序）
 
   // 配置
   config: AppConfig;

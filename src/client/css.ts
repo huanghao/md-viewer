@@ -1167,6 +1167,55 @@ export const styles = `
       padding: 1px 5px;
       margin-left: 4px;
     }
+    .tab {
+      transition: transform 140ms cubic-bezier(0.2, 0, 0, 1);
+      will-change: transform;
+    }
+    .tab.tab-dragging {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .tab-drag-ghost {
+      position: fixed;
+      z-index: 9999;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      font-size: var(--text-sm);
+      white-space: nowrap;
+      background: #fff;
+      border: 1px solid var(--color-border);
+      border-bottom: 2px solid var(--color-accent);
+      border-radius: 4px 4px 0 0;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+      transform: scaleY(1.06);
+      transform-origin: bottom center;
+      cursor: grabbing;
+    }
+    .file-item {
+      transition: transform 140ms cubic-bezier(0.2, 0, 0, 1);
+      will-change: transform;
+    }
+    .file-item.file-item-dragging {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .file-drag-ghost {
+      position: fixed;
+      z-index: 9999;
+      pointer-events: none;
+      padding: 6px 12px;
+      font-size: var(--text-sm);
+      white-space: nowrap;
+      background: #fff;
+      border: 1px solid var(--color-border);
+      border-left: 2px solid var(--color-accent);
+      border-radius: 4px;
+      box-shadow: 4px 4px 12px rgba(0,0,0,0.14);
+      cursor: grabbing;
+    }
 
     /* 内容区 */
     .content {

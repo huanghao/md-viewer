@@ -145,9 +145,11 @@ export function generateClientHTML(): string {
         <button class="toolbar-text-button" id="monitorButton" onclick="toggleMonitorPanel()" title="系统监控">
           <span>[◫ 监控]</span>
         </button>
-        <button class="font-scale-button" id="fontScaleButton" onclick="zoomReset()" title="缩放 (⌘+ / ⌘−)，点击重置">
-          <span id="fontScaleText">100%</span>
-        </button>
+        <div class="zoom-control" id="zoomControl">
+          <button class="zoom-step-btn" id="zoomOutBtn" onclick="zoomOut()" title="缩小 (⌘−)">−</button>
+          <input class="zoom-input" id="fontScaleInput" type="text" value="100%" title="缩放比例，可直接输入（如 150%）" />
+          <button class="zoom-step-btn" id="zoomInBtn" onclick="zoomIn()" title="放大 (⌘+)">+</button>
+        </div>
         <span class="connection-status" id="connectionStatus" title="连接状态">
           <span class="connection-indicator" id="connectionIndicator"></span>
           <span class="connection-text" id="connectionText"></span>

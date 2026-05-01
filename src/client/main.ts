@@ -1423,7 +1423,7 @@ function removeFileHandler(path: string) {
 }
 
 function cycleTab(direction: 1 | -1): void {
-  const files = Array.from(state.sessionFiles.keys());
+  const files = state.tabOrder.filter(p => state.sessionFiles.has(p));
   if (files.length <= 1) return;
   const currentIndex = state.currentFile ? files.indexOf(state.currentFile) : -1;
   const nextIndex = (currentIndex + direction + files.length) % files.length;
@@ -1431,7 +1431,7 @@ function cycleTab(direction: 1 | -1): void {
 }
 
 function jumpToTab(n: number): void {
-  const files = Array.from(state.sessionFiles.keys());
+  const files = state.tabOrder.filter(p => state.sessionFiles.has(p));
   if (files.length === 0) return;
   const index = n === 9 ? files.length - 1 : n - 1;
   if (index >= 0 && index < files.length) void switchFile(files[index]);
@@ -2680,7 +2680,7 @@ function startWorkspacePolling() {
     id: 'cycle-tab-next',
     label: '切换到下一个文件',
     category: 'navigation',
-    defaultKey: 'Alt+]',
+    defaultKey: 'Ctrl+]',
     handler: () => cycleTab(1),
   });
 
@@ -2688,9 +2688,17 @@ function startWorkspacePolling() {
     id: 'cycle-tab-prev',
     label: '切换到上一个文件',
     category: 'navigation',
-    defaultKey: 'Alt+[',
+    defaultKey: 'Ctrl+[',
     handler: () => cycleTab(-1),
   });
+
+  // Ctrl+Tab: captured at window level before browser default (works in Firefox; Chrome ignores it)
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab' || !e.ctrlKey) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    cycleTab(e.shiftKey ? -1 : 1);
+  }, { capture: true });
 
   for (let n = 1; n <= 9; n++) {
     const tabN = n;

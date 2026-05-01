@@ -12,9 +12,9 @@ describe('clampZoom', () => {
 });
 
 describe('zoomStep', () => {
-  it('steps up by 0.1', () => expect(zoomStep(1.0, +1)).toBe(1.1));
-  it('steps down by 0.1', () => expect(zoomStep(1.0, -1)).toBe(0.9));
-  it('rounds correctly at float boundary', () => expect(zoomStep(0.9, +1)).toBe(1.0));
+  it('steps up by 0.25', () => expect(zoomStep(1.0, +1)).toBe(1.25));
+  it('steps down by 0.25', () => expect(zoomStep(1.0, -1)).toBe(0.75));
+  it('rounds correctly at float boundary', () => expect(zoomStep(0.75, +1)).toBe(1.0));
 });
 
 describe('double-clamp pattern (caller applies domain bounds)', () => {
@@ -38,7 +38,7 @@ describe('double-clamp pattern (caller applies domain bounds)', () => {
 
 describe('constants', () => {
   it('PDF_ZOOM_DEFAULT is 1.5', () => expect(PDF_ZOOM_DEFAULT).toBe(1.5));
-  it('ZOOM_STEP is 0.1', () => expect(ZOOM_STEP).toBe(0.1));
+  it('ZOOM_STEP is 0.25', () => expect(ZOOM_STEP).toBe(0.25));
   it('MD range is 0.5–2.0', () => { expect(MD_ZOOM_MIN).toBe(0.5); expect(MD_ZOOM_MAX).toBe(2.0); });
   it('PDF range is 0.5–3.0', () => { expect(PDF_ZOOM_MIN).toBe(0.5); expect(PDF_ZOOM_MAX).toBe(3.0); });
 });

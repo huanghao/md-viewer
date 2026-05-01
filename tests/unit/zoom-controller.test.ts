@@ -3,7 +3,7 @@ import {
   initZoom,
   zoomIn,
   zoomOut,
-  zoomReset,
+  setZoomFromInput,
   getPdfZoom,
   setPdfZoomValue,
   updateZoomDisplay,
@@ -24,11 +24,18 @@ const storage = new MemoryStorage();
 (globalThis as any).localStorage = storage;
 
 const setPropertyMock = mock();
+const mockInput = { value: '', tagName: 'INPUT' };
 const getElementMock = mock(() => null);
+let activeElement: any = null;
 (globalThis as any).document = {
   documentElement: { style: { setProperty: setPropertyMock } },
   getElementById: getElementMock,
 };
+Object.defineProperty((globalThis as any).document, 'activeElement', {
+  get: () => activeElement,
+  set: (val: any) => { activeElement = val; },
+  configurable: true,
+});
 
 function makeDeps(currentFile?: string, viewer?: { setScale: ReturnType<typeof mock> }) {
   return {
@@ -42,6 +49,8 @@ beforeEach(() => {
   setPropertyMock.mockReset();
   getElementMock.mockReset();
   getElementMock.mockReturnValue(null);
+  mockInput.value = '';
+  activeElement = null;
 });
 
 describe('getPdfZoom', () => {
@@ -68,35 +77,47 @@ describe('initZoom', () => {
   });
 });
 
-describe('zoomIn / zoomOut / zoomReset (MD mode)', () => {
+describe('zoomIn / zoomOut (MD mode)', () => {
   beforeEach(() => initZoom(makeDeps('/test.md')));
 
-  it('zoomIn increases fontScale', () => {
+  it('zoomIn increases fontScale by 0.25', () => {
     setPropertyMock.mockReset();
     zoomIn();
-    expect(setPropertyMock).toHaveBeenCalledWith('--font-scale', '1.1');
+    expect(setPropertyMock).toHaveBeenCalledWith('--font-scale', '1.25');
   });
 
-  it('zoomOut decreases fontScale', () => {
+  it('zoomOut decreases fontScale by 0.25', () => {
     setPropertyMock.mockReset();
     zoomOut();
-    expect(setPropertyMock).toHaveBeenCalledWith('--font-scale', '0.9');
-  });
-
-  it('zoomReset sets fontScale to 1.0', () => {
-    zoomIn();
-    setPropertyMock.mockReset();
-    zoomReset();
-    expect(setPropertyMock).toHaveBeenCalledWith('--font-scale', '1');
+    expect(setPropertyMock).toHaveBeenCalledWith('--font-scale', '0.75');
   });
 });
 
-describe('zoomReset (PDF mode)', () => {
-  it('sets PDF zoom to PDF_ZOOM_DEFAULT', () => {
-    const deps = makeDeps('/test.pdf');
-    initZoom(deps);
-    zoomReset();
-    expect(getPdfZoom('/test.pdf')).toBe(PDF_ZOOM_DEFAULT);
+describe('setZoomFromInput (MD mode)', () => {
+  beforeEach(() => initZoom(makeDeps('/test.md')));
+
+  it('sets zoom from percent string', () => {
+    setPropertyMock.mockReset();
+    setZoomFromInput('150%');
+    expect(setPropertyMock).toHaveBeenCalledWith('--font-scale', '1.5');
+  });
+
+  it('sets zoom from plain number', () => {
+    setPropertyMock.mockReset();
+    setZoomFromInput('75');
+    expect(setPropertyMock).toHaveBeenCalledWith('--font-scale', '0.75');
+  });
+
+  it('does nothing for invalid input', () => {
+    setPropertyMock.mockReset();
+    setZoomFromInput('abc');
+    expect(setPropertyMock).not.toHaveBeenCalled();
+  });
+
+  it('clamps to MD_ZOOM_MAX', () => {
+    setPropertyMock.mockReset();
+    setZoomFromInput('500%');
+    expect(setPropertyMock).toHaveBeenCalledWith('--font-scale', '2');
   });
 });
 
@@ -144,23 +165,30 @@ describe('setPdfZoomValue', () => {
 });
 
 describe('updateZoomDisplay', () => {
-  it('shows MD percentage text on fontScaleText element', () => {
-    const btn = { textContent: '' };
-    getElementMock.mockReturnValue(btn);
+  it('shows MD percentage in input value', () => {
+    getElementMock.mockReturnValue(mockInput);
     initZoom(makeDeps('/test.md'));
-    setPropertyMock.mockReset();
+    mockInput.value = '';
     updateZoomDisplay();
-    expect(btn.textContent).toBe('100%');
+    expect(mockInput.value).toBe('100%');
   });
 
-  it('shows PDF percentage text for PDF file', () => {
-    const btn = { textContent: '' };
-    getElementMock.mockReturnValue(btn);
+  it('shows PDF percentage in input value', () => {
+    getElementMock.mockReturnValue(mockInput);
     const deps = makeDeps('/test.pdf');
     initZoom(deps);
     storage.setItem('md-viewer:pdf-zoom:/test.pdf', '2');
     updateZoomDisplay();
-    expect(btn.textContent).toBe('200%');
+    expect(mockInput.value).toBe('200%');
+  });
+
+  it('skips update when input is focused', () => {
+    activeElement = mockInput;
+    getElementMock.mockReturnValue(mockInput);
+    initZoom(makeDeps('/test.md'));
+    mockInput.value = 'typing...';
+    updateZoomDisplay();
+    expect(mockInput.value).toBe('typing...');
   });
 });
 
@@ -169,11 +197,9 @@ describe('applyFontScale', () => {
     initZoom(makeDeps('/test.md'));
     setPropertyMock.mockReset();
     storage.clear();
-    // zoomIn triggers applyFontScale
     zoomIn();
-    expect(setPropertyMock).toHaveBeenCalledWith('--font-scale', '1.1');
-    // storageSet stores number 1.1
-    expect(storage.getItem('fontScale')).toBe('1.1');
+    expect(setPropertyMock).toHaveBeenCalledWith('--font-scale', '1.25');
+    expect(storage.getItem('fontScale')).toBe('1.25');
   });
 });
 

@@ -8,6 +8,8 @@ import {
   resetBinding,
   resetAllBindings,
   findActionByKey,
+  findActionsByKey,
+  initDispatcher,
 } from '../../src/client/keybindings';
 
 let win: Window;
@@ -187,5 +189,104 @@ describe('KeybindingStore', () => {
     resetAllBindings();
     expect(getEffectiveKey('test-reset-all-a')).toBe('Ctrl+a');
     expect(getEffectiveKey('test-reset-all-b')).toBe('Ctrl+b');
+  });
+});
+
+describe('findActionsByKey', () => {
+  beforeEach(() => {
+    resetAllBindings();
+  });
+
+  it('returns all actions sharing a key', () => {
+    registerAction({ id: 'multi-a', label: 'A', category: 'view', defaultKey: 'Ctrl+g', handler: () => {} });
+    registerAction({ id: 'multi-b', label: 'B', category: 'diff', defaultKey: 'Ctrl+g', handler: () => {} });
+    const ids = findActionsByKey('Ctrl+g').map(a => a.id);
+    expect(ids).toContain('multi-a');
+    expect(ids).toContain('multi-b');
+    expect(ids).toHaveLength(2);
+  });
+
+  it('returns empty array for unknown combo', () => {
+    expect(findActionsByKey('Ctrl+y')).toHaveLength(0);
+  });
+
+  it('respects user overrides', () => {
+    registerAction({ id: 'multi-c', label: 'C', category: 'view', defaultKey: 'Ctrl+g', handler: () => {} });
+    registerAction({ id: 'multi-d', label: 'D', category: 'view', defaultKey: 'Ctrl+h', handler: () => {} });
+    saveBinding('multi-d', 'Ctrl+g');
+    const ids = findActionsByKey('Ctrl+g').map(a => a.id);
+    expect(ids).toContain('multi-c');
+    expect(ids).toContain('multi-d');
+  });
+});
+
+describe('dispatcher priority with shouldActivate', () => {
+  beforeEach(() => {
+    resetAllBindings();
+    (globalThis as any).document = win.document;
+  });
+
+  it('runs first action whose shouldActivate passes, skips others', () => {
+    const calls: string[] = [];
+    registerAction({
+      id: 'disp-first',
+      label: 'First',
+      category: 'diff',
+      defaultKey: 'Ctrl+j',
+      handler: () => calls.push('first'),
+      shouldActivate: () => false,
+    });
+    registerAction({
+      id: 'disp-second',
+      label: 'Second',
+      category: 'navigation',
+      defaultKey: 'Ctrl+j',
+      handler: () => calls.push('second'),
+      shouldActivate: () => true,
+    });
+
+    initDispatcher();
+    win.document.dispatchEvent(
+      new (win.KeyboardEvent as any)('keydown', { key: 'j', ctrlKey: true, bubbles: true })
+    );
+
+    expect(calls).toEqual(['second']);
+  });
+
+  it('runs no action when all shouldActivate return false', () => {
+    const calls: string[] = [];
+    registerAction({
+      id: 'disp-none',
+      label: 'None',
+      category: 'view',
+      defaultKey: 'Ctrl+i',
+      handler: () => calls.push('none'),
+      shouldActivate: () => false,
+    });
+
+    initDispatcher();
+    win.document.dispatchEvent(
+      new (win.KeyboardEvent as any)('keydown', { key: 'i', ctrlKey: true, bubbles: true })
+    );
+
+    expect(calls).toEqual([]);
+  });
+
+  it('runs action without shouldActivate unconditionally', () => {
+    const calls: string[] = [];
+    registerAction({
+      id: 'disp-unconditional',
+      label: 'Unconditional',
+      category: 'view',
+      defaultKey: 'Ctrl+u',
+      handler: () => calls.push('unconditional'),
+    });
+
+    initDispatcher();
+    win.document.dispatchEvent(
+      new (win.KeyboardEvent as any)('keydown', { key: 'u', ctrlKey: true, bubbles: true })
+    );
+
+    expect(calls).toEqual(['unconditional']);
   });
 });

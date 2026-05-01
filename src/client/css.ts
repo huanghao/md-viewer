@@ -981,25 +981,51 @@ export const styles = `
       white-space: nowrap;
     }
 
-    /* 字体缩放按钮 */
-    .font-scale-button {
-      padding: 4px 8px;
+    /* 缩放控件三件套 */
+    .zoom-control {
+      display: inline-flex;
+      align-items: center;
       border-radius: var(--radius-sm);
-      font-size: var(--text-sm);
-      font-weight: 400;
-      font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Consolas', monospace;
-      cursor: pointer;
+      overflow: hidden;
+    }
+
+    .zoom-step-btn {
+      padding: 4px 6px;
       border: none;
       background: transparent;
       color: var(--color-text-muted);
-      transition: all 0.15s ease;
-      white-space: nowrap;
-      position: relative;
+      cursor: pointer;
+      font-size: var(--text-sm);
+      line-height: 1;
+      transition: background 0.15s ease, color 0.15s ease;
+      flex-shrink: 0;
     }
 
-    .font-scale-button:hover {
-      background: rgba(0, 0, 0, 0.04);
+    .zoom-step-btn:hover {
+      background: rgba(0, 0, 0, 0.06);
       color: var(--color-text-secondary);
+    }
+
+    .zoom-input {
+      width: 4ch;
+      padding: 2px 2px;
+      border: none;
+      background: transparent;
+      color: var(--color-text-muted);
+      font-size: var(--text-sm);
+      font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Consolas', monospace;
+      text-align: center;
+      outline: none;
+      cursor: default;
+      transition: color 0.15s ease, background 0.15s ease;
+    }
+
+    .zoom-input:focus {
+      cursor: text;
+      color: var(--color-text-primary);
+      background: rgba(0, 0, 0, 0.04);
+      border-radius: 2px;
+      width: 5ch;
     }
 
 

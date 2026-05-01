@@ -86,9 +86,11 @@ export function getPdfZoom(filePath: string): number {
   return storageGetNumber(pdfZoomKey(filePath), PDF_ZOOM_DEFAULT);
 }
 
-export function updateZoomDisplay(): void {
+export function updateZoomDisplay(force = false): void {
   const input = document.getElementById('fontScaleInput') as HTMLInputElement | null;
-  if (!input || document.activeElement === input) return;
+  if (!input) return;
+  if (!force && document.activeElement === input) return;
+  if (force && document.activeElement === input) (input as HTMLElement).blur();
   const currentFile = _deps.getCurrentFile();
   if (isPdf(currentFile)) {
     const scale = getPdfZoom(currentFile!);

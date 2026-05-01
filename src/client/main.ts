@@ -171,7 +171,7 @@ async function onFileLoaded(data: FileData, focus: boolean = false) {
   syncAnnotationsForCurrentFile(shouldFocus && previousFile !== data.path);
   if (shouldFocus) {
     updateToc(data.path);
-    updateZoomDisplay();
+    updateZoomDisplay(true);
   }
 }
 
@@ -1395,7 +1395,7 @@ async function switchFile(path: string) {
   const previousFile = state.currentFile;
   (window as any).__resetDwell?.();
   switchToFile(path);
-  updateZoomDisplay();
+  updateZoomDisplay(true);
   renderSidebar();
 
   // Immediately show loading state to avoid stale TOC during transition
@@ -2433,6 +2433,8 @@ window.switchAnnotationTab = switchAnnotationTab;
 window.openExternalFile = openFileInBrowser;
 window.renderContent = renderContent;
 (window as any).applyTheme = applyTheme;
+(window as any).zoomIn = zoomIn;
+(window as any).zoomOut = zoomOut;
 
 // ── Browsing signals: dwell + scroll ─────────────────────────────────────────
 if (typeof window !== 'undefined') {

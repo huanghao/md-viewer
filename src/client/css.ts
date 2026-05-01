@@ -986,7 +986,6 @@ export const styles = `
       display: inline-flex;
       align-items: center;
       border-radius: var(--radius-sm);
-      overflow: hidden;
     }
 
     .zoom-step-btn {
@@ -1007,7 +1006,7 @@ export const styles = `
     }
 
     .zoom-input {
-      width: 4ch;
+      width: 5ch;
       padding: 2px 2px;
       border: none;
       background: transparent;
@@ -4242,5 +4241,64 @@ export const styles = `
     .preferences-btn:hover { background: var(--color-bg-subtle, #f0f0f0); }
     .preferences-btn.primary { background: var(--color-accent, #2563eb); color: white; border-color: var(--color-accent, #2563eb); font-weight: 500; }
     .preferences-btn.primary:hover { background: #1d4ed8; }
+
+    /* ── RAG 搜索面板 ── */
+    .rag-search-wrap {
+      display: flex; flex-direction: column; height: 100%;
+    }
+    .rag-search-input-wrap {
+      flex-shrink: 0; margin: 8px 8px 0;
+    }
+    .rag-results-area {
+      flex: 1; overflow-y: auto; padding: 4px 0;
+    }
+    .rag-empty {
+      padding: 20px 12px; text-align: center;
+      font-size: var(--text-sm); color: var(--color-text-muted);
+      line-height: 1.6;
+    }
+    .rag-empty small { font-size: var(--text-xs); }
+    .rag-item {
+      padding: 7px 10px; border-bottom: 1px solid var(--color-border-subtle);
+      cursor: pointer;
+    }
+    .rag-item:hover { background: var(--color-bg-subtle); }
+    .rag-item.active {
+      background: #f0f6ff;
+      border-left: 2px solid var(--color-accent);
+      padding-left: 8px;
+    }
+    .rag-item-file {
+      font-size: var(--text-xs); color: var(--color-text-muted);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-bottom: 2px;
+    }
+    .rag-item-heading {
+      font-size: var(--text-sm); font-weight: 500;
+      color: var(--color-text-primary); margin-bottom: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .rag-item-snippet {
+      font-size: var(--text-xs); color: var(--color-text-secondary);
+      line-height: 1.4;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .rag-status-bar {
+      display: flex; align-items: center; gap: 5px;
+      padding: 4px 10px; flex-shrink: 0;
+      font-size: 10px; color: var(--color-text-muted);
+      border-top: 1px solid var(--color-border-subtle);
+    }
+    .rag-status-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #2da44e; flex-shrink: 0;
+    }
+    .rag-status-dot.warn { background: #bf8700; }
+    .rag-status-dot.off  { background: var(--color-border); }
+    mark.rag-highlight {
+      background: #fff3b0; border-radius: 2px; padding: 0 1px;
+      outline: 2px solid #e6c700; outline-offset: 1px;
+    }
 
 `;

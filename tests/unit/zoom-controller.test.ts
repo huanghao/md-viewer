@@ -190,6 +190,26 @@ describe('updateZoomDisplay', () => {
     updateZoomDisplay();
     expect(mockInput.value).toBe('typing...');
   });
+
+  it('force=true overrides focus and updates value', () => {
+    const blurMock = mock();
+    const focusedInput = { value: 'typing...', blur: blurMock };
+    activeElement = focusedInput;
+    getElementMock.mockReturnValue(focusedInput);
+    initZoom(makeDeps('/test.md'));
+    updateZoomDisplay(true);
+    expect(focusedInput.value).toBe('100%');
+    expect(blurMock).toHaveBeenCalled();
+  });
+
+  it('force=true on file switch shows new file zoom', () => {
+    getElementMock.mockReturnValue(mockInput);
+    const deps = makeDeps('/test.pdf');
+    initZoom(deps);
+    storage.setItem('md-viewer:pdf-zoom:/test.pdf', '1.75');
+    updateZoomDisplay(true);
+    expect(mockInput.value).toBe('175%');
+  });
 });
 
 describe('applyFontScale', () => {

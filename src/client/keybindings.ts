@@ -77,14 +77,24 @@ export function findActionByKey(combo: string): Action | undefined {
   return undefined;
 }
 
+export function findActionsByKey(combo: string): Action[] {
+  const result: Action[] = [];
+  for (const action of registry.values()) {
+    if (getEffectiveKey(action.id) === combo) result.push(action);
+  }
+  return result;
+}
+
 export function initDispatcher(): void {
   document.addEventListener('keydown', (e) => {
     const combo = normalizeKeyCombo(e);
     if (!combo) return;
-    const action = findActionByKey(combo);
-    if (!action) return;
-    if (action.shouldActivate && !action.shouldActivate(e)) return;
-    e.preventDefault();
-    action.handler();
+    const actions = findActionsByKey(combo);
+    for (const action of actions) {
+      if (action.shouldActivate && !action.shouldActivate(e)) continue;
+      e.preventDefault();
+      action.handler();
+      return;
+    }
   });
 }

@@ -1422,6 +1422,19 @@ function removeFileHandler(path: string) {
   if (panel) renderTocPanel(panel, [], () => {});
 }
 
+function navigateFileInView(direction: 1 | -1): void {
+  const items = Array.from(document.querySelectorAll<HTMLElement>('#fileList [data-path]'));
+  if (items.length === 0) return;
+  const paths = items.map(el => el.dataset.path!);
+  const currentIdx = state.currentFile ? paths.indexOf(state.currentFile) : -1;
+  const nextIdx = currentIdx === -1
+    ? (direction === 1 ? 0 : paths.length - 1)
+    : Math.max(0, Math.min(paths.length - 1, currentIdx + direction));
+  if (paths[nextIdx] && paths[nextIdx] !== state.currentFile) {
+    void switchFile(paths[nextIdx]);
+  }
+}
+
 function cycleTab(direction: 1 | -1): void {
   const files = state.tabOrder.filter(p => state.sessionFiles.has(p));
   if (files.length <= 1) return;
@@ -2662,7 +2675,7 @@ function startWorkspacePolling() {
     id: 'diff-next',
     label: '下一个变更块',
     category: 'diff',
-    defaultKey: 'n',
+    defaultKey: 'j',
     handler: () => navigateDiffBlock(1),
     shouldActivate: () => diffViewActive && !isInputFocused(),
   });
@@ -2671,25 +2684,47 @@ function startWorkspacePolling() {
     id: 'diff-prev',
     label: '上一个变更块',
     category: 'diff',
-    defaultKey: 'p',
+    defaultKey: 'k',
     handler: () => navigateDiffBlock(-1),
     shouldActivate: () => diffViewActive && !isInputFocused(),
   });
 
+  // j/k: 在当前侧边栏视角里上下移动文件（非 diff 模式，非输入框）
+  registerAction({
+    id: 'nav-file-down',
+    label: '移到下一个文件',
+    category: 'navigation',
+    defaultKey: 'j',
+    handler: () => navigateFileInView(1),
+    shouldActivate: () => !diffViewActive && !isInputFocused(),
+  });
+
+  registerAction({
+    id: 'nav-file-up',
+    label: '移到上一个文件',
+    category: 'navigation',
+    defaultKey: 'k',
+    handler: () => navigateFileInView(-1),
+    shouldActivate: () => !diffViewActive && !isInputFocused(),
+  });
+
+  // h/l: tab 左右切换（非输入框）
   registerAction({
     id: 'cycle-tab-next',
-    label: '切换到下一个文件',
+    label: '切换到右边的 tab',
     category: 'navigation',
-    defaultKey: 'Ctrl+]',
+    defaultKey: 'l',
     handler: () => cycleTab(1),
+    shouldActivate: () => !isInputFocused(),
   });
 
   registerAction({
     id: 'cycle-tab-prev',
-    label: '切换到上一个文件',
+    label: '切换到左边的 tab',
     category: 'navigation',
-    defaultKey: 'Ctrl+[',
+    defaultKey: 'h',
     handler: () => cycleTab(-1),
+    shouldActivate: () => !isInputFocused(),
   });
 
   // Ctrl+Tab: captured at window level before browser default (works in Firefox; Chrome ignores it)

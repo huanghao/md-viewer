@@ -6,8 +6,8 @@ const modKey = isMac ? '⌘' : 'Ctrl';
 const SHORTCUTS = [
   { group: '导航' },
   { key: `${mod}F`, desc: '快速打开文件' },
-  { key: 'Ctrl+]', desc: '切换到下一个文件' },
-  { key: 'Ctrl+[', desc: '切换到上一个文件' },
+  { key: 'j / k', desc: '文件列表上 / 下移动' },
+  { key: 'h / l', desc: '切换到左 / 右 tab' },
   { key: `${modKey}+1~9`, desc: '跳到第 N 个文件' },
   { group: '文件' },
   { key: `${mod}W`, desc: '关闭当前文件' },
@@ -17,8 +17,8 @@ const SHORTCUTS = [
   { key: `${mod}−`, desc: '缩小' },
   { key: `${mod}0`, desc: '重置缩放' },
   { group: 'Diff 模式' },
-  { key: 'n', desc: '下一个变更块' },
-  { key: 'p', desc: '上一个变更块' },
+  { key: 'j', desc: '下一个变更块' },
+  { key: 'k', desc: '上一个变更块' },
   { group: '通用' },
   { key: 'Esc', desc: '关闭弹窗 / 批注面板' },
 ];

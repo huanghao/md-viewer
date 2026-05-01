@@ -61,12 +61,12 @@ function scrollCurrentFileIntoView(container: HTMLElement): void {
 export function setSidebarTab(tab: 'focus' | 'full' | 'list' | 'search'): void {
   state.config.sidebarTab = tab;
   saveConfig(state.config);
+  if (tab !== 'search') stopStatusPolling();
   if (tab === 'focus') {
     import('./workspace-focus').then(({ refreshFrecencySignals, renderFocusView: _ }) => {
       void refreshFrecencySignals().then(() => renderSidebar());
     });
   } else {
-    if (tab !== 'search') stopStatusPolling();
     renderSidebar();
   }
 }

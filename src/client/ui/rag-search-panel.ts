@@ -176,13 +176,7 @@ function highlightRagChunk(chunkText: string): void {
     parent.removeChild(node);
     parent.normalize();
 
-    const HEADER_OFFSET = 90;
-    const contentEl = document.getElementById('content');
-    if (contentEl) {
-      contentEl.scrollTo({ top: (mark as HTMLElement).offsetTop - HEADER_OFFSET, behavior: 'smooth' });
-    } else {
-      mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
+    mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
     setTimeout(() => {
       mark.style.transition = 'background 0.5s';

@@ -38,6 +38,7 @@ interface FileDragState {
 let tabDragState: TabDragState | null = null;
 let fileDragState: FileDragState | null = null;
 import { attachPathAutocomplete } from './path-autocomplete';
+import { renderRagSearchPanel, stopStatusPolling } from './rag-search-panel';
 
 // 将当前打开的文件滚动到侧边栏40%位置
 function scrollCurrentFileIntoView(container: HTMLElement): void {
@@ -57,7 +58,7 @@ function scrollCurrentFileIntoView(container: HTMLElement): void {
   });
 }
 
-export function setSidebarTab(tab: 'focus' | 'full' | 'list'): void {
+export function setSidebarTab(tab: 'focus' | 'full' | 'list' | 'search'): void {
   state.config.sidebarTab = tab;
   saveConfig(state.config);
   if (tab === 'focus') {
@@ -65,6 +66,7 @@ export function setSidebarTab(tab: 'focus' | 'full' | 'list'): void {
       void refreshFrecencySignals().then(() => renderSidebar());
     });
   } else {
+    if (tab !== 'search') stopStatusPolling();
     renderSidebar();
   }
 }
@@ -282,10 +284,11 @@ function renderViewTabs(): void {
   if (!container) return;
 
   const tab = state.config.sidebarTab;
-  const tabs: Array<{ key: 'focus' | 'full' | 'list'; label: string }> = [
+  const tabs: Array<{ key: 'focus' | 'full' | 'list' | 'search'; label: string }> = [
     { key: 'focus', label: '最近' },
     { key: 'full', label: '工作区' },
     { key: 'list', label: '打开' },
+    { key: 'search', label: '搜索' },
   ];
 
   container.innerHTML = `
@@ -602,6 +605,21 @@ export function renderSidebar(): void {
 
   renderSearchBox();
   renderViewTabs();
+
+  if (tab === 'search') {
+    renderCurrentPath();
+    let searchContainer = document.getElementById('fileList');
+    if (!searchContainer) {
+      searchContainer = document.createElement('div');
+      searchContainer.id = 'fileList';
+      const sidebarEl = document.querySelector('.sidebar');
+      sidebarEl?.appendChild(searchContainer);
+    }
+    searchContainer.className = 'rag-search-container';
+    renderRagSearchPanel(searchContainer);
+    renderTabs();
+    return;
+  }
 
   if (tab === 'list') {
     renderCurrentPath();

@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>RAG 搜索 UI 原型 — 方案 B</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f0f2f4; padding: 24px; }
+
+  :root {
+    --sidebar-width: 260px;
+    --color-text-primary:   #24292e;
+    --color-text-secondary: #57606a;
+    --color-text-muted:     #8b949e;
+    --color-border:         #d0d7de;
+    --color-border-subtle:  #e8ecf0;
+    --color-bg-subtle:      #f6f8fa;
+    --color-accent:         #0969da;
+    --color-warning:        #bf8700;
+    --text-xs: 11px;
+    --text-sm: 13px;
+  }
+
+  .label { font-size: 11px; color: #999; margin-bottom: 6px; }
+  .section { margin-bottom: 48px; }
+  .section-title { font-size: 16px; font-weight: 600; color: #24292e; margin-bottom: 4px; }
+  .section-desc { font-size: 12px; color: #888; margin-bottom: 20px; line-height: 1.6; }
+  .demos { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+
+  /* ── 侧边栏壳 ── */
+  .sidebar {
+    width: var(--sidebar-width);
+    background: white;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .sidebar-header {
+    border-bottom: 1px solid var(--color-border-subtle);
+    padding: 8px 8px 0;
+    flex-shrink: 0;
+  }
+
+  /* 搜索框 */
+  .search-wrapper {
+    display: flex; align-items: center; gap: 6px;
+    border: 1px solid var(--color-border);
+    border-radius: 5px;
+    padding: 4px 8px;
+    background: white;
+    margin-bottom: 6px;
+  }
+  .search-wrapper.focused { border-color: var(--color-accent); }
+  .search-icon { color: var(--color-text-muted); font-size: 12px; }
+  .search-input {
+    flex: 1; border: none; outline: none;
+    font-size: var(--text-sm); color: var(--color-text-primary);
+    background: transparent;
+  }
+  .search-input::placeholder { color: var(--color-text-muted); }
+  .search-clear {
+    border: none; background: none; color: var(--color-text-muted);
+    cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px;
+  }
+
+  /* view tabs — 4个 */
+  .view-tabs { display: flex; gap: 2px; margin-bottom: 6px; }
+  .view-tab {
+    flex: 1; padding: 4px 0; border: none; background: none;
+    font-size: var(--text-xs); color: var(--color-text-secondary);
+    border-radius: 4px; cursor: pointer; white-space: nowrap;
+  }
+  .view-tab.active {
+    background: var(--color-bg-subtle);
+    color: var(--color-accent);
+    font-weight: 500;
+  }
+  /* 搜索 tab 文字略小以适应宽度 */
+  .view-tab.search-tab { font-size: 11px; }
+  .view-tab.search-tab.active { color: var(--color-accent); }
+
+  /* 文件列表 */
+  .file-list { padding: 4px 0; overflow-y: auto; }
+  .file-item {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 10px; font-size: var(--text-sm);
+    color: var(--color-text-secondary); cursor: pointer;
+  }
+  .file-item:hover { background: var(--color-bg-subtle); }
+  .file-item.current { color: var(--color-accent); background: #f0f6ff; }
+  .file-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-border); flex-shrink: 0; }
+  .file-dot.current { background: var(--color-accent); }
+  .file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-dir { font-size: 10px; color: var(--color-text-muted); white-space: nowrap; }
+
+  /* ── 搜索结果 ── */
+  .rag-results { overflow-y: auto; }
+  .rag-results-meta {
+    padding: 5px 10px 4px;
+    font-size: 10px; color: var(--color-text-muted);
+    border-bottom: 1px solid var(--color-border-subtle);
+    display: flex; justify-content: space-between;
+  }
+  .rag-item {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--color-border-subtle);
+    cursor: pointer;
+  }
+  .rag-item:hover { background: var(--color-bg-subtle); }
+  .rag-item.active { background: #f0f6ff; border-left: 2px solid var(--color-accent); padding-left: 8px; }
+  .rag-item-top { margin-bottom: 2px; }
+  .rag-item-file {
+    font-size: var(--text-xs); color: var(--color-text-muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
+  }
+  .rag-score { display: none; }
+  .rag-item-heading {
+    font-size: var(--text-sm); color: var(--color-text-primary);
+    font-weight: 500; margin-bottom: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .rag-item-snippet {
+    font-size: var(--text-xs); color: var(--color-text-secondary);
+    line-height: 1.4;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  mark { background: #fff3b0; border-radius: 2px; padding: 0 1px; font-style: normal; }
+
+  /* 状态栏 */
+  .rag-status-bar {
+    padding: 4px 10px;
+    font-size: 10px; color: var(--color-text-muted);
+    border-top: 1px solid var(--color-border-subtle);
+    display: flex; align-items: center; gap: 4px;
+    flex-shrink: 0;
+  }
+  .rag-status-dot { width: 6px; height: 6px; border-radius: 50%; background: #2da44e; flex-shrink: 0; }
+  .rag-status-dot.warn { background: var(--color-warning); }
+  .rag-status-dot.off { background: var(--color-border); }
+
+  /* 空/加载状态 */
+  .empty-tip {
+    padding: 24px 12px; text-align: center;
+    font-size: var(--text-sm); color: var(--color-text-muted);
+    line-height: 1.6;
+  }
+  .kbd-hint {
+    display: inline-block;
+    background: var(--color-bg-subtle); border: 1px solid var(--color-border);
+    border-radius: 3px; padding: 1px 5px;
+    font-size: 11px; color: var(--color-text-secondary);
+    font-family: inherit;
+  }
+
+  /* 正文区域（右侧预览） */
+  .content-pane {
+    flex: 1; background: white; border: 1px solid var(--color-border);
+    border-radius: 6px; padding: 20px 24px; overflow-y: auto;
+    font-size: 14px; line-height: 1.6; color: var(--color-text-primary);
+    min-height: 400px;
+  }
+  .content-pane h3 { font-size: 15px; margin-bottom: 8px; }
+  .content-pane p { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 10px; }
+  /* 跳转目标段落：滚动锚点 + 轻微背景，行内高亮用 mark */
+  .highlight-para {
+    background: #fffef0;
+    outline: 2px solid #e6c700;
+    outline-offset: 3px;
+    border-radius: 3px;
+    margin: 8px 0;
+    padding: 2px 0;
+  }
+  .content-filename {
+    font-size: 11px; color: var(--color-text-muted);
+    margin-bottom: 16px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  /* app layout */
+  .app-mockup {
+    display: flex; gap: 0; border: 1px solid var(--color-border);
+    border-radius: 6px; overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  .app-mockup .sidebar { border-radius: 0; border: none; border-right: 1px solid var(--color-border); }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+  场景 1：非搜索 tab — 正常工作区状态
+  ⌘⇧F 触发 / 点搜索图标 → 切换到搜索 tab
+══════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title">场景 1 — 工作区 tab（正常状态）</div>
+  <div class="section-desc">侧边栏现有三个 tab + 右侧新增 🔍 图标 tab。⌘⇧F 或点图标切换到搜索视图，不影响当前三个 tab 的使用。</div>
+  <div class="demos">
+    <div>
+      <div class="label">点击 🔍 前</div>
+      <div class="sidebar" style="height:320px;">
+        <div class="sidebar-header">
+          <div class="search-wrapper">
+            <span class="search-icon">🔍</span>
+            <input class="search-input" placeholder="搜索工作区文件 (⌘K)" value="">
+            <button class="search-clear" style="visibility:hidden;">×</button>
+          </div>
+          <div class="view-tabs">
+            <button class="view-tab">最近</button>
+            <button class="view-tab active">工作区</button>
+            <button class="view-tab">打开</button>
+            <button class="view-tab search-tab" title="内容搜索 (⌘⇧F)">搜索</button>
+          </div>
+        </div>
+        <div class="file-list">
+          <div class="file-item current"><span class="file-dot current"></span><span class="file-name">rag-design.md</span><span class="file-dir">docs/</span></div>
+          <div class="file-item"><span class="file-dot"></span><span class="file-name">handlers.ts</span><span class="file-dir">src/</span></div>
+          <div class="file-item"><span class="file-dot"></span><span class="file-name">sidebar.ts</span><span class="file-dir">ui/</span></div>
+          <div class="file-item"><span class="file-dot"></span><span class="file-name">rag-indexer.ts</span><span class="file-dir">src/</span></div>
+          <div class="file-item"><span class="file-dot"></span><span class="file-name">rag-server.ts</span><span class="file-dir">src/</span></div>
+          <div class="file-item"><span class="file-dot"></span><span class="file-name">README.md</span><span class="file-dir"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+  场景 2：搜索 tab，空查询
+══════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title">场景 2 — 切换到搜索 tab，输入前</div>
+  <div class="section-desc">切换后搜索框自动 focus，placeholder 变为「搜索内容…」，结果区显示使用提示。</div>
+  <div class="demos">
+    <div>
+      <div class="label">搜索 tab，未输入</div>
+      <div class="sidebar" style="height:340px;">
+        <div class="sidebar-header">
+          <div class="search-wrapper focused">
+            <span class="search-icon">🔍</span>
+            <input class="search-input" placeholder="搜索内容… (⌘⇧F)" value="" autofocus>
+            <button class="search-clear" style="visibility:hidden;">×</button>
+          </div>
+          <div class="view-tabs">
+            <button class="view-tab">最近</button>
+            <button class="view-tab">工作区</button>
+            <button class="view-tab">打开</button>
+            <button class="view-tab search-tab active" title="内容搜索 (⌘⇧F)">搜索</button>
+          </div>
+        </div>
+        <div class="empty-tip">
+          输入关键词搜索文档内容<br>
+          <span style="font-size:11px;margin-top:6px;display:block;">
+            支持语义搜索，无需精确匹配<br>
+            <span class="kbd-hint">↑↓</span> 选择 &nbsp; <span class="kbd-hint">↵</span> 跳转 &nbsp; <span class="kbd-hint">Esc</span> 关闭
+          </span>
+        </div>
+        <div class="rag-status-bar">
+          <span class="rag-status-dot"></span>
+          <span>RAG 就绪 · 已索引 312 个块</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+  场景 3：搜索中，结果常驻，右侧展示文件内容
+══════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title">场景 3 — 搜索结果常驻，点击跳转到文件</div>
+  <div class="section-desc">
+    结果列表留在左侧，点击后右侧打开文件并高亮对应段落。可以来回点击多个结果对比，不需要重新搜索。
+    这和 VS Code Search panel 的体验完全一致。
+  </div>
+  <div class="demos">
+    <div class="app-mockup" style="width: 680px;">
+      <!-- 左：搜索侧边栏 -->
+      <div class="sidebar" style="height:420px; flex-shrink:0;">
+        <div class="sidebar-header">
+          <div class="search-wrapper focused">
+            <span class="search-icon">🔍</span>
+            <input class="search-input" value="chokidar 文件监听">
+            <button class="search-clear">×</button>
+          </div>
+          <div class="view-tabs">
+            <button class="view-tab">最近</button>
+            <button class="view-tab">工作区</button>
+            <button class="view-tab">打开</button>
+            <button class="view-tab search-tab active">搜索</button>
+          </div>
+        </div>
+        <div class="rag-results" style="flex:1;overflow-y:auto;">
+          <div class="rag-results-meta">
+            <span>4 个结果 · 12ms</span>
+          </div>
+          <!-- 当前选中 -->
+          <div class="rag-item active">
+            <div class="rag-item-top">
+              <span class="rag-item-file">rag-design.md</span>
+              <span class="rag-score">94%</span>
+            </div>
+            <div class="rag-item-heading">## 3.1 架构概览</div>
+            <div class="rag-item-snippet">启动 <mark>chokidar</mark> watch 所有工作区目录。文件新增/修改 → 防抖 2s 后入队。</div>
+          </div>
+          <div class="rag-item">
+            <div class="rag-item-top">
+              <span class="rag-item-file">rag-indexer.ts</span>
+              <span class="rag-score">89%</span>
+            </div>
+            <div class="rag-item-heading">watchWorkspace()</div>
+            <div class="rag-item-snippet">初始化 <mark>chokidar</mark> watcher，监听 .md 文件，防抖 2000ms 后触发 re-index。</div>
+          </div>
+          <div class="rag-item">
+            <div class="rag-item-top">
+              <span class="rag-item-file">rag-design.md</span>
+              <span class="rag-score">81%</span>
+            </div>
+            <div class="rag-item-heading">## 3.2 索引调度策略</div>
+            <div class="rag-item-snippet">文件保存（<mark>chokidar</mark>事件）防抖 2s 后入队，防止编辑中间状态。不设定时轮询。</div>
+          </div>
+          <div class="rag-item">
+            <div class="rag-item-top">
+              <span class="rag-item-file">rag-design.md</span>
+              <span class="rag-score mid">70%</span>
+            </div>
+            <div class="rag-item-heading">## 3.7 治理规则</div>
+            <div class="rag-item-snippet">文件删除 → 立即同步删除 chunks + vectors（CASCADE）。不设 cron，事件驱动。</div>
+          </div>
+        </div>
+        <div class="rag-status-bar">
+          <span class="rag-status-dot"></span>
+          <span>RAG 就绪 · 已索引 312 个块</span>
+        </div>
+      </div>
+
+      <!-- 右：文件内容（高亮对应段落） -->
+      <div class="content-pane" style="border-radius:0; border:none; height:420px;">
+        <div class="content-filename">docs/design/rag-design.md</div>
+        <h3>3. 索引服务设计</h3>
+        <p>RAG server 是一个独立的 Bun 进程，与主 md-viewer server 分离...</p>
+
+        <h3>3.1 架构概览</h3>
+        <p>RAG server 启动后加载 embedding 模型，初始化 SQLite 表，读 rag_meta 对比模型名。</p>
+
+        <p class="highlight-para"><mark>文件系统事件（chokidar）</mark><br>
+          <mark>启动 chokidar watch 所有工作区目录。</mark><br>
+          <mark>文件新增/修改 → 防抖 2s 后入队，文件删除 → 立即删除对应 chunks + vectors。</mark>
+        </p>
+
+        <p>重索引队列串行执行，单次一个文件：读文件 → 分块 → batch encode → 事务写库。</p>
+        <h3>3.2 索引调度策略</h3>
+        <p>触发时机：RAG server 启动时增量扫描，文件保存时防抖 2s 后入队，文件删除立即处理，模型变更时全量重索引。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+  场景 4：RAG server 未运行
+══════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title">场景 4 — RAG server 未运行（降级状态）</div>
+  <div class="section-desc">搜索 tab 可以打开，但提示服务未运行，附启动命令。搜索框禁用。切回其他 tab 完全正常。</div>
+  <div class="demos">
+    <div>
+      <div class="label">RAG 未启动</div>
+      <div class="sidebar" style="height:300px;">
+        <div class="sidebar-header">
+          <div class="search-wrapper" style="background:var(--color-bg-subtle);">
+            <span class="search-icon">🔍</span>
+            <input class="search-input" placeholder="内容搜索不可用" disabled style="color:var(--color-text-muted);">
+          </div>
+          <div class="view-tabs">
+            <button class="view-tab">最近</button>
+            <button class="view-tab">工作区</button>
+            <button class="view-tab">打开</button>
+            <button class="view-tab search-tab active">搜索</button>
+          </div>
+        </div>
+        <div class="empty-tip">
+          <span style="color:var(--color-warning);">⚠ RAG server 未运行</span><br>
+          <span style="font-size:11px;margin-top:8px;display:block;color:var(--color-text-muted);">
+            在终端启动：<br>
+            <code style="background:#f6f8fa;padding:2px 6px;border-radius:3px;font-size:11px;">bun run src/rag-server.ts</code>
+          </span>
+        </div>
+        <div class="rag-status-bar">
+          <span class="rag-status-dot off"></span>
+          <span>RAG 未连接</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 正在索引中 -->
+    <div>
+      <div class="label">首次启动，正在建索引</div>
+      <div class="sidebar" style="height:300px;">
+        <div class="sidebar-header">
+          <div class="search-wrapper focused">
+            <span class="search-icon">🔍</span>
+            <input class="search-input" placeholder="搜索内容…" value="">
+          </div>
+          <div class="view-tabs">
+            <button class="view-tab">最近</button>
+            <button class="view-tab">工作区</button>
+            <button class="view-tab">打开</button>
+            <button class="view-tab search-tab active">搜索</button>
+          </div>
+        </div>
+        <div class="empty-tip">
+          <span style="color:var(--color-accent);">⏳ 正在建立索引…</span><br>
+          <span style="font-size:11px;margin-top:6px;display:block;color:var(--color-text-muted);">
+            首次启动需下载模型 (118MB)<br>
+            完成后即可搜索
+          </span>
+        </div>
+        <div class="rag-status-bar">
+          <span class="rag-status-dot warn"></span>
+          <span>正在索引 · 47 / 312 块</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+  tab 宽度讨论：图标 vs 文字
+══════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title">细节：搜索 tab 的形态</div>
+  <div class="section-desc">260px 侧边栏放 4 个 tab，两种排布方式。</div>
+  <div class="demos">
+
+    <div>
+      <div class="label">选项 1 — 文字 tab（4 个等宽，略紧）</div>
+      <div class="sidebar" style="height:60px;">
+        <div class="sidebar-header">
+          <div class="view-tabs" style="margin:8px 0 6px;">
+            <button class="view-tab">最近</button>
+            <button class="view-tab active">工作区</button>
+            <button class="view-tab">打开</button>
+            <button class="view-tab" style="font-size:11px;">搜索</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="label">选项 2 — 四个文字 tab（搜索未激活）</div>
+      <div class="sidebar" style="height:60px;">
+        <div class="sidebar-header">
+          <div class="view-tabs" style="margin:8px 0 6px;">
+            <button class="view-tab">最近</button>
+            <button class="view-tab active">工作区</button>
+            <button class="view-tab">打开</button>
+            <button class="view-tab search-tab">搜索</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="label">选项 3 — 四个文字 tab（搜索激活）</div>
+      <div class="sidebar" style="height:60px;">
+        <div class="sidebar-header">
+          <div class="view-tabs" style="margin:8px 0 6px;">
+            <button class="view-tab">最近</button>
+            <button class="view-tab">工作区</button>
+            <button class="view-tab">打开</button>
+            <button class="view-tab search-tab active">搜索</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

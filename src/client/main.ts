@@ -2715,7 +2715,7 @@ function startWorkspacePolling() {
     id: 'quick-open',
     label: '快速打开文件',
     category: 'navigation',
-    defaultKey: 'Ctrl+p',
+    defaultKey: 'Ctrl+f',
     handler: () => showQuickOpen(),
   });
 

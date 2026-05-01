@@ -5,7 +5,7 @@ const modKey = isMac ? '⌘' : 'Ctrl';
 
 const SHORTCUTS = [
   { group: '导航' },
-  { key: `${mod}P`, desc: '快速打开文件' },
+  { key: `${mod}F`, desc: '快速打开文件' },
   { key: 'Ctrl+]', desc: '切换到下一个文件' },
   { key: 'Ctrl+[', desc: '切换到上一个文件' },
   { key: `${modKey}+1~9`, desc: '跳到第 N 个文件' },

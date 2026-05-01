@@ -163,13 +163,15 @@ function handleKey(e: KeyboardEvent): void {
     hideQuickOpen();
     return;
   }
-  if (e.key === 'ArrowDown') {
+  const isNext = e.key === 'ArrowDown' || (e.key === 'n' && e.ctrlKey);
+  const isPrev = e.key === 'ArrowUp' || (e.key === 'p' && e.ctrlKey);
+  if (isNext) {
     e.preventDefault();
     activeIndex = Math.min(activeIndex + 1, results.length - 1);
     updateActiveClass();
     return;
   }
-  if (e.key === 'ArrowUp') {
+  if (isPrev) {
     e.preventDefault();
     activeIndex = Math.max(activeIndex - 1, 0);
     updateActiveClass();

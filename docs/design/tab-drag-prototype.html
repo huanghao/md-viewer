@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>Tab Drag Prototype</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #f0f2f5;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 40px 20px; gap: 32px;
+  }
+  .hint {
+    font-size: 12px; color: #888; background: #fff;
+    border: 1px solid #e0e0e0; border-radius: 6px;
+    padding: 10px 14px; max-width: 740px; width: 100%; line-height: 1.8;
+  }
+
+  /* ══ TAB BAR ═══════════════════════════════════════════ */
+  .tabs-wrap {
+    width: 740px; border: 1px solid #d0d7de;
+    border-radius: 8px; overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  /* 关键：overflow visible，让 ghost 可以浮出 */
+  .tabs-scroll {
+    display: flex; align-items: stretch;
+    background: #f6f8fa;
+    border-bottom: 1px solid #d0d7de;
+    position: relative;         /* ghost 的 absolute 参照系 */
+    user-select: none;
+    overflow: visible;           /* ← ghost 不被裁切 */
+    height: 36px;
+  }
+  .tab {
+    display: flex; align-items: center; gap: 6px;
+    padding: 0 16px; height: 36px;
+    font-size: 13px; color: #57606a;
+    border-right: 1px solid #d0d7de;
+    background: #f6f8fa;
+    cursor: grab; white-space: nowrap; flex-shrink: 0;
+    position: relative; z-index: 1;
+    /* 其他 tab 让位动画 */
+    transition: transform 140ms cubic-bezier(0.2, 0, 0, 1);
+    will-change: transform;
+  }
+  .tab:hover { background: #eaf0f6; }
+  .tab.is-active {
+    background: #fff; color: #0969da;
+    border-bottom: 2px solid #0969da; margin-bottom: -1px;
+  }
+  .tab.is-dragging {
+    /* 原位变成透明轮廓，保持占位 */
+    opacity: 0;
+    pointer-events: none;
+    cursor: default;
+  }
+  .tab-name { pointer-events: none; }
+  .tab-close {
+    pointer-events: auto;
+    display: flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; border-radius: 3px;
+    font-size: 14px; color: #8c959f;
+    opacity: 0; transition: opacity 100ms, background 100ms;
+  }
+  .tab:hover .tab-close { opacity: 1; }
+  .tab-close:hover { background: #ffcdd2; color: #c62828; opacity: 1; }
+
+  /* Ghost：fixed 定位，X/Y 都跟手 */
+  .tab-ghost {
+    position: fixed;
+    height: 36px;
+    display: flex; align-items: center; gap: 6px;
+    padding: 0 16px;
+    font-size: 13px; color: #24292f;
+    background: #fff;
+    border: 1px solid #b6c2cf;
+    border-bottom: 2px solid #0969da;
+    border-radius: 4px 4px 0 0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.1);
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 100;
+    /* 略微放大，感觉被"拾起" */
+    transform: scaleY(1.06);
+    transform-origin: bottom center;
+    cursor: grabbing;
+  }
+
+  .content {
+    padding: 20px; background: #fff;
+    font-size: 13px; color: #57606a; min-height: 80px;
+  }
+
+  /* ══ FILE LIST ══════════════════════════════════════════ */
+  .layout {
+    display: flex; width: 740px;
+    border: 1px solid #d0d7de; border-radius: 8px;
+    overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .sidebar {
+    width: 210px; flex-shrink: 0;
+    background: #f6f8fa; border-right: 1px solid #d0d7de;
+    user-select: none; position: relative;
+  }
+  .sidebar-title {
+    padding: 8px 12px; font-size: 11px; font-weight: 600;
+    color: #8c959f; text-transform: uppercase; letter-spacing: 0.5px;
+    border-bottom: 1px solid #d0d7de;
+  }
+  .file-list {
+    position: relative; /* ghost 参照系 */
+    overflow: visible;
+  }
+  .file-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 12px; font-size: 13px; color: #57606a;
+    cursor: grab; white-space: nowrap; overflow: hidden;
+    position: relative; z-index: 1;
+    transition: transform 140ms cubic-bezier(0.2, 0, 0, 1);
+    will-change: transform;
+  }
+  .file-item:hover { background: #eaf0f6; }
+  .file-item.is-active { background: #dbeafe; color: #1d4ed8; }
+  .file-item.is-dragging { opacity: 0; pointer-events: none; }
+  .file-item .icon { font-size: 12px; flex-shrink: 0; pointer-events: none; }
+  .file-item span:last-child { pointer-events: none; }
+
+  /* 垂直 ghost：fixed，X/Y 都跟手 */
+  .file-ghost {
+    position: fixed;
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 12px; font-size: 13px; color: #24292f;
+    background: #fff;
+    border: 1px solid #b6c2cf;
+    border-left: 2px solid #0969da;
+    border-radius: 4px;
+    box-shadow: 4px 4px 12px rgba(0,0,0,0.14), 1px 1px 4px rgba(0,0,0,0.08);
+    white-space: nowrap; pointer-events: none;
+    z-index: 100;
+    transform: scaleX(1.02);
+    transform-origin: left center;
+    cursor: grabbing;
+  }
+
+  .main-content {
+    flex: 1; padding: 20px; background: #fff;
+    font-size: 13px; color: #57606a;
+  }
+</style>
+</head>
+<body>
+
+<div class="hint">
+  模拟 Chrome tab 拖拽风格。<br>
+  <strong>Tab 栏</strong>：ghost 锁在 tab 行，只跟 X 轴移动；其他 tab 用 <code>translateX</code> 滑动让位；触发点是 ghost 中心越过邻 tab 中线。<br>
+  <strong>文件列表</strong>：同理，ghost 锁在列表宽度内，只跟 Y 轴移动。
+</div>
+
+<!-- Tab bar -->
+<div class="tabs-wrap">
+  <div class="tabs-scroll" id="tabsScroll"></div>
+  <div class="content" id="tabContent">点击 tab 切换内容</div>
+</div>
+
+<!-- File list -->
+<div class="layout">
+  <div class="sidebar">
+    <div class="sidebar-title">打开的文件</div>
+    <div class="file-list" id="fileList"></div>
+  </div>
+  <div class="main-content" id="fileContent">点击文件查看内容</div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════
+   TAB BAR DRAG
+   策略：
+   - ghost 是 absolute 子元素，top:0，只改 left
+   - 原 tab 隐藏（opacity:0）保持占位，维持布局
+   - 其他 tab 用 translateX 让位，不改 DOM 顺序
+   - 中线触发换位
+══════════════════════════════════════════════════════════ */
+let tabs = [
+  { id:1, name:'README.md',    active:true  },
+  { id:2, name:'index.ts',     active:false },
+  { id:3, name:'sidebar.ts',   active:false },
+  { id:4, name:'state.ts',     active:false },
+  { id:5, name:'CHANGELOG.md', active:false },
+  { id:6, name:'package.json', active:false },
+];
+
+const tabsScroll = document.getElementById('tabsScroll');
+const tabContent = document.getElementById('tabContent');
+
+let tabDrag = null;
+
+function renderTabs() {
+  tabsScroll.innerHTML = '';
+  tabs.forEach((tab, i) => {
+    const el = document.createElement('div');
+    el.className = 'tab' + (tab.active ? ' is-active' : '');
+    el.dataset.i = i;
+    el.innerHTML = `<span class="tab-name">${tab.name}</span><span class="tab-close">×</span>`;
+
+    el.querySelector('.tab-close').addEventListener('click', ev => {
+      ev.stopPropagation();
+      tabs.splice(i, 1);
+      if (tab.active && tabs.length > 0) tabs[Math.max(0, i-1)].active = true;
+      renderTabs();
+    });
+    el.addEventListener('click', () => {
+      if (tabDrag) return;
+      tabs.forEach(t => t.active = false);
+      tab.active = true;
+      renderTabs();
+      tabContent.textContent = '内容：' + tab.name;
+    });
+    el.addEventListener('pointerdown', e => startTabDrag(e, i));
+    tabsScroll.appendChild(el);
+  });
+}
+
+function startTabDrag(e, fromIdx) {
+  if (e.button !== 0) return;
+  if (e.target.classList.contains('tab-close')) return;
+  e.preventDefault();
+
+  const tabEls = [...tabsScroll.querySelectorAll('.tab')];
+  const srcEl = tabEls[fromIdx];
+  const scrollRect = tabsScroll.getBoundingClientRect();
+  const tabRect = srcEl.getBoundingClientRect();
+
+  // ghost：fixed，初始位置对齐原 tab
+  const ghost = document.createElement('div');
+  ghost.className = 'tab-ghost';
+  ghost.innerHTML = srcEl.innerHTML;
+  ghost.style.width = tabRect.width + 'px';
+  ghost.style.left  = tabRect.left + 'px';
+  ghost.style.top   = tabRect.top  + 'px';
+  document.body.appendChild(ghost);
+
+  srcEl.classList.add('is-dragging');
+
+  // 记录每个 tab 初始中点（相对 scrollRect.left）
+  const tabMids = tabEls.map(el => {
+    const r = el.getBoundingClientRect();
+    return r.left - scrollRect.left + r.width / 2;
+  });
+  const tabWidths = tabEls.map(el => el.getBoundingClientRect().width);
+
+  tabDrag = {
+    fromIdx,
+    ghost, srcEl,
+    offsetX: e.clientX - tabRect.left,
+    offsetY: e.clientY - tabRect.top,
+    scrollLeft: scrollRect.left,
+    tabMids, tabWidths,
+    insertIdx: fromIdx,
+  };
+
+  srcEl.setPointerCapture(e.pointerId);
+  srcEl.addEventListener('pointermove', onTabMove);
+  srcEl.addEventListener('pointerup',   onTabUp);
+  srcEl.addEventListener('pointercancel', onTabUp);
+}
+
+function onTabMove(e) {
+  if (!tabDrag) return;
+  const { ghost, offsetX, offsetY, scrollLeft, fromIdx } = tabDrag;
+
+  // Ghost 跟 X 和 Y
+  ghost.style.left = (e.clientX - offsetX) + 'px';
+  ghost.style.top  = (e.clientY - offsetY) + 'px';
+
+  // 换位判断只看 X（ghost 中心越过邻 tab 的 1/3 处触发）
+  const ghostCenterX = e.clientX - offsetX + ghost.offsetWidth / 2;
+
+  const tabEls = [...tabsScroll.querySelectorAll('.tab')];
+  let newInsertIdx = fromIdx;
+
+  const others = tabEls.filter((_, i) => i !== fromIdx);
+  let found = false;
+  for (let i = 0; i < others.length; i++) {
+    const r = others[i].getBoundingClientRect();
+    // 触发点：tab 左边 + 1/3 宽度（而非 1/2）
+    const threshold = r.left + r.width / 3;
+    if (ghostCenterX < threshold) {
+      const origIdx = parseInt(others[i].dataset.i);
+      newInsertIdx = origIdx > fromIdx ? origIdx - 1 : origIdx;
+      found = true;
+      break;
+    }
+  }
+  if (!found) newInsertIdx = tabs.length - 1;
+
+  tabDrag.insertIdx = newInsertIdx;
+
+  // 用 translateX 让其他 tab 让位
+  // 计算：如果 ghost 插在 newInsertIdx，则
+  //   - 原 fromIdx 左边、newInsertIdx 左边的：不动
+  //   - 从 newInsertIdx 到 fromIdx-1 的：右移 ghostWidth
+  //   - 从 fromIdx+1 到 newInsertIdx 的：左移 ghostWidth
+  const ghostW = ghost.offsetWidth;
+  tabEls.forEach((el, i) => {
+    if (i === fromIdx) return; // 源 tab 隐藏，不处理
+    let dx = 0;
+    if (newInsertIdx < fromIdx) {
+      // 向左拖：[newInsertIdx, fromIdx-1] 右移
+      if (i >= newInsertIdx && i < fromIdx) dx = ghostW;
+    } else {
+      // 向右拖：[fromIdx+1, newInsertIdx] 左移
+      if (i > fromIdx && i <= newInsertIdx) dx = -ghostW;
+    }
+    el.style.transform = dx !== 0 ? `translateX(${dx}px)` : '';
+  });
+}
+
+function onTabUp(e) {
+  if (!tabDrag) return;
+  const { fromIdx, insertIdx, ghost, srcEl } = tabDrag;
+
+  const tabEls = [...tabsScroll.querySelectorAll('.tab')];
+  tabEls.forEach(el => el.style.transform = '');
+  srcEl.classList.remove('is-dragging');
+  ghost.remove(); // body 上的 fixed ghost
+
+  tabDrag = null;
+  srcEl.removeEventListener('pointermove', onTabMove);
+  srcEl.removeEventListener('pointerup',   onTabUp);
+  srcEl.removeEventListener('pointercancel', onTabUp);
+
+  if (fromIdx !== insertIdx) {
+    const [moved] = tabs.splice(fromIdx, 1);
+    tabs.splice(insertIdx, 0, moved);
+  }
+  renderTabs();
+}
+
+/* ══════════════════════════════════════════════════════════
+   FILE LIST DRAG
+   同策略，轴改成 Y
+══════════════════════════════════════════════════════════ */
+let files = [
+  { id:1, name:'README.md',    icon:'📄', active:true  },
+  { id:2, name:'index.ts',     icon:'📝', active:false },
+  { id:3, name:'sidebar.ts',   icon:'📝', active:false },
+  { id:4, name:'state.ts',     icon:'📝', active:false },
+  { id:5, name:'CHANGELOG.md', icon:'📄', active:false },
+  { id:6, name:'package.json', icon:'🔧', active:false },
+];
+
+const fileListEl  = document.getElementById('fileList');
+const fileContent = document.getElementById('fileContent');
+let fileDrag = null;
+
+function renderFiles() {
+  fileListEl.innerHTML = '';
+  files.forEach((f, i) => {
+    const el = document.createElement('div');
+    el.className = 'file-item' + (f.active ? ' is-active' : '');
+    el.dataset.i = i;
+    el.innerHTML = `<span class="icon">${f.icon}</span><span>${f.name}</span>`;
+
+    el.addEventListener('click', () => {
+      if (fileDrag) return;
+      files.forEach(x => x.active = false);
+      f.active = true;
+      renderFiles();
+      fileContent.textContent = '内容：' + f.name;
+    });
+    el.addEventListener('pointerdown', e => startFileDrag(e, i));
+    fileListEl.appendChild(el);
+  });
+}
+
+function startFileDrag(e, fromIdx) {
+  if (e.button !== 0) return;
+  e.preventDefault();
+
+  const fileEls = [...fileListEl.querySelectorAll('.file-item')];
+  const srcEl = fileEls[fromIdx];
+  const listRect = fileListEl.getBoundingClientRect();
+  const itemRect = srcEl.getBoundingClientRect();
+
+  const ghost = document.createElement('div');
+  ghost.className = 'file-ghost';
+  ghost.innerHTML = srcEl.innerHTML;
+  ghost.style.width = itemRect.width + 'px';
+  ghost.style.left  = itemRect.left + 'px';
+  ghost.style.top   = itemRect.top  + 'px';
+  document.body.appendChild(ghost);
+
+  srcEl.classList.add('is-dragging');
+
+  fileDrag = {
+    fromIdx, insertIdx: fromIdx,
+    ghost, srcEl,
+    offsetX: e.clientX - itemRect.left,
+    offsetY: e.clientY - itemRect.top,
+  };
+
+  srcEl.setPointerCapture(e.pointerId);
+  srcEl.addEventListener('pointermove', onFileMove);
+  srcEl.addEventListener('pointerup',   onFileUp);
+  srcEl.addEventListener('pointercancel', onFileUp);
+}
+
+function onFileMove(e) {
+  if (!fileDrag) return;
+  const { ghost, offsetX, offsetY, fromIdx } = fileDrag;
+
+  // Ghost X/Y 都跟手
+  ghost.style.left = (e.clientX - offsetX) + 'px';
+  ghost.style.top  = (e.clientY - offsetY) + 'px';
+
+  const ghostH = ghost.offsetHeight;
+  const ghostCenterY = e.clientY - offsetY + ghostH / 2;
+
+  const fileEls = [...fileListEl.querySelectorAll('.file-item')];
+  const others = fileEls.filter((_, i) => i !== fromIdx);
+
+  let newInsertIdx = fromIdx;
+  let found = false;
+  for (let i = 0; i < others.length; i++) {
+    const r = others[i].getBoundingClientRect();
+    const threshold = r.top + r.height / 3;
+    if (ghostCenterY < threshold) {
+      const origIdx = parseInt(others[i].dataset.i);
+      newInsertIdx = origIdx > fromIdx ? origIdx - 1 : origIdx;
+      found = true;
+      break;
+    }
+  }
+  if (!found) newInsertIdx = files.length - 1;
+
+  fileDrag.insertIdx = newInsertIdx;
+
+  fileEls.forEach((el, i) => {
+    if (i === fromIdx) return;
+    let dy = 0;
+    if (newInsertIdx < fromIdx) {
+      if (i >= newInsertIdx && i < fromIdx) dy = ghostH;
+    } else {
+      if (i > fromIdx && i <= newInsertIdx) dy = -ghostH;
+    }
+    el.style.transform = dy !== 0 ? `translateY(${dy}px)` : '';
+  });
+}
+
+function onFileUp(e) {
+  if (!fileDrag) return;
+  const { fromIdx, insertIdx, ghost, srcEl } = fileDrag;
+
+  const fileEls = [...fileListEl.querySelectorAll('.file-item')];
+  fileEls.forEach(el => el.style.transform = '');
+  srcEl.classList.remove('is-dragging');
+  ghost.remove();
+
+  fileDrag = null;
+  srcEl.removeEventListener('pointermove', onFileMove);
+  srcEl.removeEventListener('pointerup',   onFileUp);
+  srcEl.removeEventListener('pointercancel', onFileUp);
+
+  if (fromIdx !== insertIdx) {
+    const [moved] = files.splice(fromIdx, 1);
+    files.splice(insertIdx, 0, moved);
+  }
+  renderFiles();
+}
+
+/* ── init ── */
+renderTabs();
+renderFiles();
+</script>
+</body>
+</html>

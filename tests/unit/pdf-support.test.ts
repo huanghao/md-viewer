@@ -43,7 +43,7 @@ beforeAll(() => {
 
 afterAll(() => {
   resetDbForTesting();
-  process.env.XDG_CONFIG_HOME = oldConfigHome;
+  if (oldConfigHome === undefined) { delete process.env.XDG_CONFIG_HOME; } else { process.env.XDG_CONFIG_HOME = oldConfigHome; }
   rmSync(tempDir, { recursive: true, force: true });
 });
 

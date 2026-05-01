@@ -1,11 +1,18 @@
 const isMac = navigator.platform.toUpperCase().includes('MAC');
 const mod = isMac ? '⌘' : 'Ctrl+';
 
+const modKey = isMac ? '⌘' : 'Ctrl';
+
 const SHORTCUTS = [
   { group: '导航' },
-  { key: `${mod}K`, desc: '聚焦搜索框' },
+  { key: `${mod}P`, desc: '快速打开文件' },
+  { key: 'Ctrl+Tab', desc: '切换到下一个文件' },
+  { key: 'Ctrl+Shift+Tab', desc: '切换到上一个文件' },
+  { key: `${modKey}+1~9`, desc: '跳到第 N 个文件' },
+  { group: '文件' },
   { key: `${mod}W`, desc: '关闭当前文件' },
-  { group: '缩放' },
+  { group: '视图' },
+  { key: `${mod}K`, desc: '聚焦搜索框' },
   { key: `${mod}+`, desc: '放大' },
   { key: `${mod}−`, desc: '缩小' },
   { key: `${mod}0`, desc: '重置缩放' },
@@ -14,6 +21,7 @@ const SHORTCUTS = [
   { key: 'p', desc: '上一个变更块' },
   { group: '通用' },
   { key: 'Esc', desc: '关闭弹窗 / 批注面板' },
+  { key: '?', desc: '显示此帮助' },
 ];
 
 let popover: HTMLElement | null = null;

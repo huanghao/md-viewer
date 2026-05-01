@@ -20,8 +20,10 @@ import { getFileTypeIcon, getFileTypeLabel, isJsonFile, isJsonlFile } from './ut
 // 导入 UI 组件
 import { renderSidebar } from './ui/sidebar';
 import { showToast, showSuccess, showError, showWarning, showInfo } from './ui/toast';
-import { showSettingsDialog, closeSettingsDialog } from './ui/settings';
+import { showPreferences, closePreferences } from './ui/preferences';
 import { toggleShortcutsHelp, hideShortcutsHelp, isShortcutsHelpVisible } from './ui/shortcuts-help';
+import { registerAction, initDispatcher } from './keybindings';
+import { initQuickOpen, showQuickOpen, hideQuickOpen } from './ui/quick-open';
 import { renderJsonContent } from './ui/json-viewer';
 import { mountScrollbar, unmountScrollbar, updateScrollbar, updateDiffMarkers, clearDiffMarkers } from './ui/doc-scrollbar';
 import { shouldRefreshDiff, refreshDiffBannerLabel } from './ui/diff-refresh';
@@ -59,7 +61,7 @@ import { storageGet, storageSet, storageGetNumber } from './utils/storage';
 import { recordSignal } from './utils/focus-signals';
 import { flushAll as flushUndoQueue } from './utils/undo-queue';
 import { createResizer } from './utils/resizer';
-import { setupKeyboardShortcuts } from './keyboard-shortcuts';
+// // import { setupKeyboardShortcuts } from './keyboard-shortcuts'; // migrated to keybindings.ts // migrated to keybindings.ts
 import { initZoom, zoomIn, zoomOut, zoomReset, updateZoomDisplay, setPdfZoomValue, getPdfZoom } from './zoom-controller';
 import { injectParaIds, initTranslation, handleTranslateButtonClick } from './translation';
 
@@ -1420,6 +1422,21 @@ function removeFileHandler(path: string) {
   if (panel) renderTocPanel(panel, [], () => {});
 }
 
+function cycleTab(direction: 1 | -1): void {
+  const files = Array.from(state.sessionFiles.keys());
+  if (files.length <= 1) return;
+  const currentIndex = state.currentFile ? files.indexOf(state.currentFile) : -1;
+  const nextIndex = (currentIndex + direction + files.length) % files.length;
+  void switchFile(files[nextIndex]);
+}
+
+function jumpToTab(n: number): void {
+  const files = Array.from(state.sessionFiles.keys());
+  if (files.length === 0) return;
+  const index = n === 9 ? files.length - 1 : n - 1;
+  if (index >= 0 && index < files.length) void switchFile(files[index]);
+}
+
 // 搜索文件
 async function searchFilesHandler(rawQuery?: string) {
   const input = document.getElementById('searchInput') as HTMLInputElement | null;
@@ -2406,7 +2423,7 @@ window.copyFilePath = copyFilePath;
 window.copyRelativePath = copyRelativePath;
 window.copyAbsolutePath = copyAbsolutePath;
 window.showToast = showToast;
-window.showSettingsDialog = showSettingsDialog;
+window.showSettingsDialog = showPreferences;
 window.toggleShortcutsHelp = toggleShortcutsHelp;
 window.toggleMonitorPanel = toggleMonitorPanel;
 window.switchMonitorTab = switchMonitorTab;
@@ -2593,17 +2610,123 @@ function startWorkspacePolling() {
     clearAddConfirm();
   });
   handleURLParams();
-  setupKeyboardShortcuts({
-    dismissAnnotationPopup: dismissAnnotationPopupByEscape,
-    closeSettings: closeSettingsDialog,
-    removeFile: removeFileHandler,
-    navigateDiff: navigateDiffBlock,
-    getCurrentFile: () => state.currentFile,
-    isDiffActive: () => diffViewActive,
-    toggleShortcutsHelp,
-    hideShortcutsHelp,
-    isShortcutsHelpVisible,
+  const isInputFocused = () => {
+    const tag = (document.activeElement as HTMLElement)?.tagName?.toLowerCase();
+    return tag === 'input' || tag === 'textarea';
+  };
+
+  registerAction({
+    id: 'escape',
+    label: 'Escape',
+    category: 'view',
+    defaultKey: 'Escape',
+    handler: () => {
+      if (dismissAnnotationPopupByEscape()) return;
+      const qoOverlay = document.querySelector('.quick-open-overlay') as HTMLElement | null;
+      if (qoOverlay && qoOverlay.style.display !== 'none') { hideQuickOpen(); return; }
+      if (isShortcutsHelpVisible()) { hideShortcutsHelp(); return; }
+      const settingsEl = document.getElementById('preferencesOverlay');
+      if (settingsEl?.classList.contains('show')) { closePreferences(); return; }
+      const addWsEl = document.getElementById('addWorkspaceDialogOverlay');
+      if (addWsEl?.classList.contains('show')) { addWsEl.classList.remove('show'); }
+    },
   });
+
+  registerAction({
+    id: 'focus-search',
+    label: '聚焦搜索框',
+    category: 'view',
+    defaultKey: 'Ctrl+k',
+    handler: () => {
+      const input = document.getElementById('searchInput') as HTMLInputElement | null;
+      if (input) { input.focus(); input.select(); }
+    },
+    shouldActivate: () => !isInputFocused(),
+  });
+
+  registerAction({
+    id: 'close-file',
+    label: '关闭当前文件',
+    category: 'file',
+    defaultKey: 'Ctrl+w',
+    handler: () => {
+      const current = state.currentFile;
+      if (current) removeFileHandler(current);
+    },
+  });
+
+  registerAction({
+    id: 'toggle-shortcuts-help',
+    label: '显示快捷键帮助',
+    category: 'view',
+    defaultKey: '?',
+    handler: () => toggleShortcutsHelp(),
+    shouldActivate: () => !isInputFocused(),
+  });
+
+  registerAction({
+    id: 'diff-next',
+    label: '下一个变更块',
+    category: 'diff',
+    defaultKey: 'n',
+    handler: () => navigateDiffBlock(1),
+    shouldActivate: () => diffViewActive && !isInputFocused(),
+  });
+
+  registerAction({
+    id: 'diff-prev',
+    label: '上一个变更块',
+    category: 'diff',
+    defaultKey: 'p',
+    handler: () => navigateDiffBlock(-1),
+    shouldActivate: () => diffViewActive && !isInputFocused(),
+  });
+
+  const isMac = navigator.platform.toUpperCase().includes('MAC');
+  const modKey = isMac ? 'Cmd' : 'Ctrl';
+
+  registerAction({
+    id: 'cycle-tab-next',
+    label: '切换到下一个文件',
+    category: 'navigation',
+    defaultKey: 'Ctrl+Tab',
+    handler: () => cycleTab(1),
+  });
+
+  registerAction({
+    id: 'cycle-tab-prev',
+    label: '切换到上一个文件',
+    category: 'navigation',
+    defaultKey: 'Ctrl+Shift+Tab',
+    handler: () => cycleTab(-1),
+  });
+
+  for (let n = 1; n <= 9; n++) {
+    const tabN = n;
+    registerAction({
+      id: `jump-to-tab-${tabN}`,
+      label: `跳到第 ${tabN} 个文件`,
+      category: 'navigation',
+      defaultKey: `${modKey}+${tabN}`,
+      handler: () => jumpToTab(tabN),
+    });
+  }
+
+  registerAction({
+    id: 'quick-open',
+    label: '快速打开文件',
+    category: 'navigation',
+    defaultKey: 'Ctrl+p',
+    handler: () => showQuickOpen(),
+  });
+
+  initQuickOpen({
+    getOpenFilePaths: () => Array.from(state.sessionFiles.keys()),
+    openFile: (path) => addFileByPath(path, true),
+    switchToOpen: (path) => void switchFile(path),
+  });
+
+  initDispatcher();
 
   // 添加批注文本选中监听
   document.addEventListener('mouseup', () => {

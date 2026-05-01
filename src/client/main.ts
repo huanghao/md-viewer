@@ -2676,6 +2676,17 @@ function startWorkspacePolling() {
   });
 
   registerAction({
+    id: 'rag-search',
+    label: '内容搜索',
+    category: 'view',
+    defaultKey: `${modKey}+Shift+f`,
+    handler: () => {
+      (window as any).setSidebarTab?.('search');
+    },
+    shouldActivate: () => !isInputFocused(),
+  });
+
+  registerAction({
     id: 'close-file',
     label: '关闭当前文件',
     category: 'file',

@@ -929,18 +929,30 @@ export function handleGetWorkspaces(c: Context) {
   return c.json({ paths: Array.from(registeredWorkspacePaths) });
 }
 
-export async function handleRagSearch(c: Context) {
-  const q = c.req.query("q");
-  const limit = c.req.query("limit") ?? "10";
-  if (!q) return c.json({ results: [] });
+const RAG_SERVER = 'http://localhost:3001';
 
+export async function handleRagSearch(c: Context) {
+  const q = c.req.query('q')?.trim();
+  const safeLimit = String(Math.min(parseInt(c.req.query('limit') ?? '10', 10) || 10, 50));
+  if (!q) return c.json({ results: [] });
   try {
-    const url = `http://localhost:3001/search?q=${encodeURIComponent(q)}&limit=${limit}`;
-    const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    const resp = await fetch(
+      `${RAG_SERVER}/search?q=${encodeURIComponent(q)}&limit=${safeLimit}`,
+      { signal: AbortSignal.timeout(3000) }
+    );
+    if (!resp.ok) return c.json({ results: [], error: 'rag_error' });
     return c.json(await resp.json());
   } catch {
-    return c.json({ results: [], error: "rag_unavailable" });
+    return c.json({ results: [], error: 'rag_unavailable' });
   }
+}
+
+export async function handleRagStatus(c: Context) {
+  try {
+    const resp = await fetch(`${RAG_SERVER}/health`, { signal: AbortSignal.timeout(1000) });
+    if (resp.ok) return c.json({ available: true });
+  } catch { /* fall through */ }
+  return c.json({ available: false });
 }
 
 export async function handleListTodos(c: any): Promise<Response> {

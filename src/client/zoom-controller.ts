@@ -1,5 +1,5 @@
 import { storageSet, storageGetNumber } from './utils/storage';
-import { clampZoom, zoomStep, pdfZoomKey, MD_ZOOM_MIN, MD_ZOOM_MAX, PDF_ZOOM_MIN, PDF_ZOOM_MAX, PDF_ZOOM_DEFAULT } from './zoom';
+import { clampZoom, zoomStep, pdfZoomKey, parseZoomInput, MD_ZOOM_MIN, MD_ZOOM_MAX, PDF_ZOOM_MIN, PDF_ZOOM_MAX, PDF_ZOOM_DEFAULT } from './zoom';
 
 export interface ZoomDeps {
   getCurrentFile: () => string | undefined;
@@ -50,12 +50,16 @@ export function zoomOut(): void {
   }
 }
 
-export function zoomReset(): void {
+/** Apply a zoom value typed into the input field. raw is the string from the input. */
+export function setZoomFromInput(raw: string): void {
+  const scale = parseZoomInput(raw);
+  if (scale === null) return;
   const currentFile = _deps.getCurrentFile();
   if (isPdf(currentFile)) {
-    setPdfZoomValue(currentFile!, PDF_ZOOM_DEFAULT);
+    const clamped = clampZoom(scale, PDF_ZOOM_MIN, PDF_ZOOM_MAX);
+    setPdfZoomValue(currentFile!, clamped);
   } else {
-    currentFontScale = 1.0;
+    currentFontScale = clampZoom(scale, MD_ZOOM_MIN, MD_ZOOM_MAX);
     applyFontScale();
   }
 }
@@ -83,13 +87,13 @@ export function getPdfZoom(filePath: string): number {
 }
 
 export function updateZoomDisplay(): void {
-  const btn = document.getElementById('fontScaleText');
-  if (!btn) return;
+  const input = document.getElementById('fontScaleInput') as HTMLInputElement | null;
+  if (!input || document.activeElement === input) return;
   const currentFile = _deps.getCurrentFile();
   if (isPdf(currentFile)) {
     const scale = getPdfZoom(currentFile!);
-    btn.textContent = `${Math.round(scale * 100)}%`;
+    input.value = `${Math.round(scale * 100)}%`;
   } else {
-    btn.textContent = `${Math.round(currentFontScale * 100)}%`;
+    input.value = `${Math.round(currentFontScale * 100)}%`;
   }
 }

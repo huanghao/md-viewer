@@ -35,7 +35,7 @@ export interface FileTreeNode {
 
 // 应用配置类型
 export interface AppConfig {
-  sidebarTab: 'focus' | 'full' | 'list';
+  sidebarTab: 'focus' | 'full' | 'list' | 'search';
   focusWindowKey: '8h' | '2d' | '1w' | '1m';
   focusStrategy: 'frecency' | 'mtime'; // 最近视图排序策略，默认 frecency
   markdownTheme: string;  // 'github' | 'notion' | 'bear'
@@ -107,4 +107,16 @@ export interface PathDetectResponse {
   isUrl?: boolean;
   error?: string;
 }
+
+export interface RagResult {
+  path: string;
+  heading: string | null;
+  text: string;
+  score: number;
+  charStart: number;
+}
+
+export type RagStatus =
+  | { available: false }
+  | { available: true; indexedChunks?: number; indexing?: boolean; progress?: number };
 

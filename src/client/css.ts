@@ -884,13 +884,15 @@ export const styles = `
       order: 2;
     }
     .file-item .close {
-      opacity: 0;
-      padding: 2px 6px;
+      width: 0;
+      overflow: hidden;
+      padding: 0;
       border-radius: var(--radius-sm);
       order: 3;
     }
     .file-item:hover .close {
-      opacity: 1;
+      width: auto;
+      padding: 2px 6px;
     }
     .file-item .close:hover {
       background: #ff4444;

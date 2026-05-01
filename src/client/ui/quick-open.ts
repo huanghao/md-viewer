@@ -1,4 +1,4 @@
-import { getPathSuggestions } from '../api/files';
+import { searchWorkspaceFiles } from '../api/files';
 import type { PathSuggestion } from '../types';
 
 interface QuickOpenDeps {
@@ -83,9 +83,10 @@ async function renderResults(query: string): Promise<void> {
 
   if (query.trim()) {
     try {
-      const data = await getPathSuggestions(query, { kind: 'file' });
-      for (const s of data.suggestions) {
-        if (openPaths.has(s.path)) openMatches.push(s);
+      const hits = await searchWorkspaceFiles(query);
+      for (const h of hits) {
+        const s: PathSuggestion = { path: h.path, display: h.display, type: 'file' };
+        if (openPaths.has(h.path)) openMatches.push(s);
         else fileMatches.push(s);
       }
     } catch {

@@ -40,6 +40,15 @@ export async function getNearbyFiles(path: string): Promise<NearbyResponse> {
 }
 
 // 获取路径补全建议
+export async function searchWorkspaceFiles(
+  q: string
+): Promise<Array<{ path: string; display: string; workspaceRoot: string }>> {
+  const params = new URLSearchParams({ q });
+  const response = await fetch(`/api/workspace-search?${params.toString()}`);
+  const data = await response.json() as { results: Array<{ path: string; display: string; workspaceRoot: string }> };
+  return data.results ?? [];
+}
+
 export async function getPathSuggestions(
   input: string,
   options: { kind?: 'file' | 'directory'; markdownOnly?: boolean } = {}

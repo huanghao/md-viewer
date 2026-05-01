@@ -998,3 +998,38 @@ export async function handleTidyTodos(c: any): Promise<Response> {
   const result = tidyTodos({ olderThanDays, missingFiles: body.missingFiles === true });
   return c.json(result);
 }
+
+export function handleWorkspaceSearch(c: Context) {
+  const q = (c.req.query('q') || '').trim().toLowerCase();
+  const limit = Math.min(Number(c.req.query('limit') ?? '50'), 200);
+
+  if (!q) return c.json({ results: [] });
+
+  const results: Array<{ path: string; display: string; workspaceRoot: string }> = [];
+
+  function walkDir(dir: string, workspaceRoot: string): void {
+    if (results.length >= limit) return;
+    let entries: ReturnType<typeof readdirSync>;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (results.length >= limit) return;
+      if (entry.name.startsWith('.') || ['node_modules', 'dist', 'build', '.git'].includes(entry.name)) continue;
+      const fullPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walkDir(fullPath, workspaceRoot);
+      } else if (entry.isFile() && isMarkdownFilename(entry.name) && entry.name.toLowerCase().includes(q)) {
+        results.push({ path: fullPath, display: entry.name, workspaceRoot });
+      }
+    }
+  }
+
+  for (const wsPath of registeredWorkspacePaths) {
+    walkDir(wsPath, wsPath);
+  }
+
+  return c.json({ results });
+}

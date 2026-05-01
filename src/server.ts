@@ -43,6 +43,7 @@ import {
   handleTidyTodos,
   handleGetWorkspaces,
   handleRagSearch,
+  handleWorkspaceSearch,
 } from "./handlers.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
 
@@ -144,6 +145,9 @@ app.get("/api/config", (c) => handleGetClientConfig());
 
 // API: 工作区路径列表（供 RAG server 消费）
 app.get("/api/workspaces", handleGetWorkspaces);
+
+// API: 工作区文件名搜索（供 Quick Open 使用）
+app.get("/api/workspace-search", handleWorkspaceSearch);
 
 // API: RAG 语义搜索（代理到 localhost:3001）
 app.get("/api/rag-search", handleRagSearch);

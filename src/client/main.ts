@@ -62,7 +62,7 @@ import { recordSignal } from './utils/focus-signals';
 import { flushAll as flushUndoQueue } from './utils/undo-queue';
 import { createResizer } from './utils/resizer';
 // // import { setupKeyboardShortcuts } from './keyboard-shortcuts'; // migrated to keybindings.ts // migrated to keybindings.ts
-import { initZoom, zoomIn, zoomOut, zoomReset, updateZoomDisplay, setPdfZoomValue, getPdfZoom } from './zoom-controller';
+import { initZoom, zoomIn, zoomOut, setZoomFromInput, updateZoomDisplay, setPdfZoomValue, getPdfZoom } from './zoom-controller';
 import { injectParaIds, initTranslation, handleTranslateButtonClick } from './translation';
 
 declare global {
@@ -2375,7 +2375,6 @@ declare global {
     toggleMonitorPanel: () => void;
     switchMonitorTab: (tab: 'memory' | 'sessions') => void;
     switchAnnotationTab: (tab: 'comments' | 'chat' | 'todo') => void;
-    zoomReset: () => void;
     openExternalFile?: (path: string) => void | Promise<void>;
     renderContent?: () => void;
     applyTheme?: () => void;
@@ -2431,7 +2430,6 @@ window.toggleShortcutsHelp = toggleShortcutsHelp;
 window.toggleMonitorPanel = toggleMonitorPanel;
 window.switchMonitorTab = switchMonitorTab;
 window.switchAnnotationTab = switchAnnotationTab;
-window.zoomReset = zoomReset;
 window.openExternalFile = openFileInBrowser;
 window.renderContent = renderContent;
 (window as any).applyTheme = applyTheme;
@@ -2563,6 +2561,31 @@ function startWorkspacePolling() {
     getCurrentFile: () => state.currentFile,
     getPdfViewer: (filePath) => pdfViewerRegistry.get(filePath)?.viewer ?? null,
   });
+
+  // Wire zoom input field
+  const zoomInput = document.getElementById('fontScaleInput') as HTMLInputElement | null;
+  if (zoomInput) {
+    let savedValue = '';
+
+    zoomInput.addEventListener('focus', () => {
+      savedValue = zoomInput.value;
+      zoomInput.select();
+    });
+
+    zoomInput.addEventListener('blur', () => {
+      setZoomFromInput(zoomInput.value);
+      updateZoomDisplay();
+    });
+
+    zoomInput.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        zoomInput.blur();
+      } else if (e.key === 'Escape') {
+        zoomInput.value = savedValue;
+        zoomInput.blur();
+      }
+    });
+  }
 
   // 初始化批注功能
   initAnnotationElements();
@@ -2763,15 +2786,6 @@ function startWorkspacePolling() {
     category: 'view',
     defaultKey: `${modKey}+-`,
     handler: () => zoomOut(),
-    shouldActivate: () => !isInputFocused(),
-  });
-
-  registerAction({
-    id: 'zoom-reset',
-    label: '重置缩放',
-    category: 'view',
-    defaultKey: `${modKey}+0`,
-    handler: () => zoomReset(),
     shouldActivate: () => !isInputFocused(),
   });
 

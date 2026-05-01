@@ -2119,17 +2119,7 @@ function toggleMonitorPanel(): void {
   }
 }
 
-// ==================== 键盘缩放快捷键 ====================
-const IS_MAC = navigator.platform.toUpperCase().includes('MAC');
-document.addEventListener('keydown', (e: KeyboardEvent) => {
-  const tag = (document.activeElement as HTMLElement)?.tagName?.toLowerCase();
-  if (tag === 'input' || tag === 'textarea') return;
-  const mod = IS_MAC ? e.metaKey : e.ctrlKey;
-  if (!mod) return;
-  if (e.key === '=' || e.key === '+') { e.preventDefault(); zoomIn(); }
-  else if (e.key === '-') { e.preventDefault(); zoomOut(); }
-  else if (e.key === '0') { e.preventDefault(); zoomReset(); }
-});
+// ==================== 键盘缩放快捷键（迁移到 registerAction 统一管理）====================
 
 // ==================== SSE 连接状态 ====================
 let sseConnectionState: 'connecting' | 'connected' | 'disconnected' | 'failed' = 'connecting';
@@ -2676,6 +2666,7 @@ function startWorkspacePolling() {
     label: '下一个变更块',
     category: 'diff',
     defaultKey: 'j',
+    context: 'Diff 模式',
     handler: () => navigateDiffBlock(1),
     shouldActivate: () => diffViewActive && !isInputFocused(),
   });
@@ -2685,6 +2676,7 @@ function startWorkspacePolling() {
     label: '上一个变更块',
     category: 'diff',
     defaultKey: 'k',
+    context: 'Diff 模式',
     handler: () => navigateDiffBlock(-1),
     shouldActivate: () => diffViewActive && !isInputFocused(),
   });
@@ -2695,6 +2687,7 @@ function startWorkspacePolling() {
     label: '移到下一个文件',
     category: 'navigation',
     defaultKey: 'j',
+    context: '非 Diff 模式',
     handler: () => navigateFileInView(1),
     shouldActivate: () => !diffViewActive && !isInputFocused(),
   });
@@ -2704,6 +2697,7 @@ function startWorkspacePolling() {
     label: '移到上一个文件',
     category: 'navigation',
     defaultKey: 'k',
+    context: '非 Diff 模式',
     handler: () => navigateFileInView(-1),
     shouldActivate: () => !diffViewActive && !isInputFocused(),
   });
@@ -2752,6 +2746,33 @@ function startWorkspacePolling() {
     category: 'navigation',
     defaultKey: 'Ctrl+f',
     handler: () => showQuickOpen(),
+  });
+
+  registerAction({
+    id: 'zoom-in',
+    label: '放大',
+    category: 'view',
+    defaultKey: `${modKey}+=`,
+    handler: () => zoomIn(),
+    shouldActivate: () => !isInputFocused(),
+  });
+
+  registerAction({
+    id: 'zoom-out',
+    label: '缩小',
+    category: 'view',
+    defaultKey: `${modKey}+-`,
+    handler: () => zoomOut(),
+    shouldActivate: () => !isInputFocused(),
+  });
+
+  registerAction({
+    id: 'zoom-reset',
+    label: '重置缩放',
+    category: 'view',
+    defaultKey: `${modKey}+0`,
+    handler: () => zoomReset(),
+    shouldActivate: () => !isInputFocused(),
   });
 
   initQuickOpen({

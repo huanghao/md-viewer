@@ -7,6 +7,8 @@ export interface Action {
   defaultKey: string | null;
   handler: () => void;
   shouldActivate?: (e: KeyboardEvent) => boolean;
+  /** Optional display hint shown in preferences when the action is context-dependent */
+  context?: string;
 }
 
 const registry = new Map<string, Action>();

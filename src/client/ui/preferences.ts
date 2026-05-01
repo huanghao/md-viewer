@@ -292,7 +292,10 @@ function renderKeybindingsTab(): string {
           border-radius:7px;border:1px solid transparent;margin-bottom:2px;
           ${isRecording ? 'background:#eff6ff;border-color:#93c5fd;' : ''}
         ">
-          <span style="flex:1;font-size:13px;color:var(--color-text-primary,#222)">${escapeHtml(action.label)}</span>
+          <span style="flex:1;font-size:13px;color:var(--color-text-primary,#222)">
+            ${escapeHtml(action.label)}
+            ${action.context ? `<span style="font-size:11px;color:var(--color-text-muted,#aaa);margin-left:6px;font-weight:normal">(${escapeHtml(action.context)})</span>` : ''}
+          </span>
           ${isRecording
             ? `<span class="kb-recording-badge" style="font-size:12px;color:#2563eb;background:#dbeafe;
                 border-radius:5px;padding:3px 10px;animation:kb-pulse 1s ease-in-out infinite">按下按键…</span>`

@@ -2632,11 +2632,14 @@ function startWorkspacePolling() {
     },
   });
 
+  const isMac = navigator.platform.toUpperCase().includes('MAC');
+  const modKey = isMac ? 'Cmd' : 'Ctrl';
+
   registerAction({
     id: 'focus-search',
     label: '聚焦搜索框',
     category: 'view',
-    defaultKey: 'Ctrl+k',
+    defaultKey: `${modKey}+k`,
     handler: () => {
       const input = document.getElementById('searchInput') as HTMLInputElement | null;
       if (input) { input.focus(); input.select(); }
@@ -2653,15 +2656,6 @@ function startWorkspacePolling() {
       const current = state.currentFile;
       if (current) removeFileHandler(current);
     },
-  });
-
-  registerAction({
-    id: 'toggle-shortcuts-help',
-    label: '显示快捷键帮助',
-    category: 'view',
-    defaultKey: '?',
-    handler: () => toggleShortcutsHelp(),
-    shouldActivate: () => !isInputFocused(),
   });
 
   registerAction({
@@ -2682,14 +2676,11 @@ function startWorkspacePolling() {
     shouldActivate: () => diffViewActive && !isInputFocused(),
   });
 
-  const isMac = navigator.platform.toUpperCase().includes('MAC');
-  const modKey = isMac ? 'Cmd' : 'Ctrl';
-
   registerAction({
     id: 'cycle-tab-next',
     label: '切换到下一个文件',
     category: 'navigation',
-    defaultKey: 'Ctrl+Tab',
+    defaultKey: 'Alt+]',
     handler: () => cycleTab(1),
   });
 
@@ -2697,7 +2688,7 @@ function startWorkspacePolling() {
     id: 'cycle-tab-prev',
     label: '切换到上一个文件',
     category: 'navigation',
-    defaultKey: 'Ctrl+Shift+Tab',
+    defaultKey: 'Alt+[',
     handler: () => cycleTab(-1),
   });
 

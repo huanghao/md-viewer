@@ -6,8 +6,8 @@ const modKey = isMac ? '⌘' : 'Ctrl';
 const SHORTCUTS = [
   { group: '导航' },
   { key: `${mod}P`, desc: '快速打开文件' },
-  { key: 'Ctrl+Tab', desc: '切换到下一个文件' },
-  { key: 'Ctrl+Shift+Tab', desc: '切换到上一个文件' },
+  { key: 'Alt+]', desc: '切换到下一个文件' },
+  { key: 'Alt+[', desc: '切换到上一个文件' },
   { key: `${modKey}+1~9`, desc: '跳到第 N 个文件' },
   { group: '文件' },
   { key: `${mod}W`, desc: '关闭当前文件' },
@@ -21,7 +21,6 @@ const SHORTCUTS = [
   { key: 'p', desc: '上一个变更块' },
   { group: '通用' },
   { key: 'Esc', desc: '关闭弹窗 / 批注面板' },
-  { key: '?', desc: '显示此帮助' },
 ];
 
 let popover: HTMLElement | null = null;

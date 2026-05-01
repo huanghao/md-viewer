@@ -137,4 +137,55 @@ describe('KeybindingStore', () => {
   it('findActionByKey returns undefined for unknown combo', () => {
     expect(findActionByKey('Ctrl+z')).toBeUndefined();
   });
+
+  it('findActionByKey finds action by user override key, not default', () => {
+    registerAction({
+      id: 'test-override-find',
+      label: 'Test override find',
+      category: 'view',
+      defaultKey: 'Alt+]',
+      handler: () => {},
+    });
+    saveBinding('test-override-find', 'Alt+[');
+    expect(findActionByKey('Alt+[')?.id).toBe('test-override-find');
+    expect(findActionByKey('Alt+]')).toBeUndefined();
+  });
+
+  it('findActionByKey does not find action with null binding', () => {
+    registerAction({
+      id: 'test-null-find',
+      label: 'Test null find',
+      category: 'view',
+      defaultKey: 'Alt+m',
+      handler: () => {},
+    });
+    saveBinding('test-null-find', null);
+    expect(findActionByKey('Alt+m')).toBeUndefined();
+  });
+
+  it('getEffectiveKey returns null for unregistered action', () => {
+    expect(getEffectiveKey('nonexistent-action')).toBeNull();
+  });
+
+  it('resetAllBindings clears all overrides', () => {
+    registerAction({
+      id: 'test-reset-all-a',
+      label: 'A',
+      category: 'view',
+      defaultKey: 'Ctrl+a',
+      handler: () => {},
+    });
+    registerAction({
+      id: 'test-reset-all-b',
+      label: 'B',
+      category: 'view',
+      defaultKey: 'Ctrl+b',
+      handler: () => {},
+    });
+    saveBinding('test-reset-all-a', 'Alt+a');
+    saveBinding('test-reset-all-b', 'Alt+b');
+    resetAllBindings();
+    expect(getEffectiveKey('test-reset-all-a')).toBe('Ctrl+a');
+    expect(getEffectiveKey('test-reset-all-b')).toBe('Ctrl+b');
+  });
 });

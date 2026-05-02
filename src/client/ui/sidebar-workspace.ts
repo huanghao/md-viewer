@@ -28,6 +28,7 @@ import {
 } from '../workspace';
 import { clearListDiff, clearWorkspaceModified } from '../workspace-state';
 import { renderFileRow } from './file-row';
+import { fuzzyMatch } from '../utils/fuzzy-search';
 
 
 const ADD_WORKSPACE_DIALOG_ID = 'addWorkspaceDialogOverlay';
@@ -398,7 +399,7 @@ function renderWorkspaceItem(workspace: Workspace, index: number, total: number,
   const shouldExpand = query ? true : workspace.isExpanded;
   const canMoveUp = index > 0;
   const canMoveDown = index < total - 1;
-  const workspaceMatched = !query || workspace.name.toLowerCase().includes(query) || workspace.path.toLowerCase().includes(query);
+  const workspaceMatched = !query || !!fuzzyMatch(workspace.name, query) || !!fuzzyMatch(workspace.path, query);
   const hasTreeMatch = !!tree && !!tree.children && tree.children.length > 0;
   const missingSection = shouldExpand ? renderMissingOpenFiles(workspace.id, workspace.path, tree, query) : '';
   const hasMissingMatch = !!missingSection;
@@ -566,7 +567,7 @@ function renderMissingOpenFiles(workspaceId: string, workspacePath: string, tree
     if (!file.path.startsWith(workspacePrefix)) return false;
     if (filePathsInTree.has(file.path)) return false;
     if (!query) return true;
-    return file.name.toLowerCase().includes(query) || file.path.toLowerCase().includes(query);
+    return !!fuzzyMatch(file.name, query) || !!fuzzyMatch(file.path, query);
   });
 
   const openedSet = new Set(missingOpenedFiles.map((file) => file.path));
@@ -575,9 +576,8 @@ function renderMissingOpenFiles(workspaceId: string, workspacePath: string, tree
     .filter((path) => !filePathsInTree.has(path))
     .filter((path) => {
       if (!query) return true;
-      const lower = path.toLowerCase();
-      const name = (path.split('/').pop() || '').toLowerCase();
-      return lower.includes(query) || name.includes(query);
+      const name = path.split('/').pop() || '';
+      return !!fuzzyMatch(name, query) || !!fuzzyMatch(path, query);
     });
 
   if (missingOpenedFiles.length === 0 && missingPaths.length === 0) {

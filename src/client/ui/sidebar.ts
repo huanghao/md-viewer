@@ -736,7 +736,6 @@ export function renderSidebar(): void {
     renderTabs();
     return;
   }
-
   if (tab === 'list') {
     renderCurrentPath();
     const listEl = document.getElementById('fileList');

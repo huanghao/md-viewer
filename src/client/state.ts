@@ -2,6 +2,7 @@ import type { AppState, FileInfo, FileData } from './types';
 import { loadConfig } from './config';
 import { storageGet, storageSet } from './utils/storage';
 import { recordSignal } from './utils/focus-signals';
+import { fuzzyMatch } from './utils/fuzzy-search';
 import {
   clearListDiff,
   clearWorkspacePathMissing,
@@ -321,7 +322,6 @@ export function getFilteredFiles(): FileInfo[] {
   }
 
   return Array.from(state.sessionFiles.values()).filter(file => {
-    return file.name.toLowerCase().includes(query) ||
-           file.path.toLowerCase().includes(query);
+    return !!fuzzyMatch(file.name, query) || !!fuzzyMatch(file.path, query);
   });
 }

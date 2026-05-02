@@ -7,6 +7,7 @@ import {
 } from '../state';
 import { escapeHtml, escapeAttr } from '../utils/escape';
 import { stripWorkspaceTreeDisplayExtension } from '../utils/workspace-file-name';
+import { fuzzyMatch } from '../utils/fuzzy-search';
 import { getPinnedFiles } from '../utils/pinned-files';
 import { scanWorkspace } from '../workspace';
 import { renderFileRow } from './file-row';
@@ -332,8 +333,8 @@ function renderFocusViewMtime(): string {
     let activeFiles = getActiveFiles(ws.path, tree, windowMs, pinned, state.annotationSummaries);
     if (query) {
       activeFiles = activeFiles.filter((f) => {
-        const name = (stripWorkspaceTreeDisplayExtension(f.name) || f.name).toLowerCase();
-        return name.includes(query) || f.path.toLowerCase().includes(query);
+        const name = stripWorkspaceTreeDisplayExtension(f.name) || f.name;
+        return !!fuzzyMatch(name, query) || !!fuzzyMatch(f.path, query);
       });
     }
     activeFiles = activeFiles.filter((f) => {
@@ -425,8 +426,8 @@ export function renderFocusView(): string {
   // Search filter
   let filtered = query
     ? allCandidates.filter(({ file: f }) => {
-        const name = (stripWorkspaceTreeDisplayExtension(f.name) || f.name).toLowerCase();
-        return name.includes(query) || f.path.toLowerCase().includes(query);
+        const name = stripWorkspaceTreeDisplayExtension(f.name) || f.name;
+        return !!fuzzyMatch(name, query) || !!fuzzyMatch(f.path, query);
       })
     : allCandidates;
 

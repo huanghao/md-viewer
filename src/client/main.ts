@@ -13,7 +13,6 @@ import { loadFile, searchFiles, getNearbyFiles, openFile, detectPathType } from 
 // 导入工具函数
 import { escapeHtml, escapeAttr } from './utils/escape';
 import { normalizeJoinedPath, resolveMarkdownLinkPath } from './utils/md-link';
-import { diffLines } from './utils/diff';
 import { formatRelativeTime } from './utils/format';
 import { generateDistinctNames } from './utils/file-names';
 import { getFileTypeIcon, getFileTypeLabel, isJsonFile, isJsonlFile } from './utils/file-type';
@@ -28,9 +27,7 @@ import { toggleShortcutsHelp, hideShortcutsHelp, isShortcutsHelpVisible } from '
 import { registerAction, initDispatcher } from './keybindings';
 import { initQuickOpen, showQuickOpen, hideQuickOpen } from './ui/quick-open';
 import { renderJsonContent } from './ui/json-viewer';
-import { mountScrollbar, unmountScrollbar, updateScrollbar, updateDiffMarkers, clearDiffMarkers } from './ui/doc-scrollbar';
-import { shouldRefreshDiff, refreshDiffBannerLabel } from './ui/diff-refresh';
-import { buildDiffBannerHTML, initDiffBannerActions } from './ui/diff-banner';
+import { mountScrollbar, unmountScrollbar, updateScrollbar } from './ui/doc-scrollbar';
 import { initChatPanel, onChatFileSwitch, getAgentUrl } from './ui/chat-panel.js';
 
 import { getMdThemeCss, getHlThemeCss } from './themes/index';
@@ -70,6 +67,13 @@ import { createResizer } from './utils/resizer';
 // // import { setupKeyboardShortcuts } from './keyboard-shortcuts'; // migrated to keybindings.ts // migrated to keybindings.ts
 import { initZoom, zoomIn, zoomOut, setZoomFromInput, updateZoomDisplay, setPdfZoomValue, getPdfZoom } from './zoom-controller';
 import { injectParaIds, initTranslation, handleTranslateButtonClick } from './translation';
+import {
+  initDiffView,
+  getDiffViewActive, setDiffViewActive,
+  refreshDiffIfActive,
+  handleDiffButtonClick,
+  navigateDiffBlock,
+} from './diff-view';
 
 declare global {
   function cleanupAllExpiredRecords(): number;
@@ -96,7 +100,6 @@ const SIDEBAR_DEFAULT_WIDTH = 260;
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 680;
 const fileRefreshSeq = new Map<string, number>();
-let diffViewActive = false;
 let workspacePollRunning = false;
 let mermaidInitialized = false;
 let currentPdfBridge: ReturnType<typeof createPdfAnnotationBridge> | null = null;
@@ -572,8 +575,8 @@ async function syncFileFromDisk(
   saveState();
 
   if (state.currentFile === path || state.currentFile === data.path) {
-    if (diffViewActive) {
-      diffViewActive = false;
+    if (getDiffViewActive()) {
+      setDiffViewActive(false);
       const diffBtn = document.getElementById('diffButton');
       if (diffBtn) diffBtn.classList.remove('active');
       const banner = document.getElementById('diffBanner');
@@ -884,7 +887,7 @@ function unmountPdfPageIndicator(container: HTMLElement): void {
 function renderContent() {
   const container = document.getElementById('content');
   if (!container) return;
-  if (!diffViewActive) container.classList.remove('diff-active');
+  if (!getDiffViewActive()) container.classList.remove('diff-active');
 
   // Save scroll position of the outgoing MD file before switching content.
   const outgoingFile = container.getAttribute('data-current-file');
@@ -1395,8 +1398,8 @@ async function handleSmartAddInput(path: string): Promise<void> {
 // 切换文件
 async function switchFile(path: string) {
   // 切换文件时关闭 diff 视图
-  if (diffViewActive) {
-    diffViewActive = false;
+  if (getDiffViewActive()) {
+    setDiffViewActive(false);
     const diffBtn = document.getElementById('diffButton');
     if (diffBtn) diffBtn.classList.remove('active');
     const banner = document.getElementById('diffBanner');
@@ -1530,291 +1533,6 @@ function handleURLParams() {
     // 清理 URL 参数
     window.history.replaceState({}, '', window.location.pathname);
   }
-}
-
-// ==================== Diff 视图 ====================
-
-async function loadPendingContent(path: string): Promise<string | null> {
-  const file = state.sessionFiles.get(path);
-  if (!file) return null;
-  if (file.pendingContent !== undefined) return file.pendingContent;
-  const data = await loadFile(path, true);
-  if (!data) return null;
-  file.pendingContent = data.content;
-  return data.content;
-}
-
-function renderInlineDiffHTML(lines: import('./utils/diff').DiffLine[]): { html: string; totalBlocks: number } {
-  type Segment =
-    | { kind: 'equal'; lines: typeof lines }
-    | { kind: 'delete'; lines: typeof lines }
-    | { kind: 'insert'; lines: typeof lines }
-    | { kind: 'modify'; delLines: typeof lines; insLines: typeof lines };
-
-  const segments: Segment[] = [];
-  let i = 0;
-  while (i < lines.length) {
-    const l = lines[i];
-    if (l.type === 'equal') {
-      const batch: typeof lines = [];
-      while (i < lines.length && lines[i].type === 'equal') batch.push(lines[i++]);
-      segments.push({ kind: 'equal', lines: batch });
-    } else if (l.type === 'delete') {
-      const delBatch: typeof lines = [];
-      while (i < lines.length && lines[i].type === 'delete') delBatch.push(lines[i++]);
-      if (i < lines.length && lines[i].type === 'insert') {
-        const insBatch: typeof lines = [];
-        while (i < lines.length && lines[i].type === 'insert') insBatch.push(lines[i++]);
-        segments.push({ kind: 'modify', delLines: delBatch, insLines: insBatch });
-      } else {
-        segments.push({ kind: 'delete', lines: delBatch });
-      }
-    } else {
-      const batch: typeof lines = [];
-      while (i < lines.length && lines[i].type === 'insert') batch.push(lines[i++]);
-      segments.push({ kind: 'insert', lines: batch });
-    }
-  }
-
-  const md = (s: string) => {
-    const g = protectMath(s);
-    return g.restore((window as any).marked.parse(g.protected));
-  };
-
-  // 将严格相邻（无 equal 间隔）的变更段合并为 group
-  type Group = { segments: Segment[]; hasChange: boolean };
-  const groups: Group[] = [];
-  let currentGroup: Group = { segments: [], hasChange: false };
-
-  for (const seg of segments) {
-    if (seg.kind !== 'equal') {
-      currentGroup.segments.push(seg);
-      currentGroup.hasChange = true;
-    } else {
-      if (currentGroup.hasChange) groups.push(currentGroup);
-      groups.push({ segments: [seg], hasChange: false });
-      currentGroup = { segments: [], hasChange: false };
-    }
-  }
-  if (currentGroup.hasChange) groups.push(currentGroup);
-
-  let blockIndex = 0;
-  let html = '<div class="markdown-body diff-inline-body">';
-
-  for (const group of groups) {
-    if (!group.hasChange) {
-      // 纯 equal 上下文，直接渲染
-      for (const seg of group.segments) {
-        if (seg.kind === 'equal') {
-          html += md(seg.lines.map(l => l.content).join('\n'));
-        }
-      }
-      continue;
-    }
-
-    // 变更 group：外层包 diff-group
-    html += `<div class="diff-group" data-block-index="${blockIndex}">`;
-    for (const seg of group.segments) {
-      if (seg.kind === 'equal') {
-        html += `<div class="diff-group-context">${md(seg.lines.map(l => l.content).join('\n'))}</div>`;
-      } else if (seg.kind === 'delete') {
-        const inner = md(seg.lines.map(l => l.content).join('\n'));
-        html += `<div class="diff-block diff-block-delete">${inner}</div>`;
-      } else if (seg.kind === 'insert') {
-        const inner = md(seg.lines.map(l => l.content).join('\n'));
-        html += `<div class="diff-block diff-block-insert">${inner}</div>`;
-      } else {
-        const delInner = md(seg.delLines.map(l => l.content).join('\n'));
-        const insInner = md(seg.insLines.map(l => l.content).join('\n'));
-        html += `<div class="diff-block diff-block-modify-del">${delInner}</div>`;
-        html += `<div class="diff-block diff-block-modify-ins">${insInner}</div>`;
-      }
-    }
-    html += '</div>';
-    blockIndex++;
-  }
-
-  html += '</div>';
-  return { html, totalBlocks: blockIndex };
-}
-
-function renderDiffView(oldContent: string, newContent: string): void {
-  currentDiffBlockIndex = -1;
-  const container = document.getElementById('content');
-  if (!container) return;
-
-  const lines = diffLines(oldContent, newContent);
-  const hasChanges = lines.some(l => l.type !== 'equal');
-
-  if (!hasChanges) {
-    container.innerHTML = `
-      <div class="diff-no-changes">文件内容与磁盘一致，无差异</div>
-    `;
-    return;
-  }
-
-  const { html: bodyHTML, totalBlocks } = renderInlineDiffHTML(lines);
-
-  // 更新 banner（banner 元素在 #content 之外，由 handleDiffButtonClick 注入）
-  const banner = document.getElementById('diffBanner');
-  if (banner) {
-    const countEl = banner.querySelector<HTMLElement>('#diffNavCount');
-    if (countEl) countEl.textContent = `1 / ${totalBlocks}`;
-    const prevBtn = banner.querySelector<HTMLButtonElement>('#diffNavPrev');
-    const nextBtn = banner.querySelector<HTMLButtonElement>('#diffNavNext');
-    if (prevBtn) prevBtn.disabled = true;
-    if (nextBtn) nextBtn.disabled = totalBlocks <= 1;
-  }
-
-  container.innerHTML = bodyHTML;
-  renderMath(container);
-
-  // 更新滚动条 diff 标记
-  unmountScrollbar();
-  mountScrollbar();
-  const diffGroups: Array<{ el: HTMLElement; kind: 'insert' | 'delete' | 'modify' }> = [];
-  container.querySelectorAll<HTMLElement>('.diff-group[data-block-index]').forEach(groupEl => {
-    const hasInsert = groupEl.querySelector('.diff-block-insert, .diff-block-modify-ins');
-    const hasDelete = groupEl.querySelector('.diff-block-delete, .diff-block-modify-del');
-    const kind = (hasInsert && hasDelete) ? 'modify' : hasInsert ? 'insert' : 'delete';
-    diffGroups.push({ el: groupEl, kind });
-  });
-  updateDiffMarkers(diffGroups);
-
-  // 自动跳到第一个 block
-  navigateDiffBlock(1);
-}
-
-function refreshDiffIfActive(): void {
-  if (!state.currentFile) return;
-  const file = state.sessionFiles.get(state.currentFile);
-  if (!shouldRefreshDiff({ diffViewActive, pendingContent: file?.pendingContent })) return;
-  refreshDiffBannerLabel(document);
-  renderDiffView(file!.content, file!.pendingContent!);
-}
-
-async function handleDiffButtonClick(): Promise<void> {
-  if (!state.currentFile) return;
-  const file = state.sessionFiles.get(state.currentFile);
-  if (!file) return;
-
-  if (diffViewActive) {
-    closeDiffView();
-    return;
-  }
-
-  const newContent = await loadPendingContent(state.currentFile);
-  if (newContent === null) return;
-
-  diffViewActive = true;
-  const diffBtn = document.getElementById('diffButton');
-  if (diffBtn) diffBtn.classList.add('active');
-  document.getElementById('content')?.classList.add('diff-active');
-
-  // 插入 banner 到 #content 父元素
-  const contentEl = document.getElementById('content');
-  const parent = contentEl?.parentElement;
-  if (parent && !document.getElementById('diffBanner')) {
-    const banner = document.createElement('div');
-    banner.id = 'diffBanner';
-    banner.className = 'diff-banner';
-    banner.innerHTML = buildDiffBannerHTML();
-    initDiffBannerActions(banner, {
-      onNavigate: (dir) => navigateDiffBlock(dir),
-      onAccept: () => acceptDiffUpdate(),
-      onClose: () => closeDiffView(),
-    });
-    const prevBtn = banner.querySelector<HTMLButtonElement>('#diffNavPrev');
-    if (prevBtn) prevBtn.disabled = true;
-    parent.insertBefore(banner, contentEl);
-  }
-
-  renderDiffView(file.content, newContent);
-}
-
-function closeDiffView(): void {
-  diffViewActive = false;
-  currentDiffBlockIndex = -1;
-  const diffBtn = document.getElementById('diffButton');
-  if (diffBtn) diffBtn.classList.remove('active');
-  document.getElementById('content')?.classList.remove('diff-active');
-
-  // 移除 banner
-  const banner = document.getElementById('diffBanner');
-  if (banner) banner.remove();
-
-  clearDiffMarkers();
-  renderContent();
-}
-
-let currentDiffBlockIndex = -1; // -1 表示未激活任何 block
-
-function navigateDiffBlock(direction: 1 | -1): void {
-  const contentEl = document.getElementById('content');
-  if (!contentEl) return;
-
-  // 找所有 diff-group 元素，按 DOM 顺序收集
-  const blockEls: HTMLElement[] = [];
-  contentEl.querySelectorAll<HTMLElement>('.diff-group[data-block-index]').forEach(el => {
-    blockEls.push(el);
-  });
-  const totalBlocks = blockEls.length;
-  if (totalBlocks === 0) return;
-
-  const nextIndex = currentDiffBlockIndex === -1
-    ? (direction === 1 ? 0 : totalBlocks - 1)
-    : Math.max(0, Math.min(totalBlocks - 1, currentDiffBlockIndex + direction));
-
-  if (nextIndex === currentDiffBlockIndex && currentDiffBlockIndex !== -1) return;
-
-  // 移除旧 focus
-  contentEl.querySelectorAll<HTMLElement>('.diff-focused').forEach(el => {
-    el.classList.remove('diff-focused');
-  });
-
-  // 加新 focus（同一 blockIndex 的所有元素，即 modify 的 del+ins 两个都高亮）
-  contentEl.querySelectorAll<HTMLElement>(`.diff-group[data-block-index="${nextIndex}"]`).forEach(el => {
-    el.classList.add('diff-focused');
-  });
-
-  // 滚动到第一个匹配元素
-  blockEls[nextIndex]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-  currentDiffBlockIndex = nextIndex;
-
-  // 更新 banner 计数和按钮状态
-  const countEl = document.getElementById('diffNavCount');
-  if (countEl) countEl.textContent = `${nextIndex + 1} / ${totalBlocks}`;
-  const prevBtn = document.getElementById('diffNavPrev') as HTMLButtonElement | null;
-  const nextBtn = document.getElementById('diffNavNext') as HTMLButtonElement | null;
-  if (prevBtn) prevBtn.disabled = nextIndex === 0;
-  if (nextBtn) nextBtn.disabled = nextIndex === totalBlocks - 1;
-}
-
-async function acceptDiffUpdate(): Promise<void> {
-  if (!state.currentFile) return;
-  const file = state.sessionFiles.get(state.currentFile);
-  if (!file || file.pendingContent === undefined) return;
-
-  file.content = file.pendingContent;
-  file.pendingContent = undefined;
-  file.displayedModified = file.lastModified;
-  saveState();
-
-  diffViewActive = false;
-  const diffBtn = document.getElementById('diffButton');
-  if (diffBtn) diffBtn.classList.remove('active');
-  const banner = document.getElementById('diffBanner');
-  if (banner) banner.remove();
-  document.getElementById('content')?.classList.remove('diff-active');
-  currentDiffBlockIndex = -1;
-  clearDiffMarkers();
-  renderContent();
-  updateToc(state.currentFile);
-  syncAnnotationsForCurrentFile(false);
-  flashContentUpdated();
-  renderSidebar();
-  await updateToolbarButtons();
 }
 
 // ==================== 工具栏按钮 ====================
@@ -2253,7 +1971,7 @@ async function syncOpenFilesAfterReconnect() {
 
     // 如果当前文件有更新且未在 diff 模式，给用户提示
     const currentFile = state.currentFile ? state.sessionFiles.get(state.currentFile) : null;
-    if (currentFile && currentFile.pendingContent !== undefined && !diffViewActive) {
+    if (currentFile && currentFile.pendingContent !== undefined && !getDiffViewActive()) {
       showInfo('文件有更新，点击 Diff 查看差异', 3000);
     }
   }
@@ -2295,7 +2013,7 @@ function connectSSE(isReconnect = false) {
         clearWorkspacePathMissing(data.path);
       }
       // 若当前文件正在 diff 模式，fetch 新内容并刷新 diff 界面
-      if (diffViewActive && state.currentFile === data.path) {
+      if (getDiffViewActive() && state.currentFile === data.path) {
         const fetched = await loadFile(data.path, true);
         if (fetched) {
           file.pendingContent = fetched.content;
@@ -2585,6 +2303,15 @@ function startWorkspacePolling() {
   }
   startWorkspacePolling();
 
+  initDiffView({
+    renderContent,
+    updateToolbarButtons,
+    updateToc,
+    syncAnnotationsForCurrentFile,
+    flashContentUpdated,
+    renderMath,
+  });
+
   // 工具栏 + annotation tabs：document 级事件委托，一次性注册
   initToolbarActions(document, {
     handleDiffButtonClick: () => void handleDiffButtonClick(),
@@ -2766,7 +2493,7 @@ function startWorkspacePolling() {
     defaultKey: 'j',
     context: 'Diff 模式',
     handler: () => navigateDiffBlock(1),
-    shouldActivate: () => diffViewActive && !isInputFocused(),
+    shouldActivate: () => getDiffViewActive() && !isInputFocused(),
   });
 
   registerAction({
@@ -2776,7 +2503,7 @@ function startWorkspacePolling() {
     defaultKey: 'k',
     context: 'Diff 模式',
     handler: () => navigateDiffBlock(-1),
-    shouldActivate: () => diffViewActive && !isInputFocused(),
+    shouldActivate: () => getDiffViewActive() && !isInputFocused(),
   });
 
   // j/k: 在当前侧边栏视角里上下移动文件（非 diff 模式，非输入框）
@@ -2787,7 +2514,7 @@ function startWorkspacePolling() {
     defaultKey: 'j',
     context: '非 Diff 模式',
     handler: () => navigateFileInView(1),
-    shouldActivate: () => !diffViewActive && !isInputFocused(),
+    shouldActivate: () => !getDiffViewActive() && !isInputFocused(),
   });
 
   registerAction({
@@ -2797,7 +2524,7 @@ function startWorkspacePolling() {
     defaultKey: 'k',
     context: '非 Diff 模式',
     handler: () => navigateFileInView(-1),
-    shouldActivate: () => !diffViewActive && !isInputFocused(),
+    shouldActivate: () => !getDiffViewActive() && !isInputFocused(),
   });
 
   // h/l: tab 左右切换（非输入框）

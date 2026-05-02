@@ -547,15 +547,14 @@ export function showQuickAdd(x: number, y: number, pendingData: Omit<Annotation,
   }
   state.pendingAnnotation = { ...pendingData, note: '', createdAt: Date.now() };
   state.pendingAnnotationFilePath = el.content?.getAttribute('data-current-file') || state.currentFilePath;
-  const width = 80;
-  const height = 30;
-  const left = clamp(x, 8, window.innerWidth - width - 8);
-  const top = clamp(y, 8, window.innerHeight - height - 8);
-  _lastQuickAddX = left;
-  _lastQuickAddY = top;
-  el.quickAddWrap.style.left = `${left}px`;
-  el.quickAddWrap.style.top = `${top}px`;
   el.quickAddWrap.classList.remove('hidden');
+  placeFloating(el.quickAddWrap, x, y, {
+    fallbackWidth: 168,
+    fallbackHeight: 96,
+    flipY: true,
+  });
+  _lastQuickAddX = Number.parseFloat(el.quickAddWrap.style.left || '0');
+  _lastQuickAddY = Number.parseFloat(el.quickAddWrap.style.top || '0');
 }
 
 function hideQuickAdd(clearPending = false): void {
@@ -1966,10 +1965,6 @@ export function initAnnotationElements(): void {
     syncAnnotationSidebarLayout();
     syncPinnedPopoverPosition();
   });
-
-  (window as any).openAnnotationSidebar = openAnnotationSidebar;
-  (window as any).closeAnnotationSidebar = closeAnnotationSidebar;
-  (window as any).toggleAnnotationSidebar = toggleAnnotationSidebar;
 
   // ── 拆分 / 合并 Chat 面板 ──────────────────────────────────────────────────
   const CHAT_SPLIT_KEY = 'md-viewer:chat-split';

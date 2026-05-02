@@ -63,7 +63,7 @@ export function renderTocPanel(
     (header.getElementsByClassName('toc-toggle-btn')[0] as HTMLElement | undefined)?.addEventListener('click', () => {
       sidebar?.classList.remove('toc-visible');
       // Persist close for current file
-      (window as any).__onTocClose?.();
+      document.dispatchEvent(new CustomEvent('toc:close'));
     });
   }
 

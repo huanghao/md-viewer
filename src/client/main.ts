@@ -1,5 +1,6 @@
 // 导入类型
 import type { FileData } from './types';
+import type { TocItem } from './toc-extractor.js';
 
 // 导入状态管理
 import { state, saveState, restoreState, addOrUpdateFile, removeFile as removeFileFromState, switchToFile, setSearchQuery, markFileMissing, getSessionFile, saveScrollPosition, markWorkspaceFailed } from './state';
@@ -116,6 +117,13 @@ function applyPdfModeButtons(mode: 'select' | 'annotate'): void {
   const annotateBtn = document.getElementById('pdfModeAnnotateBtn');
   if (selectBtn) selectBtn.classList.toggle('is-active', !isAnnotate);
   if (annotateBtn) annotateBtn.classList.toggle('is-active', isAnnotate);
+}
+
+function setPdfMode(mode: 'select' | 'annotate'): void {
+  const nextMode = mode === 'annotate' ? 'annotate' : 'select';
+  storageSet(PDF_MODE_KEY, nextMode);
+  currentPdfViewer?.setAnnotateMode(nextMode === 'annotate');
+  applyPdfModeButtons(nextMode);
 }
 
 function evictPdfViewer(filePath: string): void {
@@ -281,9 +289,9 @@ function setupTocOpenBtn(): void {
     saveTocOpen(true);
   });
   // Wire close callback for toc-panel.ts
-  (window as any).__onTocClose = () => {
+  document.addEventListener('toc:close', () => {
     saveTocOpen(false);
-  };
+  });
 }
 const TOC_PANE_DEFAULT_HEIGHT = 240;
 const TOC_PANE_MIN_HEIGHT = 80;
@@ -977,7 +985,7 @@ function renderContent() {
       updateToc(filePath);
       // Restore and apply saved PDF mode
       const savedPdfMode = storageGet<string>(PDF_MODE_KEY, 'select') as 'select' | 'annotate';
-      currentPdfViewer.setAnnotateMode(savedPdfMode === 'annotate');
+      existingEntry.viewer.setAnnotateMode(savedPdfMode === 'annotate');
       const pdfModeSelectBtn = document.getElementById('pdfModeSelectBtn');
       const pdfModeAnnotateBtn = document.getElementById('pdfModeAnnotateBtn');
       if (pdfModeSelectBtn) pdfModeSelectBtn.style.display = '';
@@ -1030,7 +1038,7 @@ function renderContent() {
       updateToc(filePath);
       // Restore and apply saved PDF mode
       const savedPdfMode = storageGet<string>(PDF_MODE_KEY, 'select') as 'select' | 'annotate';
-      currentPdfViewer.setAnnotateMode(savedPdfMode === 'annotate');
+      pdfViewerInstance.setAnnotateMode(savedPdfMode === 'annotate');
       const pdfModeSelectBtn = document.getElementById('pdfModeSelectBtn');
       const pdfModeAnnotateBtn = document.getElementById('pdfModeAnnotateBtn');
       if (pdfModeSelectBtn) pdfModeSelectBtn.style.display = '';
@@ -2498,7 +2506,7 @@ function startWorkspacePolling() {
 
   // 初始化字体缩放
   initZoom({
-    getCurrentFile: () => state.currentFile,
+    getCurrentFile: () => state.currentFile ?? undefined,
     getPdfViewer: (filePath) => pdfViewerRegistry.get(filePath)?.viewer ?? null,
   });
 
@@ -2532,7 +2540,7 @@ function startWorkspacePolling() {
   initTodoPanel();
   initTodoExternalCallbacks({
     switchFile: (path) => void switchFile(path),
-    switchAnnotationTab,
+    switchAnnotationTab: (tab) => switchAnnotationTab(tab as 'comments' | 'chat' | 'todo'),
     openAnnotationSidebar,
   });
 
@@ -2734,7 +2742,7 @@ function startWorkspacePolling() {
     category: 'view',
     defaultKey: `${modKey}+Shift+k`,
     handler: () => {
-      (window as any).setSidebarTab?.('search');
+      document.dispatchEvent(new CustomEvent('sidebar:set-tab', { detail: { tab: 'search' } }));
     },
     shouldActivate: () => !isInputFocused(),
   });
@@ -3131,7 +3139,7 @@ function setupFindBar() {
     clearHighlights();
   }
 
-  // 暴露给 Swift 调用
+  // 暴露给 Swift 调用（Swift 通过 evaluateJavaScript("window.__showFindBar(true/false)") 调用）
   (window as any).__showFindBar = show;
 
   input.addEventListener('input', () => highlightMatches(input.value));

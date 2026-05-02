@@ -462,7 +462,7 @@ function bindTabEvents(): void {
 
   const clearCommentsBtn = document.getElementById('clearAllCommentsBtn');
   clearCommentsBtn?.addEventListener('click', () => {
-    (window as any).clearAllAnnotationState?.();
+    // TODO: implement clearAllAnnotationState
   });
 
   const clearStateBtn = document.getElementById('clearClientStateBtn');

@@ -1,3 +1,4 @@
+import type { FileInfo } from '../types';
 import { state, setSearchQuery, getFilteredFiles, saveState, moveTabOrder } from '../state';
 import { hasListDiff } from '../workspace-state';
 import { saveConfig } from '../config';
@@ -188,7 +189,17 @@ export function setSidebarTab(tab: 'focus' | 'full' | 'list' | 'search'): void {
 }
 
 if (typeof window !== 'undefined') {
-  (window as any).setSidebarTab = setSidebarTab;
+  document.addEventListener('sidebar:set-tab', (e) => {
+    setSidebarTab((e as CustomEvent<{ tab: string }>).detail.tab);
+  });
+  document.addEventListener('click', (ev: MouseEvent) => {
+    const el = (ev.target as Element).closest('[data-action]') as HTMLElement | null;
+    if (!el) return;
+    if (el.dataset.action === 'set-sidebar-tab') {
+      const tab = el.dataset.tab;
+      if (tab) setSidebarTab(tab);
+    }
+  });
 }
 
 export function toggleTabManager(): void {
@@ -408,7 +419,7 @@ function renderViewTabs(): void {
     <div class="view-tabs">
       ${tabs.map(t => `
         <button class="view-tab${tab === t.key ? ' active' : ''}"
-                onclick="setSidebarTab('${t.key}')">${t.label}</button>
+                data-action="set-sidebar-tab" data-tab="${t.key}">${t.label}</button>
       `).join('')}
     </div>
   `;

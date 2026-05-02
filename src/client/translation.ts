@@ -1,5 +1,5 @@
 const TRANSLATE_URL_KEY = 'md-viewer:translate-url';
-const DEFAULT_TRANSLATE_URL = 'http://localhost:5050';
+const DEFAULT_TRANSLATE_URL = 'http://localhost:3002';
 const TRANSLATE_STATE_PREFIX = 'md-viewer:translate:';
 
 export function getTranslateUrl(): string {

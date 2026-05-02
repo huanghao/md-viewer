@@ -2,12 +2,15 @@
 # 日常开发只需要: just dev / just install
 
 # 开发模式：同时启动前端 watch + 后端 watch，Ctrl+C 一起退出
+# 端口: main=3000, rag=3001, translate=3002, agent=3003
 dev:
     #!/usr/bin/env bash
     trap 'kill 0' INT TERM
     bun run build.ts --watch &
     bun --watch run src/server.ts &
     bun --watch run src/rag-server.ts &
+    bun --watch run agent-server/server.ts &
+    python3 translate-server/server.py &
     wait
 
 # 构建并安装 Mac App 到 /Applications

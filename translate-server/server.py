@@ -107,7 +107,7 @@ def health():
 if __name__ == "__main__":
     import uvicorn
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=5050)
+    parser.add_argument("--port", type=int, default=3002)
     parser.add_argument("--clear-before", type=int, default=None,
                         help="Delete cache entries older than N days, then exit")
     args = parser.parse_args()

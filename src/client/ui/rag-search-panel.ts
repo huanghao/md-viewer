@@ -62,7 +62,7 @@ export function renderRagSearchPanel(container: HTMLElement): void {
           type="text"
           class="search-input"
           id="ragSearchInput"
-          placeholder="搜索内容… (⌘⇧F)"
+          placeholder="搜索内容… (⌘⇧K)"
           autocomplete="off"
           spellcheck="false"
         />
@@ -278,4 +278,3 @@ function highlightRagChunk(chunkText: string): void {
     return;
   }
 }
-

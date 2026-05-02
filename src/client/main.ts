@@ -2732,7 +2732,7 @@ function startWorkspacePolling() {
     id: 'rag-search',
     label: '内容搜索',
     category: 'view',
-    defaultKey: `${modKey}+Shift+f`,
+    defaultKey: `${modKey}+Shift+k`,
     handler: () => {
       (window as any).setSidebarTab?.('search');
     },

@@ -13,6 +13,7 @@ const SHORTCUTS = [
   { key: `${mod}W`, desc: '关闭当前文件' },
   { group: '视图' },
   { key: `${mod}K`, desc: '聚焦搜索框' },
+  { key: `${mod}⇧K`, desc: '内容搜索' },
   { key: `${mod}+`, desc: '放大' },
   { key: `${mod}−`, desc: '缩小' },
   { key: `${mod}0`, desc: '重置缩放' },

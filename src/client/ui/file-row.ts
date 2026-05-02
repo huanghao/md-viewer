@@ -96,7 +96,8 @@ export function renderFileRow(
     pinBtn = `<button
       class="tree-pin-btn${pinned ? ' active' : ''}"
       title="${pinned ? '取消固定' : '固定到最近视图'}"
-      onclick="event.stopPropagation();${pinned ? `handleUnpinFile` : `handlePinFile`}('${escapeAttr(path)}')"
+      data-action="${pinned ? 'unpin-file' : 'pin-file'}"
+      data-path="${escapeAttr(path)}"
     >📌</button>`;
   }
 
@@ -123,7 +124,7 @@ export function renderFileRow(
   const clickAttr = opts.onClickJs
     ? `onclick="${opts.onClickJs(path)}"`
     : opts.onClickAction
-      ? `data-action="${escapeAttr(opts.onClickAction)}"`
+      ? `data-action="${escapeAttr(opts.onClickAction)}" data-path="${escapeAttr(path)}"`
       : '';
 
   return `

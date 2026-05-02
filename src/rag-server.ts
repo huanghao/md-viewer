@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { loadModel, scanWorkspace, watchWorkspace, getEmbedder } from "./rag-indexer.ts";
-import { getAllVectors, getWorkspacePaths } from "./rag-storage.ts";
+import { getWorkspacePaths } from "./rag-storage.ts";
+import { getVectorCache } from "./rag-vector-cache.ts";
 
 const RAG_PORT = 3001;
 const MAIN_SERVER_URL = "http://localhost:3000";
@@ -25,7 +26,7 @@ app.get("/search", async (c) => {
   const out = await (embedder as any)([q], { pooling: "mean", normalize: true });
   const queryVec = out.data.slice(0, out.data.length) as Float32Array;
 
-  const chunks = getAllVectors();
+  const chunks = getVectorCache();
   const scored = chunks.map(ch => ({ ...ch, score: cosine(queryVec, ch.vector) }));
   scored.sort((a, b) => b.score - a.score);
   const top = scored.slice(0, limit).map(ch => ({

@@ -5,6 +5,7 @@ import { collectWorkspaceMdFiles } from "./workspace-scanner.ts";
 import chokidar from "chokidar";
 import { chunkMarkdown } from "./rag-chunker.ts";
 import { upsertFileChunks, deleteFileChunks, getFileMtime, getMeta, setMeta } from "./rag-storage.ts";
+import { invalidateChunksForPath, appendChunks } from "./rag-vector-cache.ts";
 
 export const MODEL_NAME = "Xenova/paraphrase-multilingual-MiniLM-L12-v2";
 const MODEL_DTYPE = "q8";
@@ -27,6 +28,8 @@ export async function loadModel(): Promise<void> {
   if ((storedName && storedName !== MODEL_NAME) || (storedDtype && storedDtype !== MODEL_DTYPE)) {
     console.log("[rag] Model config changed, clearing old vectors...");
     getDb().exec("DELETE FROM rag_vectors; DELETE FROM rag_chunks;");
+    const { resetCache } = await import("./rag-vector-cache.ts");
+    resetCache();
   }
   setMeta("model_name", MODEL_NAME);
   setMeta("model_dtype", MODEL_DTYPE);
@@ -66,22 +69,30 @@ export async function indexFile(filePath: string): Promise<void> {
     const chunks = chunkMarkdown(content);
     if (chunks.length === 0) {
       deleteFileChunks(filePath);
+      invalidateChunksForPath(filePath);
       return;
     }
 
     console.log(`[rag] Indexing ${filePath} (${chunks.length} chunks)...`);
     const vectors = await embedTexts(chunks.map(c => c.text));
-    upsertFileChunks(
-      chunks.map((c, i) => ({
-        path: filePath,
-        chunkIndex: i,
-        heading: c.heading,
-        text: c.text,
-        charStart: c.charStart,
-        fileMtime: mtime,
-      })),
-      vectors
-    );
+    const ragChunks = chunks.map((c, i) => ({
+      path: filePath,
+      chunkIndex: i,
+      heading: c.heading,
+      text: c.text,
+      charStart: c.charStart,
+      fileMtime: mtime,
+    }));
+    upsertFileChunks(ragChunks, vectors);
+    invalidateChunksForPath(filePath);
+    appendChunks(ragChunks.map((c, i) => ({
+      id: -1, // not used in search
+      path: c.path,
+      heading: c.heading,
+      text: c.text,
+      charStart: c.charStart,
+      vector: vectors[i],
+    })));
   } catch (e) {
     console.error(`[rag] Error indexing ${filePath}:`, e);
   }
@@ -145,6 +156,7 @@ export function watchWorkspace(workspacePath: string): void {
     .on("unlink", (p) => {
       if ([".md", ".markdown"].includes(extname(p))) {
         deleteFileChunks(p);
+        invalidateChunksForPath(p);
         console.log(`[rag] Deleted: ${p}`);
       }
     });

@@ -74,6 +74,10 @@ declare global {
   function cleanupAllExpiredRecords(): number;
 }
 
+// Module-level variables for internal function references
+let _resetDwell: (() => void) | null = null;
+let _setPendingAnnotation: ((ann: any, filePath: string, x: number, y: number) => void) | null = null;
+
 export function applyTheme(): void {
   const mdCss = getMdThemeCss(state.config.markdownTheme || 'github');
   const hlCss = getHlThemeCss(state.config.codeTheme || 'github');
@@ -1391,7 +1395,7 @@ async function switchFile(path: string) {
     if (banner) banner.remove();
   }
   const previousFile = state.currentFile;
-  (window as any).__resetDwell?.();
+  _resetDwell?.();
   switchToFile(path);
   updateZoomDisplay(true);
   renderSidebar();
@@ -2405,7 +2409,7 @@ if (typeof window !== 'undefined') {
   }
 
   // resetDwell is called from switchFile (defined below in this file)
-  (window as any).__resetDwell = () => {
+  _resetDwell = () => {
     pauseDwell();
     scrollAccum = 0;
     lastScrollTop = 0;
@@ -2548,7 +2552,7 @@ function startWorkspacePolling() {
     },
   });
   initChatPanel();
-  (window as any).__setPendingAnnotation = setPendingAnnotation;
+  _setPendingAnnotation = setPendingAnnotation;
   syncAnnotationSidebarLayout();
   window.addEventListener('resize', () => {
     syncAnnotationSidebarLayout();
@@ -2925,8 +2929,8 @@ function startWorkspacePolling() {
   // 监听 pdf:show-composer 事件
   document.addEventListener("pdf:show-composer", (e: Event) => {
     const { annotation, filePath, clientX, clientY } = (e as CustomEvent).detail;
-    if ((window as any).__setPendingAnnotation) {
-      (window as any).__setPendingAnnotation(annotation, filePath, clientX, clientY);
+    if (_setPendingAnnotation) {
+      _setPendingAnnotation(annotation, filePath, clientX, clientY);
     }
   });
 

@@ -347,9 +347,6 @@ export function initTodoPanel(): void {
       onDoneToggle: doneToggle,
     });
   }
-  (window as any).setTodoFilter = setTodoFilter;
-  (window as any).showTodoComposer = showTodoComposer;
-
   // Fetch open count on init so tab badge and floating button badge are correct
   // without requiring the user to open the Todo tab first.
   fetchTodos({ done: false }).then(todos => {

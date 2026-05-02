@@ -190,14 +190,14 @@ export function setSidebarTab(tab: 'focus' | 'full' | 'list' | 'search'): void {
 
 if (typeof window !== 'undefined') {
   document.addEventListener('sidebar:set-tab', (e) => {
-    setSidebarTab((e as CustomEvent<{ tab: string }>).detail.tab);
+    setSidebarTab((e as CustomEvent<{ tab: string }>).detail.tab as Parameters<typeof setSidebarTab>[0]);
   });
   document.addEventListener('click', (ev: MouseEvent) => {
     const el = (ev.target as Element).closest('[data-action]') as HTMLElement | null;
     if (!el) return;
     if (el.dataset.action === 'set-sidebar-tab') {
       const tab = el.dataset.tab;
-      if (tab) setSidebarTab(tab);
+      if (tab) setSidebarTab(tab as Parameters<typeof setSidebarTab>[0]);
     }
   });
 }

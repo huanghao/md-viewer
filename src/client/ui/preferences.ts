@@ -366,7 +366,7 @@ async function renderCommentsTab(container: Element): Promise<void> {
   const items = await fetchQuickComments();
   editingComments = items.map((it) => it.text);
 
-  const PRESETS = ['这是什么？', '举例说明', '为什么这样做？', '有什么风险？', '如何改进？', '出处在哪？'];
+  const PRESETS = ['这是什么，解释一下', '有点抽象，举个例子', '单独写一篇文档介绍这个', '给一些数字，让我有个体感', '你确定吗？别猜，去代码里确认'];
 
   container.innerHTML = `
     <div class="settings-group-title">快捷评论</div>

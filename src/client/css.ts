@@ -4176,16 +4176,16 @@ export const styles = `
     .todo-composer-quote { background: #f5f5f4; border-left: 3px solid var(--color-accent); padding: 7px 10px; border-radius: 0 6px 6px 0; font-size: 12px; color: var(--color-text-secondary); line-height: 1.55; font-style: italic; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 8px; }
 
     /* ── Quick-add two-button wrap ── */
-    .annotation-quick-add-wrap { position: fixed; z-index: var(--z-quick-add); display: flex; gap: 3px; background: #1c1917; border-radius: 8px; padding: 4px 5px; box-shadow: 0 4px 16px rgba(0,0,0,0.25), 0 1px 4px rgba(0,0,0,0.15); align-items: center; }
+    .annotation-quick-add-wrap { position: fixed; z-index: var(--z-quick-add); display: flex; flex-direction: column; min-width: 160px; background: #1c1917; border-radius: 8px; padding: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.25), 0 1px 4px rgba(0,0,0,0.15); overflow: hidden; }
     .annotation-quick-add-wrap.hidden { display: none; }
-    .quick-add-btn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 5px; border: none; font-size: 12px; cursor: pointer; font-weight: 500; color: #e7e5e4; background: transparent; transition: background 0.1s; font-family: inherit; }
+    .quick-add-btn { display: flex; align-items: center; gap: 7px; padding: 6px 10px; border-radius: 5px; border: none; font-size: 13px; cursor: pointer; font-weight: 400; color: #e7e5e4; background: transparent; transition: background 0.1s; font-family: inherit; width: 100%; text-align: left; }
     .quick-add-btn:hover { background: rgba(255,255,255,0.12); }
     .quick-add-btn.todo { color: #93c5fd; }
     .quick-add-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
     .quick-add-section { padding: 4px; }
-    .quick-add-section + .quick-add-section { border-top: 1px solid var(--color-border, #d0d7de); }
-    .quick-add-section-label { font-size: 10px; color: var(--color-text-muted, #8b949e); padding: 4px 8px 2px; text-transform: uppercase; letter-spacing: 0.4px; }
-    .quick-add-btn.quick-prompt { color: var(--color-accent, #8b5cf6); }
+    .quick-add-section + .quick-add-section { border-top: 1px solid rgba(255,255,255,0.1); }
+    .quick-add-section-label { font-size: 10px; color: rgba(255,255,255,0.35); padding: 4px 8px 2px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .quick-add-btn.quick-prompt { color: #c4b5fd; }
 
     /* ── Copy menu ── */
     .todo-copy-menu { position: fixed; background: #1c1917; border-radius: 8px; padding: 4px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); z-index: calc(var(--z-quick-add) + 1); min-width: 180px; }

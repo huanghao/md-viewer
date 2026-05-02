@@ -208,6 +208,19 @@ export function getDb(): Database {
     );
   `);
 
+  const qcCount = (db.query('SELECT COUNT(*) as n FROM quick_comments').get() as { n: number }).n;
+  if (qcCount === 0) {
+    const defaults = [
+      '这是什么，解释一下',
+      '有点抽象，举个例子',
+      '单独写一篇文档介绍这个',
+      '给一些数字，让我有个体感',
+      '你确定吗？别猜，去代码里确认',
+    ];
+    const insertDefault = db.prepare('INSERT INTO quick_comments (text, sort_order) VALUES (?, ?)');
+    defaults.forEach((text, i) => insertDefault.run(text, i));
+  }
+
   const columns = db.query(`PRAGMA table_info(annotations)`).all() as Array<{ name: string }>;
   const hasSerial = columns.some((col) => col.name === "serial");
   const hasThreadJson = columns.some((col) => col.name === "thread_json");

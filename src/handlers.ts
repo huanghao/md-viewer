@@ -947,11 +947,12 @@ export function handleGetQuickComments(c: Context) {
 }
 
 export async function handleUpsertQuickComments(c: Context) {
-  const body = await c.req.json() as { items?: Array<{ text: string }> };
+  let body: any;
+  try { body = await c.req.json(); } catch { return c.json({ error: 'invalid JSON' }, 400); }
   if (!Array.isArray(body.items)) return c.json({ error: 'items must be array' }, 400);
   const sanitized = body.items
-    .map((it) => ({ text: String(it.text ?? '').trim() }))
-    .filter((it) => it.text.length > 0)
+    .map((it: any) => ({ text: String(it.text ?? '').trim() }))
+    .filter((it: { text: string }) => it.text.length > 0)
     .slice(0, 50);
   replaceQuickComments(sanitized);
   return c.json({ ok: true });

@@ -1,6 +1,7 @@
 import type { PdfViewerInstance } from "./pdf-viewer.js";
 import { nextAnnotationSerial, showQuickAdd, showPopover, showPopoverBottomRight } from "./annotation.js";
 import type { Annotation } from "./annotation.js";
+import { pdfPendingRectCoords, setPdfPendingRectCoords } from './pdf-state';
 
 export interface PdfAnnotationBridgeOptions {
   filePath: string;
@@ -38,9 +39,8 @@ export function createPdfAnnotationBridge(opts: PdfAnnotationBridgeOptions): Pdf
     // Build a pending annotation and show the composer
     const annotations = opts.getAnnotations();
     const serial = nextAnnotationSerial(annotations);
-    const pendingRect = (window as any).__pdfPendingRectCoords as
-      { pageNum: number; x1: number; y1: number; x2: number; y2: number } | null | undefined;
-    (window as any).__pdfPendingRectCoords = null;
+    const pendingRect = pdfPendingRectCoords;
+    setPdfPendingRectCoords(null);
     const rectCoords = pendingRect && pendingRect.pageNum === pageNum
       ? { x1: pendingRect.x1, y1: pendingRect.y1, x2: pendingRect.x2, y2: pendingRect.y2 }
       : undefined;

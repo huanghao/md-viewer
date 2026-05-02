@@ -59,6 +59,7 @@ import { initTodoPanel, initTodoExternalCallbacks } from './ui/todo-panel';
 
 import { createPdfViewer, type PdfViewerInstance } from "./pdf-viewer.js";
 import { createPdfAnnotationBridge } from "./pdf-annotation.js";
+import { currentPdfViewer, setCurrentPdfViewer, setPdfDefaultScale } from './pdf-state';
 import { extractMdToc, extractPdfOutline, loadSidecar, saveSidecar, scanPdfHeadings } from './toc-extractor.js';
 import { renderTocPanel, setActiveTocItem } from './ui/toc-panel.js';
 import { storageGet, storageSet, storageGetNumber } from './utils/storage';
@@ -93,7 +94,6 @@ const fileRefreshSeq = new Map<string, number>();
 let diffViewActive = false;
 let workspacePollRunning = false;
 let mermaidInitialized = false;
-let currentPdfViewer: PdfViewerInstance | null = null;
 let currentPdfBridge: ReturnType<typeof createPdfAnnotationBridge> | null = null;
 
 // PDF viewer registry: tracks all open PDF viewers and their idle timers
@@ -114,20 +114,13 @@ function applyPdfModeButtons(mode: 'select' | 'annotate'): void {
   if (annotateBtn) annotateBtn.classList.toggle('is-active', isAnnotate);
 }
 
-(window as any).setPdfMode = function(mode: 'select' | 'annotate') {
-  if (!currentPdfViewer) return;
-  currentPdfViewer.setAnnotateMode(mode === 'annotate');
-  storageSet(PDF_MODE_KEY, mode);
-  applyPdfModeButtons(mode);
-};
-
 function evictPdfViewer(filePath: string): void {
   const entry = pdfViewerRegistry.get(filePath);
   if (!entry) return;
   if (entry.idleTimer) clearTimeout(entry.idleTimer);
   entry.viewer.destroy();
-  if ((window as any).__currentPdfViewer === entry.viewer) {
-    (window as any).__currentPdfViewer = null;
+  if (currentPdfViewer === entry.viewer) {
+    setCurrentPdfViewer(null);
   }
   pdfViewerRegistry.delete(filePath);
 }
@@ -898,8 +891,7 @@ function renderContent() {
     }
     if (path !== state.currentFile) scheduleEviction(path);
   }
-  currentPdfViewer = null;
-  (window as any).__currentPdfViewer = null;
+  setCurrentPdfViewer(null);
   currentPdfBridge = null;
   container.removeAttribute('data-pdf');
   if (!state.currentFile || !isPdfPath(state.currentFile)) {
@@ -955,7 +947,6 @@ function renderContent() {
     // Reuse existing viewer if available — re-attach its el to container
     const existingEntry = pdfViewerRegistry.get(filePath);
     if (existingEntry) {
-      currentPdfViewer = existingEntry.viewer;
       currentPdfBridge = createPdfAnnotationBridge({
         filePath,
         viewer: existingEntry.viewer,
@@ -964,7 +955,7 @@ function renderContent() {
           currentPdfBridge?.renderHighlights(getAnnotations());
         },
       });
-      (window as any).__currentPdfViewer = existingEntry.viewer;
+      setCurrentPdfViewer(existingEntry.viewer);
       existingEntry.viewer.onAnnotationClick = (annotationId: string, clientX: number, clientY: number) => {
         currentPdfBridge?.handleAnnotationClick(annotationId, clientX, clientY);
       };
@@ -1008,7 +999,6 @@ function renderContent() {
         updateScrollbar();
       },
     }).then((pdfViewerInstance) => {
-      currentPdfViewer = pdfViewerInstance;
       container.setAttribute('data-current-file', filePath);
       const savedScroll = storageGetNumber(`md-viewer:pdf-scroll:${filePath}`, 0);
       pdfViewerRegistry.set(filePath, {
@@ -1018,7 +1008,7 @@ function renderContent() {
         savedScrollTop: Number.isFinite(savedScroll) && savedScroll > 0 ? savedScroll : undefined,
       });
       if (savedScroll > 0) container.scrollTop = savedScroll;
-      (window as any).__currentPdfViewer = pdfViewerInstance;
+      setCurrentPdfViewer(pdfViewerInstance);
       pdfViewerInstance.onAnnotationClick = (annotationId: string, clientX: number, clientY: number) => {
         currentPdfBridge?.handleAnnotationClick(annotationId, clientX, clientY);
       };
@@ -2492,7 +2482,7 @@ function startWorkspacePolling() {
     if (res.ok) {
       const cfg = await res.json();
       if (cfg?.pdf?.defaultScale) {
-        (window as any).__pdfDefaultScale = cfg.pdf.defaultScale;
+        setPdfDefaultScale(cfg.pdf.defaultScale);
       }
     }
   } catch {}

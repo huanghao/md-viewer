@@ -1,4 +1,5 @@
 // PDF.js loaded via ES module in html.ts, exposed as window.pdfjsLib after 'pdfjslib-ready' event
+import { pdfDefaultScale, setPdfPendingRectCoords } from './pdf-state';
 
 function getPdfjsLib(): Promise<any> {
   if ((window as any).pdfjsLib) return Promise.resolve((window as any).pdfjsLib);
@@ -77,8 +78,8 @@ export interface PdfViewerInstance {
   setScale(scale: number): Promise<void>;
 }
 
-const SCALE_DEFAULT: number = (typeof window !== 'undefined' && (window as any).__pdfDefaultScale)
-  ? (window as any).__pdfDefaultScale
+const SCALE_DEFAULT: number = (typeof window !== 'undefined' && pdfDefaultScale)
+  ? pdfDefaultScale
   : 1.5;
 const LINE_HEIGHT_MULTIPLIER = 1.5;
 
@@ -399,13 +400,13 @@ export async function createPdfViewer(opts: PdfViewerOptions): Promise<PdfViewer
         const startItemIdx = result.hits[0];
         const endItemIdx = result.hits[result.hits.length - 1];
 
-        (window as any).__pdfPendingRectCoords = {
+        setPdfPendingRectCoords({
           pageNum,
           x1: Math.min(downPdfX, upPdfX),
           y1: Math.min(downPdfY, upPdfY),
           x2: Math.max(downPdfX, upPdfX),
           y2: Math.max(downPdfY, upPdfY),
-        };
+        });
 
         const prefix = buildPdfContext(allItems, startItemIdx, 'before');
         const suffix = buildPdfContext(allItems, endItemIdx, 'after');

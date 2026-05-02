@@ -23,6 +23,7 @@ import { formatRelativeTimeShort } from './utils/format';
 import { storageGet, storageSet, storageGetNumber } from './utils/storage';
 import { createResizer } from './utils/resizer';
 import { getTextNodes, globalOffsetForPosition, globalOffsetForPositionEnd, positionForGlobalOffset, clamp, placeFloating, getReaderText } from './annotation/position';
+import { currentPdfViewer } from './pdf-state';
 import { isResolvedAnn, getAnchorTrack, matchesFilter, getVisibleAnnotations as getVisibleAnnotationsUtil } from './annotation/query';
 import { handleEmacsKeys } from './utils/emacs-keys';
 import { recordSignal } from './utils/focus-signals';
@@ -564,7 +565,7 @@ function hideQuickAdd(clearPending = false): void {
   if (clearPending) {
     clearTempSelectionMark();
     state.pendingAnnotation = null;
-    const pdfViewer = (window as any).__currentPdfViewer as import('./pdf-viewer.js').PdfViewerInstance | undefined;
+    const pdfViewer = currentPdfViewer ?? undefined;
     pdfViewer?.clearTempRect();
     state.pendingAnnotationFilePath = null;
   }
@@ -574,7 +575,7 @@ export function openComposerFromPending(x?: number, y?: number): void {
   const el = getElements();
   if (!state.pendingAnnotation || !el.composer || !el.composerNote) return;
   applyTempSelectionMark();
-  const pdfViewer = (window as any).__currentPdfViewer as import('./pdf-viewer.js').PdfViewerInstance | undefined;
+  const pdfViewer = currentPdfViewer ?? undefined;
   const pendingAnn = state.pendingAnnotation as Annotation & {
     page?: number;
     rectCoords?: { x1: number; y1: number; x2: number; y2: number };
@@ -999,7 +1000,7 @@ export function savePendingAnnotation(filePath: string): void {
 
   state.annotations.push(ann);
   persistAnnotation(filePath, ann, '创建评论失败');
-  const pdfViewer = (window as any).__currentPdfViewer as import('./pdf-viewer.js').PdfViewerInstance | undefined;
+  const pdfViewer = currentPdfViewer ?? undefined;
   pdfViewer?.clearTempRect();
   adjustAnnotationCount(filePath, +1);
   import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());

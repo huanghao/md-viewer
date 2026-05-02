@@ -1,4 +1,5 @@
 import type { Workspace, FileTreeNode } from '../types';
+import { saveConfig } from '../config';
 import {
   state,
   markWorkspaceFailed,
@@ -11,6 +12,12 @@ import { scanWorkspace } from '../workspace';
 import { renderFileRow } from './file-row';
 import { getFileExtension } from '../utils/file-type';
 import { storageGet, storageSet } from '../utils/storage';
+import {
+  normalizeFocusFileType,
+  sameFocusActiveTypes,
+  sanitizeFocusActiveTypes,
+  toggleFocusActiveType,
+} from '../utils/focus-type-filter';
 
 // Simple glob matcher for .mdvignore patterns
 // Supports: *, **, ?, and prefix matching (e.g. "bots-ws/" matches any path under bots-ws/)
@@ -46,16 +53,18 @@ export function isIgnored(filePath: string, workspacePath: string, patterns: str
 // 防止同一工作区在同一渲染周期内被重复触发扫描
 const pendingScanIds = new Set<string>();
 
-const activeTypes: Set<string> = new Set(['md', 'pdf']);
+function getActiveTypes(): Set<string> {
+  const types = sanitizeFocusActiveTypes(state.config.focusActiveTypes);
+  if (!sameFocusActiveTypes(state.config.focusActiveTypes, types)) {
+    state.config.focusActiveTypes = types;
+  }
+  return new Set(types);
+}
 
 export function toggleFocusTypeFilter(ext: string): void {
-  if (activeTypes.has(ext)) {
-    if (activeTypes.size > 1) {
-      activeTypes.delete(ext);
-    }
-  } else {
-    activeTypes.add(ext);
-  }
+  const activeTypes = getActiveTypes();
+  state.config.focusActiveTypes = toggleFocusActiveType(activeTypes, ext);
+  saveConfig(state.config);
   import('./sidebar').then(({ renderSidebar }) => renderSidebar());
 }
 
@@ -164,7 +173,7 @@ export function getActiveFiles(
 function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>, query: string, lastActivity?: number): string {
   return renderFileRow(file.path, file.name, lastActivity ?? file.lastModified, {
     containerClass: 'tree-item file-node focus-file-item',
-    onClickJs: (p) => `handleFocusFileClick('${escapeAttr(p)}')`,
+    onClickAction: 'focus-file-click',
     showPin: true,
     showTime: true,
     indentPx: 8,
@@ -175,7 +184,7 @@ function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>, query: str
 
 export function setFocusStrategy(strategy: 'frecency' | 'mtime'): void {
   state.config.focusStrategy = strategy;
-  import('../config').then(({ saveConfig }) => saveConfig(state.config));
+  saveConfig(state.config);
   import('./sidebar').then(({ renderSidebar }) => renderSidebar());
 }
 
@@ -194,6 +203,7 @@ export function closeFilterPopup(): void {
 
 function renderFilterBar(): string {
   const currentWindow = state.config.focusWindowKey || '8h';
+  const activeTypes = getActiveTypes();
   const typeOptions: Array<{ ext: string; label: string }> = [
     { ext: 'md', label: 'MD' },
     { ext: 'pdf', label: 'PDF' },
@@ -220,7 +230,7 @@ function renderFilterBar(): string {
       <div class="focus-popup-options">
         ${timeOptions.map(o => `
           <button class="focus-popup-option${currentWindow === o.key ? ' active' : ''}"
-                  onclick="setFocusWindowKey('${o.key}');toggleFilterPopup()">${o.label}</button>
+                  data-action="set-focus-window-key" data-key="${escapeAttr(o.key)}" data-also-toggle-filter="1">${o.label}</button>
         `).join('')}
       </div>
     </div>
@@ -232,7 +242,7 @@ function renderFilterBar(): string {
       <div class="focus-popup-options">
         ${typeOptions.map(o => `
           <button class="focus-popup-option${activeTypes.has(o.ext) ? ' active' : ''}"
-                  onclick="toggleFocusTypeFilter('${o.ext}')">${o.label}</button>
+                  data-action="toggle-focus-type-filter" data-key="${escapeAttr(o.ext)}">${o.label}</button>
         `).join('')}
       </div>
     </div>`;
@@ -251,7 +261,7 @@ function renderFilterBar(): string {
       <div class="focus-active-tags">${activeTimeLabel}${sep}${activeTypeTags}</div>
       <div class="focus-filter-popup-wrap">
         <button class="focus-filter-btn${filterPopupOpen ? ' active' : ''}"
-                onclick="toggleFilterPopup()" title="筛选">
+                data-action="toggle-filter-popup" title="筛选">
           <svg viewBox="0 0 16 16" fill="currentColor" width="11" height="11">
             <path d="M2 3h12L9.5 8v4.5l-3-1.5V8z"/>
           </svg>
@@ -285,7 +295,7 @@ function renderFocusWorkspaceGroup(
 
   return `
     <div class="focus-ws-group${hasFiles ? ' has-files' : ''}">
-      <div class="focus-ws-header" onclick="handleFocusWorkspaceToggle('${escapeAttr(workspace.id)}')">
+      <div class="focus-ws-header" data-action="focus-workspace-toggle" data-workspace-id="${escapeAttr(workspace.id)}">
         <span class="focus-ws-arrow${!isCollapsed ? ' open' : ''}">▶</span>
         <span class="focus-ws-name">${escapeHtml(workspace.name)}</span>
         ${badge}
@@ -302,6 +312,7 @@ function renderFocusViewMtime(): string {
   const pinned = getPinnedFiles();
   const query = state.searchQuery.trim().toLowerCase();
   const collapsed = getFocusCollapsed();
+  const activeTypes = getActiveTypes();
 
   const groups = workspaces.map((ws) => {
     const tree = state.fileTree.get(ws.id);
@@ -327,9 +338,7 @@ function renderFocusViewMtime(): string {
     }
     activeFiles = activeFiles.filter((f) => {
       if (pinned.has(f.path)) return true;
-      const ext = getFileExtension(f.path);
-      const norm = ext === 'markdown' ? 'md' : ext === 'htm' ? 'html' : ext === 'jsonl' ? 'json' : ext;
-      return activeTypes.has(norm);
+      return activeTypes.has(normalizeFocusFileType(getFileExtension(f.path)));
     });
     if (!loading && activeFiles.length === 0) return '';
     return renderFocusWorkspaceGroup(ws, activeFiles, pinned, loading, query, collapsed);
@@ -356,6 +365,7 @@ export function renderFocusView(): string {
   const query = state.searchQuery.trim().toLowerCase();
   const allSignals = getSignalCache();
   const collapsed = getFocusCollapsed();
+  const activeTypes = getActiveTypes();
 
   const NEW_WINDOW_MS = FOCUS_WINDOW_MS[state.config.focusWindowKey || '8h'] ?? FOCUS_WINDOW_MS['8h'];
   const newCutoff = Date.now() - NEW_WINDOW_MS;
@@ -391,8 +401,7 @@ export function renderFocusView(): string {
       if (!pinned.has(f.path)) {
         const ext = getFileExtension(f.path);
         if (ext === 'jsonl' || ext === 'log') continue;
-        const norm = ext === 'markdown' ? 'md' : ext === 'htm' ? 'html' : ext;
-        if (!activeTypes.has(norm)) continue;
+        if (!activeTypes.has(normalizeFocusFileType(ext))) continue;
       }
       const score = frecencyMap.get(f.path) ?? 0;
       // Include if: pinned, has frecency score, or recently modified (new file — shown with existing new-dot)
@@ -442,16 +451,68 @@ export function renderFocusView(): string {
   return `<div class="focus-view">${renderFilterBar()}${groups}</div>`;
 }
 
+// ── Functions moved here from sidebar-workspace.ts (no circular import) ──────
+
+function setFocusWindowKey(key: string): void {
+  state.config.focusWindowKey = key as '8h' | '2d' | '1w' | '1m';
+  saveConfig(state.config);
+  // Refresh signals so the new window filter picks up the latest data, then re-render
+  refreshFrecencySignals().then(() =>
+    import('./sidebar').then(({ renderSidebar }) => renderSidebar())
+  );
+}
+
+async function handleFocusWorkspaceToggle(workspaceId: string): Promise<void> {
+  const collapsed = getFocusCollapsed();
+  if (collapsed.has(workspaceId)) {
+    collapsed.delete(workspaceId);
+  } else {
+    collapsed.add(workspaceId);
+  }
+  saveFocusCollapsed(collapsed);
+  const { renderSidebar } = await import('./sidebar');
+  renderSidebar();
+}
+
+// ── Event delegation ──────────────────────────────────────────────────────────
+
+let _delegateBound = false;
+
 if (typeof window !== 'undefined') {
-  (window as any).toggleFocusTypeFilter = toggleFocusTypeFilter;
-  (window as any).setFocusStrategy = setFocusStrategy;
-  (window as any).toggleFilterPopup = toggleFilterPopup;
   void refreshFrecencySignals();
 
-  // 点击 popup 外部关闭
-  document.addEventListener('click', (e) => {
-    if (!filterPopupOpen) return;
-    if ((e.target as HTMLElement).closest('.focus-filter-popup-wrap')) return;
-    closeFilterPopup();
-  });
+  if (!_delegateBound) {
+    _delegateBound = true;
+
+    document.addEventListener('click', async (e) => {
+      // 点击 popup 外部关闭
+      if (filterPopupOpen && !(e.target as HTMLElement).closest('.focus-filter-popup-wrap')) {
+        closeFilterPopup();
+      }
+
+      const el = (e.target as Element).closest('[data-action]') as HTMLElement | null;
+      if (!el) return;
+
+      const { action, key, workspaceId, alsoToggleFilter } = el.dataset;
+
+      switch (action) {
+        case 'focus-workspace-toggle':
+          if (workspaceId) await handleFocusWorkspaceToggle(workspaceId);
+          break;
+        case 'set-focus-window-key':
+          if (key) setFocusWindowKey(key);
+          if (alsoToggleFilter) toggleFilterPopup();
+          break;
+        case 'toggle-focus-type-filter':
+          if (key) toggleFocusTypeFilter(key);
+          break;
+        case 'set-focus-strategy':
+          if (key) setFocusStrategy(key as 'frecency' | 'mtime');
+          break;
+        case 'toggle-filter-popup':
+          toggleFilterPopup();
+          break;
+      }
+    });
+  }
 }

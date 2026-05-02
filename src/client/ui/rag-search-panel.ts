@@ -201,6 +201,7 @@ function stripMarkdown(src: string): string {
 
 function highlightRagChunk(chunkText: string): void {
   const reader = document.getElementById('reader');
+  console.log('[rag:highlight] reader=', !!reader, 'chunkText[:40]=', chunkText.slice(0, 40));
   if (!reader) return;
 
   // Clear previous highlight
@@ -211,6 +212,7 @@ function highlightRagChunk(chunkText: string): void {
 
   // Build needle from stripped markdown; try progressively shorter lengths if no match
   const stripped = stripMarkdown(chunkText);
+  console.log('[rag:highlight] stripped[:80]=', stripped.slice(0, 80));
   const candidates = [stripped.slice(0, 80), stripped.slice(0, 50), stripped.slice(0, 30)];
 
   for (const needle of candidates) {
@@ -231,6 +233,7 @@ function highlightRagChunk(chunkText: string): void {
     }
 
     const idx = concat.indexOf(needle);
+    console.log('[rag:highlight] needle[:40]=', needle.slice(0, 40), '→ idx=', idx);
     if (idx === -1) continue;
 
     // Find which node contains idx and wrap the first text node with a mark

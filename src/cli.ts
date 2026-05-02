@@ -884,6 +884,7 @@ MD Viewer CLI - 命令行工具
   mdv todos list --json               JSON 格式输出
   mdv todos tidy [--days <N>]         清理 N 天前已完成的 Todo（默认 30 天）
   mdv todos tidy --missing            同时清理来源文件已删除的 Todo
+  mdv rag tidy                        删除已不存在文件的 RAG 索引
   mdv --help                           显示帮助
 
 选项:
@@ -960,7 +961,7 @@ function parseArgs(args: string[]): {
 
   const command: string[] = [];
   let filePath: string | undefined;
-  const topLevelCommands = new Set(["tabs", "config", "comments", "todos"]);
+  const topLevelCommands = new Set(["tabs", "config", "comments", "todos", "rag"]);
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -1194,6 +1195,31 @@ async function main() {
     } else {
       console.error(`❌ 未知的 todos 子命令: ${todosSubcmd}`);
       console.error("   可用: list, tidy");
+      process.exit(1);
+    }
+  } else if (cmd === "rag") {
+    const ragSubcmd = subcmd || "tidy";
+    if (ragSubcmd === "tidy") {
+      const { getIndexedPaths, deleteFileChunks } = await import("./rag-storage.ts");
+      const { invalidateChunksForPath } = await import("./rag-vector-cache.ts");
+      const paths = getIndexedPaths();
+      let deleted = 0;
+      for (const p of paths) {
+        if (!existsSync(p)) {
+          deleteFileChunks(p);
+          invalidateChunksForPath(p);
+          deleted++;
+          if (!options.json) console.log(`  删除孤立索引: ${p}`);
+        }
+      }
+      if (options.json) {
+        console.log(JSON.stringify({ deleted, checked: paths.length }));
+      } else {
+        console.log(`✅ 检查 ${paths.length} 个已索引文件，删除 ${deleted} 条孤立索引`);
+      }
+    } else {
+      console.error(`❌ 未知的 rag 子命令: ${ragSubcmd}`);
+      console.error("   可用: tidy");
       process.exit(1);
     }
   } else {

@@ -726,8 +726,10 @@ export function listQuickComments(): QuickComment[] {
 }
 
 export function replaceQuickComments(items: Array<{ text: string }>): void {
-  const db = getDb();
-  db.exec('DELETE FROM quick_comments');
-  const insert = db.prepare('INSERT INTO quick_comments (text, sort_order) VALUES (?, ?)');
-  items.forEach((item, i) => insert.run(item.text, i));
+  const database = getDb();
+  const insert = database.prepare('INSERT INTO quick_comments (text, sort_order) VALUES (?, ?)');
+  database.transaction(() => {
+    database.exec('DELETE FROM quick_comments');
+    items.forEach((item, i) => insert.run(item.text, i));
+  })();
 }

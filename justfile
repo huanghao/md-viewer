@@ -20,7 +20,7 @@ test coverage="":
     if [[ "{{coverage}}" == "coverage" || "{{coverage}}" == "--coverage" ]]; then
         bun test --coverage tests/unit/
     else
-        bun test tests/unit/
+        bun test --only-failures tests/unit/
     fi
 
 e2e:

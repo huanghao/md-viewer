@@ -44,7 +44,6 @@ import {
   handleTidyTodos,
   handleGetWorkspaces,
   handleRagSearch,
-  handleRagStatus,
   handleWorkspaceSearch,
   handleGetQuickComments,
   handleUpsertQuickComments,
@@ -160,7 +159,6 @@ app.get("/api/workspace-search", handleWorkspaceSearch);
 
 // API: RAG 语义搜索（代理到 localhost:3001）
 app.get("/api/rag-search", handleRagSearch);
-app.get("/api/rag-status", handleRagStatus);
 
 // API: 焦点信号采集（写 SQLite DB，用于 frecency 策略评估）
 import { insertFocusSignal, queryFocusSignals, pruneFocusSignals } from "./annotation-storage.ts";

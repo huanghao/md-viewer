@@ -394,6 +394,23 @@ export async function handleDetectPath(c: Context) {
   }
 }
 
+export async function handleInferWorkspace(c: Context) {
+  const body = await c.req.json() as any;
+  const filePath = typeof body?.filePath === 'string' ? body.filePath.trim() : '';
+  if (!filePath) return c.json({ error: '缺少 filePath 参数' }, 400);
+
+  let dir = dirname(resolve(filePath));
+  while (true) {
+    if (existsSync(join(dir, '.git'))) {
+      return c.json({ workspacePath: dir, workspaceName: basename(dir) });
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return c.json({ error: '未找到 .git 目录' }, 404);
+}
+
 // API: CLI 调用 - 打开文件
 export async function handleOpenFile(c: Context) {
   const body = await c.req.json<{ path?: string; focus?: boolean }>();

@@ -2,6 +2,17 @@ import { describe, expect, it, beforeEach } from 'bun:test';
 import { state, addOrUpdateFile, getSessionFile, saveScrollPosition, removeFile } from '../../src/client/state';
 import type { FileData } from '../../src/client/types';
 
+class MemoryStorage implements Storage {
+  private data = new Map<string, string>();
+  get length() { return this.data.size; }
+  clear() { this.data.clear(); }
+  getItem(key: string) { return this.data.get(key) ?? null; }
+  key(index: number) { return Array.from(this.data.keys())[index] ?? null; }
+  removeItem(key: string) { this.data.delete(key); }
+  setItem(key: string, value: string) { this.data.set(key, value); }
+}
+(globalThis as any).localStorage = new MemoryStorage();
+
 function makeFileData(path: string): FileData {
   return { path, filename: path.split('/').pop()!, content: '# test', lastModified: 1000 };
 }

@@ -16,12 +16,12 @@ export function storageSet<T>(key: string, value: T, onQuota?: () => void): void
         onQuota();
         try {
           localStorage.setItem(key, JSON.stringify(value));
-        } catch (retryError) {
-          console.error(`[storage] 保存 ${key} 失败（重试后）:`, retryError);
+        } catch (retryError: any) {
+          console.error(`[storage] 保存 ${key} 失败（重试后）:`, retryError?.message ?? retryError);
         }
       }
     } else {
-      console.error(`[storage] 保存 ${key} 失败:`, e);
+      console.error(`[storage] 保存 ${key} 失败:`, e?.message ?? e);
     }
   }
 }

@@ -155,7 +155,7 @@ interface FileDragState {
 let tabDragState: TabDragState | null = null;
 let fileDragState: FileDragState | null = null;
 import { attachPathAutocomplete } from './path-autocomplete';
-import { renderRagSearchPanel, stopStatusPolling } from './rag-search-panel';
+import { renderRagSearchPanel } from './rag-search-panel';
 
 // 将当前打开的文件滚动到侧边栏40%位置
 function scrollCurrentFileIntoView(container: HTMLElement): void {
@@ -178,7 +178,6 @@ function scrollCurrentFileIntoView(container: HTMLElement): void {
 export function setSidebarTab(tab: 'focus' | 'full' | 'list' | 'search'): void {
   state.config.sidebarTab = tab;
   saveConfig(state.config);
-  if (tab !== 'search') stopStatusPolling();
   if (tab === 'focus') {
     import('./workspace-focus').then(({ refreshFrecencySignals, renderFocusView: _ }) => {
       void refreshFrecencySignals().then(() => renderSidebar());

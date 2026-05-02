@@ -99,6 +99,10 @@ export function deleteFileChunks(path: string): void {
   getDb().query("DELETE FROM rag_chunks WHERE path = ?").run(path);
 }
 
+export function getIndexedPaths(): string[] {
+  return (getDb().query("SELECT DISTINCT path FROM rag_chunks").all() as { path: string }[]).map(r => r.path);
+}
+
 export interface StoredChunk {
   id: number;
   path: string;

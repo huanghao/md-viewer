@@ -3,7 +3,7 @@ import { escapeHtml } from '../utils/escape';
 
 export interface RagPanelCallbacks {
   onOpen: (idx: number) => void;
-  switchFile: (path: string) => void;
+  switchFile: (path: string, afterRender: () => void) => void;
 }
 
 let ragCallbacks: RagPanelCallbacks | null = null;
@@ -51,15 +51,7 @@ let results: RagResult[] = [];
 let activeIdx = 0;
 let savedQuery = '';
 let savedScrollTop = 0;
-let pendingHighlightText: string | null = null;
 
-/** 文件加载完成后由 main.ts onFileLoaded 调用，执行跨文件跳转后的高亮 */
-export function flushPendingRagHighlight(): void {
-  if (!pendingHighlightText) return;
-  const text = pendingHighlightText;
-  pendingHighlightText = null;
-  setTimeout(() => highlightRagChunk(text), 80);
-}
 
 export function renderRagSearchPanel(container: HTMLElement): void {
   container.innerHTML = `
@@ -189,20 +181,9 @@ async function openResult(idx: number): Promise<void> {
   activeIdx = idx;
   renderRagResults();
 
-  // 设置 pending highlight，供 onFileLoaded 完成后执行
-  pendingHighlightText = r.text;
-
   if (ragCallbacks) {
-    ragCallbacks.switchFile(r.path);
+    ragCallbacks.switchFile(r.path, () => highlightRagChunk(r.text));
   }
-
-  // 当前文件已加载时，switchFile 是同步的，onFileLoaded 不会重新调用，直接 highlight
-  requestAnimationFrame(() => {
-    if (pendingHighlightText === r.text) {
-      pendingHighlightText = null;
-      setTimeout(() => highlightRagChunk(r.text), 80);
-    }
-  });
 }
 
 /** 把 Markdown 源文本剥成纯文本，用于和渲染后 DOM 匹配 */

@@ -895,15 +895,18 @@ export async function handleRagSearch(c: Context) {
     const data = await resp.json() as { results: Array<{ path: string; score: number; heading: string | null; text: string; charStart: number }> };
     const semanticResults = data.results ?? [];
 
+    // 过滤掉文件已不存在的结果（embedding 孤立 chunk）
+    const liveResults = semanticResults.filter((r) => existsSync(r.path));
+
     // 文件名命中但语义结果未包含的文件，补充到末尾（score=0 表示非语义匹配）
-    const semanticPaths = new Set(semanticResults.map((r) => r.path));
+    const semanticPaths = new Set(liveResults.map((r) => r.path));
     const extras = filenameHits
-      .filter((h) => !semanticPaths.has(h.path))
+      .filter((h) => !semanticPaths.has(h.path) && existsSync(h.path))
       .map((h) => ({ ...h, score: 0 }));
 
-    return c.json({ results: [...semanticResults, ...extras] });
+    return c.json({ results: [...liveResults, ...extras] });
   } catch {
-    const extras = filenameHits.map((h) => ({ ...h, score: 0 }));
+    const extras = filenameHits.filter((h) => existsSync(h.path)).map((h) => ({ ...h, score: 0 }));
     return c.json({ results: extras, error: 'rag_unavailable' });
   }
 }

@@ -4,7 +4,7 @@ import { join, extname } from "path";
 import { collectWorkspaceMdFiles } from "./workspace-scanner.ts";
 import chokidar from "chokidar";
 import { chunkMarkdown } from "./rag-chunker.ts";
-import { upsertFileChunks, deleteFileChunks, getFileMtime, getMeta, setMeta } from "./rag-storage.ts";
+import { upsertFileChunks, deleteFileChunks, getFileMtime, getMeta, setMeta, getIndexedPaths } from "./rag-storage.ts";
 import { invalidateChunksForPath, appendChunks } from "./rag-vector-cache.ts";
 
 export const MODEL_NAME = "Xenova/paraphrase-multilingual-MiniLM-L12-v2";
@@ -105,9 +105,19 @@ export async function scanWorkspace(workspacePath: string): Promise<void> {
   console.log(`[rag] Found ${files.length} markdown files`);
   for (const f of files) {
     await indexFile(f);
-    // yield to GC between files
     await new Promise(r => setTimeout(r, 0));
   }
+
+  // 清理已索引但文件已不存在的孤立 chunks（属于本 workspace 下的路径）
+  const fileSet = new Set(files);
+  const indexed = getIndexedPaths().filter(p => p.startsWith(workspacePath));
+  for (const p of indexed) {
+    if (!fileSet.has(p) && !existsSync(p)) {
+      deleteFileChunks(p);
+      console.log(`[rag] Pruned missing file: ${p}`);
+    }
+  }
+
   console.log(`[rag] Workspace scan complete: ${workspacePath}`);
 }
 

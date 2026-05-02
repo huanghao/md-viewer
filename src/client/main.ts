@@ -20,7 +20,7 @@ import { getFileTypeIcon, getFileTypeLabel, isJsonFile, isJsonlFile } from './ut
 // 导入 UI 组件
 import { renderSidebar, initTabsActions, initFileListActions, initWorkspaceActions, initSearchBoxCallbacks, toggleTabManager, applyTabBatchAction } from './ui/sidebar';
 import { initToolbarActions } from './main-actions';
-import { setRagCallbacks, flushPendingRagHighlight } from './ui/rag-search-panel';
+import { setRagCallbacks } from './ui/rag-search-panel';
 import { showToast, showSuccess, showError, showWarning, showInfo } from './ui/toast';
 import { showPreferences, closePreferences } from './ui/preferences';
 import { toggleShortcutsHelp, hideShortcutsHelp, isShortcutsHelpVisible } from './ui/shortcuts-help';
@@ -177,7 +177,6 @@ async function onFileLoaded(data: FileData, focus: boolean = false) {
     updateToc(data.path);
     updateZoomDisplay(true);
   }
-  flushPendingRagHighlight();
 }
 
 export function scrollContentToTop(): void {
@@ -2543,13 +2542,14 @@ function startWorkspacePolling() {
   // 预设 RAG 面板 callbacks（renderRagSearchPanel 渲染时会绑定事件委托）
   setRagCallbacks({
     onOpen: () => {},
-    switchFile: (path) => {
+    switchFile: (path, afterRender) => {
       if (state.sessionFiles.has(path)) {
-        void switchFile(path);
+        void switchFile(path).then(() => afterRender());
       } else {
         void (async () => {
           const data = await loadFile(path);
           if (data) await onFileLoaded(data, true);
+          afterRender();
         })();
       }
     },

@@ -1410,6 +1410,21 @@ async function switchFile(path: string) {
   const tocPanel = document.getElementById('tocPanel');
   if (tocPanel) renderTocPanel(tocPanel, [], () => {}, true);
 
+  // 懒加载：占位 entry 的 content 为空时，先拉内容再渲染
+  const entry = state.sessionFiles.get(path);
+  if (entry && !entry.content && !entry.isMissing && !isPdfPath(path)) {
+    const fileData = await loadFile(path, true);
+    if (fileData) {
+      entry.content = fileData.content;
+      entry.lastModified = Math.max(entry.lastModified, fileData.lastModified);
+      entry.displayedModified = fileData.lastModified;
+      entry.isMissing = false;
+    } else {
+      entry.isMissing = true;
+    }
+    saveState();
+  }
+
   renderContent();
   if (!isPdfPath(path)) updateToc(path);
   syncAnnotationsForCurrentFile(true);
@@ -2466,8 +2481,10 @@ function startWorkspacePolling() {
 
 // ==================== 初始化 ====================
 (async () => {
+  console.time('[init] total');
   // 拉取服务端客户端配置
   try {
+    console.time('[init] /api/config');
     const res = await fetch('/api/config');
     if (res.ok) {
       const cfg = await res.json();
@@ -2476,6 +2493,7 @@ function startWorkspacePolling() {
       }
     }
   } catch {}
+  console.timeEnd('[init] /api/config');
 
   initSidebarWidth();
   initSidebarCollapsed();
@@ -2546,9 +2564,16 @@ function startWorkspacePolling() {
     flushUndoQueue();
   });
 
+  console.time('[init] restoreState');
   await restoreState(loadFile);
-  applyTheme();  // apply saved theme preference
+  console.timeEnd('[init] restoreState');
+
+  applyTheme();
+
+  console.time('[init] hydrateExpandedWorkspaces');
   const failedWorkspaceIds = await hydrateExpandedWorkspaces();
+  console.timeEnd('[init] hydrateExpandedWorkspaces');
+
   if (failedWorkspaceIds.length > 0) {
     failedWorkspaceIds.forEach(markWorkspaceFailed);
   }
@@ -2642,6 +2667,7 @@ function startWorkspacePolling() {
   }).catch(() => {/* 静默忽略 */});
 
   renderContent();
+  console.timeEnd('[init] total');
   syncAnnotationsForCurrentFile(true);
   if (state.currentFile) updateToc(state.currentFile);
 

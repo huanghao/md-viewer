@@ -1,6 +1,6 @@
 import { pipeline, env } from "@huggingface/transformers";
 import { statSync, existsSync } from "fs";
-import { join } from "path";
+import { join, extname } from "path";
 import { collectWorkspaceMdFiles } from "./workspace-scanner.ts";
 import chokidar from "chokidar";
 import { chunkMarkdown } from "./rag-chunker.ts";
@@ -90,7 +90,7 @@ export async function indexFile(filePath: string): Promise<void> {
 
 export async function scanWorkspace(workspacePath: string): Promise<void> {
   console.log(`[rag] Scanning workspace: ${workspacePath}`);
-  const files = collectWorkspaceMdFiles(workspacePath);
+  const files = await collectWorkspaceMdFiles(workspacePath);
   console.log(`[rag] Found ${files.length} markdown files`);
   for (const f of files) {
     await indexFile(f);
@@ -131,7 +131,15 @@ export function watchWorkspace(workspacePath: string): void {
   chokidar.watch(workspacePath, {
     persistent: true,
     ignoreInitial: true,
-    ignored: /(node_modules|\.git|\.pytest_cache|\.claude\/commands)/,
+    ignored: (p: string) => {
+      const name = p.split("/").pop() ?? "";
+      if (name.startsWith(".")) return true;
+      // skip non-md files (avoid watching large binary/data dirs)
+      if (name.includes(".") && ![".md", ".markdown"].includes(extname(name))) return true;
+      // skip always-ignored dirs by name
+      if (/(node_modules|\.git|\.pytest_cache|\.claude)/.test(p)) return true;
+      return false;
+    },
   }).on("add", (p) => scheduleIndex(p))
     .on("change", (p) => scheduleIndex(p))
     .on("unlink", (p) => {

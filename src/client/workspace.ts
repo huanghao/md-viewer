@@ -3,6 +3,7 @@ import { state } from './state';
 import { updateWorkspaceListDiff, removeWorkspaceTracking } from './workspace-state';
 import { recordSignal } from './utils/focus-signals';
 import { saveConfig } from './config';
+import { storageGet, storageSet } from './utils/storage';
 import { mergeDirectoryExpandedState, applyDirectoryExpandedState } from './workspace-tree-expansion';
 import {
   collectExpandedStateFromTree,
@@ -10,6 +11,8 @@ import {
   removeWorkspaceExpandedState,
   setWorkspaceExpandedState,
 } from './workspace-tree-expansion-persistence';
+
+const FILE_TREE_CACHE_KEY = 'md-viewer:fileTreeCache';
 
 // 生成唯一 ID
 function generateId(): string {
@@ -211,16 +214,32 @@ export async function scanWorkspace(workspaceId: string): Promise<FileTreeNode |
       }
     }
 
-    // 缓存文件树
+    // 缓存文件树（内存 + localStorage）
     state.fileTree.set(workspaceId, tree);
     setWorkspaceExpandedState(workspaceId, collectExpandedStateFromTree(tree));
     updateWorkspaceListDiff(workspaceId, collectFilePaths(tree));
+    saveFileTreeCache(workspaceId, tree);
 
     return tree;
   } catch (e) {
     console.error('扫描工作区失败:', e);
     return null;
   }
+}
+
+function saveFileTreeCache(workspaceId: string, tree: FileTreeNode): void {
+  try {
+    const all = storageGet<Record<string, FileTreeNode>>(FILE_TREE_CACHE_KEY, {});
+    all[workspaceId] = tree;
+    storageSet(FILE_TREE_CACHE_KEY, all);
+  } catch { /* 超配额时静默忽略 */ }
+}
+
+function loadFileTreeCache(workspaceId: string): FileTreeNode | null {
+  try {
+    const all = storageGet<Record<string, FileTreeNode>>(FILE_TREE_CACHE_KEY, {});
+    return all[workspaceId] ?? null;
+  } catch { return null; }
 }
 
 function collectFilePaths(node: FileTreeNode | undefined): string[] {
@@ -296,22 +315,35 @@ function expandRecentFileDirs(root: FileTreeNode, maxCount: number): void {
   }
 }
 
-// 刷新后恢复已展开工作区的目录树，避免出现”已展开但未加载”的占位状态。
+// 刷新后恢复已展开工作区的目录树。
+// 先从 localStorage 缓存立即恢复（同步，不阻塞），再后台异步重新扫描刷新。
 export async function hydrateExpandedWorkspaces(): Promise<string[]> {
   const expanded = state.config.workspaces.filter((ws) => ws.isExpanded);
-  const failedIds: string[] = [];
 
+  // 从缓存同步恢复，立即可渲染
   for (const ws of expanded) {
-    const tree = await scanWorkspace(ws.id);
-    if (!tree) failedIds.push(ws.id);
+    const cached = loadFileTreeCache(ws.id);
+    if (cached) {
+      const persistedExpandedState = getWorkspaceExpandedState(ws.id);
+      if (persistedExpandedState && persistedExpandedState.size > 0) {
+        applyDirectoryExpandedState(cached, persistedExpandedState);
+      }
+      state.fileTree.set(ws.id, cached);
+      updateWorkspaceListDiff(ws.id, collectFilePaths(cached));
+    }
   }
 
-  // 刷新后如果没有当前工作区，默认选中第一个工作区。
+  // 默认选中第一个工作区
   if (!state.currentWorkspace && state.config.workspaces.length > 0) {
     state.currentWorkspace = state.config.workspaces[0].id;
   }
 
-  return failedIds;
+  // 后台异步刷新（不 await，不阻塞首屏）
+  for (const ws of expanded) {
+    scanWorkspace(ws.id).catch(() => {});
+  }
+
+  return []; // 缓存命中时不报失败；首次无缓存时树为空但不阻塞
 }
 
 // 在工作区模式下根据文件路径自动展开目录树并定位工作区

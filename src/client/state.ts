@@ -100,32 +100,21 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
     if (!data) return;
     if (!data.files || data.files.length === 0) return;
 
-    // 恢复文件列表（重新加载内容）
-    const validFiles: Array<[string, any]> = [];
+    // 用 localStorage 里的元数据直接占位，不发网络请求
     for (const [path, fileInfo] of data.files) {
-      const fileData = await loadFile(path, true); // 静默加载，不弹窗
-      if (fileData) {
-        // content is loaded fresh from disk (fileData.content), so displayedModified
-        // must align to fileData.lastModified — we are displaying that version.
-        // lastModified takes the max in case an SSE event before reload recorded a
-        // newer mtime than the disk value we just read.
-        const lastModified = Math.max(fileData.lastModified, fileInfo.lastModified || 0);
-
-        state.sessionFiles.set(path, {
-          path: fileData.path,
-          name: fileData.filename,
-          content: fileData.content,
-          lastModified,
-          displayedModified: fileData.lastModified,
-          isRemote: fileData.isRemote || false,
-          isMissing: false,  // 恢复时文件存在，清除 isMissing
-          lastAccessed: fileInfo.lastAccessed || fileData.lastModified,
-        });
-        validFiles.push([path, fileInfo]);
-      }
+      state.sessionFiles.set(path, {
+        path: fileInfo.path || path,
+        name: fileInfo.name || path.split('/').pop() || path,
+        content: '',
+        lastModified: fileInfo.lastModified || 0,
+        displayedModified: fileInfo.displayedModified || fileInfo.lastModified || 0,
+        isRemote: fileInfo.isRemote || false,
+        isMissing: fileInfo.isMissing || false,
+        lastAccessed: fileInfo.lastAccessed || 0,
+      });
     }
 
-    // 恢复 tabOrder：过滤掉不存在的路径，追加 sessionFiles 中有但 tabOrder 中没有的路径
+    // 恢复 tabOrder
     const restoredOrder: string[] = [];
     const seenPaths = new Set<string>();
     if (data.tabOrder && Array.isArray(data.tabOrder)) {
@@ -137,26 +126,30 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
       }
     }
     for (const path of state.sessionFiles.keys()) {
-      if (!seenPaths.has(path)) {
-        restoredOrder.push(path);
-      }
+      if (!seenPaths.has(path)) restoredOrder.push(path);
     }
     state.tabOrder = restoredOrder;
 
-    // 清理不存在的文件：用实际存在的文件覆盖 localStorage
-    if (validFiles.length !== data.files.length) {
-      const currentFile = state.sessionFiles.has(data.currentFile)
-        ? data.currentFile
-        : null;
-      storageSet(STORAGE_KEY, { files: validFiles, currentFile, tabOrder: state.tabOrder });
-    }
-
-    // 恢复当前文件
+    // 确定当前文件
     if (data.currentFile && state.sessionFiles.has(data.currentFile)) {
       state.currentFile = data.currentFile;
     } else {
-      // 如果保存的当前文件不存在了，切换到 tabOrder 第一个文件
       state.currentFile = state.tabOrder.length > 0 ? state.tabOrder[0] : null;
+    }
+
+    // 只加载当前文件内容
+    if (state.currentFile) {
+      const fileData = await loadFile(state.currentFile, true);
+      if (fileData) {
+        const entry = state.sessionFiles.get(state.currentFile)!;
+        entry.content = fileData.content;
+        entry.lastModified = Math.max(entry.lastModified, fileData.lastModified);
+        entry.displayedModified = fileData.lastModified;
+        entry.isMissing = false;
+      } else {
+        // 当前文件已不存在
+        state.sessionFiles.get(state.currentFile)!.isMissing = true;
+      }
     }
   } catch (e) {
     console.error('恢复状态失败:', e);

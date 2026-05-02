@@ -533,6 +533,11 @@ export function handleEvents(c: Context) {
 
 // API: 推断工作区（从文件路径推断 git 仓库根目录）
 // API: 扫描工作区，构建文件树
+// 扫描结果缓存 + in-flight dedup：同路径并发请求共享同一次扫描
+const scanCache = new Map<string, { tree: any; ts: number }>();
+const scanInFlight = new Map<string, Promise<any>>();
+const SCAN_CACHE_TTL_MS = 10_000;
+
 export async function handleScanWorkspace(c: Context) {
   try {
     const { path } = await c.req.json() as any;
@@ -545,11 +550,31 @@ export async function handleScanWorkspace(c: Context) {
       return c.json({ error: `目录不存在: ${resolvedPath}` }, 404);
     }
 
-    // 扫描后开启目录级监听，保证”未打开文件”也能收到删除事件。
+    const cached = scanCache.get(resolvedPath);
+    if (cached && Date.now() - cached.ts < SCAN_CACHE_TTL_MS) {
+      return c.json(cached.tree);
+    }
+
+    // 如果已有正在进行的扫描，等它完成共享结果
+    const inFlight = scanInFlight.get(resolvedPath);
+    if (inFlight) {
+      const tree = await inFlight;
+      return c.json(tree);
+    }
+
     watchWorkspace(resolvedPath);
 
-    const tree = scanWorkspaceTree(resolvedPath);
+    const scanPromise = scanWorkspaceTree(resolvedPath).then((tree) => {
+      scanCache.set(resolvedPath, { tree, ts: Date.now() });
+      scanInFlight.delete(resolvedPath);
+      return tree;
+    }).catch((err) => {
+      scanInFlight.delete(resolvedPath);
+      throw err;
+    });
+    scanInFlight.set(resolvedPath, scanPromise);
 
+    const tree = await scanPromise;
     return c.json(tree);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);

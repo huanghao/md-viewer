@@ -1,4 +1,5 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "fs";
+import { existsSync, readFileSync } from "fs";
+import { readdir, stat } from "fs/promises";
 import { join, extname, relative } from "path";
 import { homedir } from "os";
 import { minimatch } from "minimatch";
@@ -43,13 +44,12 @@ function isIgnored(fullPath: string, patterns: Pattern[]): boolean {
   });
 }
 
-interface WalkCallbacks {
-  onEnterDir?: (path: string, name: string, localPatterns: string[]) => void;
-  onLeaveDir?: (path: string, fileCount: number) => void;
-  onFile: (path: string, name: string, mtime: number) => void;
-}
-
-function walk(dir: string, ancestorPatterns: Pattern[], cb: WalkCallbacks): number {
+async function walk(
+  dir: string,
+  ancestorPatterns: Pattern[],
+  nodeMap: Map<string, FileTreeNode>,
+  parentNode: FileTreeNode,
+): Promise<number> {
   const localPatterns = loadLocalPatterns(dir);
   const patterns: Pattern[] = [
     ...ancestorPatterns,
@@ -57,10 +57,11 @@ function walk(dir: string, ancestorPatterns: Pattern[], cb: WalkCallbacks): numb
   ];
 
   let entries;
-  try { entries = readdirSync(dir, { withFileTypes: true }); }
+  try { entries = await readdir(dir, { withFileTypes: true }); }
   catch { return 0; }
 
   let fileCount = 0;
+
   for (const e of entries) {
     if (e.name.startsWith(".")) continue;
     if (ALWAYS_SKIP.has(e.name)) continue;
@@ -68,22 +69,32 @@ function walk(dir: string, ancestorPatterns: Pattern[], cb: WalkCallbacks): numb
     if (isIgnored(fullPath, patterns)) continue;
 
     if (e.isDirectory()) {
-      cb.onEnterDir?.(fullPath, e.name, localPatterns);
-      const count = walk(fullPath, patterns, cb);
-      cb.onLeaveDir?.(fullPath, count);
+      const dirNode: FileTreeNode = { name: e.name, path: fullPath, type: "directory", children: [], fileCount: 0 };
+      nodeMap.set(fullPath, dirNode);
+      const count = await walk(fullPath, patterns, nodeMap, dirNode);
+      if (count === 0) {
+        nodeMap.delete(fullPath);
+        continue;
+      }
+      const local = loadLocalPatterns(fullPath);
+      if (local.length > 0) dirNode.ignorePatterns = local;
+      dirNode.fileCount = count;
+      parentNode.children!.push(dirNode);
       fileCount += count;
     } else if (e.isFile()) {
+      if (!isSupportedTextFile(e.name.toLowerCase())) continue;
       let mtime = 0;
-      try { mtime = statSync(fullPath).mtimeMs; } catch {}
-      cb.onFile(fullPath, e.name, mtime);
+      try { mtime = (await stat(fullPath)).mtimeMs; } catch {}
+      parentNode.children!.push({ name: e.name, path: fullPath, type: "file", lastModified: mtime });
       fileCount++;
     }
   }
+
   return fileCount;
 }
 
 // Returns a FileTreeNode tree (for the workspace sidebar).
-export function scanWorkspaceTree(rootPath: string): FileTreeNode {
+export async function scanWorkspaceTree(rootPath: string): Promise<FileTreeNode> {
   const nodeMap = new Map<string, FileTreeNode>();
 
   const rootLocalPatterns = loadLocalPatterns(rootPath);
@@ -101,29 +112,9 @@ export function scanWorkspaceTree(rootPath: string): FileTreeNode {
     ...globalPatterns().map((p) => ({ base: rootPath, pattern: p })),
     ...rootLocalPatterns.map((p) => ({ base: rootPath, pattern: p })),
   ];
-  walk(rootPath, rootAncestorPatterns, {
-    onEnterDir(path, name, _localPatterns) {
-      const node: FileTreeNode = { name, path, type: "directory", children: [], fileCount: 0 };
-      nodeMap.set(path, node);
-    },
-    onLeaveDir(path, fileCount) {
-      const node = nodeMap.get(path)!;
-      // attach .mdvignore patterns for the client-side ignore-filter
-      const local = loadLocalPatterns(path);
-      if (local.length > 0) node.ignorePatterns = local;
-      if (fileCount === 0) { nodeMap.delete(path); return; }
-      node.fileCount = fileCount;
-      const parentPath = path.substring(0, path.lastIndexOf("/"));
-      nodeMap.get(parentPath)?.children!.push(node);
-    },
-    onFile(path, name, mtime) {
-      const parentPath = path.substring(0, path.lastIndexOf("/"));
-      if (!isSupportedTextFile(name.toLowerCase())) return;
-      nodeMap.get(parentPath)?.children!.push({ name, path, type: "file", lastModified: mtime });
-    },
-  });
 
-  // aggregate fileCount up to root and sort children at every level
+  await walk(rootPath, rootAncestorPatterns, nodeMap, root);
+
   function finalize(node: FileTreeNode): number {
     if (node.type === "file") return 1;
     node.children!.sort((a, b) => {
@@ -139,7 +130,7 @@ export function scanWorkspaceTree(rootPath: string): FileTreeNode {
 }
 
 // Returns a flat list of .md/.markdown files (for RAG indexer).
-export function collectWorkspaceMdFiles(rootPath: string): string[] {
+export async function collectWorkspaceMdFiles(rootPath: string): Promise<string[]> {
   if (!existsSync(rootPath)) return [];
   const files: string[] = [];
   const rootLocalPatterns = loadLocalPatterns(rootPath);
@@ -148,11 +139,29 @@ export function collectWorkspaceMdFiles(rootPath: string): string[] {
     ...rootLocalPatterns.map((p) => ({ base: rootPath, pattern: p })),
   ];
 
-  walk(rootPath, rootAncestorPatterns, {
-    onFile(path, name) {
-      if ([".md", ".markdown"].includes(extname(name))) files.push(path);
-    },
-  });
+  async function collectFiles(dir: string, ancestorPatterns: Pattern[]): Promise<void> {
+    const localPatterns = loadLocalPatterns(dir);
+    const patterns: Pattern[] = [
+      ...ancestorPatterns,
+      ...localPatterns.map((p) => ({ base: dir, pattern: p })),
+    ];
+    let entries;
+    try { entries = await readdir(dir, { withFileTypes: true }); }
+    catch { return; }
 
+    for (const e of entries) {
+      if (e.name.startsWith(".")) continue;
+      if (ALWAYS_SKIP.has(e.name)) continue;
+      const fullPath = join(dir, e.name);
+      if (isIgnored(fullPath, patterns)) continue;
+      if (e.isDirectory()) {
+        await collectFiles(fullPath, patterns);
+      } else if (e.isFile() && [".md", ".markdown"].includes(extname(e.name))) {
+        files.push(fullPath);
+      }
+    }
+  }
+
+  await collectFiles(rootPath, rootAncestorPatterns);
   return files;
 }

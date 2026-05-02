@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>快捷评论 — 交互原型</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    background: #1a1a1a;
+    color: #e0e0e0;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── Layout ── */
+  .app {
+    display: flex;
+    width: 100%;
+    height: 100%;
+  }
+
+  .sidebar {
+    width: 220px;
+    background: #111;
+    border-right: 1px solid #2a2a2a;
+    padding: 12px 0;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .sidebar-item {
+    padding: 6px 16px;
+    color: #888;
+    cursor: pointer;
+    border-radius: 4px;
+    margin: 0 6px;
+    font-size: 13px;
+  }
+  .sidebar-item.active { background: #2a2a2a; color: #e0e0e0; }
+  .sidebar-item:hover:not(.active) { background: #1e1e1e; color: #ccc; }
+
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .toolbar {
+    height: 40px;
+    background: #111;
+    border-bottom: 1px solid #2a2a2a;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 8px;
+    font-size: 12px;
+    color: #666;
+  }
+
+  .reader {
+    flex: 1;
+    overflow-y: auto;
+    padding: 40px 60px;
+    max-width: 780px;
+    margin: 0 auto;
+    width: 100%;
+    line-height: 1.8;
+  }
+
+  .reader h1 { font-size: 24px; font-weight: 600; margin-bottom: 16px; color: #f0f0f0; }
+  .reader h2 { font-size: 18px; font-weight: 600; margin: 24px 0 10px; color: #e0e0e0; }
+  .reader p { margin-bottom: 14px; color: #ccc; }
+  .reader code {
+    background: #2a2a2a;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: 'SF Mono', monospace;
+    font-size: 12px;
+    color: #a8d8a8;
+  }
+
+  /* highlight */
+  .ann-highlight {
+    background: rgba(255, 200, 50, 0.2);
+    border-bottom: 1.5px solid rgba(255, 200, 50, 0.6);
+    cursor: pointer;
+  }
+
+  /* ── Quick Add Popup (existing) ── */
+  .quick-add-wrap {
+    position: fixed;
+    background: #252525;
+    border: 1px solid #383838;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    z-index: 9999;
+    overflow: hidden;
+    min-width: 180px;
+  }
+
+  .quick-add-section {
+    padding: 4px;
+  }
+
+  .quick-add-section + .quick-add-section {
+    border-top: 1px solid #333;
+  }
+
+  .section-label {
+    font-size: 10px;
+    color: #555;
+    padding: 4px 8px 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .quick-add-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 10px;
+    background: none;
+    border: none;
+    color: #ccc;
+    cursor: pointer;
+    border-radius: 5px;
+    font-size: 13px;
+    text-align: left;
+    transition: background 0.1s;
+  }
+  .quick-add-btn:hover { background: #333; color: #fff; }
+  .quick-add-btn svg { width: 14px; height: 14px; flex-shrink: 0; opacity: 0.7; }
+
+  .quick-add-btn.primary { color: #7cb9ff; }
+  .quick-add-btn.todo { color: #88d8a0; }
+  .quick-add-btn.quick-prompt { color: #d4a8ff; }
+
+  .quick-add-btn kbd {
+    margin-left: auto;
+    font-size: 10px;
+    color: #555;
+    background: #1a1a1a;
+    padding: 1px 4px;
+    border-radius: 3px;
+    border: 1px solid #333;
+    font-family: inherit;
+  }
+
+  /* hidden */
+  .hidden { display: none !important; }
+
+  /* ── Annotation panel ── */
+  .ann-panel {
+    width: 300px;
+    background: #111;
+    border-left: 1px solid #2a2a2a;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .ann-panel-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid #222;
+    font-size: 12px;
+    color: #888;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .ann-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+  }
+
+  .ann-item {
+    padding: 10px 12px;
+    border-radius: 6px;
+    border: 1px solid #2a2a2a;
+    margin-bottom: 6px;
+    background: #191919;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .ann-item:hover { border-color: #3a3a3a; }
+  .ann-item.new { border-color: #4a3a6a; background: #1e1830; }
+
+  .ann-item-quote {
+    font-size: 11px;
+    color: #666;
+    margin-bottom: 5px;
+    border-left: 2px solid #444;
+    padding-left: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ann-item-note {
+    font-size: 13px;
+    color: #ccc;
+  }
+
+  .ann-item-meta {
+    font-size: 11px;
+    color: #555;
+    margin-top: 5px;
+  }
+
+  .ann-item.quick { }
+  .ann-item.quick .ann-item-note { color: #c4a0ee; }
+
+  /* ── Preferences overlay ── */
+  .pref-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pref-dialog {
+    width: 640px;
+    max-height: 80vh;
+    background: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 10px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .pref-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid #2a2a2a;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .pref-header h2 { font-size: 15px; font-weight: 600; }
+  .pref-close {
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .pref-close:hover { background: #333; color: #ccc; }
+
+  .pref-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .pref-nav {
+    width: 130px;
+    padding: 10px 8px;
+    border-right: 1px solid #2a2a2a;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .pref-nav-item {
+    padding: 7px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #888;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .pref-nav-item:hover { background: #252525; color: #ccc; }
+  .pref-nav-item.active { background: #2a2a2a; color: #e0e0e0; }
+
+  .pref-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+  }
+
+  .pref-section-title {
+    font-size: 12px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+    margin-top: 16px;
+  }
+  .pref-section-title:first-child { margin-top: 0; }
+
+  .pref-desc {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 14px;
+    line-height: 1.5;
+  }
+
+  /* Quick comments list */
+  .qc-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+
+  .qc-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: #252525;
+    border: 1px solid #333;
+    border-radius: 6px;
+  }
+
+  .qc-item-drag {
+    color: #444;
+    cursor: grab;
+    font-size: 14px;
+    padding: 0 2px;
+  }
+
+  .qc-item-text {
+    flex: 1;
+    background: none;
+    border: none;
+    color: #ddd;
+    font-size: 13px;
+    outline: none;
+    min-width: 0;
+  }
+  .qc-item-text:focus {
+    color: #fff;
+  }
+
+  .qc-item-del {
+    background: none;
+    border: none;
+    color: #555;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-size: 14px;
+    line-height: 1;
+  }
+  .qc-item-del:hover { background: #3a2020; color: #e06060; }
+
+  .qc-add-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    background: none;
+    border: 1px dashed #333;
+    border-radius: 6px;
+    color: #666;
+    cursor: pointer;
+    font-size: 13px;
+    width: 100%;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .qc-add-btn:hover { border-color: #555; color: #aaa; }
+
+  /* preset chips */
+  .qc-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 12px;
+  }
+
+  .qc-preset-chip {
+    padding: 4px 10px;
+    background: #1a1a2e;
+    border: 1px solid #3a3060;
+    border-radius: 20px;
+    color: #a080d0;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .qc-preset-chip:hover { background: #252040; color: #c4a0f0; }
+
+  .pref-footer {
+    padding: 12px 18px;
+    border-top: 1px solid #2a2a2a;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .pref-btn {
+    padding: 6px 16px;
+    border-radius: 5px;
+    font-size: 13px;
+    cursor: pointer;
+    border: 1px solid #333;
+    background: #252525;
+    color: #ccc;
+  }
+  .pref-btn:hover { background: #2e2e2e; }
+  .pref-btn.primary { background: #3a2f6a; border-color: #5040a0; color: #c4a0ff; }
+  .pref-btn.primary:hover { background: #4a3f7a; }
+
+  /* toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    color: #ccc;
+    z-index: 99999;
+    animation: fadeInUp 0.2s ease;
+    pointer-events: none;
+  }
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
+  /* demo label */
+  .demo-badge {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: #3a2f6a;
+    color: #c4a0ff;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid #5040a0;
+    z-index: 100000;
+  }
+
+  .hint {
+    position: fixed;
+    bottom: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 12px;
+    color: #666;
+    z-index: 100;
+    white-space: nowrap;
+  }
+  .hint kbd {
+    background: #252525;
+    border: 1px solid #3a3a3a;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: inherit;
+  }
+
+  select.settings-select {
+    background: #252525;
+    border: 1px solid #383838;
+    color: #ddd;
+    padding: 5px 8px;
+    border-radius: 5px;
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .settings-label { font-size: 13px; color: #aaa; }
+
+  /* drag active */
+  .qc-item.drag-over { border-color: #7060c0; background: #201a35; }
+</style>
+</head>
+<body>
+
+<div class="demo-badge">交互原型</div>
+
+<div class="app">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-item active">📄 README.md</div>
+    <div class="sidebar-item">📄 CHANGELOG.md</div>
+    <div class="sidebar-item">📁 docs/</div>
+  </div>
+
+  <!-- Main reader -->
+  <div class="main">
+    <div class="toolbar">
+      <span>README.md</span>
+      <span style="margin-left:auto;cursor:pointer;color:#888" id="openPrefBtn" title="偏好设置">⚙ 偏好设置</span>
+    </div>
+    <div class="reader" id="reader">
+      <h1>md-viewer</h1>
+      <p>
+        一个基于 Web 的 Markdown 查看器，支持实时预览、<strong>划词评论</strong>、RAG 语义搜索和 PDF 标注。
+        通过 <code>mdv</code> 命令在本地启动服务，用浏览器访问即可。
+      </p>
+      <h2>核心功能</h2>
+      <p>
+        支持 <strong>GitHub Flavored Markdown</strong>，包含表格、任务列表和代码块高亮。
+        内置 KaTeX 数学公式渲染，支持行内公式和独立块公式。
+        文档目录自动生成，侧边栏展示工作区文件树。
+      </p>
+      <p>
+        RAG 搜索功能基于本地向量索引，无需联网即可对工作区内所有文档进行语义检索。
+        划词后可以快速创建评论或 Todo，评论数据持久化存储在本地 SQLite 数据库中。
+      </p>
+      <h2>快速开始</h2>
+      <p>
+        运行 <code>bun install</code> 安装依赖，然后执行 <code>bun dev</code> 启动开发服务器。
+        构建生产版本使用 <code>bun run build</code>，输出单文件可执行程序 <code>mdv</code>。
+      </p>
+    </div>
+  </div>
+
+  <!-- Annotation panel -->
+  <div class="ann-panel">
+    <div class="ann-panel-header">
+      <span>评论</span>
+      <span id="annCount" style="background:#2a2a2a;padding:1px 6px;border-radius:10px;font-size:11px">0</span>
+    </div>
+    <div class="ann-list" id="annList">
+      <div style="color:#555;font-size:12px;padding:12px;text-align:center">划词后点击快捷评论</div>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Add popup (hidden by default) -->
+<div class="quick-add-wrap hidden" id="quickAddWrap">
+  <!-- Section 1: 通用操作 -->
+  <div class="quick-add-section">
+    <button class="quick-add-btn primary" id="btnComment">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+        <rect x="2" y="2.5" width="12" height="11" rx="1.5"/>
+        <path d="M5 6h6M5 9h4"/>
+      </svg>
+      写评论…
+    </button>
+    <button class="quick-add-btn todo" id="btnTodo">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+        <path d="M3 8l3.5 3.5L13 4.5"/>
+      </svg>
+      Todo
+    </button>
+  </div>
+
+  <!-- Section 2: 快捷评论（可配置） -->
+  <div class="quick-add-section" id="quickPromptsSection">
+    <div class="section-label">快捷评论</div>
+    <div id="quickPromptBtns"></div>
+  </div>
+</div>
+
+<!-- Preferences overlay (hidden) -->
+<div class="pref-overlay hidden" id="prefOverlay">
+  <div class="pref-dialog">
+    <div class="pref-header">
+      <h2>偏好设置</h2>
+      <button class="pref-close" id="prefClose">×</button>
+    </div>
+    <div class="pref-body">
+      <nav class="pref-nav" id="prefNav">
+        <div class="pref-nav-item" data-tab="外观">🎨 外观</div>
+        <div class="pref-nav-item" data-tab="快捷键">⌨️ 快捷键</div>
+        <div class="pref-nav-item active" data-tab="评论">💬 评论</div>
+      </nav>
+      <div class="pref-content" id="prefContent"></div>
+    </div>
+    <div class="pref-footer">
+      <button class="pref-btn" id="prefCancel">取消</button>
+      <button class="pref-btn primary" id="prefSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="hint">选中文字 → 快捷评论弹出 &nbsp;|&nbsp; <kbd>⚙</kbd> 管理快捷评论列表</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const DEFAULT_QUICK_COMMENTS = [
+  '这是什么？',
+  '举例说明',
+  '为什么这样做？',
+  '有什么风险？',
+];
+
+// Simulate AppConfig storage
+function loadQuickComments() {
+  try {
+    const raw = localStorage.getItem('mdv-proto:quick-comments');
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return [...DEFAULT_QUICK_COMMENTS];
+}
+
+function saveQuickComments(list) {
+  localStorage.setItem('mdv-proto:quick-comments', JSON.stringify(list));
+}
+
+let quickComments = loadQuickComments();
+let annotations = [];
+let pendingQuote = '';
+let pendingRange = null;
+
+// ── Render quick prompt buttons ────────────────────────────────────────────
+function renderQuickPromptBtns() {
+  const container = document.getElementById('quickPromptBtns');
+  const section = document.getElementById('quickPromptsSection');
+  container.innerHTML = '';
+
+  if (quickComments.length === 0) {
+    section.classList.add('hidden');
+    return;
+  }
+  section.classList.remove('hidden');
+
+  quickComments.forEach((text, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'quick-add-btn quick-prompt';
+    btn.innerHTML = `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+        <path d="M8 2a6 6 0 110 12A6 6 0 018 2zm0 3v4m0 2v1"/>
+      </svg>
+      ${escHtml(text)}
+    `;
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      onQuickCommentClick(text);
+    });
+    container.appendChild(btn);
+  });
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Text selection → show popup ────────────────────────────────────────────
+let selTimeout = null;
+
+document.getElementById('reader').addEventListener('mouseup', (e) => {
+  clearTimeout(selTimeout);
+  selTimeout = setTimeout(() => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.toString().trim()) {
+      hideQuickAdd();
+      return;
+    }
+    const text = sel.toString().trim();
+    const range = sel.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+
+    pendingQuote = text;
+    pendingRange = range.cloneRange();
+
+    showQuickAdd(rect.left + rect.width / 2, rect.top - 8);
+  }, 80);
+});
+
+document.addEventListener('mousedown', (e) => {
+  const wrap = document.getElementById('quickAddWrap');
+  if (!wrap.contains(e.target)) {
+    hideQuickAdd();
+  }
+});
+
+function showQuickAdd(centerX, topY) {
+  renderQuickPromptBtns();
+  const wrap = document.getElementById('quickAddWrap');
+  wrap.classList.remove('hidden');
+
+  // Position
+  const w = wrap.offsetWidth || 180;
+  let left = centerX - w / 2;
+  let top = topY - wrap.offsetHeight - 8;
+  if (top < 60) top = topY + 28; // flip below selection
+  left = Math.max(10, Math.min(left, window.innerWidth - w - 10));
+
+  wrap.style.left = left + 'px';
+  wrap.style.top = top + 'px';
+}
+
+function hideQuickAdd() {
+  document.getElementById('quickAddWrap').classList.add('hidden');
+  pendingRange = null;
+}
+
+// ── Apply highlight span ───────────────────────────────────────────────────
+function applyHighlight(range, annId) {
+  if (!range) return;
+  try {
+    const span = document.createElement('span');
+    span.className = 'ann-highlight';
+    span.dataset.annId = annId;
+    range.surroundContents(span);
+  } catch {
+    // cross-node selection: just skip visual highlight in prototype
+  }
+}
+
+// ── Create annotation ──────────────────────────────────────────────────────
+function createAnnotation(note) {
+  if (!pendingQuote) return;
+  const id = 'ann-' + Date.now();
+  const ann = {
+    id,
+    quote: pendingQuote,
+    note,
+    createdAt: Date.now(),
+    isQuick: true,
+  };
+  annotations.push(ann);
+
+  if (pendingRange) applyHighlight(pendingRange, id);
+  hideQuickAdd();
+  window.getSelection()?.removeAllRanges();
+  pendingQuote = '';
+  pendingRange = null;
+
+  renderAnnList();
+  showToast(`已保存：「${note}」`);
+}
+
+// ── Quick comment click ────────────────────────────────────────────────────
+function onQuickCommentClick(text) {
+  createAnnotation(text);
+}
+
+// ── "写评论…" button ───────────────────────────────────────────────────────
+document.getElementById('btnComment').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const note = prompt(`评论内容：\n\n划词：「${pendingQuote}」`);
+  if (note && note.trim()) {
+    const ann = {
+      id: 'ann-' + Date.now(),
+      quote: pendingQuote,
+      note: note.trim(),
+      createdAt: Date.now(),
+      isQuick: false,
+    };
+    annotations.push(ann);
+    if (pendingRange) applyHighlight(pendingRange, ann.id);
+    hideQuickAdd();
+    window.getSelection()?.removeAllRanges();
+    pendingQuote = '';
+    pendingRange = null;
+    renderAnnList();
+    showToast('评论已保存');
+  }
+});
+
+document.getElementById('btnTodo').addEventListener('click', (e) => {
+  e.stopPropagation();
+  showToast('（Todo 功能不在本原型演示范围内）');
+  hideQuickAdd();
+});
+
+// ── Render annotation list ─────────────────────────────────────────────────
+function renderAnnList() {
+  const list = document.getElementById('annList');
+  const count = document.getElementById('annCount');
+  count.textContent = annotations.length;
+
+  if (annotations.length === 0) {
+    list.innerHTML = '<div style="color:#555;font-size:12px;padding:12px;text-align:center">划词后点击快捷评论</div>';
+    return;
+  }
+
+  list.innerHTML = annotations.slice().reverse().map(a => `
+    <div class="ann-item ${a.isQuick ? 'quick new' : 'new'}" data-id="${a.id}">
+      <div class="ann-item-quote">${escHtml(a.quote)}</div>
+      <div class="ann-item-note">${escHtml(a.note)}</div>
+      <div class="ann-item-meta">刚刚</div>
+    </div>
+  `).join('');
+}
+
+// ── Preferences ────────────────────────────────────────────────────────────
+let editingComments = [];
+let currentPrefTab = '评论';
+
+document.getElementById('openPrefBtn').addEventListener('click', openPreferences);
+
+function openPreferences() {
+  editingComments = [...quickComments];
+  document.getElementById('prefOverlay').classList.remove('hidden');
+  renderPrefNav();
+  renderPrefContent();
+}
+
+function renderPrefNav() {
+  document.querySelectorAll('.pref-nav-item').forEach(item => {
+    item.classList.toggle('active', item.dataset.tab === currentPrefTab);
+    item.addEventListener('click', () => {
+      currentPrefTab = item.dataset.tab;
+      renderPrefNav();
+      renderPrefContent();
+    });
+  });
+}
+
+function renderPrefContent() {
+  const content = document.getElementById('prefContent');
+  if (currentPrefTab === '评论') {
+    renderCommentsTab(content);
+  } else {
+    content.innerHTML = `<div style="color:#555;padding:20px;font-size:13px">（此 tab 不在原型演示范围内）</div>`;
+  }
+}
+
+function renderCommentsTab(container) {
+  const presets = [
+    '这是什么？', '举例说明', '为什么这样做？', '有什么风险？',
+    '如何改进？', '出处在哪？', '补充背景', '待确认',
+  ];
+
+  container.innerHTML = `
+    <div class="pref-section-title">快捷评论</div>
+    <p class="pref-desc">
+      划词后会在弹出菜单中显示，点击即可一键创建评论，无需打开输入框。<br>
+      顺序决定显示顺序，拖拽可调整。
+    </p>
+
+    <div class="qc-list" id="qcList"></div>
+
+    <button class="qc-add-btn" id="qcAddBtn">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M8 3v10M3 8h10"/>
+      </svg>
+      添加快捷评论
+    </button>
+
+    <div class="pref-section-title" style="margin-top:20px">推荐预设</div>
+    <p class="pref-desc">点击可添加到列表中。</p>
+    <div class="qc-presets">
+      ${presets.map(p => `<div class="qc-preset-chip" data-text="${escHtml(p)}">${escHtml(p)}</div>`).join('')}
+    </div>
+  `;
+
+  renderQcList();
+
+  container.querySelector('#qcAddBtn').addEventListener('click', () => {
+    editingComments.push('新快捷评论');
+    renderQcList();
+    // focus last input
+    const inputs = container.querySelectorAll('.qc-item-text');
+    if (inputs.length) {
+      const last = inputs[inputs.length - 1];
+      last.focus();
+      last.select();
+    }
+  });
+
+  container.querySelectorAll('.qc-preset-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const text = chip.dataset.text;
+      if (!editingComments.includes(text)) {
+        editingComments.push(text);
+        renderQcList();
+        showToast(`已添加：「${text}」`);
+      } else {
+        showToast('已在列表中');
+      }
+    });
+  });
+}
+
+function renderQcList() {
+  const list = document.getElementById('qcList');
+  if (!list) return;
+  list.innerHTML = editingComments.map((text, i) => `
+    <div class="qc-item" draggable="true" data-index="${i}">
+      <span class="qc-item-drag" title="拖拽排序">⠿</span>
+      <input class="qc-item-text" value="${escHtml(text)}" data-index="${i}" />
+      <button class="qc-item-del" data-index="${i}" title="删除">×</button>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.qc-item-text').forEach(input => {
+    input.addEventListener('input', (e) => {
+      editingComments[parseInt(e.target.dataset.index)] = e.target.value;
+    });
+  });
+
+  list.querySelectorAll('.qc-item-del').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const idx = parseInt(e.target.dataset.index);
+      editingComments.splice(idx, 1);
+      renderQcList();
+    });
+  });
+
+  // Basic drag-to-reorder
+  let dragIdx = null;
+  list.querySelectorAll('.qc-item').forEach(item => {
+    item.addEventListener('dragstart', (e) => {
+      dragIdx = parseInt(item.dataset.index);
+      item.style.opacity = '0.5';
+    });
+    item.addEventListener('dragend', (e) => {
+      item.style.opacity = '';
+      list.querySelectorAll('.qc-item').forEach(i => i.classList.remove('drag-over'));
+    });
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      list.querySelectorAll('.qc-item').forEach(i => i.classList.remove('drag-over'));
+      item.classList.add('drag-over');
+    });
+    item.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const dropIdx = parseInt(item.dataset.index);
+      if (dragIdx !== null && dragIdx !== dropIdx) {
+        const moved = editingComments.splice(dragIdx, 1)[0];
+        editingComments.splice(dropIdx, 0, moved);
+        renderQcList();
+      }
+      dragIdx = null;
+    });
+  });
+}
+
+document.getElementById('prefSave').addEventListener('click', () => {
+  quickComments = [...editingComments];
+  saveQuickComments(quickComments);
+  document.getElementById('prefOverlay').classList.add('hidden');
+  showToast('已保存');
+});
+
+document.getElementById('prefCancel').addEventListener('click', () => {
+  document.getElementById('prefOverlay').classList.add('hidden');
+});
+
+document.getElementById('prefClose').addEventListener('click', () => {
+  document.getElementById('prefOverlay').classList.add('hidden');
+});
+
+document.getElementById('prefOverlay').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) {
+    document.getElementById('prefOverlay').classList.add('hidden');
+  }
+});
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+let toastTimer = null;
+function showToast(msg) {
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  if (toastTimer) clearTimeout(toastTimer);
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  toastTimer = setTimeout(() => el.remove(), 2200);
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+renderAnnList();
+renderQuickPromptBtns();
+</script>
+</body>
+</html>

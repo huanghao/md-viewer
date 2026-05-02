@@ -10,6 +10,7 @@ import {
   replyAnnotationRemote,
   deleteAnnotationRemote,
   updateAnnotationStatusRemote,
+  fetchQuickComments,
 } from './api/annotations';
 import { showError, showToast } from './ui/toast';
 import { enqueueOp } from './utils/undo-queue';
@@ -91,9 +92,58 @@ const ANNOTATION_PANEL_OPEN_KEY = 'md-viewer:annotation-panel-open';
 
 let _lastQuickAddX = 0;
 let _lastQuickAddY = 0;
+let _quickComments: string[] = [];
 
 export function getLastQuickAddPosition(): { x: number; y: number } {
   return { x: _lastQuickAddX, y: _lastQuickAddY };
+}
+
+export async function loadQuickComments(): Promise<void> {
+  const items = await fetchQuickComments();
+  _quickComments = items.map((it) => it.text);
+  renderQuickPromptBtns();
+}
+
+function renderQuickPromptBtns(): void {
+  const container = document.getElementById('quickPromptBtns');
+  const section = document.getElementById('quickPromptsSection');
+  if (!container || !section) return;
+
+  if (_quickComments.length === 0) {
+    section.classList.add('hidden');
+    return;
+  }
+  section.classList.remove('hidden');
+
+  container.innerHTML = _quickComments.map((text, i) =>
+    `<button class="quick-add-btn quick-prompt" data-qc-index="${i}" aria-label="${text.replace(/"/g, '&quot;')}">
+      <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+        <path d="M8 2a6 6 0 110 12A6 6 0 018 2zm0 3v4m0 2.5v.5"/>
+      </svg>
+      ${text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+    </button>`
+  ).join('');
+
+  container.querySelectorAll<HTMLButtonElement>('[data-qc-index]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = parseInt(btn.dataset.qcIndex ?? '0', 10);
+      onQuickCommentClick(_quickComments[idx] ?? '');
+    });
+  });
+}
+
+function onQuickCommentClick(note: string): void {
+  const pending = state.pendingAnnotation;
+  const filePath = state.pendingAnnotationFilePath;
+  if (!pending || !filePath || !note) {
+    hideQuickAdd(true);
+    return;
+  }
+  const el = getElements();
+  if (el.composerNote) el.composerNote.value = note;
+  hideQuickAdd(false);
+  savePendingAnnotation(filePath);
 }
 
 export function nextAnnotationSerial(annotations: Annotation[]): number {
@@ -487,6 +537,7 @@ export function mergeAnnotationStatus(
 
 // ==================== UI 操作 ====================
 export function showQuickAdd(x: number, y: number, pendingData: Omit<Annotation, 'note' | 'createdAt'>): void {
+  renderQuickPromptBtns();
   const el = getElements();
   if (!el.quickAddWrap) return;
   // 新划词时关闭旧的 composer（明确的焦点转移）
@@ -2125,6 +2176,8 @@ export function initAnnotationElements(): void {
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
   });
+
+  loadQuickComments();
 }
 
 export function setPendingAnnotation(annotation: Annotation, filePath: string, clientX?: number, clientY?: number): void {

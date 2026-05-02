@@ -1,4 +1,5 @@
 import { searchWorkspaceFiles } from '../api/files';
+import { fuzzyMatch } from '../utils/fuzzy-search';
 import type { PathSuggestion } from '../types';
 
 interface QuickOpenDeps {
@@ -204,13 +205,7 @@ function updateActiveClass(): void {
 }
 
 function highlightMatch(text: string, query: string): string {
-  const escaped = escapeHtml(text);
-  const escapedQuery = escapeRegExp(query);
-  return escaped.replace(new RegExp(escapedQuery, 'gi'), '<em>$&</em>');
-}
-
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return fuzzyMatch(text, query)?.highlight ?? escapeHtml(text);
 }
 
 function escapeHtml(text: string): string {

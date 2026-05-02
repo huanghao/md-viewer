@@ -15,8 +15,10 @@ import {
   type Action,
   type ActionCategory,
 } from '../keybindings';
+import { fetchQuickComments, saveQuickComments } from '../api/annotations';
+import { loadQuickComments } from '../annotation';
 
-type PrefTab = '外观' | '快捷键';
+type PrefTab = '外观' | '快捷键' | '评论';
 
 let overlay: HTMLElement | null = null;
 let currentTab: PrefTab = '外观';
@@ -25,6 +27,7 @@ let savedCodeTheme = '';
 let savedMathInline = true;
 let recordingActionId: string | null = null;
 let keydownHandler: ((e: KeyboardEvent) => void) | null = null;
+let editingComments: string[] = [];
 
 export function showPreferences(): void {
   savedMarkdownTheme = state.config.markdownTheme || 'github';
@@ -94,6 +97,7 @@ function renderNav(): void {
   const tabs: Array<{ id: PrefTab; icon: string }> = [
     { id: '外观', icon: '🎨' },
     { id: '快捷键', icon: '⌨️' },
+    { id: '评论', icon: '💬' },
   ];
   nav.innerHTML = tabs
     .map(
@@ -119,6 +123,7 @@ function renderTab(): void {
   const content = overlay!.querySelector('#prefContent')!;
   if (currentTab === '外观') content.innerHTML = renderAppearanceTab();
   else if (currentTab === '快捷键') content.innerHTML = renderKeybindingsTab();
+  else if (currentTab === '评论') { renderCommentsTab(content); return; }
   bindTabEvents();
 }
 
@@ -229,6 +234,14 @@ function renderAppearanceTab(): string {
 }
 
 async function saveAndClose(): Promise<void> {
+  if (currentTab === '评论') {
+    const texts = editingComments.filter((t) => t.trim().length > 0);
+    await saveQuickComments(texts);
+    await loadQuickComments();
+    closePreferences();
+    return;
+  }
+
   const mdSelect = document.getElementById('markdownThemeSelect') as HTMLSelectElement | null;
   const codeSelect = document.getElementById('codeThemeSelect') as HTMLSelectElement | null;
   const mathCheck = document.getElementById('mathInlineCheckbox') as HTMLInputElement | null;
@@ -347,6 +360,90 @@ function formatKeyCombo(combo: string, isMac: boolean): string {
       return `<kbd style="display:inline-block;padding:2px 6px;border:1px solid #ccc;border-bottom:2px solid #bbb;border-radius:4px;background:#f9f9f9;font-size:11px;font-family:monospace">${escapeHtml(part)}</kbd>`;
     })
     .join('');
+}
+
+async function renderCommentsTab(container: Element): Promise<void> {
+  const items = await fetchQuickComments();
+  editingComments = items.map((it) => it.text);
+
+  const PRESETS = ['这是什么？', '举例说明', '为什么这样做？', '有什么风险？', '如何改进？', '出处在哪？'];
+
+  container.innerHTML = `
+    <div class="settings-group-title">快捷评论</div>
+    <div class="settings-section-desc">
+      划词弹窗中显示的快捷评论，点击即直接保存，无需输入。顺序决定显示顺序。
+    </div>
+    <div class="qc-list" id="qcList"></div>
+    <button class="quick-add-btn" id="qcAddBtn" style="width:100%;margin-top:4px">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="13" height="13"><path d="M8 3v10M3 8h10"/></svg>
+      添加
+    </button>
+    <div class="settings-group-title" style="margin-top:16px">推荐预设</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+      ${PRESETS.map((p) => `<button class="qc-preset-chip" data-text="${p.replace(/"/g, '&quot;')}">${p}</button>`).join('')}
+    </div>
+  `;
+
+  renderQcList(container);
+
+  container.querySelector('#qcAddBtn')?.addEventListener('click', () => {
+    editingComments.push('');
+    renderQcList(container);
+    const inputs = container.querySelectorAll<HTMLInputElement>('.qc-item-text');
+    inputs[inputs.length - 1]?.focus();
+  });
+
+  container.querySelectorAll<HTMLElement>('.qc-preset-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const text = chip.dataset.text ?? '';
+      if (text && !editingComments.includes(text)) {
+        editingComments.push(text);
+        renderQcList(container);
+      }
+    });
+  });
+}
+
+function renderQcList(container: Element): void {
+  const list = container.querySelector('#qcList');
+  if (!list) return;
+  list.innerHTML = editingComments.map((text, i) => `
+    <div class="qc-item" draggable="true" data-index="${i}">
+      <span class="qc-item-drag" title="拖拽排序">⠿</span>
+      <input class="qc-item-text" value="${text.replace(/"/g, '&quot;')}" data-index="${i}" />
+      <button class="qc-item-del" data-index="${i}" title="删除">×</button>
+    </div>
+  `).join('');
+
+  list.querySelectorAll<HTMLInputElement>('.qc-item-text').forEach((input) => {
+    input.addEventListener('input', () => {
+      editingComments[parseInt(input.dataset.index ?? '0', 10)] = input.value;
+    });
+  });
+
+  list.querySelectorAll<HTMLButtonElement>('.qc-item-del').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      editingComments.splice(parseInt(btn.dataset.index ?? '0', 10), 1);
+      renderQcList(container);
+    });
+  });
+
+  let dragIdx: number | null = null;
+  list.querySelectorAll<HTMLElement>('.qc-item').forEach((item) => {
+    item.addEventListener('dragstart', () => { dragIdx = parseInt(item.dataset.index ?? '0', 10); item.style.opacity = '0.5'; });
+    item.addEventListener('dragend', () => { item.style.opacity = ''; });
+    item.addEventListener('dragover', (e) => { e.preventDefault(); });
+    item.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const dropIdx = parseInt(item.dataset.index ?? '0', 10);
+      if (dragIdx !== null && dragIdx !== dropIdx) {
+        const [moved] = editingComments.splice(dragIdx, 1);
+        editingComments.splice(dropIdx, 0, moved);
+        renderQcList(container);
+      }
+      dragIdx = null;
+    });
+  });
 }
 
 function bindTabEvents(): void {

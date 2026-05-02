@@ -4248,6 +4248,13 @@ export const styles = `
     .preferences-btn:hover { background: var(--color-bg-subtle, #f0f0f0); }
     .preferences-btn.primary { background: var(--color-accent, #2563eb); color: white; border-color: var(--color-accent, #2563eb); font-weight: 500; }
     .preferences-btn.primary:hover { background: #1d4ed8; }
+    .qc-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--settings-row-bg, #f8f8f8); border: 1px solid var(--border-color, #e0e0e0); border-radius: 5px; margin-bottom: 4px; }
+    .qc-item-drag { color: var(--text-muted, #ccc); cursor: grab; }
+    .qc-item-text { flex: 1; background: none; border: none; outline: none; font-size: 13px; min-width: 0; }
+    .qc-item-del { background: none; border: none; cursor: pointer; color: var(--text-muted, #bbb); padding: 2px 4px; border-radius: 3px; }
+    .qc-item-del:hover { background: var(--danger-bg, #fee2e2); color: var(--danger, #e53e3e); }
+    .qc-preset-chip { padding: 3px 10px; border: 1px solid var(--accent-border, #ddd6fe); border-radius: 20px; background: var(--accent-bg, #f5f3ff); color: var(--accent, #7c3aed); font-size: 12px; cursor: pointer; }
+    .qc-preset-chip:hover { background: var(--accent-hover-bg, #ede9fe); }
 
     /* ── RAG 搜索面板 ── */
     .rag-search-container {

@@ -4183,9 +4183,9 @@ export const styles = `
     .quick-add-btn.todo { color: #93c5fd; }
     .quick-add-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
     .quick-add-section { padding: 4px; }
-    .quick-add-section + .quick-add-section { border-top: 1px solid var(--border-color, #e0e0e0); }
-    .quick-add-section-label { font-size: 10px; color: var(--text-muted, #999); padding: 4px 8px 2px; text-transform: uppercase; letter-spacing: 0.4px; }
-    .quick-add-btn.quick-prompt { color: var(--accent-purple, #8b5cf6); }
+    .quick-add-section + .quick-add-section { border-top: 1px solid var(--color-border, #d0d7de); }
+    .quick-add-section-label { font-size: 10px; color: var(--color-text-muted, #8b949e); padding: 4px 8px 2px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .quick-add-btn.quick-prompt { color: var(--color-accent, #8b5cf6); }
 
     /* ── Copy menu ── */
     .todo-copy-menu { position: fixed; background: #1c1917; border-radius: 8px; padding: 4px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); z-index: calc(var(--z-quick-add) + 1); min-width: 180px; }
@@ -4248,13 +4248,13 @@ export const styles = `
     .preferences-btn:hover { background: var(--color-bg-subtle, #f0f0f0); }
     .preferences-btn.primary { background: var(--color-accent, #2563eb); color: white; border-color: var(--color-accent, #2563eb); font-weight: 500; }
     .preferences-btn.primary:hover { background: #1d4ed8; }
-    .qc-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--settings-row-bg, #f8f8f8); border: 1px solid var(--border-color, #e0e0e0); border-radius: 5px; margin-bottom: 4px; }
-    .qc-item-drag { color: var(--text-muted, #ccc); cursor: grab; }
+    .qc-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--color-bg-subtle, #f6f8fa); border: 1px solid var(--color-border, #d0d7de); border-radius: 5px; margin-bottom: 4px; }
+    .qc-item-drag { color: var(--color-text-muted, #8b949e); cursor: grab; }
     .qc-item-text { flex: 1; background: none; border: none; outline: none; font-size: 13px; min-width: 0; }
-    .qc-item-del { background: none; border: none; cursor: pointer; color: var(--text-muted, #bbb); padding: 2px 4px; border-radius: 3px; }
-    .qc-item-del:hover { background: var(--danger-bg, #fee2e2); color: var(--danger, #e53e3e); }
-    .qc-preset-chip { padding: 3px 10px; border: 1px solid var(--accent-border, #ddd6fe); border-radius: 20px; background: var(--accent-bg, #f5f3ff); color: var(--accent, #7c3aed); font-size: 12px; cursor: pointer; }
-    .qc-preset-chip:hover { background: var(--accent-hover-bg, #ede9fe); }
+    .qc-item-del { background: none; border: none; cursor: pointer; color: var(--color-text-muted, #8b949e); padding: 2px 4px; border-radius: 3px; }
+    .qc-item-del:hover { background: var(--color-error-bg, #ffebe9); color: var(--color-error, #cf222e); }
+    .qc-preset-chip { padding: 3px 10px; border: 1px solid var(--color-border-subtle, #e8ecf0); border-radius: 20px; background: var(--color-bg-subtle, #f6f8fa); color: var(--color-accent, #0969da); font-size: 12px; cursor: pointer; }
+    .qc-preset-chip:hover { background: var(--color-border-subtle, #e8ecf0); }
 
     /* ── RAG 搜索面板 ── */
     .rag-search-container {

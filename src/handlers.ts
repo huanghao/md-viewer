@@ -30,7 +30,7 @@ import {
   replaceQuickComments,
 } from "./annotation-storage.ts";
 import { createTodo, listTodos, updateTodo, deleteTodo, tidyTodos } from './todo-storage.ts';
-import { upsertWorkspacePath, getWorkspacePaths, deleteWorkspacePath } from './rag-storage.ts';
+import { upsertWorkspacePath, getWorkspacePaths, deleteWorkspacePath, searchByFilename } from './rag-storage.ts';
 import { calculateOpenCount } from "./annotation-status.ts";
 
 function expandHomePath(input: string): string {
@@ -866,25 +866,31 @@ export async function handleRagSearch(c: Context) {
   const q = c.req.query('q')?.trim();
   const safeLimit = String(Math.min(parseInt(c.req.query('limit') ?? '10', 10) || 10, 50));
   if (!q) return c.json({ results: [] });
+
+  const filenameHits = searchByFilename(q);
+
   try {
     const resp = await fetch(
       `${RAG_SERVER}/search?q=${encodeURIComponent(q)}&limit=${safeLimit}`,
       { signal: AbortSignal.timeout(3000) }
     );
     if (!resp.ok) return c.json({ results: [], error: 'rag_error' });
-    return c.json(await resp.json());
+    const data = await resp.json() as { results: Array<{ path: string; score: number; heading: string | null; text: string; charStart: number }> };
+    const semanticResults = data.results ?? [];
+
+    // 文件名命中但语义结果未包含的文件，补充到末尾（score=0 表示非语义匹配）
+    const semanticPaths = new Set(semanticResults.map((r) => r.path));
+    const extras = filenameHits
+      .filter((h) => !semanticPaths.has(h.path))
+      .map((h) => ({ ...h, score: 0 }));
+
+    return c.json({ results: [...semanticResults, ...extras] });
   } catch {
-    return c.json({ results: [], error: 'rag_unavailable' });
+    const extras = filenameHits.map((h) => ({ ...h, score: 0 }));
+    return c.json({ results: extras, error: 'rag_unavailable' });
   }
 }
 
-export async function handleRagStatus(c: Context) {
-  try {
-    const resp = await fetch(`${RAG_SERVER}/health`, { signal: AbortSignal.timeout(1000) });
-    if (resp.ok) return c.json({ available: true });
-  } catch { /* fall through */ }
-  return c.json({ available: false });
-}
 
 export async function handleListTodos(c: any): Promise<Response> {
   const done = c.req.query('done');

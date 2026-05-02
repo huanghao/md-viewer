@@ -20,7 +20,7 @@ import { getFileTypeIcon, getFileTypeLabel, isJsonFile, isJsonlFile } from './ut
 // 导入 UI 组件
 import { renderSidebar, initTabsActions, initFileListActions, initWorkspaceActions, initSearchBoxCallbacks, toggleTabManager, applyTabBatchAction } from './ui/sidebar';
 import { initToolbarActions } from './main-actions';
-import { setRagCallbacks } from './ui/rag-search-panel';
+import { setRagCallbacks, flushPendingRagHighlight } from './ui/rag-search-panel';
 import { showToast, showSuccess, showError, showWarning, showInfo } from './ui/toast';
 import { showPreferences, closePreferences } from './ui/preferences';
 import { toggleShortcutsHelp, hideShortcutsHelp, isShortcutsHelpVisible } from './ui/shortcuts-help';
@@ -177,6 +177,7 @@ async function onFileLoaded(data: FileData, focus: boolean = false) {
     updateToc(data.path);
     updateZoomDisplay(true);
   }
+  flushPendingRagHighlight();
 }
 
 export function scrollContentToTop(): void {

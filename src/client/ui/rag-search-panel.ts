@@ -1,4 +1,4 @@
-import type { RagResult, RagStatus } from '../types';
+import type { RagResult } from '../types';
 import { escapeHtml } from '../utils/escape';
 
 export interface RagPanelCallbacks {
@@ -31,11 +31,15 @@ export function renderRagResultsHTML(results: RagResult[], activeIdx: number): s
     const relPath = r.path.split('/').slice(-2).join('/');
     const heading = r.heading ? escapeHtml(r.heading.replace(/^#+\s*/, '')) : '';
     const snippet = escapeHtml(r.text.slice(0, 120));
+    const scoreLabel = r.score > 0 ? `${Math.round(r.score * 100)}%` : '文件名';
     return `
       <div class="rag-item${i === activeIdx ? ' active' : ''}"
            data-idx="${i}"
            data-action="rag-open">
-        <div class="rag-item-file">${escapeHtml(relPath)}</div>
+        <div class="rag-item-file">
+          <span class="rag-item-path">${escapeHtml(relPath)}</span>
+          <span class="rag-item-score">${scoreLabel}</span>
+        </div>
         ${heading ? `<div class="rag-item-heading">${heading}</div>` : ''}
         <div class="rag-item-snippet">${snippet}</div>
       </div>
@@ -47,10 +51,15 @@ let results: RagResult[] = [];
 let activeIdx = 0;
 let savedQuery = '';
 let savedScrollTop = 0;
-let statusPollTimer: ReturnType<typeof setInterval> | null = null;
-let ragStatus: RagStatus = { available: false };
+let pendingHighlightText: string | null = null;
 
-const STATUS_POLL_MS = 5000;
+/** 文件加载完成后由 main.ts onFileLoaded 调用，执行跨文件跳转后的高亮 */
+export function flushPendingRagHighlight(): void {
+  if (!pendingHighlightText) return;
+  const text = pendingHighlightText;
+  pendingHighlightText = null;
+  setTimeout(() => highlightRagChunk(text), 80);
+}
 
 export function renderRagSearchPanel(container: HTMLElement): void {
   container.innerHTML = `
@@ -68,15 +77,12 @@ export function renderRagSearchPanel(container: HTMLElement): void {
         <button class="search-clear" id="ragSearchClear" style="display:none;">×</button>
       </div>
       <div class="rag-results-area" id="ragResultsArea"></div>
-      <div class="rag-status-bar" id="ragStatusBar"></div>
     </div>
   `;
 
   bindRagSearchEvents();
   initRagPanelActions();
   renderRagResults();
-  renderRagStatusBar();
-  startStatusPolling();
 
   const input = document.getElementById('ragSearchInput') as HTMLInputElement;
   if (input && savedQuery) {
@@ -179,17 +185,23 @@ function openActive(): void {
 
 async function openResult(idx: number): Promise<void> {
   const r = results[idx];
-  console.log('[rag] openResult', idx, r?.path);
   if (!r) return;
   activeIdx = idx;
   renderRagResults();
+
+  // 设置 pending highlight，供 onFileLoaded 完成后执行
+  pendingHighlightText = r.text;
 
   if (ragCallbacks) {
     ragCallbacks.switchFile(r.path);
   }
 
+  // 当前文件已加载时，switchFile 是同步的，onFileLoaded 不会重新调用，直接 highlight
   requestAnimationFrame(() => {
-    setTimeout(() => highlightRagChunk(r.text), 100);
+    if (pendingHighlightText === r.text) {
+      pendingHighlightText = null;
+      setTimeout(() => highlightRagChunk(r.text), 80);
+    }
   });
 }
 
@@ -242,38 +254,3 @@ function highlightRagChunk(chunkText: string): void {
   }
 }
 
-function renderRagStatusBar(): void {
-  const bar = document.getElementById('ragStatusBar');
-  if (!bar) return;
-  if (!ragStatus.available) {
-    bar.innerHTML = `<span class="rag-status-dot off"></span><span>RAG 未连接</span>`;
-    return;
-  }
-  const chunks = ragStatus.indexedChunks ?? 0;
-  if (ragStatus.indexing) {
-    const prog = ragStatus.progress ?? 0;
-    bar.innerHTML = `<span class="rag-status-dot warn"></span><span>正在索引 · ${prog} / ${chunks} 块</span>`;
-  } else {
-    bar.innerHTML = `<span class="rag-status-dot"></span><span>RAG 就绪 · 已索引 ${chunks} 个块</span>`;
-  }
-}
-
-async function pollStatus(): Promise<void> {
-  try {
-    const resp = await fetch('/api/rag-status');
-    ragStatus = await resp.json() as RagStatus;
-  } catch {
-    ragStatus = { available: false };
-  }
-  renderRagStatusBar();
-}
-
-function startStatusPolling(): void {
-  void pollStatus();
-  if (statusPollTimer) clearInterval(statusPollTimer);
-  statusPollTimer = setInterval(() => void pollStatus(), STATUS_POLL_MS);
-}
-
-export function stopStatusPolling(): void {
-  if (statusPollTimer) { clearInterval(statusPollTimer); statusPollTimer = null; }
-}

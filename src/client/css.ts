@@ -4291,9 +4291,11 @@ export const styles = `
     }
     .rag-item-file {
       font-size: var(--text-xs); color: var(--color-text-muted);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      margin-bottom: 2px;
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 2px; gap: 6px;
     }
+    .rag-item-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+    .rag-item-score { flex-shrink: 0; color: var(--color-text-muted); opacity: 0.7; font-variant-numeric: tabular-nums; }
     .rag-item-heading {
       font-size: var(--text-sm); font-weight: 500;
       color: var(--color-text-primary); margin-bottom: 2px;
@@ -4305,19 +4307,7 @@ export const styles = `
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
       overflow: hidden;
     }
-    .rag-status-bar {
-      display: flex; align-items: center; gap: 5px;
-      padding: 4px 10px; flex-shrink: 0;
-      font-size: 10px; color: var(--color-text-muted);
-      border-top: 1px solid var(--color-border-subtle);
-    }
-    .rag-status-dot {
-      width: 6px; height: 6px; border-radius: 50%;
-      background: #2da44e; flex-shrink: 0;
-    }
-    .rag-status-dot.warn { background: #bf8700; }
-    .rag-status-dot.off  { background: var(--color-border); }
-    mark.rag-highlight {
+mark.rag-highlight {
       background: #fff3b0; border-radius: 2px; padding: 0 1px;
       outline: 2px solid #e6c700; outline-offset: 1px;
     }

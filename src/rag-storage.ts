@@ -120,6 +120,26 @@ export function getWorkspacePaths(): string[] {
   return (getDb().query("SELECT path FROM rag_workspaces ORDER BY added_at").all() as { path: string }[]).map(r => r.path);
 }
 
+export interface FilenameMatch {
+  path: string;
+  heading: string | null;
+  text: string;
+  charStart: number;
+}
+
+/** 按文件名（basename）模糊匹配，返回每个命中文件的第一个 chunk */
+export function searchByFilename(query: string): FilenameMatch[] {
+  const pattern = `%${query.replace(/%/g, '\\%').replace(/_/g, '\\_')}%`;
+  return getDb().query(
+    `SELECT path, heading, text, char_start as charStart
+     FROM rag_chunks
+     WHERE path LIKE ? ESCAPE '\\'
+     GROUP BY path
+     ORDER BY chunk_index ASC
+     LIMIT 5`
+  ).all(pattern) as FilenameMatch[];
+}
+
 export function getAllVectors(): StoredChunk[] {
   const rows = getDb().query(
     "SELECT c.id, c.path, c.heading, c.text, c.char_start as charStart, v.vector FROM rag_chunks c JOIN rag_vectors v ON v.chunk_id = c.id"

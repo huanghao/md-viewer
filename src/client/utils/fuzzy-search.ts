@@ -50,7 +50,7 @@ export function fuzzyMatch(text: string, query: string): FuzzyMatchResult | null
 
   const indices = new Set<number>();
   for (const r of results) {
-    for (const idx of (r as any)._indexes ?? []) {
+    for (const idx of r.indexes) {
       indices.add(idx);
     }
   }

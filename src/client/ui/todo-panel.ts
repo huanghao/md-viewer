@@ -5,6 +5,18 @@ import { showToast } from './toast';
 
 const LONG_QUOTE_THRESHOLD = 80;
 
+export interface TodoExternalCallbacks {
+  switchFile: (path: string) => void;
+  switchAnnotationTab: (tab: string) => void;
+  openAnnotationSidebar: () => void;
+}
+
+let _externalCallbacks: TodoExternalCallbacks | null = null;
+
+export function initTodoExternalCallbacks(cbs: TodoExternalCallbacks): void {
+  _externalCallbacks = cbs;
+}
+
 let _todos: ClientTodo[] = [];
 let _filter: 'open' | 'all' = 'open';
 const _pendingUndoTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -35,7 +47,7 @@ function renderTodoList(): void {
   if (done.length > 0) {
     html += `
       <div class="todo-done-section">
-        <div class="todo-done-toggle" id="todoDoneToggle" onclick="window._todoDoneToggle()">
+        <div class="todo-done-toggle" id="todoDoneToggle" data-action="todo-done-toggle">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 4l4 4-4 4"/></svg>
           已完成 · ${done.length}
         </div>
@@ -49,33 +61,33 @@ function renderTodoList(): void {
   container.innerHTML = html;
 }
 
-function renderTodoItem(todo: ClientTodo): string {
+export function renderTodoItem(todo: ClientTodo): string {
   const isLong = todo.quote.length > LONG_QUOTE_THRESHOLD;
   const fileName = todo.filePath.split('/').pop() ?? todo.filePath;
   const time = relativeTime(todo.createdAt);
   const fullTime = new Date(todo.createdAt).toLocaleString();
   const missingClass = todo.fileMissing ? ' missing' : '';
   const fileTitle = todo.fileMissing ? `${todo.filePath}（文件已删除）` : todo.filePath;
-  const fileOnclick = todo.fileMissing ? '' : `onclick="window._todoJump('${escapeAttr(todo.id)}')"`;
+  const jumpAttr = todo.fileMissing ? '' : `data-action="todo-jump" data-id="${escapeAttr(todo.id)}"`;
 
   return `
     <div class="todo-item${todo.done ? ' done' : ''}${isLong ? ' todo-item-long' : ''}" data-todo-id="${escapeAttr(todo.id)}">
-      <div class="todo-cb${todo.done ? ' checked' : ''}" onclick="window._todoCheck('${escapeAttr(todo.id)}')" title="标记完成"></div>
+      <div class="todo-cb${todo.done ? ' checked' : ''}" data-action="todo-check" data-id="${escapeAttr(todo.id)}" title="标记完成"></div>
       <div class="todo-item-body">
         <div class="todo-item-top">
-          <span class="todo-item-file${missingClass}" title="${escapeAttr(fileTitle)}" ${fileOnclick}>${escapeHtml(fileName)}</span>
+          <span class="todo-item-file${missingClass}" title="${escapeAttr(fileTitle)}" ${jumpAttr}>${escapeHtml(fileName)}</span>
           ${todo.fileMissing ? '<span class="todo-item-missing-badge">已删除</span>' : ''}
           <span class="todo-item-time" title="${escapeAttr(fullTime)}">${escapeHtml(time)}</span>
         </div>
         <div class="todo-item-quote" id="tq-${escapeAttr(todo.id)}">"${escapeHtml(todo.quote)}"</div>
-        ${isLong ? `<button class="todo-item-expand" onclick="window._todoExpandQuote('${escapeAttr(todo.id)}')">展开 ↓</button>` : ''}
+        ${isLong ? `<button class="todo-item-expand" data-action="todo-expand-quote" data-id="${escapeAttr(todo.id)}">展开 ↓</button>` : ''}
         ${todo.note ? `<div class="todo-item-note">${escapeHtml(todo.note)}</div>` : ''}
       </div>
       <div class="todo-item-actions">
-        <button class="todo-item-action" onclick="window._todoCopyMenu(event,'${escapeAttr(todo.id)}')" title="复制">
+        <button class="todo-item-action" data-action="todo-copy-menu" data-id="${escapeAttr(todo.id)}" title="复制">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="5" y="4" width="8" height="10" rx="1.5"/><path d="M3 11V3a1 1 0 011-1h7"/></svg>
         </button>
-        <button class="todo-item-action del" onclick="window._todoDelete('${escapeAttr(todo.id)}')" title="删除">
+        <button class="todo-item-action del" data-action="todo-delete" data-id="${escapeAttr(todo.id)}" title="删除">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 5h10M6 5V3h4v2M6 8v4M10 8v4M5 5l.5 8h5l.5-8"/></svg>
         </button>
       </div>
@@ -136,7 +148,7 @@ async function todoDelete(id: string): Promise<void> {
   }, 280);
 }
 
-function todoExpandQuote(id: string): void {
+export function expandQuoteToggle(id: string): void {
   const q = document.getElementById(`tq-${id}`);
   const btn = document.querySelector(`.todo-item[data-todo-id="${CSS.escape(id)}"] .todo-item-expand`) as HTMLButtonElement | null;
   if (!q || !btn) return;
@@ -153,8 +165,7 @@ function todoJump(id: string): void {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path: todo.filePath }),
   }).catch(() => {
-    // Fallback: try switchFile if the file is already in session
-    (window as any).switchFile?.(todo.filePath);
+    _externalCallbacks?.switchFile(todo.filePath);
   });
 }
 
@@ -238,11 +249,8 @@ async function saveTodoFromComposer(): Promise<void> {
   hideTodoComposer();
   await apiCreateTodo({ ...pending, note });
   await loadAndRenderTodos();
-  // Switch to todo tab so user sees the new item
-  const switchTab = (window as any).switchAnnotationTab as ((tab: string) => void) | undefined;
-  if (switchTab) switchTab('todo');
-  const openSidebar = (window as any).openAnnotationSidebar as (() => void) | undefined;
-  if (openSidebar) openSidebar();
+  _externalCallbacks?.switchAnnotationTab('todo');
+  _externalCallbacks?.openAnnotationSidebar();
 }
 
 // ── Filter ────────────────────────────────────────────────────────────────
@@ -250,6 +258,47 @@ async function saveTodoFromComposer(): Promise<void> {
 export function setTodoFilter(filter: 'open' | 'all'): void {
   _filter = filter;
   loadAndRenderTodos();
+}
+
+// ── Exported pure actions ─────────────────────────────────────────────────
+
+export function doneToggle(): void {
+  const toggle = document.getElementById('todoDoneToggle');
+  const items = document.getElementById('todoDoneItems');
+  toggle?.classList.toggle('open');
+  items?.classList.toggle('visible');
+}
+
+export interface TodoPanelCallbacks {
+  onCheck: (id: string) => void;
+  onDelete: (id: string) => void;
+  onExpandQuote: (id: string) => void;
+  onJump: (id: string) => void;
+  onCopyMenu: (id: string, e: MouseEvent) => void;
+  onDoneToggle: () => void;
+}
+
+export function initTodoPanelActions(container: HTMLElement, callbacks: TodoPanelCallbacks): void {
+  container.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const actionEl = target.closest('[data-action]') as HTMLElement | null;
+    if (!actionEl) return;
+    const action = actionEl.dataset.action;
+    const id = actionEl.dataset.id ?? '';
+    if (action === 'todo-check') {
+      callbacks.onCheck(id);
+    } else if (action === 'todo-delete') {
+      callbacks.onDelete(id);
+    } else if (action === 'todo-expand-quote') {
+      callbacks.onExpandQuote(id);
+    } else if (action === 'todo-jump') {
+      callbacks.onJump(id);
+    } else if (action === 'todo-copy-menu') {
+      callbacks.onCopyMenu(id, e as MouseEvent);
+    } else if (action === 'todo-done-toggle') {
+      callbacks.onDoneToggle();
+    }
+  });
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────
@@ -286,18 +335,18 @@ export function initTodoPanel(): void {
     showTodoComposer(detail);
   });
 
-  // Expose to window for inline onclick handlers and external callers
-  (window as any)._todoCheck = todoCheck;
-  (window as any)._todoDelete = todoDelete;
-  (window as any)._todoExpandQuote = todoExpandQuote;
-  (window as any)._todoJump = todoJump;
-  (window as any)._todoCopyMenu = todoCopyMenu;
-  (window as any)._todoDoneToggle = () => {
-    const toggle = document.getElementById('todoDoneToggle');
-    const items = document.getElementById('todoDoneItems');
-    toggle?.classList.toggle('open');
-    items?.classList.toggle('visible');
-  };
+  // 事件委托：todo 列表容器上统一处理所有 data-action 按钮
+  const listContainer = document.getElementById('todoListContainer');
+  if (listContainer) {
+    initTodoPanelActions(listContainer, {
+      onCheck: (id) => void todoCheck(id),
+      onDelete: (id) => void todoDelete(id),
+      onExpandQuote: expandQuoteToggle,
+      onJump: todoJump,
+      onCopyMenu: (id, e) => todoCopyMenu(e, id),
+      onDoneToggle: doneToggle,
+    });
+  }
   (window as any).setTodoFilter = setTodoFilter;
   (window as any).showTodoComposer = showTodoComposer;
 

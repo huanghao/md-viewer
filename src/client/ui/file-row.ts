@@ -10,8 +10,14 @@ import { isPinned } from '../utils/pinned-files';
 export interface FileRowOptions {
   /** 外层 div 的 class（各视图不同，如 'tree-item file-node' 或 'file-item'） */
   containerClass: string;
-  /** 点击文件的 onclick JS 字符串，接收 path 返回完整 onclick 属性值 */
-  onClickJs: (path: string) => string;
+  /**
+   * 点击文件的处理方式（二选一）：
+   * - onClickAction: data-action 值，由外层容器事件委托处理（推荐）
+   * - onClickJs: 兼容旧用法，直接生成 onclick 字符串
+   */
+  onClickAction?: string;
+  /** @deprecated 用 onClickAction 替代 */
+  onClickJs?: (path: string) => string;
   /** 是否显示 pin 按钮（全量树/焦点：true；列表：false） */
   showPin: boolean;
   /** 是否显示相对修改时间（焦点：true；其余：false） */
@@ -95,9 +101,14 @@ export function renderFileRow(
   }
 
   // 关闭按钮（仅列表视图）
-  const closeBtn = opts.showClose && opts.onCloseJs
-    ? `<span class="close" onclick="event.stopPropagation();${opts.onCloseJs(path)}">×</span>`
-    : '';
+  let closeBtn = '';
+  if (opts.showClose) {
+    if (opts.onCloseJs) {
+      closeBtn = `<span class="close" onclick="event.stopPropagation();${opts.onCloseJs(path)}">×</span>`;
+    } else if (opts.onClickAction) {
+      closeBtn = `<span class="close" data-action="remove-file" data-path="${escapeAttr(path)}">×</span>`;
+    }
+  }
 
   // 外层 class
   const classes = [
@@ -108,8 +119,15 @@ export function renderFileRow(
 
   const typeIcon = getFileTypeIcon(path);
 
+  // onclick 属性：优先 onClickJs（旧用法），否则用 data-action
+  const clickAttr = opts.onClickJs
+    ? `onclick="${opts.onClickJs(path)}"`
+    : opts.onClickAction
+      ? `data-action="${escapeAttr(opts.onClickAction)}"`
+      : '';
+
   return `
-    <div class="${classes}" data-path="${escapeAttr(path)}" onclick="${opts.onClickJs(path)}">
+    <div class="${classes}" data-path="${escapeAttr(path)}" ${clickAttr}>
       <span class="tree-indent" style="width: ${opts.indentPx}px"></span>
       <span class="tree-toggle"></span>
       <span class="file-type-icon ${typeIcon.cls}">${escapeHtml(typeIcon.label)}</span>

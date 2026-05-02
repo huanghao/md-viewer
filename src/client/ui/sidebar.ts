@@ -19,6 +19,118 @@ let tabManagerGlobalBound = false;
 let tabsScrollLeft = 0;
 let tabsScrollHandlerBound = false;
 let lastTabsRenderKey = '';
+
+export interface SearchBoxCallbacks {
+  handleUnifiedInputSubmit: (value?: string) => void;
+  dismissQuickActionConfirm: () => void;
+  renderContent: () => void;
+}
+
+let searchBoxCallbacks: SearchBoxCallbacks | null = null;
+
+export function initSearchBoxCallbacks(callbacks: SearchBoxCallbacks): void {
+  searchBoxCallbacks = callbacks;
+}
+
+export interface FileListCallbacks {
+  switchFile: (path: string) => void;
+  removeFile: (path: string) => void;
+}
+
+let fileListCallbacks: FileListCallbacks | null = null;
+
+export function initFileListActions(callbacks: FileListCallbacks): void {
+  fileListCallbacks = callbacks;
+  const sidebar = document.querySelector('.sidebar');
+  if (!sidebar) return;
+  sidebar.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const actionEl = target.closest('[data-action]') as HTMLElement | null;
+    if (!actionEl) return;
+    const action = actionEl.dataset.action;
+    if (action === 'remove-file') {
+      e.stopPropagation();
+      const path = actionEl.dataset.path;
+      if (path) fileListCallbacks?.removeFile(path);
+    } else if (action === 'switch-file') {
+      const path = actionEl.dataset.path;
+      if (path) fileListCallbacks?.switchFile(path);
+    }
+  });
+}
+
+export interface TabsCallbacks {
+  switchFile: (path: string) => void;
+  removeFile: (path: string) => void;
+  applyTabBatchAction: (action: string) => void;
+  toggleTabManager: () => void;
+}
+
+let tabsCallbacks: TabsCallbacks | null = null;
+
+export function initTabsActions(container: HTMLElement, callbacks: TabsCallbacks): void {
+  tabsCallbacks = callbacks;
+  container.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const actionEl = target.closest('[data-action]') as HTMLElement | null;
+    if (!actionEl) return;
+    const action = actionEl.dataset.action;
+    if (action === 'remove-file') {
+      e.stopPropagation();
+      const path = actionEl.dataset.path;
+      if (path) tabsCallbacks?.removeFile(path);
+    } else if (action === 'switch-file') {
+      const path = actionEl.dataset.path;
+      if (path) tabsCallbacks?.switchFile(path);
+    } else if (action === 'toggle-tab-manager') {
+      e.stopPropagation();
+      tabsCallbacks?.toggleTabManager();
+    } else if (action === 'batch-action') {
+      const batch = actionEl.dataset.batch;
+      if (batch) tabsCallbacks?.applyTabBatchAction(batch);
+    }
+  });
+}
+
+interface BatchCount { others: number; right: number; unmodified: number; all: number; }
+interface FileEntry { path: string; displayName: string; name: string; isMissing?: boolean; }
+
+export function renderTabsHTML(
+  filesWithDisplay: FileEntry[],
+  currentFile: string | null,
+  tabManagerIsOpen: boolean,
+  batchCount: BatchCount,
+): string {
+  const tabsHtml = filesWithDisplay.map((file, index) => {
+    const isCurrent = file.path === currentFile;
+    const classes = ['tab'];
+    if (isCurrent) classes.push('active');
+    if (file.isMissing) classes.push('deleted');
+    return `
+      <div class="${classes.join(' ')}" data-index="${index}" data-path="${escapeAttr(file.path)}"
+           data-action="switch-file">
+        <span class="tab-name">${escapeHtml(file.displayName)}</span>
+        <span class="tab-close" data-action="remove-file" data-path="${escapeAttr(file.path)}">×</span>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="tabs-scroll">${tabsHtml}</div>
+    <div class="tab-manager-wrap">
+      <button class="tab-manager-toggle ${tabManagerIsOpen ? 'active' : ''}" type="button"
+              data-action="toggle-tab-manager">≡ Tabs (${filesWithDisplay.length})</button>
+      <div class="tab-manager-panel ${tabManagerIsOpen ? 'show' : ''}" onclick="event.stopPropagation()">
+        <div class="tab-manager-row tab-manager-actions-row">
+          <button class="tab-manager-action" type="button" data-action="batch-action" data-batch="close-others">关闭其他 (${batchCount.others})</button>
+          <button class="tab-manager-action" type="button" data-action="batch-action" data-batch="close-right">关闭右侧 (${batchCount.right})</button>
+          <button class="tab-manager-action" type="button" data-action="batch-action" data-batch="close-unmodified">关闭未修改 (${batchCount.unmodified})</button>
+          <button class="tab-manager-action danger" type="button" data-action="batch-action" data-batch="close-all">关闭全部 (${batchCount.all})</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
 interface TabDragState {
   fromIdx: number;
   insertIdx: number;
@@ -73,11 +185,9 @@ export function setSidebarTab(tab: 'focus' | 'full' | 'list' | 'search'): void {
 
 if (typeof window !== 'undefined') {
   (window as any).setSidebarTab = setSidebarTab;
-  (window as any).toggleTabManager = toggleTabManager;
-  (window as any).applyTabBatchAction = applyTabBatchAction;
 }
 
-function toggleTabManager(): void {
+export function toggleTabManager(): void {
   tabManagerOpen = !tabManagerOpen;
   renderTabs();
 }
@@ -115,7 +225,7 @@ function ensureTabsScrollHandler(): void {
   }, { passive: true, capture: true });
 }
 
-function applyTabBatchAction(action: TabBatchAction): void {
+export function applyTabBatchAction(action: TabBatchAction): void {
   const filesWithDisplay = generateDistinctNames(state.sessionFiles);
   const targets = getTabBatchTargets(
     action,
@@ -128,13 +238,12 @@ function applyTabBatchAction(action: TabBatchAction): void {
       return status.type === 'normal' || status.type === 'new';
     }
   );
-  const removeHandler = (window as any).removeFile as ((path: string) => void) | undefined;
   const closeable = targets.filter((path) => !isPinned(path));
-  if (!removeHandler || closeable.length === 0) {
+  if (!tabsCallbacks || closeable.length === 0) {
     renderTabs();
     return;
   }
-  closeable.forEach((path) => removeHandler(path));
+  closeable.forEach((path) => tabsCallbacks!.removeFile(path));
 }
 
 function rerenderByMode(): void {
@@ -198,7 +307,7 @@ export function renderSearchBox(): void {
     });
 
     input.addEventListener('input', (e) => {
-      (window as any).dismissQuickActionConfirm?.();
+      searchBoxCallbacks?.dismissQuickActionConfirm();
       const query = (e.target as HTMLInputElement).value;
       lastEscAt = 0;
       lastEscValue = '';
@@ -209,7 +318,7 @@ export function renderSearchBox(): void {
       rerenderByMode();
       // If current file is JSON, re-render with new query
       if (state.currentFile && (isJsonFile(state.currentFile) || isJsonlFile(state.currentFile))) {
-        (window as any).renderContent?.();
+        searchBoxCallbacks?.renderContent();
       }
     });
 
@@ -217,7 +326,7 @@ export function renderSearchBox(): void {
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         input!.dispatchEvent(new Event('path-autocomplete-hide'));
-        (window as any).handleUnifiedInputSubmit?.(input!.value);
+        searchBoxCallbacks?.handleUnifiedInputSubmit(input!.value);
         return;
       }
       if (e.defaultPrevented) {
@@ -227,10 +336,10 @@ export function renderSearchBox(): void {
       if (e.key === 'Enter') {
         e.preventDefault();
         input!.dispatchEvent(new Event('path-autocomplete-hide'));
-        (window as any).handleUnifiedInputSubmit?.(input!.value);
+        searchBoxCallbacks?.handleUnifiedInputSubmit(input!.value);
       }
       if (e.key === 'Escape') {
-        (window as any).dismissQuickActionConfirm?.();
+        searchBoxCallbacks?.dismissQuickActionConfirm();
         const now = Date.now();
         const currentValue = input!.value;
         const isDoubleEsc = now - lastEscAt < 900 && lastEscValue === currentValue;
@@ -580,13 +689,12 @@ export function renderFiles(): void {
   container.innerHTML = filesWithDisplay.map(file => {
     return renderFileRow(file.path, file.displayName || file.name, undefined, {
       containerClass: 'file-item',
-      onClickJs: (p) => `window.switchFile('${escapeAttr(p)}')`,
+      onClickAction: 'switch-file',
       showPin: true,
       showTime: false,
       indentPx: 0,
       query: state.searchQuery.toLowerCase().trim(),
       showClose: true,
-      onCloseJs: (p) => `window.removeFile('${escapeAttr(p)}')`,
     });
   }).join('');
 
@@ -616,7 +724,10 @@ export function renderSidebar(): void {
       sidebarEl?.appendChild(searchContainer);
     }
     searchContainer.className = 'rag-search-container';
-    renderRagSearchPanel(searchContainer);
+    // Only build the panel once — rebuilding it resets input and scroll position
+    if (!searchContainer.querySelector('.rag-search-wrap')) {
+      renderRagSearchPanel(searchContainer);
+    }
     renderTabs();
     return;
   }
@@ -624,7 +735,7 @@ export function renderSidebar(): void {
   if (tab === 'list') {
     renderCurrentPath();
     const listEl = document.getElementById('fileList');
-    if (listEl) listEl.className = '';
+    if (listEl) listEl.className = 'file-list';
     renderFiles();
     renderTabs();
     return;
@@ -705,23 +816,6 @@ export function renderTabs(): void {
   }
   lastTabsRenderKey = nextTabsRenderKey;
 
-  const tabsHtml = filesWithDisplay
-    .map((file, index) => {
-      const isCurrent = file.path === state.currentFile;
-      const isMissing = file.isMissing || false;
-      const classes = ['tab'];
-      if (isCurrent) classes.push('active');
-      if (isMissing) classes.push('deleted');
-
-      return `
-        <div class="${classes.join(' ')}" data-index="${index}" data-path="${escapeAttr(file.path)}"
-             onclick="window.switchFile('${escapeAttr(file.path)}')">
-          <span class="tab-name">${escapeHtml(file.displayName)}</span>
-          <span class="tab-close" onclick="event.stopPropagation();window.removeFile('${escapeAttr(file.path)}')">×</span>
-        </div>
-      `;
-    }).join('');
-
   const batchCount = {
     others: getTabBatchTargets('close-others', filesWithDisplay, state.currentFile, () => false).length,
     right: getTabBatchTargets('close-right', filesWithDisplay, state.currentFile, () => false).length,
@@ -734,20 +828,7 @@ export function renderTabs(): void {
     all: getTabBatchTargets('close-all', filesWithDisplay, state.currentFile, () => false).length,
   };
 
-  container.innerHTML = `
-    <div class="tabs-scroll">${tabsHtml}</div>
-    <div class="tab-manager-wrap">
-      <button class="tab-manager-toggle ${tabManagerOpen ? 'active' : ''}" type="button" onclick="event.stopPropagation();window.toggleTabManager()">≡ Tabs (${filesWithDisplay.length})</button>
-      <div class="tab-manager-panel ${tabManagerOpen ? 'show' : ''}" onclick="event.stopPropagation()">
-        <div class="tab-manager-row tab-manager-actions-row">
-          <button class="tab-manager-action" type="button" data-action="close-others" onclick="window.applyTabBatchAction('close-others')">关闭其他 (${batchCount.others})</button>
-          <button class="tab-manager-action" type="button" data-action="close-right" onclick="window.applyTabBatchAction('close-right')">关闭右侧 (${batchCount.right})</button>
-          <button class="tab-manager-action" type="button" data-action="close-unmodified" onclick="window.applyTabBatchAction('close-unmodified')">关闭未修改 (${batchCount.unmodified})</button>
-          <button class="tab-manager-action danger" type="button" data-action="close-all" onclick="window.applyTabBatchAction('close-all')">关闭全部 (${batchCount.all})</button>
-        </div>
-      </div>
-    </div>
-  `;
+  container.innerHTML = renderTabsHTML(filesWithDisplay, state.currentFile, tabManagerOpen, batchCount);
 
   requestAnimationFrame(() => {
     const tabsScrollEl = container.querySelector('.tabs-scroll') as HTMLElement | null;

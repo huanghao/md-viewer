@@ -1,13 +1,55 @@
 import type { RagResult, RagStatus } from '../types';
 import { escapeHtml } from '../utils/escape';
 
+export interface RagPanelCallbacks {
+  onOpen: (idx: number) => void;
+  switchFile: (path: string) => void;
+}
+
+let ragCallbacks: RagPanelCallbacks | null = null;
+
+export function setRagCallbacks(callbacks: RagPanelCallbacks): void {
+  ragCallbacks = callbacks;
+}
+
+export function initRagPanelActions(): void {
+  const sidebar = document.querySelector('.sidebar');
+  if (!sidebar || (sidebar as any).__ragActionsbound) return;
+  (sidebar as any).__ragActionsbound = true;
+  sidebar.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const actionEl = target.closest('[data-action="rag-open"]') as HTMLElement | null;
+    if (!actionEl) return;
+    const idx = parseInt(actionEl.dataset.idx ?? '', 10);
+    if (!isNaN(idx)) void openResult(idx);
+  });
+}
+
+export function renderRagResultsHTML(results: RagResult[], activeIdx: number): string {
+  if (!results.length) return '';
+  return results.map((r, i) => {
+    const relPath = r.path.split('/').slice(-2).join('/');
+    const heading = r.heading ? escapeHtml(r.heading.replace(/^#+\s*/, '')) : '';
+    const snippet = escapeHtml(r.text.slice(0, 120));
+    return `
+      <div class="rag-item${i === activeIdx ? ' active' : ''}"
+           data-idx="${i}"
+           data-action="rag-open">
+        <div class="rag-item-file">${escapeHtml(relPath)}</div>
+        ${heading ? `<div class="rag-item-heading">${heading}</div>` : ''}
+        <div class="rag-item-snippet">${snippet}</div>
+      </div>
+    `;
+  }).join('');
+}
+
 let results: RagResult[] = [];
 let activeIdx = 0;
-let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let savedQuery = '';
+let savedScrollTop = 0;
 let statusPollTimer: ReturnType<typeof setInterval> | null = null;
 let ragStatus: RagStatus = { available: false };
 
-const DEBOUNCE_MS = 300;
 const STATUS_POLL_MS = 5000;
 
 export function renderRagSearchPanel(container: HTMLElement): void {
@@ -31,11 +73,25 @@ export function renderRagSearchPanel(container: HTMLElement): void {
   `;
 
   bindRagSearchEvents();
+  initRagPanelActions();
   renderRagResults();
   renderRagStatusBar();
   startStatusPolling();
 
   const input = document.getElementById('ragSearchInput') as HTMLInputElement;
+  if (input && savedQuery) {
+    input.value = savedQuery;
+    const clear = document.getElementById('ragSearchClear') as HTMLButtonElement;
+    if (clear) clear.style.display = 'block';
+  }
+
+  if (savedScrollTop) {
+    requestAnimationFrame(() => {
+      const area = document.getElementById('ragResultsArea');
+      if (area) area.scrollTop = savedScrollTop;
+    });
+  }
+
   input?.focus();
 }
 
@@ -45,16 +101,18 @@ function bindRagSearchEvents(): void {
   if (!input || !clear) return;
 
   input.addEventListener('input', () => {
-    const q = input.value;
-    clear.style.display = q ? 'block' : 'none';
-    if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => void runSearch(q), DEBOUNCE_MS);
+    clear.style.display = input.value ? 'block' : 'none';
   });
 
   input.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowDown') { e.preventDefault(); moveActive(1); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); moveActive(-1); }
-    else if (e.key === 'Enter') { e.preventDefault(); openActive(); }
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      const q = input.value.trim();
+      if (results.length && q === savedQuery) openActive();
+      else void runSearch(q);
+    }
     else if (e.key === 'Escape') { input.value = ''; clear.style.display = 'none'; clearResults(); }
   });
 
@@ -68,6 +126,9 @@ function bindRagSearchEvents(): void {
 
 async function runSearch(q: string): Promise<void> {
   if (!q.trim()) { clearResults(); return; }
+  savedQuery = q;
+  const area = document.getElementById('ragResultsArea');
+  if (area) area.innerHTML = `<div class="rag-empty">搜索中…</div>`;
   try {
     const resp = await fetch(`/api/rag-search?q=${encodeURIComponent(q)}&limit=10`);
     const data = await resp.json() as { results: RagResult[]; error?: string };
@@ -83,6 +144,7 @@ async function runSearch(q: string): Promise<void> {
 function clearResults(): void {
   results = [];
   activeIdx = 0;
+  savedQuery = '';
   renderRagResults();
 }
 
@@ -91,6 +153,7 @@ function renderRagResults(): void {
   if (!area) return;
 
   if (!results.length) {
+    savedScrollTop = 0;
     const input = (document.getElementById('ragSearchInput') as HTMLInputElement)?.value;
     area.innerHTML = input
       ? `<div class="rag-empty">无结果</div>`
@@ -98,20 +161,9 @@ function renderRagResults(): void {
     return;
   }
 
-  area.innerHTML = results.map((r, i) => {
-    const relPath = r.path.split('/').slice(-2).join('/');
-    const heading = r.heading ? escapeHtml(r.heading.replace(/^#+\s*/, '')) : '';
-    const snippet = escapeHtml(r.text.slice(0, 120));
-    return `
-      <div class="rag-item${i === activeIdx ? ' active' : ''}"
-           data-idx="${i}"
-           onclick="window.__ragOpenResult(${i})">
-        <div class="rag-item-file">${escapeHtml(relPath)}</div>
-        ${heading ? `<div class="rag-item-heading">${heading}</div>` : ''}
-        <div class="rag-item-snippet">${snippet}</div>
-      </div>
-    `;
-  }).join('');
+  savedScrollTop = area.scrollTop;
+  area.innerHTML = renderRagResultsHTML(results, activeIdx);
+  area.scrollTop = savedScrollTop;
 }
 
 function moveActive(delta: number): void {
@@ -127,19 +179,18 @@ function openActive(): void {
 
 async function openResult(idx: number): Promise<void> {
   const r = results[idx];
+  console.log('[rag] openResult', idx, r?.path);
   if (!r) return;
   activeIdx = idx;
   renderRagResults();
 
-  await (window as any).switchFile?.(r.path);
+  if (ragCallbacks) {
+    ragCallbacks.switchFile(r.path);
+  }
 
   requestAnimationFrame(() => {
     setTimeout(() => highlightRagChunk(r.text), 100);
   });
-}
-
-if (typeof window !== 'undefined') {
-  (window as any).__ragOpenResult = (idx: number) => void openResult(idx);
 }
 
 function highlightRagChunk(chunkText: string): void {

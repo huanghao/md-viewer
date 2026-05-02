@@ -124,31 +124,31 @@ export function generateClientHTML(): string {
       <div class="toolbar">
         <div class="breadcrumb" id="breadcrumb"></div>
         <div class="spacer"></div>
-        <button class="toolbar-text-button" id="pdfModeSelectBtn" onclick="setPdfMode('select')" title="文本选择模式" style="display:none">
+        <button class="toolbar-text-button" id="pdfModeSelectBtn" data-action="set-pdf-mode" data-mode="select" title="文本选择模式" style="display:none">
           <span>[𝐓 选择]</span>
         </button>
-        <button class="toolbar-text-button" id="pdfModeAnnotateBtn" onclick="setPdfMode('annotate')" title="拉框批注模式" style="display:none">
+        <button class="toolbar-text-button" id="pdfModeAnnotateBtn" data-action="set-pdf-mode" data-mode="annotate" title="拉框批注模式" style="display:none">
           <span>[⬚ 批注]</span>
         </button>
-        <button class="toolbar-text-button" onclick="showSettingsDialog()" title="设置">
+        <button class="toolbar-text-button" data-action="show-settings" title="设置">
           <span id="settingsButtonText">[⚙ 设置]</span>
         </button>
-<button class="toolbar-text-button" id="translateButton" onclick="handleTranslateButtonClick()" title="切换段落翻译（英→中）">
+        <button class="toolbar-text-button" id="translateButton" data-action="translate-button" title="切换段落翻译（英→中）">
           <span id="translateButtonText">[译]</span>
         </button>
-        <button class="toolbar-text-button" id="diffButton" onclick="handleDiffButtonClick()" style="display: none;" title="查看修改内容">
+        <button class="toolbar-text-button" id="diffButton" data-action="diff-button" style="display: none;" title="查看修改内容">
           <span id="diffButtonText">[± Diff]</span>
         </button>
-        <button class="toolbar-text-button" id="refreshButton" onclick="handleRefreshButtonClick()" style="display: none;" title="文件已更新，点击刷新">
+        <button class="toolbar-text-button" id="refreshButton" data-action="refresh-button" style="display: none;" title="文件已更新，点击刷新">
           <span id="refreshButtonText">[↻ 刷新]</span>
         </button>
-        <button class="toolbar-text-button" id="monitorButton" onclick="toggleMonitorPanel()" title="系统监控">
+        <button class="toolbar-text-button" id="monitorButton" data-action="toggle-monitor" title="系统监控">
           <span>[◫ 监控]</span>
         </button>
         <div class="zoom-control" id="zoomControl">
-          <button class="zoom-step-btn" id="zoomOutBtn" onclick="zoomOut()" title="缩小 (⌘−)">−</button>
+          <button class="zoom-step-btn" id="zoomOutBtn" data-action="zoom-out" title="缩小 (⌘−)">−</button>
           <input class="zoom-input" id="fontScaleInput" type="text" value="100%" title="缩放比例，可直接输入（如 150%）" />
-          <button class="zoom-step-btn" id="zoomInBtn" onclick="zoomIn()" title="放大 (⌘+)">+</button>
+          <button class="zoom-step-btn" id="zoomInBtn" data-action="zoom-in" title="放大 (⌘+)">+</button>
         </div>
         <span class="connection-status" id="connectionStatus" title="连接状态">
           <span class="connection-indicator" id="connectionIndicator"></span>
@@ -161,10 +161,10 @@ export function generateClientHTML(): string {
       <div class="monitor-panel" id="monitorPanel" style="display: none;">
         <div class="monitor-panel-header">
           <div class="monitor-tabs">
-            <button class="monitor-tab is-active" onclick="switchMonitorTab('memory')">内存</button>
-            <button class="monitor-tab" onclick="switchMonitorTab('sessions')">Agent Sessions</button>
+            <button class="monitor-tab is-active" data-action="switch-monitor-tab" data-tab="memory">内存</button>
+            <button class="monitor-tab" data-action="switch-monitor-tab" data-tab="sessions">Agent Sessions</button>
           </div>
-          <button class="monitor-close" onclick="toggleMonitorPanel()" title="关闭">×</button>
+          <button class="monitor-close" data-action="toggle-monitor" title="关闭">×</button>
         </div>
         <div class="monitor-body">
           <div class="monitor-tab-panel" id="monitorTabMemory"></div>
@@ -198,9 +198,9 @@ export function generateClientHTML(): string {
     <!-- 评论侧边栏 -->
     <aside class="annotation-sidebar" id="annotationSidebar">
       <div class="annotation-tabs" id="annotationTabs">
-        <button class="annotation-tab is-active" data-tab="comments" onclick="switchAnnotationTab('comments')">评论<span class="annotation-tab-count" id="annotationTabCount"></span></button>
-        <button class="annotation-tab" data-tab="todo" onclick="switchAnnotationTab('todo')">Todo<span class="annotation-tab-count" id="todoTabCount"></span></button>
-        <button class="annotation-tab" id="annotationChatTab" data-tab="chat" onclick="switchAnnotationTab('chat')">✨ Chat</button>
+        <button class="annotation-tab is-active" data-tab="comments" data-action="switch-annotation-tab">评论<span class="annotation-tab-count" id="annotationTabCount"></span></button>
+        <button class="annotation-tab" data-tab="todo" data-action="switch-annotation-tab">Todo<span class="annotation-tab-count" id="todoTabCount"></span></button>
+        <button class="annotation-tab" id="annotationChatTab" data-tab="chat" data-action="switch-annotation-tab">✨ Chat</button>
         <div class="annotation-tab-actions">
           <div class="annotation-tab-actions-group" id="annotationCommentsActions">
             <button class="annotation-icon-btn" id="annotationDensityToggle" title="切换默认/极简" aria-label="切换默认/极简">

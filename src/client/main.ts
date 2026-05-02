@@ -18,7 +18,9 @@ import { generateDistinctNames } from './utils/file-names';
 import { getFileTypeIcon, getFileTypeLabel, isJsonFile, isJsonlFile } from './utils/file-type';
 
 // 导入 UI 组件
-import { renderSidebar } from './ui/sidebar';
+import { renderSidebar, initTabsActions, initFileListActions, initSearchBoxCallbacks, toggleTabManager, applyTabBatchAction } from './ui/sidebar';
+import { initToolbarActions } from './main-actions';
+import { setRagCallbacks } from './ui/rag-search-panel';
 import { showToast, showSuccess, showError, showWarning, showInfo } from './ui/toast';
 import { showPreferences, closePreferences } from './ui/preferences';
 import { toggleShortcutsHelp, hideShortcutsHelp, isShortcutsHelpVisible } from './ui/shortcuts-help';
@@ -27,6 +29,7 @@ import { initQuickOpen, showQuickOpen, hideQuickOpen } from './ui/quick-open';
 import { renderJsonContent } from './ui/json-viewer';
 import { mountScrollbar, unmountScrollbar, updateScrollbar, updateDiffMarkers, clearDiffMarkers } from './ui/doc-scrollbar';
 import { shouldRefreshDiff, refreshDiffBannerLabel } from './ui/diff-refresh';
+import { buildDiffBannerHTML, initDiffBannerActions } from './ui/diff-banner';
 import { initChatPanel, onChatFileSwitch, getAgentUrl } from './ui/chat-panel.js';
 
 import { getMdThemeCss, getHlThemeCss } from './themes/index';
@@ -49,9 +52,10 @@ import {
   getAnnotations,
   switchAnnotationTab,
   openComposerFromPending,
+  openAnnotationSidebar,
 } from './annotation';
 
-import { initTodoPanel } from './ui/todo-panel';
+import { initTodoPanel, initTodoExternalCallbacks } from './ui/todo-panel';
 
 import { createPdfViewer, type PdfViewerInstance } from "./pdf-viewer.js";
 import { createPdfAnnotationBridge } from "./pdf-annotation.js";
@@ -69,7 +73,7 @@ declare global {
   function cleanupAllExpiredRecords(): number;
 }
 
-function applyTheme(): void {
+export function applyTheme(): void {
   const mdCss = getMdThemeCss(state.config.markdownTheme || 'github');
   const hlCss = getHlThemeCss(state.config.codeTheme || 'github');
 
@@ -1110,7 +1114,7 @@ function renderBreadcrumb() {
   // 显示面包屑路径和复制按钮
   container.innerHTML = `
     ${breadcrumbItems}
-    <button class="copy-filename-button" onclick="copyRelativePath('${escapeAttr(file.path)}', event)" title="复制相对路径">
+    <button class="copy-filename-button" data-action="copy-relative-path" data-path="${escapeAttr(file.path)}" title="复制相对路径">
       <span class="copy-icon"></span>
       <span class="check-icon">
         <svg viewBox="0 0 16 16" fill="currentColor">
@@ -1119,7 +1123,7 @@ function renderBreadcrumb() {
       </span>
       <span class="copy-tooltip">复制相对路径</span>
     </button>
-    <button class="copy-filename-button copy-abspath-button" onclick="copyAbsolutePath('${escapeAttr(file.path)}', event)" title="复制绝对路径">
+    <button class="copy-filename-button copy-abspath-button" data-action="copy-absolute-path" data-path="${escapeAttr(file.path)}" title="复制绝对路径">
       <span class="copy-abspath-icon">/</span>
       <span class="check-icon">
         <svg viewBox="0 0 16 16" fill="currentColor">
@@ -1155,11 +1159,15 @@ async function showNearbyMenu(e: Event) {
     menuElement.innerHTML = `
       <div class="nearby-menu-header">附近的文件</div>
       ${data.files.map(f => `
-        <div class="nearby-menu-item" onclick="window.addFileByPath('${escapeAttr(f.path)}', true)">
+        <div class="nearby-menu-item" data-action="nearby-open" data-path="${escapeAttr(f.path)}">
           📄 ${escapeHtml(f.name)}
         </div>
       `).join('')}
     `;
+    menuElement.addEventListener('click', (ev) => {
+      const item = (ev.target as HTMLElement).closest('[data-action="nearby-open"]') as HTMLElement | null;
+      if (item?.dataset.path) void addFileByPath(item.dataset.path, true);
+    });
 
     const rect = button.getBoundingClientRect();
     menuElement.style.position = 'fixed';
@@ -1690,14 +1698,14 @@ async function handleDiffButtonClick(): Promise<void> {
     const banner = document.createElement('div');
     banner.id = 'diffBanner';
     banner.className = 'diff-banner';
-    banner.innerHTML = `
-      <span class="diff-banner-label">Diff 模式 · 显示新版本变更</span>
-      <button class="diff-nav-btn" id="diffNavPrev" onclick="window.navigateDiffBlock(-1)" disabled>↑ 上一处</button>
-      <span class="diff-nav-count" id="diffNavCount">- / -</span>
-      <button class="diff-nav-btn" id="diffNavNext" onclick="window.navigateDiffBlock(1)">↓ 下一处</button>
-      <button class="diff-accept-btn" onclick="window.acceptDiffUpdate()">✓ 采用新版本</button>
-      <button class="diff-close-btn" onclick="window.closeDiffView()">✕ 关闭</button>
-    `;
+    banner.innerHTML = buildDiffBannerHTML();
+    initDiffBannerActions(banner, {
+      onNavigate: (dir) => navigateDiffBlock(dir),
+      onAccept: () => acceptDiffUpdate(),
+      onClose: () => closeDiffView(),
+    });
+    const prevBtn = banner.querySelector<HTMLButtonElement>('#diffNavPrev');
+    if (prevBtn) prevBtn.disabled = true;
     parent.insertBefore(banner, contentEl);
   }
 
@@ -2349,92 +2357,6 @@ function connectSSE(isReconnect = false) {
   };
 }
 
-// ==================== 暴露全局函数 ====================
-declare global {
-  interface Window {
-    addFile: () => void;
-    handleUnifiedInputSubmit?: (value?: string) => void;
-    dismissQuickActionConfirm?: () => void;
-    switchFile: (path: string) => void;
-    removeFile: (path: string) => void;
-    showNearbyMenu: (e: Event) => void;
-    addFileByPath: (path: string, focus: boolean) => void;
-    refreshFile: (path: string) => void;
-    handleRefreshButtonClick: () => void;
-    handleDiffButtonClick: () => void;
-    closeDiffView: () => void;
-    acceptDiffUpdate: () => void;
-    copySingleText: (text: string, e?: Event) => void;
-    copyFileName: (fileName: string, event?: Event) => void;
-    copyFilePath: (filePath: string, event?: Event) => void;
-    copyRelativePath: (filePath: string, event?: Event) => void;
-    copyAbsolutePath: (filePath: string, event?: Event) => void;
-    showToast?: (message: string, type: string) => void;
-    showSettingsDialog: () => void;
-    toggleShortcutsHelp: () => void;
-    toggleMonitorPanel: () => void;
-    switchMonitorTab: (tab: 'memory' | 'sessions') => void;
-    switchAnnotationTab: (tab: 'comments' | 'chat' | 'todo') => void;
-    openExternalFile?: (path: string) => void | Promise<void>;
-    renderContent?: () => void;
-    applyTheme?: () => void;
-  }
-}
-
-window.addFile = () => {
-  const input = document.getElementById('searchInput') as HTMLInputElement;
-  if (input) {
-    handleSmartAddInput(input.value).catch((err: any) => {
-      showError(`添加失败: ${err?.message || '未知错误'}`);
-    });
-  }
-};
-window.handleUnifiedInputSubmit = (value?: string) => {
-  const input = document.getElementById('searchInput') as HTMLInputElement | null;
-  const raw = (typeof value === 'string' ? value : input?.value || '').trim();
-  if (!raw) return;
-  if (!looksLikePathInput(raw)) {
-    searchFilesHandler(raw).catch((err: any) => {
-      showError(`搜索失败: ${err?.message || '未知错误'}`);
-    });
-    return;
-  }
-  handleSmartAddInput(raw).catch((err: any) => {
-    showError(`添加失败: ${err?.message || '未知错误'}`);
-  });
-};
-window.dismissQuickActionConfirm = () => {
-  if (isAddConfirmVisible()) {
-    clearAddConfirm();
-  }
-};
-window.switchFile = switchFile;
-window.removeFile = removeFileHandler;
-window.showNearbyMenu = showNearbyMenu;
-window.addFileByPath = addFileByPath;
-window.refreshFile = refreshFile;
-window.handleRefreshButtonClick = handleRefreshButtonClick;
-window.handleDiffButtonClick = handleDiffButtonClick;
-(window as any).handleTranslateButtonClick = () => handleTranslateButtonClick(state.currentFile ?? null);
-window.closeDiffView = closeDiffView;
-(window as any).navigateDiffBlock = navigateDiffBlock;
-window.acceptDiffUpdate = acceptDiffUpdate;
-window.copySingleText = copySingleText;
-window.copyFileName = copyFileName;
-window.copyFilePath = copyFilePath;
-window.copyRelativePath = copyRelativePath;
-window.copyAbsolutePath = copyAbsolutePath;
-window.showToast = showToast;
-window.showSettingsDialog = showPreferences;
-window.toggleShortcutsHelp = toggleShortcutsHelp;
-window.toggleMonitorPanel = toggleMonitorPanel;
-window.switchMonitorTab = switchMonitorTab;
-window.switchAnnotationTab = switchAnnotationTab;
-window.openExternalFile = openFileInBrowser;
-window.renderContent = renderContent;
-(window as any).applyTheme = applyTheme;
-(window as any).zoomIn = zoomIn;
-(window as any).zoomOut = zoomOut;
 
 // ── Browsing signals: dwell + scroll ─────────────────────────────────────────
 if (typeof window !== 'undefined') {
@@ -2522,6 +2444,7 @@ function startWorkspacePolling() {
   window.setInterval(async () => {
     if (workspacePollRunning) return;
     if (state.config.sidebarTab === 'list') return;
+    if (state.config.sidebarTab === 'search') return;
 
     // In focus tab, poll all workspaces (not just expanded ones)
     const toScan = state.config.sidebarTab === 'focus'
@@ -2592,6 +2515,26 @@ function startWorkspacePolling() {
   // 初始化批注功能
   initAnnotationElements();
   initTodoPanel();
+  initTodoExternalCallbacks({
+    switchFile: (path) => void switchFile(path),
+    switchAnnotationTab,
+    openAnnotationSidebar,
+  });
+
+  // 预设 RAG 面板 callbacks（renderRagSearchPanel 渲染时会绑定事件委托）
+  setRagCallbacks({
+    onOpen: () => {},
+    switchFile: (path) => {
+      if (state.sessionFiles.has(path)) {
+        void switchFile(path);
+      } else {
+        void (async () => {
+          const data = await loadFile(path);
+          if (data) await onFileLoaded(data, true);
+        })();
+      }
+    },
+  });
   initChatPanel();
   (window as any).__setPendingAnnotation = setPendingAnnotation;
   syncAnnotationSidebarLayout();
@@ -2611,6 +2554,69 @@ function startWorkspacePolling() {
   }
   startWorkspacePolling();
 
+  // 工具栏 + annotation tabs：document 级事件委托，一次性注册
+  initToolbarActions(document, {
+    handleDiffButtonClick: () => void handleDiffButtonClick(),
+    handleRefreshButtonClick,
+    showSettingsDialog: showPreferences,
+    toggleMonitorPanel,
+    switchMonitorTab: (tab) => switchMonitorTab(tab as 'memory' | 'sessions'),
+    switchAnnotationTab: (tab) => switchAnnotationTab(tab as 'comments' | 'chat' | 'todo'),
+    zoomIn,
+    zoomOut,
+    setPdfMode: (mode) => setPdfMode(mode as 'select' | 'annotate'),
+    handleTranslateButtonClick: () => handleTranslateButtonClick(state.currentFile ?? null),
+    addFile: () => {
+      const input = document.getElementById('searchInput') as HTMLInputElement;
+      if (input) handleSmartAddInput(input.value).catch((err: any) => showError(`添加失败: ${err?.message || '未知错误'}`));
+    },
+    handleUnifiedInputSubmit: (value?: string) => {
+      const input = document.getElementById('searchInput') as HTMLInputElement | null;
+      const raw = (typeof value === 'string' ? value : input?.value || '').trim();
+      if (!raw) return;
+      if (!looksLikePathInput(raw)) {
+        searchFilesHandler(raw).catch((err: any) => showError(`搜索失败: ${err?.message || '未知错误'}`));
+        return;
+      }
+      handleSmartAddInput(raw).catch((err: any) => showError(`添加失败: ${err?.message || '未知错误'}`));
+    },
+    dismissQuickActionConfirm: () => { if (isAddConfirmVisible()) clearAddConfirm(); },
+    refreshFile,
+  });
+
+  // search box callbacks（sidebar.ts 使用）
+  initSearchBoxCallbacks({
+    handleUnifiedInputSubmit: (value?: string) => {
+      const input = document.getElementById('searchInput') as HTMLInputElement | null;
+      const raw = (typeof value === 'string' ? value : input?.value || '').trim();
+      if (!raw) return;
+      if (!looksLikePathInput(raw)) {
+        searchFilesHandler(raw).catch((err: any) => showError(`搜索失败: ${err?.message || '未知错误'}`));
+        return;
+      }
+      handleSmartAddInput(raw).catch((err: any) => showError(`添加失败: ${err?.message || '未知错误'}`));
+    },
+    dismissQuickActionConfirm: () => { if (isAddConfirmVisible()) clearAddConfirm(); },
+    renderContent,
+  });
+
+  // 注册 fileList 回调（委托到 .sidebar，一次性注册，永久有效）
+  initFileListActions({
+    switchFile: (path) => void switchFile(path),
+    removeFile: removeFileHandler,
+  });
+
+  // 注册 tabs 回调（一次性注册，renderTabs 重建 innerHTML 后委托仍有效）
+  const tabsContainer = document.getElementById('tabs');
+  if (tabsContainer) {
+    initTabsActions(tabsContainer, {
+      switchFile: (path) => void switchFile(path),
+      removeFile: removeFileHandler,
+      applyTabBatchAction: (action) => applyTabBatchAction(action as any),
+      toggleTabManager,
+    });
+  }
+
   // 根据配置渲染侧边栏
   renderSidebar();
 
@@ -2623,6 +2629,14 @@ function startWorkspacePolling() {
   renderContent();
   syncAnnotationsForCurrentFile(true);
   if (state.currentFile) updateToc(state.currentFile);
+
+  // 面包屑复制按钮：一次性绑定，renderBreadcrumb 重建 innerHTML 后委托仍有效
+  document.getElementById('breadcrumb')?.addEventListener('click', (ev) => {
+    const btn = (ev.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
+    if (!btn?.dataset.path) return;
+    if (btn.dataset.action === 'copy-relative-path') copyRelativePath(btn.dataset.path, ev);
+    else if (btn.dataset.action === 'copy-absolute-path') copyAbsolutePath(btn.dataset.path, ev);
+  });
 
   setupDragAndDrop();
   setupSidebarResize();

@@ -74,7 +74,7 @@ function buildOverlay(): HTMLElement {
     state.config.markdownTheme = savedMarkdownTheme;
     state.config.codeTheme = savedCodeTheme;
     state.config.mathInline = savedMathInline;
-    import('../main').then((m) => (m as any).applyTheme?.()).catch(() => {});
+    import('../main').then((m) => m.applyTheme()).catch(() => {});
     closePreferences();
   });
   el.querySelector('#prefSave')!.addEventListener('click', saveAndClose);
@@ -354,13 +354,13 @@ function bindTabEvents(): void {
   const mdSelect = document.getElementById('markdownThemeSelect') as HTMLSelectElement | null;
   mdSelect?.addEventListener('change', () => {
     state.config.markdownTheme = mdSelect.value;
-    import('../main').then((m) => (m as any).applyTheme?.()).catch(() => {});
+    import('../main').then((m) => m.applyTheme()).catch(() => {});
   });
 
   const codeSelect = document.getElementById('codeThemeSelect') as HTMLSelectElement | null;
   codeSelect?.addEventListener('change', () => {
     state.config.codeTheme = codeSelect.value;
-    import('../main').then((m) => (m as any).applyTheme?.()).catch(() => {});
+    import('../main').then((m) => m.applyTheme()).catch(() => {});
   });
 
   const clearCommentsBtn = document.getElementById('clearAllCommentsBtn');

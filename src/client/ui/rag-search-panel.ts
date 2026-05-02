@@ -205,6 +205,19 @@ async function openResult(idx: number): Promise<void> {
   });
 }
 
+/** 把 Markdown 源文本剥成纯文本，用于和渲染后 DOM 匹配 */
+function stripMarkdown(src: string): string {
+  return src
+    .replace(/^#{1,6}\s+/gm, '')   // heading markers
+    .replace(/`{1,3}[^`]*`{1,3}/g, (m) => m.replace(/`/g, ''))  // inline code / fences
+    .replace(/\*{1,2}([^*]+)\*{1,2}/g, '$1')  // bold/italic
+    .replace(/_{1,2}([^_]+)_{1,2}/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')  // links
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, '')      // images
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function highlightRagChunk(chunkText: string): void {
   const reader = document.getElementById('reader');
   if (!reader) return;
@@ -215,42 +228,69 @@ function highlightRagChunk(chunkText: string): void {
     if (parent) parent.replaceChild(document.createTextNode(el.textContent ?? ''), el);
   });
 
-  const needle = chunkText.trim().slice(0, 60);
-  if (!needle) return;
+  // Build needle from stripped markdown; try progressively shorter lengths if no match
+  const stripped = stripMarkdown(chunkText);
+  const candidates = [stripped.slice(0, 80), stripped.slice(0, 50), stripped.slice(0, 30)];
 
-  const walker = document.createTreeWalker(reader, NodeFilter.SHOW_TEXT);
-  let node: Text | null;
-  while ((node = walker.nextNode() as Text | null)) {
-    const idx = (node.textContent ?? '').indexOf(needle);
+  for (const needle of candidates) {
+    if (!needle || needle.length < 8) continue;
+
+    // Walk all text nodes and try to find needle across node boundaries
+    const walker = document.createTreeWalker(reader, NodeFilter.SHOW_TEXT);
+    const nodes: Text[] = [];
+    let n: Text | null;
+    while ((n = walker.nextNode() as Text | null)) nodes.push(n);
+
+    // Build concatenated text with node boundary offsets
+    let concat = '';
+    const offsets: number[] = []; // offsets[i] = start index in concat for nodes[i]
+    for (const node of nodes) {
+      offsets.push(concat.length);
+      concat += node.textContent ?? '';
+    }
+
+    const idx = concat.indexOf(needle);
     if (idx === -1) continue;
 
-    const before = node.textContent!.slice(0, idx);
-    const matched = node.textContent!.slice(idx, idx + needle.length);
-    const after = node.textContent!.slice(idx + needle.length);
+    // Find which node contains idx and wrap the first text node with a mark
+    let targetNode: Text | null = null;
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      if (offsets[i] <= idx) { targetNode = nodes[i]; break; }
+    }
+    if (!targetNode) continue;
+
+    const nodeStart = offsets[nodes.indexOf(targetNode)];
+    const localIdx = idx - nodeStart;
+    const localLen = Math.min(needle.length, (targetNode.textContent?.length ?? 0) - localIdx);
+    if (localLen <= 0) continue;
+
+    const before = targetNode.textContent!.slice(0, localIdx);
+    const matched = targetNode.textContent!.slice(localIdx, localIdx + localLen);
+    const after = targetNode.textContent!.slice(localIdx + localLen);
 
     const mark = document.createElement('mark');
     mark.className = 'rag-highlight';
     mark.textContent = matched;
 
-    const parent = node.parentNode!;
-    parent.insertBefore(document.createTextNode(before), node);
-    parent.insertBefore(mark, node);
-    parent.insertBefore(document.createTextNode(after), node);
-    parent.removeChild(node);
+    const parent = targetNode.parentNode!;
+    parent.insertBefore(document.createTextNode(before), targetNode);
+    parent.insertBefore(mark, targetNode);
+    parent.insertBefore(document.createTextNode(after), targetNode);
+    parent.removeChild(targetNode);
     parent.normalize();
 
     mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
     setTimeout(() => {
-      mark.style.transition = 'background 0.5s';
+      mark.style.transition = 'background 1s';
       mark.style.background = 'transparent';
       setTimeout(() => {
         const p = mark.parentNode;
         if (p) p.replaceChild(document.createTextNode(mark.textContent ?? ''), mark);
-      }, 500);
+      }, 1000);
     }, 3000);
 
-    break;
+    return; // found and highlighted
   }
 }
 

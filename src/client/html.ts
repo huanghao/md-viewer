@@ -340,14 +340,20 @@ export function generateClientHTML(): string {
 
   <!-- 划词后快速评论入口 -->
   <div id="annotationQuickAddWrap" class="annotation-quick-add-wrap hidden">
-    <button id="quickAddComment" class="quick-add-btn" title="添加评论" aria-label="添加评论">
-      <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M5 6h6M5 9h4"/></svg>
-      评论
-    </button>
-    <button id="quickAddTodo" class="quick-add-btn todo" title="添加 Todo" aria-label="添加 Todo">
-      <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 8l3.5 3.5L13 4.5"/></svg>
-      Todo
-    </button>
+    <div class="quick-add-section">
+      <button id="quickAddComment" class="quick-add-btn" title="添加评论" aria-label="添加评论">
+        <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M5 6h6M5 9h4"/></svg>
+        写评论…
+      </button>
+      <button id="quickAddTodo" class="quick-add-btn todo" title="添加 Todo" aria-label="添加 Todo">
+        <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 8l3.5 3.5L13 4.5"/></svg>
+        Todo
+      </button>
+    </div>
+    <div class="quick-add-section hidden" id="quickPromptsSection">
+      <div class="quick-add-section-label">快捷评论</div>
+      <div id="quickPromptBtns"></div>
+    </div>
   </div>
 
   <!-- 评论查看浮窗 -->

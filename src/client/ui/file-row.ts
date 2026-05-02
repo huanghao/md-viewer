@@ -6,6 +6,7 @@ import { stripWorkspaceTreeDisplayExtension } from '../utils/workspace-file-name
 import { formatRelativeTimeShort } from '../utils/format';
 import { escapeHtml, escapeAttr } from '../utils/escape';
 import { isPinned } from '../utils/pinned-files';
+import { fuzzyMatch } from '../utils/fuzzy-search';
 
 export interface FileRowOptions {
   /** 外层 div 的 class（各视图不同，如 'tree-item file-node' 或 'file-item'） */
@@ -33,14 +34,7 @@ export interface FileRowOptions {
 }
 
 function highlightQuery(text: string, query: string): string {
-  if (!query) return escapeHtml(text);
-  const idx = text.toLowerCase().indexOf(query.toLowerCase());
-  if (idx === -1) return escapeHtml(text);
-  return (
-    escapeHtml(text.slice(0, idx)) +
-    `<mark class="search-highlight">${escapeHtml(text.slice(idx, idx + query.length))}</mark>` +
-    escapeHtml(text.slice(idx + query.length))
-  );
+  return fuzzyMatch(text, query)?.highlight ?? escapeHtml(text);
 }
 
 export function renderFileRow(

@@ -18,7 +18,7 @@ import { generateDistinctNames } from './utils/file-names';
 import { getFileTypeIcon, getFileTypeLabel, isJsonFile, isJsonlFile } from './utils/file-type';
 
 // 导入 UI 组件
-import { renderSidebar, initTabsActions, initFileListActions, initSearchBoxCallbacks, toggleTabManager, applyTabBatchAction } from './ui/sidebar';
+import { renderSidebar, initTabsActions, initFileListActions, initWorkspaceActions, initSearchBoxCallbacks, toggleTabManager, applyTabBatchAction } from './ui/sidebar';
 import { initToolbarActions } from './main-actions';
 import { setRagCallbacks } from './ui/rag-search-panel';
 import { showToast, showSuccess, showError, showWarning, showInfo } from './ui/toast';
@@ -2604,6 +2604,21 @@ function startWorkspacePolling() {
   initFileListActions({
     switchFile: (path) => void switchFile(path),
     removeFile: removeFileHandler,
+  });
+
+  // 注册 workspace 回调（focus/full tab 文件点击）
+  initWorkspaceActions({
+    switchFile: (path) => void switchFile(path),
+    loadAndSwitchFile: async (path) => {
+      const data = await loadFile(path);
+      if (data) await onFileLoaded(data, true);
+      else {
+        const { markFileMissing } = await import('./state');
+        markFileMissing(path, true);
+        renderAll();
+        showError('文件已删除，已标记为 D（无本地缓存）');
+      }
+    },
   });
 
   // 注册 tabs 回调（一次性注册，renderTabs 重建 innerHTML 后委托仍有效）

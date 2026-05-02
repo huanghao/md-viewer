@@ -1,4 +1,5 @@
 import { basename, resolve, dirname, join, extname } from "path";
+import { scanWorkspaceTree } from "./workspace-scanner.ts";
 import { existsSync, readdirSync, statSync, readFileSync } from "fs";
 import { homedir } from "os";
 import type { Context } from "hono";
@@ -27,6 +28,7 @@ import {
   updateAnnotationStatus,
 } from "./annotation-storage.ts";
 import { createTodo, listTodos, updateTodo, deleteTodo, tidyTodos } from './todo-storage.ts';
+import { upsertWorkspacePath, getWorkspacePaths, deleteWorkspacePath } from './rag-storage.ts';
 import { calculateOpenCount } from "./annotation-status.ts";
 
 function expandHomePath(input: string): string {
@@ -530,45 +532,6 @@ export function handleEvents(c: Context) {
 }
 
 // API: 推断工作区（从文件路径推断 git 仓库根目录）
-export async function handleInferWorkspace(c: Context) {
-  try {
-    const { filePath } = await c.req.json();
-    if (!filePath) {
-      return c.json({ error: "缺少 filePath 参数" }, 400);
-    }
-
-    const resolvedPath = resolve(filePath);
-    if (!existsSync(resolvedPath)) {
-      return c.json({ error: "文件不存在" }, 404);
-    }
-
-    // 从文件路径向上查找 .git 目录
-    let currentDir = dirname(resolvedPath);
-    let workspacePath: string | null = null;
-
-    while (currentDir !== dirname(currentDir)) {  // 直到根目录
-      if (existsSync(join(currentDir, '.git'))) {
-        workspacePath = currentDir;
-        break;
-      }
-      currentDir = dirname(currentDir);
-    }
-
-    if (!workspacePath) {
-      return c.json({ workspacePath: null });
-    }
-
-    const workspaceName = basename(workspacePath);
-
-    return c.json({
-      workspacePath,
-      workspaceName
-    });
-  } catch (error: any) {
-    return c.json({ error: error.message }, 500);
-  }
-}
-
 // API: 扫描工作区，构建文件树
 export async function handleScanWorkspace(c: Context) {
   try {
@@ -584,9 +547,8 @@ export async function handleScanWorkspace(c: Context) {
 
     // 扫描后开启目录级监听，保证”未打开文件”也能收到删除事件。
     watchWorkspace(resolvedPath);
-    registerWorkspacePath(resolvedPath);
 
-    const tree = scanDirectory(resolvedPath);
+    const tree = scanWorkspaceTree(resolvedPath);
 
     return c.json(tree);
   } catch (error: any) {
@@ -594,75 +556,6 @@ export async function handleScanWorkspace(c: Context) {
   }
 }
 
-// 扫描目录，构建文件树（只包含 md/html 文件和包含这些文件的目录）
-function scanDirectory(dirPath: string): any {
-  const name = basename(dirPath);
-  const tree: any = {
-    name,
-    path: dirPath,
-    type: 'directory',
-    children: [],
-    fileCount: 0
-  };
-
-  // Read .mdvignore for this directory (patterns relative to this dir)
-  const mdvignorePath = join(dirPath, '.mdvignore');
-  if (existsSync(mdvignorePath)) {
-    try {
-      const raw = readFileSync(mdvignorePath, 'utf-8');
-      const patterns = raw.split('\n')
-        .map((l) => l.trim())
-        .filter((l) => l && !l.startsWith('#'));
-      if (patterns.length > 0) tree.ignorePatterns = patterns;
-    } catch { /* ignore */ }
-  }
-
-  try {
-    const entries = readdirSync(dirPath, { withFileTypes: true });
-
-    for (const entry of entries) {
-      // 跳过隐藏文件和特殊目录
-      if (entry.name.startsWith('.') ||
-          ['node_modules', 'dist', 'build', '.git'].includes(entry.name)) {
-        continue;
-      }
-
-      const fullPath = join(dirPath, entry.name);
-
-      if (entry.isDirectory()) {
-        const subTree = scanDirectory(fullPath);
-        // 只添加包含可展示文件的目录
-        if (subTree.fileCount > 0) {
-          tree.children.push(subTree);
-          tree.fileCount += subTree.fileCount;
-        }
-      } else if (isSupportedTextFile(entry.name.toLowerCase())) {
-        let lastModified = 0;
-        try { lastModified = statSync(fullPath).mtimeMs; } catch { /* ignore */ }
-        tree.children.push({
-          name: entry.name,
-          path: fullPath,
-          type: 'file',
-          lastModified,
-        });
-        tree.fileCount++;
-      }
-    }
-
-    // 排序：目录在前，文件在后，同类按名称排序
-    tree.children.sort((a: any, b: any) => {
-      if (a.type !== b.type) {
-        return a.type === 'directory' ? -1 : 1;
-      }
-      return a.name.localeCompare(b.name);
-    });
-
-  } catch (error) {
-    console.error(`扫描目录失败: ${dirPath}`, error);
-  }
-
-  return tree;
-}
 
 // API: 获取所有文档的批注摘要（仅含 open 批注 > 0 的文档）
 export async function handleGetAnnotationSummaries(c: Context) {
@@ -918,15 +811,26 @@ export function handleGetClientConfig(): Response {
   });
 }
 
-// In-memory workspace path registry — populated when client calls /api/scan-workspace
-const registeredWorkspacePaths = new Set<string>();
-
-export function registerWorkspacePath(path: string): void {
-  registeredWorkspacePaths.add(resolve(path));
+export function handleGetWorkspaces(c: Context) {
+  return c.json({ paths: getWorkspacePaths() });
 }
 
-export function handleGetWorkspaces(c: Context) {
-  return c.json({ paths: Array.from(registeredWorkspacePaths) });
+export function handleRegisterWorkspace(c: Context) {
+  const body = c.req.json() as any;
+  return body.then(({ path }: { path: string }) => {
+    if (!path) return c.json({ error: '缺少 path' }, 400);
+    upsertWorkspacePath(resolve(path));
+    return c.json({ ok: true });
+  });
+}
+
+export function handleUnregisterWorkspace(c: Context) {
+  const body = c.req.json() as any;
+  return body.then(({ path }: { path: string }) => {
+    if (!path) return c.json({ error: '缺少 path' }, 400);
+    deleteWorkspacePath(resolve(path));
+    return c.json({ ok: true });
+  });
 }
 
 const RAG_SERVER = 'http://localhost:3001';
@@ -1039,7 +943,7 @@ export function handleWorkspaceSearch(c: Context) {
     }
   }
 
-  for (const wsPath of registeredWorkspacePaths) {
+  for (const wsPath of getWorkspacePaths()) {
     walkDir(wsPath, wsPath);
   }
 

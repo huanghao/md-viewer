@@ -8,7 +8,7 @@ import { isJsonFile, isJsonlFile } from '../utils/file-type';
 import { renderFileRow } from './file-row';
 import { isPinned } from '../utils/pinned-files';
 import { getTabBatchTargets, type TabBatchAction } from '../utils/tab-batch';
-import { renderWorkspaceSidebar, bindWorkspaceEvents } from './sidebar-workspace';
+import { renderWorkspaceSidebar, bindWorkspaceEvents, type WorkspaceCallbacks } from './sidebar-workspace';
 import { syncAnnotationSidebarLayout } from '../annotation';
 
 let lastEscAt = 0;
@@ -38,6 +38,11 @@ export interface FileListCallbacks {
 }
 
 let fileListCallbacks: FileListCallbacks | null = null;
+let workspaceCallbacks: WorkspaceCallbacks | null = null;
+
+export function initWorkspaceActions(callbacks: WorkspaceCallbacks): void {
+  workspaceCallbacks = callbacks;
+}
 
 export function initFileListActions(callbacks: FileListCallbacks): void {
   fileListCallbacks = callbacks;
@@ -754,7 +759,7 @@ export function renderSidebar(): void {
   fileListContainer.className = 'file-list';
 
   fileListContainer.innerHTML = renderWorkspaceSidebar();
-  bindWorkspaceEvents();
+  bindWorkspaceEvents(workspaceCallbacks ?? undefined);
   scrollCurrentFileIntoView(fileListContainer);
 
   // 渲染标签页（两种模式都有）

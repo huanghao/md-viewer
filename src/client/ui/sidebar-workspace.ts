@@ -27,29 +27,8 @@ import {
   scanWorkspace,
 } from '../workspace';
 import { clearListDiff, clearWorkspaceModified } from '../workspace-state';
-import { buildIgnoredSet } from '../utils/ignore-filter';
 import { renderFileRow } from './file-row';
 
-/**
- * Returns a shallow-cloned tree with ignored file nodes removed.
- * Empty directories (after pruning) are also removed.
- * Does not mutate the original tree.
- */
-function pruneIgnored(node: FileTreeNode, ignored: Set<string>): FileTreeNode | null {
-  if (node.type === 'file') {
-    return ignored.has(node.path) ? null : node;
-  }
-  const prunedChildren: FileTreeNode[] = [];
-  for (const child of node.children || []) {
-    const pruned = pruneIgnored(child, ignored);
-    if (pruned) prunedChildren.push(pruned);
-  }
-  if (prunedChildren.length === 0 && (node.children || []).length > 0) {
-    // All children were ignored — drop this directory too
-    return null;
-  }
-  return { ...node, children: prunedChildren };
-}
 
 const ADD_WORKSPACE_DIALOG_ID = 'addWorkspaceDialogOverlay';
 const ADD_WORKSPACE_INPUT_ID = 'addWorkspacePathInput';
@@ -414,14 +393,7 @@ function renderWorkspaceItem(workspace: Workspace, index: number, total: number,
   const isCurrent = state.currentWorkspace === workspace.id;
   const rawTree = query ? buildSearchTree(workspace, query) : state.fileTree.get(workspace.id);
 
-  // Apply multi-level .mdvignore filtering (does not mutate state.fileTree)
-  let tree: FileTreeNode | undefined = rawTree;
-  if (rawTree) {
-    const ignored = buildIgnoredSet(rawTree, workspace.path);
-    if (ignored.size > 0) {
-      tree = pruneIgnored(rawTree, ignored) ?? undefined;
-    }
-  }
+  const tree: FileTreeNode | undefined = rawTree;
 
   const shouldExpand = query ? true : workspace.isExpanded;
   const canMoveUp = index > 0;
@@ -651,7 +623,15 @@ function renderMissingOpenFiles(workspaceId: string, workspacePath: string, tree
 }
 
 // 绑定工作区模式事件
-export function bindWorkspaceEvents(): void {
+export interface WorkspaceCallbacks {
+  switchFile: (path: string) => void;
+  loadAndSwitchFile: (path: string) => Promise<void>;
+}
+
+let workspaceCallbacks: WorkspaceCallbacks | null = null;
+
+export function bindWorkspaceEvents(callbacks?: WorkspaceCallbacks): void {
+  if (callbacks) workspaceCallbacks = callbacks;
   if (!removeOutsideClickBound) {
     removeOutsideClickBound = true;
     document.addEventListener('click', async (e) => {
@@ -750,29 +730,14 @@ export function bindWorkspaceEvents(): void {
 
   // 文件点击
   (window as any).handleFileClick = async (filePath: string) => {
-    // 清除工作区修改标记（点击即视为已查看）
     clearWorkspaceModified(filePath);
     clearListDiff(filePath);
-
-    const { loadFile } = await import('../api/files');
-
-    // 如果文件未打开，先加载
     if (!hasSessionFile(filePath)) {
-      const fileData = await loadFile(filePath, true);
-      if (!fileData) {
-        const { markFileMissing } = await import('../state');
-        markFileMissing(filePath, true);
-        const main = await import('../main');
-        (main as any).renderAll();
-        showError('文件已删除，已标记为 D（无本地缓存）');
-        return;
+      if (workspaceCallbacks) {
+        await workspaceCallbacks.loadAndSwitchFile(filePath);
       }
-      const { addOrUpdateFile } = await import('../state');
-      addOrUpdateFile(fileData, true);
-      const main = await import('../main');
-      (main as any).renderAll();
     } else {
-      (window as any).switchFile?.(filePath);
+      workspaceCallbacks?.switchFile(filePath);
     }
   };
 
@@ -819,25 +784,12 @@ export function bindWorkspaceEvents(): void {
   (window as any).handleFocusFileClick = async (filePath: string) => {
     clearWorkspaceModified(filePath);
     clearListDiff(filePath);
-
-    const { loadFile } = await import('../api/files');
-
     if (!hasSessionFile(filePath)) {
-      const fileData = await loadFile(filePath, true);
-      if (!fileData) {
-        const { markFileMissing } = await import('../state');
-        markFileMissing(filePath, true);
-        const main = await import('../main');
-        (main as any).renderAll();
-        showError('文件已删除，已标记为 D（无本地缓存）');
-        return;
+      if (workspaceCallbacks) {
+        await workspaceCallbacks.loadAndSwitchFile(filePath);
       }
-      const { addOrUpdateFile } = await import('../state');
-      addOrUpdateFile(fileData, true);
-      const main = await import('../main');
-      (main as any).renderAll();
     } else {
-      (window as any).switchFile?.(filePath);
+      workspaceCallbacks?.switchFile(filePath);
     }
   };
 

@@ -22,8 +22,9 @@ import {
   handleOpenFile,
   handleOpenLocalFile,
   handleEvents,
-  handleInferWorkspace,
   handleScanWorkspace,
+  handleRegisterWorkspace,
+  handleUnregisterWorkspace,
   handleGetAnnotations,
   handleGetAnnotationSummaries,
   handleUpsertAnnotation,
@@ -117,8 +118,9 @@ app.post("/api/open-local-file", handleOpenLocalFile);
 app.get("/api/events", handleEvents);
 
 // API: 工作区相关
-app.post("/api/infer-workspace", handleInferWorkspace);
 app.post("/api/scan-workspace", handleScanWorkspace);
+app.post("/api/register-workspace", handleRegisterWorkspace);
+app.post("/api/unregister-workspace", handleUnregisterWorkspace);
 
 // API: 评论相关（SQLite 持久化）
 app.get("/api/annotations/summaries", handleGetAnnotationSummaries);

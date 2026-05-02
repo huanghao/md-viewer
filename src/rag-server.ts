@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { loadModel, scanWorkspace, watchWorkspace, getEmbedder } from "./rag-indexer.ts";
-import { getAllVectors } from "./rag-storage.ts";
+import { getAllVectors, getWorkspacePaths } from "./rag-storage.ts";
 
 const RAG_PORT = 3001;
 const MAIN_SERVER_URL = "http://localhost:3000";
@@ -41,30 +41,35 @@ app.get("/search", async (c) => {
 
 app.get("/health", (c) => c.json({ status: "ok" }));
 
-async function getWorkspacePaths(): Promise<string[]> {
+async function fetchWorkspacePaths(): Promise<string[]> {
   try {
     const resp = await fetch(`${MAIN_SERVER_URL}/api/workspaces`, {
       signal: AbortSignal.timeout(3000),
     });
     const data = await resp.json() as { paths: string[] };
-    return data.paths ?? [];
-  } catch {
-    console.log("[rag] Could not fetch workspaces from main server — starting with empty list");
-    return [];
+    if (data.paths?.length) return data.paths;
+  } catch {}
+  const persisted = getWorkspacePaths();
+  if (persisted.length) {
+    console.log(`[rag] Main server unreachable — using ${persisted.length} persisted workspace(s) from DB`);
+    return persisted;
   }
+  console.log("[rag] No workspaces found, starting with empty list");
+  return [];
 }
 
 async function main() {
   await loadModel();
 
-  const workspacePaths = await getWorkspacePaths();
+  Bun.serve({ fetch: app.fetch, port: RAG_PORT });
+  console.log(`[rag] Server running on http://localhost:${RAG_PORT}`);
+
+  const workspacePaths = await fetchWorkspacePaths();
   for (const p of workspacePaths) {
     await scanWorkspace(p);
     watchWorkspace(p);
   }
-
-  Bun.serve({ fetch: app.fetch, port: RAG_PORT });
-  console.log(`[rag] Server running on http://localhost:${RAG_PORT}`);
+  console.log(`[rag] Indexing complete`);
 }
 
 if (import.meta.main) main();

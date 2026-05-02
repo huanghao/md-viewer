@@ -1,11 +1,13 @@
 import { pipeline, env } from "@huggingface/transformers";
-import { statSync, readdirSync, existsSync } from "fs";
-import { join, extname } from "path";
+import { statSync, existsSync } from "fs";
+import { join } from "path";
+import { collectWorkspaceMdFiles } from "./workspace-scanner.ts";
 import chokidar from "chokidar";
 import { chunkMarkdown } from "./rag-chunker.ts";
 import { upsertFileChunks, deleteFileChunks, getFileMtime, getMeta, setMeta } from "./rag-storage.ts";
 
 export const MODEL_NAME = "Xenova/paraphrase-multilingual-MiniLM-L12-v2";
+const MODEL_DTYPE = "q8";
 env.cacheDir = join(process.env.HOME ?? "~", ".cache", "huggingface");
 
 let embedder: Awaited<ReturnType<typeof pipeline>> | null = null;
@@ -16,23 +18,34 @@ export function getEmbedder() {
 
 export async function loadModel(): Promise<void> {
   console.log("[rag] Loading embedding model (first run downloads ~118MB to ~/.cache/huggingface)...");
-  embedder = await pipeline("feature-extraction", MODEL_NAME, { dtype: "fp32" });
+  embedder = await pipeline("feature-extraction", MODEL_NAME, { dtype: MODEL_DTYPE });
   console.log("[rag] Model ready.");
 
-  const stored = getMeta("model_name");
-  if (stored && stored !== MODEL_NAME) {
-    console.log("[rag] Model changed, clearing old vectors...");
-    const { getDb } = await import("./rag-storage.ts");
+  const { getDb } = await import("./rag-storage.ts");
+  const storedName = getMeta("model_name");
+  const storedDtype = getMeta("model_dtype");
+  if ((storedName && storedName !== MODEL_NAME) || (storedDtype && storedDtype !== MODEL_DTYPE)) {
+    console.log("[rag] Model config changed, clearing old vectors...");
     getDb().exec("DELETE FROM rag_vectors; DELETE FROM rag_chunks;");
   }
   setMeta("model_name", MODEL_NAME);
+  setMeta("model_dtype", MODEL_DTYPE);
 }
+
+const EMBED_BATCH_SIZE = 4;
 
 async function embedTexts(texts: string[]): Promise<Float32Array[]> {
   if (!embedder) throw new Error("Model not loaded");
-  const output = await (embedder as any)(texts, { pooling: "mean", normalize: true });
-  const dim = output.data.length / texts.length;
-  return texts.map((_, i) => output.data.slice(i * dim, (i + 1) * dim) as Float32Array);
+  const results: Float32Array[] = [];
+  for (let i = 0; i < texts.length; i += EMBED_BATCH_SIZE) {
+    const batch = texts.slice(i, i + EMBED_BATCH_SIZE);
+    const output = await (embedder as any)(batch, { pooling: "mean", normalize: true });
+    const dim = output.data.length / batch.length;
+    for (let j = 0; j < batch.length; j++) {
+      results.push(output.data.slice(j * dim, (j + 1) * dim) as Float32Array);
+    }
+  }
+  return results;
 }
 
 export async function indexFile(filePath: string): Promise<void> {
@@ -74,31 +87,15 @@ export async function indexFile(filePath: string): Promise<void> {
   }
 }
 
-function collectMdFiles(dir: string): string[] {
-  const files: string[] = [];
-  if (!existsSync(dir)) return files;
-  try {
-    const entries = readdirSync(dir, { recursive: true, withFileTypes: true }) as any[];
-    for (const entry of entries) {
-      if (!entry.isFile()) continue;
-      const name: string = entry.name;
-      if (![".md", ".markdown"].includes(extname(name))) continue;
-      if (name.startsWith(".")) continue;
-      const parentPath: string = entry.parentPath ?? entry.path ?? dir;
-      const full = join(parentPath, name);
-      if (full.includes("node_modules") || full.includes("/.git/")) continue;
-      files.push(full);
-    }
-  } catch {}
-  return files;
-}
 
 export async function scanWorkspace(workspacePath: string): Promise<void> {
   console.log(`[rag] Scanning workspace: ${workspacePath}`);
-  const files = collectMdFiles(workspacePath);
+  const files = collectWorkspaceMdFiles(workspacePath);
   console.log(`[rag] Found ${files.length} markdown files`);
   for (const f of files) {
     await indexFile(f);
+    // yield to GC between files
+    await new Promise(r => setTimeout(r, 0));
   }
   console.log(`[rag] Workspace scan complete: ${workspacePath}`);
 }
@@ -134,9 +131,7 @@ export function watchWorkspace(workspacePath: string): void {
   chokidar.watch(workspacePath, {
     persistent: true,
     ignoreInitial: true,
-    usePolling: true,
-    interval: 500,
-    ignored: /(node_modules|\.git)/,
+    ignored: /(node_modules|\.git|\.pytest_cache|\.claude\/commands)/,
   }).on("add", (p) => scheduleIndex(p))
     .on("change", (p) => scheduleIndex(p))
     .on("unlink", (p) => {

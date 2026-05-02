@@ -6,6 +6,7 @@ const SESSION_ID_KEY = 'md-viewer:chat-session-id';
 const PROMPTS_KEY = 'md-viewer:chat-quick-prompts';
 const MODEL_KEY = 'md-viewer:chat-model';
 const DEFAULT_AGENT_URL = 'http://localhost:3003';
+let agentAvailable: boolean | null = null; // null = untested, false = confirmed down
 const DEFAULT_MODEL = 'claude-haiku-4-5';
 
 const CLAUDE_MODELS = [
@@ -113,6 +114,7 @@ function notifyFileContext(filePath: string): void {
   if (_notifyTimer) clearTimeout(_notifyTimer);
   _notifyTimer = setTimeout(async () => {
     _notifyTimer = null;
+    if (agentAvailable === false) return;
     try {
       await fetch(`${getAgentUrl()}/session/${state.sessionId}/context`, {
         method: 'PATCH',
@@ -120,7 +122,7 @@ function notifyFileContext(filePath: string): void {
         body: JSON.stringify({ filePath }),
         signal: AbortSignal.timeout(3000),
       });
-    } catch { /* agent-server not running, ignore */ }
+    } catch { agentAvailable = false; /* agent-server not running, ignore */ }
   }, 300);
 }
 
@@ -137,9 +139,10 @@ export function resumeSession(sessionId: string): void {
 }
 
 async function loadHistory(): Promise<void> {
+  if (agentAvailable === false) return;
   try {
     const res = await fetch(`${getAgentUrl()}/session/${state.sessionId}/history`);
-    if (!res.ok) return;
+    if (!res.ok) { agentAvailable = false; return; }
     const data = await res.json() as { history: Array<{ role: 'user' | 'assistant'; content: string }> };
     if (data.history?.length) {
       state.history = data.history.map((e) => ({ role: e.role, content: e.content }));
@@ -258,9 +261,11 @@ function wireEvents(): void {
   });
 
   void (async () => {
+    if (agentAvailable === false) return;
     try {
       const res = await fetch(`${getAgentUrl()}/sessions`, { signal: AbortSignal.timeout(2000) });
-      if (!res.ok) return;
+      if (!res.ok) { agentAvailable = false; return; }
+      agentAvailable = true;
       const data = await res.json() as { sessions: Array<{ id: string; tokenUsage: { input: number; output: number; cacheRead: number; total: number }; messageCount: number }> };
       const session = data.sessions.find(s => s.id === state.sessionId);
       const hud = document.getElementById('chatTokenHud');
@@ -271,7 +276,7 @@ function wireEvents(): void {
         hud.textContent = `${fmt(u.total)} tok${cacheHit > 0 ? ` · 缓存${cacheHit}%` : ''}`;
         hud.title = `输入 ${fmt(u.input)} · 输出 ${fmt(u.output)} · 缓存命中 ${fmt(u.cacheRead)} · 共 ${session.messageCount} 条`;
       }
-    } catch { /* agent-server not available */ }
+    } catch { agentAvailable = false; /* agent-server not available */ }
   })();
 
   // Session input: Enter or blur to resume

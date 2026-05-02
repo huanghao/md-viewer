@@ -72,24 +72,28 @@ describe('initFileListActions', () => {
 
   it('点击文件行调用 switchFile(path)', () => {
     doc.body.innerHTML = `
-      <div id="fileList">
-        <div class="file-item" data-action="switch-file" data-path="/a.md">a.md</div>
-      </div>`;
+      <aside class="sidebar">
+        <div id="fileList">
+          <div class="file-item" data-action="switch-file" data-path="/a.md">a.md</div>
+        </div>
+      </aside>`;
     const cbs = makeCallbacks();
-    initFileListActions(doc.getElementById('fileList')!, cbs);
+    initFileListActions(cbs);
     (doc.querySelector('[data-action="switch-file"]') as HTMLElement).click();
     expect(cbs.switchFile).toHaveBeenCalledWith('/a.md');
   });
 
   it('点击关闭按钮调用 removeFile(path)，不触发 switchFile', () => {
     doc.body.innerHTML = `
-      <div id="fileList">
-        <div class="file-item" data-action="switch-file" data-path="/a.md">
-          <span class="close" data-action="remove-file" data-path="/a.md">×</span>
+      <aside class="sidebar">
+        <div id="fileList">
+          <div class="file-item" data-action="switch-file" data-path="/a.md">
+            <span class="close" data-action="remove-file" data-path="/a.md">×</span>
+          </div>
         </div>
-      </div>`;
+      </aside>`;
     const cbs = makeCallbacks();
-    initFileListActions(doc.getElementById('fileList')!, cbs);
+    initFileListActions(cbs);
     (doc.querySelector('[data-action="remove-file"]') as HTMLElement).click();
     expect(cbs.removeFile).toHaveBeenCalledWith('/a.md');
     expect(cbs.switchFile).not.toHaveBeenCalled();

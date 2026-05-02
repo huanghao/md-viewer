@@ -4,7 +4,6 @@ import {
   markWorkspaceFailed,
   isWorkspaceFailed,
 } from '../state';
-import { buildIgnoredSet } from '../utils/ignore-filter';
 import { escapeHtml, escapeAttr } from '../utils/escape';
 import { stripWorkspaceTreeDisplayExtension } from '../utils/workspace-file-name';
 import { getPinnedFiles } from '../utils/pinned-files';
@@ -144,10 +143,8 @@ export function getActiveFiles(
 ): FileTreeNode[] {
   if (!tree) return [];
   const cutoff = Date.now() - windowMs;
-  const ignored = buildIgnoredSet(tree, workspacePath);
   const all = collectFiles(tree);
   return all.filter((f) => {
-    if (ignored.has(f.path)) return false;
     if (pinned.has(f.path)) return true;
     if (typeof f.lastModified === 'number' && f.lastModified >= cutoff) return true;
     // Check if file has recent annotation activity
@@ -390,9 +387,7 @@ export function renderFocusView(): string {
       });
     }
     if (!tree) continue;
-    const ignored = buildIgnoredSet(tree, ws.path);
     for (const f of collectFiles(tree)) {
-      if (ignored.has(f.path)) continue;
       if (!pinned.has(f.path)) {
         const ext = getFileExtension(f.path);
         if (ext === 'jsonl' || ext === 'log') continue;

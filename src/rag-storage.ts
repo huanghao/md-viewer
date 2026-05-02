@@ -34,6 +34,11 @@ export function getDb(): Database {
       chunk_id INTEGER PRIMARY KEY REFERENCES rag_chunks(id) ON DELETE CASCADE,
       vector   BLOB NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS rag_workspaces (
+      path       TEXT PRIMARY KEY,
+      added_at   INTEGER NOT NULL
+    );
   `);
   return db;
 }
@@ -101,6 +106,18 @@ export interface StoredChunk {
   text: string;
   charStart: number;
   vector: Float32Array;
+}
+
+export function upsertWorkspacePath(path: string): void {
+  getDb().query("INSERT OR REPLACE INTO rag_workspaces (path, added_at) VALUES (?, ?)").run(path, Date.now());
+}
+
+export function deleteWorkspacePath(path: string): void {
+  getDb().query("DELETE FROM rag_workspaces WHERE path = ?").run(path);
+}
+
+export function getWorkspacePaths(): string[] {
+  return (getDb().query("SELECT path FROM rag_workspaces ORDER BY added_at").all() as { path: string }[]).map(r => r.path);
 }
 
 export function getAllVectors(): StoredChunk[] {

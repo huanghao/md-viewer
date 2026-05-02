@@ -2,7 +2,6 @@ import type { Workspace, FileTreeNode } from './types';
 import { state } from './state';
 import { updateWorkspaceListDiff, removeWorkspaceTracking } from './workspace-state';
 import { recordSignal } from './utils/focus-signals';
-import { buildIgnoredSet } from './utils/ignore-filter';
 import { saveConfig } from './config';
 import { mergeDirectoryExpandedState, applyDirectoryExpandedState } from './workspace-tree-expansion';
 import {
@@ -85,6 +84,12 @@ export function addWorkspace(name: string, path: string): Workspace {
   // 添加后切换到新工作区
   state.currentWorkspace = workspace.id;
 
+  fetch('/api/register-workspace', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: normalizedPath }),
+  }).catch(() => {});
+
   return workspace;
 }
 
@@ -93,8 +98,15 @@ export function removeWorkspace(id: string): void {
   const index = state.config.workspaces.findIndex(ws => ws.id === id);
   if (index === -1) return;
 
+  const removedPath = state.config.workspaces[index].path;
   state.config.workspaces.splice(index, 1);
   saveConfig(state.config);
+
+  fetch('/api/unregister-workspace', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: removedPath }),
+  }).catch(() => {});
 
   // 清除文件树缓存
   state.fileTree.delete(id);
@@ -144,34 +156,6 @@ export function toggleWorkspaceExpanded(id: string): void {
 export function getCurrentWorkspace(): Workspace | null {
   if (!state.currentWorkspace) return null;
   return state.config.workspaces.find(ws => ws.id === state.currentWorkspace) || null;
-}
-
-// 从文件路径推断工作区
-export async function inferWorkspaceFromPath(filePath: string): Promise<Workspace | null> {
-  try {
-    // 调用后端 API 获取文件所在的 git 仓库根目录
-    const response = await fetch('/api/infer-workspace', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filePath })
-    });
-
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    if (!data.workspacePath) return null;
-
-    // 检查是否已存在
-    const existing = state.config.workspaces.find(ws => ws.path === data.workspacePath);
-    if (existing) return existing;
-
-    // 创建新工作区
-    const name = data.workspaceName || data.workspacePath.split('/').pop() || 'workspace';
-    return addWorkspace(name, data.workspacePath);
-  } catch (e) {
-    console.error('推断工作区失败:', e);
-    return null;
-  }
 }
 
 // 扫描工作区，构建文件树
@@ -230,9 +214,7 @@ export async function scanWorkspace(workspaceId: string): Promise<FileTreeNode |
     // 缓存文件树
     state.fileTree.set(workspaceId, tree);
     setWorkspaceExpandedState(workspaceId, collectExpandedStateFromTree(tree));
-    const ignored = buildIgnoredSet(tree, workspace.path);
-    const allPaths = collectFilePaths(tree).filter((p) => !ignored.has(p));
-    updateWorkspaceListDiff(workspaceId, allPaths);
+    updateWorkspaceListDiff(workspaceId, collectFilePaths(tree));
 
     return tree;
   } catch (e) {

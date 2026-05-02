@@ -65,6 +65,7 @@ export const styles = `
       display: flex;
       flex-direction: column;
       min-height: 0;
+      overflow: hidden;
       transition: width 0.18s ease, min-width 0.18s ease;
     }
     body.sidebar-collapsed .sidebar {
@@ -642,10 +643,11 @@ export const styles = `
     }
 
     .toc-pane {
-      overflow-y: auto;
       flex-shrink: 0;
-      height: var(--toc-pane-height, 240px);
+      flex-basis: var(--toc-pane-height, 240px);
+      max-height: var(--toc-pane-height, 240px);
       display: none;
+      overflow: hidden;
     }
 
     .sidebar.toc-visible .toc-pane {
@@ -692,6 +694,7 @@ export const styles = `
     .toc-panel {
       padding: 2px 8px 6px;
       flex: 1;
+      min-height: 0;
       overflow-y: auto;
     }
 
@@ -4243,6 +4246,13 @@ export const styles = `
     .preferences-btn.primary:hover { background: #1d4ed8; }
 
     /* ── RAG 搜索面板 ── */
+    .rag-search-container {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
     .rag-search-wrap {
       display: flex; flex-direction: column; height: 100%;
     }

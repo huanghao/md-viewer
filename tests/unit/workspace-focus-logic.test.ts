@@ -149,15 +149,6 @@ describe('getActiveFiles', () => {
     expect(result.map(f => f.path)).toEqual(['/ws/pinned.md', '/ws/newer.md', '/ws/older.md']);
   });
 
-  it('excludes files matching ignorePatterns (including pinned)', () => {
-    const ignored = makeFile('/ws/bots-ws/exp.md', now - 100);
-    const normal = makeFile('/ws/docs/README.md', now - 100);
-    const tree = makeTree([ignored, normal], ['bots-ws/']);
-    const pinned = new Set(['/ws/bots-ws/exp.md']); // even pinned files are filtered
-    const result = getActiveFiles(ws, tree, windowMs, pinned);
-    expect(result.map(f => f.path)).toEqual(['/ws/docs/README.md']);
-  });
-
   it('collects files from nested directories', () => {
     const nested: FileTreeNode = {
       name: 'sub',
@@ -182,24 +173,6 @@ describe('getActiveFiles', () => {
     expect(getActiveFiles(ws, tree, windowMs, new Set())).toEqual([]);
   });
 
-  it('respects subdirectory .mdvignore patterns (multi-level)', () => {
-    const sub: FileTreeNode = {
-      name: 'sub',
-      path: '/ws/sub',
-      type: 'directory',
-      children: [
-        { name: 'secret.md', path: '/ws/sub/secret.md', type: 'file', lastModified: now - 100 },
-        { name: 'open.md',   path: '/ws/sub/open.md',   type: 'file', lastModified: now - 100 },
-      ],
-      ignorePatterns: ['secret.md'],
-    };
-    const tree: FileTreeNode = {
-      name: 'root', path: '/ws', type: 'directory', children: [sub],
-    };
-    const result = getActiveFiles('/ws', tree, 4 * 3600 * 1000, new Set());
-    expect(result.map(f => f.path)).not.toContain('/ws/sub/secret.md');
-    expect(result.map(f => f.path)).toContain('/ws/sub/open.md');
-  });
 });
 
 // ==================== formatRelativeTime ====================

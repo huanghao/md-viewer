@@ -200,6 +200,14 @@ export function getDb(): Database {
     CREATE INDEX IF NOT EXISTS idx_focus_signals_file ON focus_signals(file);
   `);
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS quick_comments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      text TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0
+    );
+  `);
+
   const columns = db.query(`PRAGMA table_info(annotations)`).all() as Array<{ name: string }>;
   const hasSerial = columns.some((col) => col.name === "serial");
   const hasThreadJson = columns.some((col) => col.name === "thread_json");
@@ -701,4 +709,25 @@ export function queryFocusSignals(days: number): Array<{ ts: number; type: strin
 export function pruneFocusSignals(olderThanDays = 7): void {
   const cutoff = Date.now() - olderThanDays * 86400 * 1000;
   getDb().prepare(`DELETE FROM focus_signals WHERE ts < ?`).run(cutoff);
+}
+
+// ==================== 快捷评论 ====================
+
+export interface QuickComment {
+  id: number;
+  text: string;
+  sortOrder: number;
+}
+
+export function listQuickComments(): QuickComment[] {
+  return getDb()
+    .query('SELECT id, text, sort_order as sortOrder FROM quick_comments ORDER BY sort_order ASC, id ASC')
+    .all() as QuickComment[];
+}
+
+export function replaceQuickComments(items: Array<{ text: string }>): void {
+  const db = getDb();
+  db.exec('DELETE FROM quick_comments');
+  const insert = db.prepare('INSERT INTO quick_comments (text, sort_order) VALUES (?, ?)');
+  items.forEach((item, i) => insert.run(item.text, i));
 }

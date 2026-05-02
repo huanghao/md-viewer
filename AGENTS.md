@@ -29,6 +29,17 @@ Do not place tool-operational playbooks here unless they are temporary workaroun
 - 优先使用非模态交互：页面内嵌输入、侧栏表单、行内编辑、抽屉。
 - 仅在高风险且不可逆操作中允许确认交互。
 
+## No `window.*` Globals for Inter-Component Communication
+
+禁止用 `(window as any).xxx = fn` 或 `window.xxx = fn` 的方式在模块间传递函数或触发行为。这种模式绕过 TypeScript 类型系统，使重命名/查找引用完全失效，并让模块间依赖在 IDE 中不可见。
+
+已知存量代码（`sidebar-workspace.ts`、`workspace-focus.ts` 等）使用了这种模式，这是技术债，不是可效仿的先例。
+
+**替代方案：**
+- HTML 模板内的 `onclick` 处理：用事件委托（`data-action` + `data-*` 属性 + 父级 `addEventListener`），在同一文件内处理
+- 跨模块触发行为：用 `CustomEvent` + `document.dispatchEvent`，接收方 `addEventListener`
+- 需要向子模块注入回调：通过函数参数或导出的 `init(callbacks)` 模式传入
+
 ## Count/Badge Consistency
 
 凡是涉及"计数"的地方（badge、tab 数字、摘要 API），必须使用同一个判断函数，不得内联重写条件：

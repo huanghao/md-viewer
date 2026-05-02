@@ -4182,6 +4182,10 @@ export const styles = `
     .quick-add-btn:hover { background: rgba(255,255,255,0.12); }
     .quick-add-btn.todo { color: #93c5fd; }
     .quick-add-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
+    .quick-add-section { padding: 4px; }
+    .quick-add-section + .quick-add-section { border-top: 1px solid var(--border-color, #e0e0e0); }
+    .quick-add-section-label { font-size: 10px; color: var(--text-muted, #999); padding: 4px 8px 2px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .quick-add-btn.quick-prompt { color: var(--accent-purple, #8b5cf6); }
 
     /* ── Copy menu ── */
     .todo-copy-menu { position: fixed; background: #1c1917; border-radius: 8px; padding: 4px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); z-index: calc(var(--z-quick-add) + 1); min-width: 180px; }

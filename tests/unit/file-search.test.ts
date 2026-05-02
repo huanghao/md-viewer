@@ -63,4 +63,24 @@ describe('searchFilesInRoots', () => {
     expect(searchFilesInRoots('', [root], 10)).toEqual([]);
     expect(searchFilesInRoots('not-found', [root], 10)).toEqual([]);
   });
+
+  it('matches multi-token query across filename segments', () => {
+    const root = createTempRoot('mdv-search-multi-');
+    writeFile(root, 'workspace-tree-expansion-persistence.md');
+    writeFile(root, 'workspace-state.md');
+    writeFile(root, 'other-file.md');
+
+    const results = searchFilesInRoots('workspace persistence', [root], 10);
+
+    expect(results.length).toBe(1);
+    expect(results[0].endsWith('workspace-tree-expansion-persistence.md')).toBe(true);
+  });
+
+  it('matches tokens in any order', () => {
+    const root = createTempRoot('mdv-search-order-');
+    writeFile(root, 'pdf-annotation.md');
+
+    const results = searchFilesInRoots('annotation pdf', [root], 10);
+    expect(results.length).toBe(1);
+  });
 });

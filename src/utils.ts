@@ -1,5 +1,6 @@
 import { readFileSync, existsSync, statSync, readdirSync } from "fs";
 import { resolve, basename, relative } from "path";
+import { fuzzyScore } from './client/utils/fuzzy-search';
 
 // ==================== 日志 ====================
 
@@ -103,15 +104,11 @@ interface SearchCandidate {
 }
 
 function scoreFileMatch(query: string, filePath: string, root: string): number {
-  const lowerQuery = query.toLowerCase();
-  const lowerName = basename(filePath).toLowerCase();
-  const lowerRel = relative(root, filePath).toLowerCase();
-
-  if (lowerName === lowerQuery) return 400;
-  if (lowerName.startsWith(lowerQuery)) return 320;
-  if (lowerName.includes(lowerQuery)) return 240;
-  if (lowerRel.includes(lowerQuery)) return 160;
-  return 0;
+  const name = basename(filePath);
+  const rel = relative(root, filePath);
+  const nameScore = fuzzyScore(name, query);
+  if (nameScore !== 0) return nameScore + 100;
+  return fuzzyScore(rel, query);
 }
 
 export function searchFilesInRoots(query: string, roots: string[], limit: number = 50): string[] {
@@ -136,7 +133,7 @@ export function searchFilesInRoots(query: string, roots: string[], limit: number
     for (const filePath of files) {
       if (seenPaths.has(filePath)) continue;
       const score = scoreFileMatch(normalizedQuery, filePath, root);
-      if (score <= 0) continue;
+      if (score === 0) continue;
       seenPaths.add(filePath);
       candidates.push({ path: filePath, root, score });
     }

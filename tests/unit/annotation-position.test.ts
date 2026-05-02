@@ -237,4 +237,20 @@ describe('placeFloating', () => {
     placeFloating(el, 100, 700); // viewport 768, height 220 → max top = 768-220-8 = 540
     expect(el.style.top).toBe('540px');
   });
+
+  it('flips upward when there is not enough room below the anchor', () => {
+    const el = doc.createElement('div') as HTMLElement;
+    Object.defineProperty(el, 'offsetWidth', { value: 168 });
+    Object.defineProperty(el, 'offsetHeight', { value: 96 });
+    placeFloating(el, 100, 720, { fallbackWidth: 168, fallbackHeight: 96, flipY: true });
+    expect(el.style.top).toBe('616px');
+  });
+
+  it('keeps the preferred top when there is enough room below the anchor', () => {
+    const el = doc.createElement('div') as HTMLElement;
+    Object.defineProperty(el, 'offsetWidth', { value: 168 });
+    Object.defineProperty(el, 'offsetHeight', { value: 96 });
+    placeFloating(el, 100, 500, { fallbackWidth: 168, fallbackHeight: 96, flipY: true });
+    expect(el.style.top).toBe('500px');
+  });
 });

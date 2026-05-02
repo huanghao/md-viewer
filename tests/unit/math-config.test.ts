@@ -53,5 +53,6 @@ describe('loadConfig — math settings', () => {
     storage.setItem('md-viewer:config', JSON.stringify(oldConfig));
     const config = loadConfig();
     expect(config.mathInline).toBe(true);
+    expect(config.focusActiveTypes).toEqual(['md', 'pdf']);
   });
 });

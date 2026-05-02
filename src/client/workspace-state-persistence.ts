@@ -16,7 +16,7 @@ export function restoreWorkspaceKnownFilesFromStorage(): void {
   workspaceKnownFiles.clear();
 
   try {
-    const records = storageGet(WORKSPACE_KNOWN_KEY);
+    const records = storageGet<unknown>(WORKSPACE_KNOWN_KEY, null);
     if (!records) return;
 
     if (!Array.isArray(records)) return;
@@ -51,4 +51,3 @@ export function removeKnownWorkspacePaths(workspaceId: string): Set<string> | un
   saveWorkspaceKnownFiles();
   return knownSet;
 }
-

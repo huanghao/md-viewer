@@ -37,6 +37,7 @@ export interface FileTreeNode {
 export interface AppConfig {
   sidebarTab: 'focus' | 'full' | 'list' | 'search';
   focusWindowKey: '8h' | '2d' | '1w' | '1m';
+  focusActiveTypes: string[];
   focusStrategy: 'frecency' | 'mtime'; // 最近视图排序策略，默认 frecency
   markdownTheme: string;  // 'github' | 'notion' | 'bear'
   codeTheme: string;      // 'github' | 'github-dark' | 'atom-one-dark'
@@ -119,4 +120,3 @@ export interface RagResult {
 export type RagStatus =
   | { available: false }
   | { available: true; indexedChunks?: number; indexing?: boolean; progress?: number };
-

@@ -1,7 +1,9 @@
 import type { FileInfo } from '../types';
 
+export type FileInfoWithDisplayName = FileInfo & { displayName: string };
+
 // 为同名文件生成区分名称
-export function generateDistinctNames(files: Map<string, FileInfo>): FileInfo[] {
+export function generateDistinctNames(files: Map<string, FileInfo>): FileInfoWithDisplayName[] {
   const fileArray = Array.from(files.values());
 
   // 统计同名文件数量
@@ -10,7 +12,7 @@ export function generateDistinctNames(files: Map<string, FileInfo>): FileInfo[] 
     nameCounts[file.name] = (nameCounts[file.name] || 0) + 1;
   });
 
-  return fileArray.map(file => {
+  return fileArray.map((file): FileInfoWithDisplayName => {
     // 如果文件名唯一，直接返回
     if (nameCounts[file.name] === 1) {
       return { ...file, displayName: file.name };

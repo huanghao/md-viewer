@@ -20,7 +20,7 @@ function saveWorkspaceExpandedState(): void {
 export function restoreWorkspaceExpandedStateFromStorage(): void {
   workspaceExpandedState.clear();
   try {
-    const parsed = storageGet(WORKSPACE_TREE_EXPANDED_KEY);
+    const parsed = storageGet<unknown>(WORKSPACE_TREE_EXPANDED_KEY, null);
     if (!parsed) return;
     if (!Array.isArray(parsed)) return;
     for (const item of parsed) {

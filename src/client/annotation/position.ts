@@ -160,11 +160,34 @@ export function clamp(val: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, val));
 }
 
-export function placeFloating(el: HTMLElement, x: number, y: number): void {
-  const width = 360;
-  const height = 220;
+interface FloatingPlacementOptions {
+  fallbackWidth?: number;
+  fallbackHeight?: number;
+  flipY?: boolean;
+  gap?: number;
+}
+
+function getFloatingSize(el: HTMLElement, fallbackWidth: number, fallbackHeight: number): { width: number; height: number } {
+  const rect = el.getBoundingClientRect();
+  return {
+    width: rect.width || el.offsetWidth || fallbackWidth,
+    height: rect.height || el.offsetHeight || fallbackHeight,
+  };
+}
+
+export function placeFloating(
+  el: HTMLElement,
+  x: number,
+  y: number,
+  options: FloatingPlacementOptions = {},
+): void {
+  const gap = options.gap ?? 8;
+  const { width, height } = getFloatingSize(el, options.fallbackWidth ?? 360, options.fallbackHeight ?? 220);
   const left = clamp(x, 8, window.innerWidth - width - 8);
-  const top = clamp(y, 8, window.innerHeight - height - 8);
+  const preferredTop = options.flipY && y + height + gap > window.innerHeight
+    ? y - height - gap
+    : y;
+  const top = clamp(preferredTop, 8, window.innerHeight - height - 8);
   el.style.left = `${left}px`;
   el.style.top = `${top}px`;
 }

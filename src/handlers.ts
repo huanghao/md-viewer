@@ -1,6 +1,7 @@
 import { basename, resolve, dirname, join, extname } from "path";
 import { scanWorkspaceTree } from "./workspace-scanner.ts";
 import { existsSync, readdirSync, statSync, readFileSync } from "fs";
+import type { Dirent } from "fs";
 import { homedir } from "os";
 import type { Context } from "hono";
 import {
@@ -994,7 +995,7 @@ export function handleWorkspaceSearch(c: Context) {
 
   function walkDir(dir: string, workspaceRoot: string): void {
     if (results.length >= limit) return;
-    let entries: ReturnType<typeof readdirSync>;
+    let entries: Dirent<string>[];
     try {
       entries = readdirSync(dir, { withFileTypes: true });
     } catch {

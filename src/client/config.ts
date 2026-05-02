@@ -1,11 +1,13 @@
 import type { AppConfig } from './types';
 import { storageGet, storageSet } from './utils/storage';
+import { sanitizeFocusActiveTypes } from './utils/focus-type-filter';
 
 const CONFIG_KEY = 'md-viewer:config';
 
 export const defaultConfig: AppConfig = {
   sidebarTab: 'focus',
   focusWindowKey: '8h',
+  focusActiveTypes: ['md', 'pdf'],
   focusStrategy: 'mtime',
   markdownTheme: 'github',
   codeTheme: 'github',
@@ -17,7 +19,11 @@ export const defaultConfig: AppConfig = {
 };
 
 export function loadConfig(): AppConfig {
-  return { ...defaultConfig, ...storageGet<Partial<AppConfig>>(CONFIG_KEY, {}) };
+  const config = { ...defaultConfig, ...storageGet<Partial<AppConfig>>(CONFIG_KEY, {}) };
+  return {
+    ...config,
+    focusActiveTypes: sanitizeFocusActiveTypes(config.focusActiveTypes),
+  };
 }
 
 export function saveConfig(config: AppConfig): void {

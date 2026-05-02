@@ -2750,6 +2750,7 @@ function startWorkspacePolling() {
       const current = state.currentFile;
       if (current) removeFileHandler(current);
     },
+    shouldActivate: () => !isInputFocused(),
   });
 
   registerAction({
@@ -2837,6 +2838,7 @@ function startWorkspacePolling() {
     category: 'navigation',
     defaultKey: 'Ctrl+f',
     handler: () => showQuickOpen(),
+    shouldActivate: () => !isInputFocused(),
   });
 
   registerAction({

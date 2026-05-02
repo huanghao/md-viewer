@@ -4185,7 +4185,7 @@ export const styles = `
     .quick-add-section { padding: 4px; }
     .quick-add-section + .quick-add-section { border-top: 1px solid rgba(255,255,255,0.1); }
     .quick-add-section-label { font-size: 10px; color: rgba(255,255,255,0.35); padding: 4px 8px 2px; text-transform: uppercase; letter-spacing: 0.4px; }
-    .quick-add-btn.quick-prompt { color: #c4b5fd; }
+    .quick-add-btn.quick-prompt { color: #a8a29e; }
 
     /* ── Copy menu ── */
     .todo-copy-menu { position: fixed; background: #1c1917; border-radius: 8px; padding: 4px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); z-index: calc(var(--z-quick-add) + 1); min-width: 180px; }

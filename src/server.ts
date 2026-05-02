@@ -46,6 +46,8 @@ import {
   handleRagSearch,
   handleRagStatus,
   handleWorkspaceSearch,
+  handleGetQuickComments,
+  handleUpsertQuickComments,
 } from "./handlers.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
 
@@ -131,6 +133,10 @@ app.post("/api/annotations/delete", handleDeleteAnnotation);
 app.post("/api/annotations/status", handleUpdateAnnotationStatus);
 app.post("/api/annotations/migrate", handleMigrateAnnotations);
 app.post("/api/annotations/clear", handleClearAllAnnotations);
+
+// API: Quick comments
+app.get("/api/quick-comments", handleGetQuickComments);
+app.post("/api/quick-comments", handleUpsertQuickComments);
 
 // API: Todos
 app.get('/api/todos', handleListTodos);

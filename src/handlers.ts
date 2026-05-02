@@ -26,6 +26,8 @@ import {
   appendAnnotationReply,
   deleteAnnotation,
   updateAnnotationStatus,
+  listQuickComments,
+  replaceQuickComments,
 } from "./annotation-storage.ts";
 import { createTodo, listTodos, updateTodo, deleteTodo, tidyTodos } from './todo-storage.ts';
 import { upsertWorkspacePath, getWorkspacePaths, deleteWorkspacePath } from './rag-storage.ts';
@@ -938,6 +940,21 @@ export async function handleTidyTodos(c: any): Promise<Response> {
     ? Number(body.olderThanDays) : undefined;
   const result = tidyTodos({ olderThanDays, missingFiles: body.missingFiles === true });
   return c.json(result);
+}
+
+export function handleGetQuickComments(c: Context) {
+  return c.json({ items: listQuickComments() });
+}
+
+export async function handleUpsertQuickComments(c: Context) {
+  const body = await c.req.json() as { items?: Array<{ text: string }> };
+  if (!Array.isArray(body.items)) return c.json({ error: 'items must be array' }, 400);
+  const sanitized = body.items
+    .map((it) => ({ text: String(it.text ?? '').trim() }))
+    .filter((it) => it.text.length > 0)
+    .slice(0, 50);
+  replaceQuickComments(sanitized);
+  return c.json({ ok: true });
 }
 
 export function handleWorkspaceSearch(c: Context) {

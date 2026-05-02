@@ -1434,15 +1434,18 @@ async function switchFile(path: string) {
 
 // 移除文件（关闭标签页和从列表删除是同一个操作）
 function removeFileHandler(path: string) {
-  // Immediately evict PDF viewer if this file is being closed
   if (isPdfPath(path)) evictPdfViewer(path);
   removeFileFromState(path);
-  renderSidebar();
-  renderContent();
-  syncAnnotationsForCurrentFile(true);
-  // Clear TOC when file is closed
-  const panel = document.getElementById('tocPanel');
-  if (panel) renderTocPanel(panel, [], () => {});
+  if (state.currentFile) {
+    // Reuse switchFile so lazy-loading triggers for session files with empty content.
+    void switchFile(state.currentFile);
+  } else {
+    renderSidebar();
+    renderContent();
+    syncAnnotationsForCurrentFile(true);
+    const panel = document.getElementById('tocPanel');
+    if (panel) renderTocPanel(panel, [], () => {});
+  }
 }
 
 function navigateFileInView(direction: 1 | -1): void {

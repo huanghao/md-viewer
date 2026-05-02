@@ -186,57 +186,58 @@ async function openResult(idx: number): Promise<void> {
   }
 }
 
-/** 把 Markdown 源文本剥成纯文本，用于和渲染后 DOM 匹配 */
-function stripMarkdown(src: string): string {
-  return src
-    .replace(/^#{1,6}\s+/gm, '')   // heading markers
-    .replace(/`{1,3}[^`]*`{1,3}/g, (m) => m.replace(/`/g, ''))  // inline code / fences
-    .replace(/\*{1,2}([^*]+)\*{1,2}/g, '$1')  // bold/italic
+/** Strip inline Markdown from a single line (no cross-line normalization) */
+function stripMarkdownLine(line: string): string {
+  return line
+    .replace(/^#{1,6}\s+/, '')
+    .replace(/`{1,3}[^`]*`{1,3}/g, (m) => m.replace(/`/g, ''))
+    .replace(/\*{1,2}([^*]+)\*{1,2}/g, '$1')
     .replace(/_{1,2}([^_]+)_{1,2}/g, '$1')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')  // links
-    .replace(/!\[[^\]]*\]\([^)]+\)/g, '')      // images
-    .replace(/\s+/g, ' ')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
     .trim();
 }
 
 function highlightRagChunk(chunkText: string): void {
   const reader = document.getElementById('reader');
-  console.log('[rag:highlight] reader=', !!reader, 'chunkText[:40]=', chunkText.slice(0, 40));
   if (!reader) return;
 
-  // Clear previous highlight
   reader.querySelectorAll('mark.rag-highlight').forEach(el => {
     const parent = el.parentNode;
     if (parent) parent.replaceChild(document.createTextNode(el.textContent ?? ''), el);
   });
 
-  // Build needle from stripped markdown; try progressively shorter lengths if no match
-  const stripped = stripMarkdown(chunkText);
-  console.log('[rag:highlight] stripped[:80]=', stripped.slice(0, 80));
-  const candidates = [stripped.slice(0, 80), stripped.slice(0, 50), stripped.slice(0, 30)];
+  // Build candidates line-by-line so we never construct a needle that spans
+  // a heading→paragraph DOM boundary (block elements have no text separator).
+  const candidates: string[] = [];
+  for (const raw of chunkText.split('\n')) {
+    const line = stripMarkdownLine(raw);
+    if (line.length >= 8) {
+      candidates.push(line.slice(0, 80));
+      if (line.length >= 50) candidates.push(line.slice(0, 50));
+      if (line.length >= 30) candidates.push(line.slice(0, 30));
+    }
+  }
+
+  // Build text-node index once, reuse for all candidates.
+  const walker = document.createTreeWalker(reader, NodeFilter.SHOW_TEXT);
+  const nodes: Text[] = [];
+  let n: Text | null;
+  while ((n = walker.nextNode() as Text | null)) nodes.push(n);
+
+  let concat = '';
+  const offsets: number[] = [];
+  for (const node of nodes) {
+    offsets.push(concat.length);
+    concat += node.textContent ?? '';
+  }
 
   for (const needle of candidates) {
     if (!needle || needle.length < 8) continue;
 
-    // Walk all text nodes and try to find needle across node boundaries
-    const walker = document.createTreeWalker(reader, NodeFilter.SHOW_TEXT);
-    const nodes: Text[] = [];
-    let n: Text | null;
-    while ((n = walker.nextNode() as Text | null)) nodes.push(n);
-
-    // Build concatenated text with node boundary offsets
-    let concat = '';
-    const offsets: number[] = []; // offsets[i] = start index in concat for nodes[i]
-    for (const node of nodes) {
-      offsets.push(concat.length);
-      concat += node.textContent ?? '';
-    }
-
     const idx = concat.indexOf(needle);
-    console.log('[rag:highlight] needle[:40]=', needle.slice(0, 40), '→ idx=', idx);
     if (idx === -1) continue;
 
-    // Find which node contains idx and wrap the first text node with a mark
     let targetNode: Text | null = null;
     for (let i = nodes.length - 1; i >= 0; i--) {
       if (offsets[i] <= idx) { targetNode = nodes[i]; break; }
@@ -274,7 +275,7 @@ function highlightRagChunk(chunkText: string): void {
       }, 1000);
     }, 3000);
 
-    return; // found and highlighted
+    return;
   }
 }
 

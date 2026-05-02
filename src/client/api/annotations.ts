@@ -94,3 +94,24 @@ export async function fetchAnnotationSummaries(): Promise<Map<string, Annotation
     return new Map();
   }
 }
+
+export interface QuickComment {
+  id: number;
+  text: string;
+  sortOrder: number;
+}
+
+export async function fetchQuickComments(): Promise<QuickComment[]> {
+  const res = await fetch('/api/quick-comments');
+  if (!res.ok) return [];
+  const data = await res.json() as { items: QuickComment[] };
+  return data.items ?? [];
+}
+
+export async function saveQuickComments(texts: string[]): Promise<void> {
+  await fetch('/api/quick-comments', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items: texts.map((text) => ({ text })) }),
+  });
+}

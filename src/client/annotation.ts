@@ -1086,8 +1086,10 @@ export function initAnnotationElements(): void {
   getElements().quickAddComment?.addEventListener('click', (event) => {
     event.stopPropagation();
     const pending = state.pendingAnnotation;
-    if (!pending || pending.start < 0) {
+    if (!pending) { hideQuickAdd(true); return; }
+    if (pending.start < 0) {
       hideQuickAdd(true);
+      showToast({ message: '无法定位评论位置（公式内无法锚定，请选取公式外的文字）', type: 'warning', duration: 3500 });
       return;
     }
     hideQuickAdd(false);

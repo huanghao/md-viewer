@@ -10,6 +10,7 @@ import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
 import { log } from "./utils.ts";
 import { generateClientHTML } from "./client/html.ts";
+import { serveStatic } from "./static.ts";
 import { broadcastEvent } from "./sse.ts";
 import {
   handleGetFile,
@@ -78,13 +79,47 @@ marked.use(
 
 const app = new Hono();
 
-// 前端页面
+// 前端页面（开发模式：静态文件；生产模式：内联 HTML）
 app.get("/", (c) => {
-  // 设置 no-cache 头，确保浏览器不缓存 HTML
   c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
   c.header('Pragma', 'no-cache');
   c.header('Expires', '0');
+  const html = serveStatic('index.html');
+  if (html) return c.html(html);
   return c.html(generateClientHTML());
+});
+
+// 静态资源（CSS、JS）
+app.get("/client.js", (c) => {
+  const content = serveStatic('client.js');
+  if (!content) return c.notFound();
+  c.header('Content-Type', 'application/javascript');
+  c.header('Cache-Control', 'no-cache');
+  return c.body(content);
+});
+
+app.get("/styles.css", (c) => {
+  const content = serveStatic('styles.css');
+  if (!content) return c.notFound();
+  c.header('Content-Type', 'text/css');
+  c.header('Cache-Control', 'no-cache');
+  return c.body(content);
+});
+
+app.get("/vendor-github-markdown.css", (c) => {
+  const content = serveStatic('vendor-github-markdown.css');
+  if (!content) return c.notFound();
+  c.header('Content-Type', 'text/css');
+  c.header('Cache-Control', 'public, max-age=31536000');
+  return c.body(content);
+});
+
+app.get("/vendor-highlight-github.css", (c) => {
+  const content = serveStatic('vendor-highlight-github.css');
+  if (!content) return c.notFound();
+  c.header('Content-Type', 'text/css');
+  c.header('Cache-Control', 'public, max-age=31536000');
+  return c.body(content);
 });
 
 // 嵌入的静态资源

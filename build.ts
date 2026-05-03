@@ -17,12 +17,22 @@ const buildOptions: esbuild.BuildOptions = {
   loader: { '.css': 'text' },
 };
 
+function copyStaticFiles() {
+  const srcDir = 'src/client';
+  const cssFiles = ['styles.css', 'vendor-github-markdown.css', 'vendor-highlight-github.css'];
+  for (const f of cssFiles) {
+    fs.copyFileSync(path.join(srcDir, f), path.join('dist', f));
+  }
+}
+
 async function build() {
   try {
     // 确保 dist 目录存在
     if (!fs.existsSync('dist')) {
       fs.mkdirSync('dist', { recursive: true });
     }
+
+    copyStaticFiles();
 
     if (watch) {
       const ctx = await esbuild.context(buildOptions);

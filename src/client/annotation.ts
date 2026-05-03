@@ -4,8 +4,6 @@
 
 import { escapeHtml } from './utils/escape';
 import {
-  fetchAnnotations,
-  upsertAnnotationRemote,
   deleteAnnotationRemote,
   updateAnnotationStatusRemote,
   fetchQuickComments,
@@ -38,9 +36,7 @@ import {
   nextAnnotationSerial,
   normalizeThread,
   ensureAnnotationThread,
-  ensureAnnotationThreads,
   ensureAnnotationSerials,
-  replaceAnnotationInState,
   mergeAnnotationStatus,
   getAnnotations,
   getAnnotationCurrentFilePath,
@@ -64,6 +60,12 @@ import {
   applyAnnotations,
   registerRenderingCallbacks,
 } from './annotation-rendering';
+import {
+  persistAnnotation,
+  persistAnnotations,
+  setAnnotations,
+  registerPersistenceCallbacks,
+} from './annotation/persistence';
 import { iconSvg } from './annotation/icons';
 import {
   registerThreadCallbacks,
@@ -91,6 +93,9 @@ export {
   closeAnnotationSidebar,
   toggleAnnotationSidebar,
   applyAnnotations,
+  setAnnotations,
+  persistAnnotation,
+  persistAnnotations,
 };
 
 export async function loadQuickComments(): Promise<void> {
@@ -141,67 +146,6 @@ function onQuickCommentClick(note: string): void {
   savePendingAnnotation(filePath);
 }
 
-function persistAnnotation(filePath: string, annotation: Annotation, errorPrefix = '评论保存失败'): void {
-  void upsertAnnotationRemote(filePath, annotation)
-    .then((saved) => {
-      if (state.currentFilePath !== filePath) return;
-      replaceAnnotationInState(saved);
-      renderAnnotationList(filePath);
-    })
-    .catch((error) => {
-      showError(`${errorPrefix}: ${error?.message || '未知错误'}`, 2600);
-      // 回滚创建时的乐观计数更新
-      adjustAnnotationCount(filePath, -1);
-      import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
-    });
-}
-
-function persistAnnotations(filePath: string, annotations: Annotation[], errorPrefix = '评论保存失败'): void {
-  for (const annotation of annotations) {
-    persistAnnotation(filePath, annotation, errorPrefix);
-  }
-}
-
-export function setAnnotations(filePath: string | null): void {
-  state.currentFilePath = filePath;
-  if (filePath) {
-    state.annotations = [];
-    void hydrateAnnotationsFromRemote(filePath);
-  } else {
-    state.annotations = [];
-  }
-  state.pinnedAnnotationId = null;
-  state.activeAnnotationId = null;
-  state.pendingAnnotation = null;
-  state.pendingAnnotationFilePath = null;
-  hideComposer();
-  hideQuickAdd(true);
-  hidePopover(true);
-  if (filePath) {
-    setSidebarCollapsed(!loadAnnotationPanelOpen());
-  } else {
-    setSidebarCollapsed(true);
-  }
-}
-
-async function hydrateAnnotationsFromRemote(filePath: string): Promise<void> {
-  try {
-    const remote = await fetchAnnotations(filePath);
-    if (!Array.isArray(remote)) return;
-    if (state.currentFilePath !== filePath) return;
-    state.annotations = remote;
-    const threadChanged = ensureAnnotationThreads(state.annotations);
-    const serialChanged = ensureAnnotationSerials(state.annotations);
-    if (threadChanged || serialChanged) {
-      persistAnnotations(filePath, state.annotations);
-    }
-    renderAnnotationList(filePath);
-    applyAnnotations();
-  } catch (error: any) {
-    if (state.currentFilePath !== filePath) return;
-    showError(`评论加载失败: ${error?.message || '未知错误'}`, 2600);
-  }
-}
 
 // ==================== 工具函数 ====================
 
@@ -1067,6 +1011,13 @@ export function handleSelectionForAnnotation(filePath: string | null): void {
 
 // ==================== 初始化 ====================
 export function initAnnotationElements(): void {
+  registerPersistenceCallbacks({
+    applyAnnotations,
+    renderAnnotationList,
+    hideComposer,
+    hideQuickAdd,
+    hidePopover,
+  });
   registerRenderingCallbacks({
     persistAnnotations,
     showPopover,

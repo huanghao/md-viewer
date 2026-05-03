@@ -1,6 +1,6 @@
 # 架构风险分析 2026-05-03（持续更新）
 
-> 上次分析：2026-05-02。本文档随重构进展持续更新。最后更新：2026-05-03。
+> 上次分析：2026-05-02。本文档随重构进展持续更新。最后更新：2026-05-03 晚。
 
 ---
 
@@ -17,7 +17,7 @@
 
 ### ✅ main.ts 3000 行神文件（原高风险）
 
-**现状**：main.ts 从 3158 行降到 **36 行**（-99%）。拆分出的模块：
+**现状**：main.ts 从 3158 行降到 **41 行**（-99%）。拆分出的模块：
 
 | 新模块 | 行数 | 职责 |
 |--------|------|------|
@@ -37,74 +37,85 @@
 
 ### ✅ 循环依赖 init.ts ↔ main.ts（已彻底消除）
 
-提取 `pdf-registry.ts`（共享 registry）、`app-actions.ts`（应用级函数）后，init.ts 不再 import main.ts。`grep "from './main'" src/client/**/*.ts` 返回空。
+提取 `pdf-registry.ts`、`app-actions.ts` 后，init.ts 不再 import main.ts。**0 个模块**依赖 main.ts。
+
+### ✅ css.ts 是 4320 行的 TypeScript 字符串文件（原中风险）
+
+**现状**：CSS 已迁移为真正的 `.css` 文件，开发体验正常：
+- `src/client/styles.css`（4345 行）— 真实 CSS，支持 IDE 变量提示、linter、格式化
+- `src/client/vendor-github-markdown.css`（1125 行）— vendor CSS
+- `src/client/vendor-highlight-github.css`（118 行）— vendor CSS
+- `css.ts`、`vendor-css.ts` 降为 3-4 行 shim（生产/Swift 路径保留）
+
+esbuild 将所有 CSS 打包输出为 `dist/client.css`，与 `dist/client.js` 对称。
+
+### ✅ CSS/JS 全部内联在动态生成 HTML 里（原中风险）
+
+**现状**：开发模式已改为标准静态文件架构：
+- `public/index.html`（343 行）— 真正的 HTML 文件，`<link>` + `<script src>` 引入
+- 服务端 serve `dist/client.js` 和 `dist/client.css` 两个静态文件
+- `html.ts` 仍保留用于生产/Swift App 内联模式（见下方 TODO）
 
 ---
 
-## 当前中高风险（已显著改善）
+## 当前中高风险
 
-### 1. `annotation.ts` 1469 行（从 2183 行降低 33%，内部质量也改善）
+### 1. `annotation.ts` 仍有 1471 行
 
-**annotation 模块分布**（总计 2519 行，9 个文件）：
+已完成多次提取，annotation 模块总计 9 个文件 2521 行：
 
 | 文件 | 行数 | 状态 |
 |------|------|------|
-| `annotation.ts` | 1469 | 主文件：Popover、Composer、CRUD、List 渲染、Init |
+| `annotation.ts` | 1471 | 主文件：Popover、Composer、CRUD、List 渲染、Init |
 | `annotation-state.ts` | 193 | ✅ 类型、state 对象、thread normalization |
 | `annotation-layout.ts` | 153 | ✅ sidebar DOM、宽度/折叠 |
 | `annotation-rendering.ts` | 251 | ✅ applyAnnotations、mark DOM |
 | `annotation/icons.ts` | 12 | ✅ iconSvg 纯函数 |
-| `annotation/thread-manager.ts` | 203 | ✅ appendReply、editThreadItem、deleteThreadItem |
+| `annotation/thread-manager.ts` | 203 | ✅ appendReply、editThreadItem |
 | `annotation/persistence.ts` | 100 | ✅ persistAnnotation、hydrateAnnotationsFromRemote |
 | `annotation/chat-split.ts` | 138 | ✅ enterSplitMode、exitSplitMode |
 
-**内部质量改善（非拆文件）**：
+**内部质量改善**：
 - `afterAnnotationWrite` / `afterAnnotationWritePdf`：消除 7 处重复收尾代码
-- `renderAnnotationList` 事件委托：从每次 render 重绑定 5 个循环，改为 `initAnnotationElements` 里注册一次的 3 个委托（click/keydown/input）
+- `renderAnnotationList` 事件委托：从每次重绑定改为 initAnnotationElements 里注册一次
 
-**剩余 1469 行的评估**：`initAnnotationElements`（~400 行 orchestration）、Popover/Composer/CRUD 三块高度互相依赖，继续拆文件收益递减。维持现状，重点转移。
+**结论**：剩余 1471 行（Popover/Composer/CRUD 高度互相依赖），继续拆文件收益递减，暂维持现状。
 
 ---
 
 ## 当前中风险
 
-### 2. `css.ts` 是 4320 行的字符串文件
+### 2. `html.ts` 398 行（生产路径遗留）
 
-整个 UI 样式是一个巨大的 TypeScript 字符串 export，无法用 CSS tooling（linter、变量提示、dead-code 检测）处理。
+开发模式已绕过 `html.ts`（直接 serve `public/index.html`），但生产/Swift App 打包仍走动态生成 HTML 的老路。`html.ts` 内联 CSS（`fs.readFileSync`）和 JS（`embedded-client.ts`）的方式本质上没有改变。
 
-**可行方案**：将 css.ts 拆分为若干 `.css` 文件，用 esbuild 的 `loader: { '.css': 'text' }` 内联，或改用 CSS-in-JS 方案。影响所有 UI，需要专项计划。
-
-**可接受性**：功能正确，只影响开发体验，不影响运行时。
+**建议**：见 TODO.md — Swift App 改用 Bundle Resources + loadFileURL，届时可删掉 `html.ts`、`embedded-client.ts`、`css.ts`、`vendor-css.ts`。
 
 ### 3. `embedded-client.ts` 是 2136 行的压缩 JS 字符串（自动生成）
 
-构建流程分两阶段（bun build → embed-client.ts），压缩后不可读，代码审查不可见，必须手动触发同步。这是 SwiftUI WebView 的必要产物，改动成本高。
+构建流程分两阶段，压缩后不可读，代码审查不可见。是生产/Swift 路径必要产物，等 Swift 集成改造完成后可删。
 
-### 4. 依赖注入模式（initXxx）已系统化但未文档化
+### 4. `handlers.ts` 1022 行（服务端）
 
-全代码库现有 26 个 `initXxx` 函数。已在 AGENTS.md 添加规则，说明何时用 init 注入 vs 直接 import。
+后端路由处理器，多个 API handler 混在一个文件。不影响前端，暂可接受。
 
 ---
 
 ## 当前低风险
 
-### 5. `handlers.ts` 1022 行（服务端）
+### 5. 依赖注入模式（initXxx）已系统化
 
-后端路由处理器，多个 API handler 混在一个文件。不影响前端，暂可接受。
+全代码库 26 个 `initXxx` 函数，使用规则已在 AGENTS.md 记录。
 
 ### 6. `pdf-viewer.ts` 1024 行
 
-PDF 渲染逻辑集中，职责相对单一，可接受。
+职责相对单一（只管 PDF 渲染），可接受。
 
 ### 7. `ui/sidebar-workspace.ts` 866 行 + `ui/sidebar.ts` 855 行
 
-偏大但已完成 data-action 事件委托重构，逻辑清晰，暂不优先。
+已完成 data-action 事件委托重构，逻辑清晰，暂不优先。
 
-### 8. 3 处 `onClickJs` 模板字符串（file-row.ts）
-
-`file-row.ts` 保留了 `opts.onCloseJs` 和 `opts.onClickJs` 两个内联 onclick 注入口，是 data-action 重构未覆盖的角落。功能正常。
-
-### 9. RAG 重型依赖无降级路径
+### 8. RAG 重型依赖无降级路径
 
 `@huggingface/transformers`、`onnxruntime-node` 在某些环境下安装可能失败，无优雅降级机制。
 
@@ -112,29 +123,32 @@ PDF 渲染逻辑集中，职责相对单一，可接受。
 
 ## 总体健康状态
 
-| 维度 | 2026-05-02 | 2026-05-03（最新） |
-|------|-----------|-------------------|
+| 维度 | 2026-05-02（起点） | 2026-05-03（最新） |
+|------|------------------|-------------------|
 | window.* 全局数量 | 40+ | **0** |
-| main.ts 行数 | 3158 | **36** |
+| main.ts 行数 | 3158 | **41** |
 | 循环依赖 | 无 | **无** |
+| css.ts | 4320 行 TS 字符串 | **3 行 shim + 真实 .css 文件** |
+| HTML 架构 | 动态生成、全内联 | **开发：标准静态文件** |
 | 单测通过率 | — | **724/724 (100%)** |
-| 最大单文件 | main.ts 3158 行 | annotation.ts **1469 行** |
-| 高风险项 | 2 | **0**（annotation.ts 已降至可接受水平） |
+| 最大单文件 | main.ts 3158 行 | annotation.ts **1471 行** |
+| 高风险项 | 2 | **0** |
 
 ---
 
 ## 下一步选项
 
-### 选项 A：css.ts 迁移（4320 行字符串 → 真实 CSS）
+### 待处理（有明确路径）
 
-**收益**：解锁 CSS tooling（变量提示、linter、dead-code 检测），彻底改善样式开发体验。
-**成本**：改动面最广，影响所有 UI，需要专项计划评估 esbuild 集成方式。
-**建议**：先做一个小模块的 POC，验证构建流程可行后再全量迁移。
+1. **Swift App 静态文件集成**（见 TODO.md）
+   - 把 `dist/` 放入 Bundle Resources
+   - Swift WebView 改用 loadFileURL
+   - 完成后删除 `html.ts`、`embedded-client.ts`、`css.ts`、`vendor-css.ts`
 
-### 选项 B：annotation.ts 继续拆分（收益递减）
+### 可选改善
 
-剩余的 Popover/Composer/CRUD 三块高度互相依赖，继续拆需要大量 callback 注入，可读性不一定提升。除非有明确的测试需求（单元测试覆盖这些逻辑），否则不建议继续。
+2. **annotation.ts 继续拆分**（收益递减）
+   - 剩余 Popover/Composer/CRUD 耦合度高，不建议继续，除非有具体测试需求
 
-### 选项 C：功能开发
-
-架构健康度已显著提升，切换到产品功能开发。
+3. **功能开发**
+   - 架构健康度已显著提升，适合切换到产品功能

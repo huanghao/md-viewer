@@ -26,6 +26,7 @@ function queryAnnotationElements() {
     quickAddComment: document.getElementById('quickAddComment') as HTMLButtonElement | null,
     quickAddTodo: document.getElementById('quickAddTodo') as HTMLButtonElement | null,
     popover: document.getElementById('annotationPopover'),
+    popoverHeader: document.getElementById('annotationPopoverHeader'),
     popoverTitle: document.getElementById('popoverTitle'),
     popoverNote: document.getElementById('popoverNote'),
     popoverResolveBtn: document.getElementById('popoverResolveBtn') as HTMLButtonElement | null,

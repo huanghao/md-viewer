@@ -359,7 +359,7 @@ export function generateClientHTML(): string {
 
   <!-- 评论查看浮窗 -->
   <div id="annotationPopover" class="annotation-popover hidden">
-    <div class="annotation-popover-header">
+    <div class="annotation-popover-header" id="annotationPopoverHeader">
       <div class="annotation-row-top">
         <div id="popoverTitle" class="annotation-row-title">#0</div>
         <div class="annotation-row-actions">

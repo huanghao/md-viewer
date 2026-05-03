@@ -3280,10 +3280,17 @@ export const styles = `
     .annotation-composer-header,
     .annotation-popover-header {
       margin-bottom: 8px;
-    }
-    .annotation-composer-header {
-      cursor: move;
+      cursor: grab;
       user-select: none;
+    }
+    .annotation-composer-header:active,
+    .annotation-popover-header:active {
+      cursor: grabbing;
+    }
+    .annotation-composer.is-dragging,
+    .annotation-popover.is-dragging {
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28);
+      opacity: 0.96;
     }
     .annotation-composer .annotation-composer-input {
       margin-top: 0;

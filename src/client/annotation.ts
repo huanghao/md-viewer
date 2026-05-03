@@ -1414,28 +1414,39 @@ export function initAnnotationElements(): void {
     }
   });
 
-  getElements().composerHeader?.addEventListener('mousedown', (event) => {
-    if ((event.target as HTMLElement).closest('.annotation-row-actions')) return;
-    const composer = getElements().composer;
-    if (!composer) return;
-    const rect = composer.getBoundingClientRect();
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const baseLeft = rect.left;
-    const baseTop = rect.top;
-    event.preventDefault();
-    const onMove = (moveEvent: MouseEvent) => {
-      const nextLeft = baseLeft + (moveEvent.clientX - startX);
-      const nextTop = baseTop + (moveEvent.clientY - startY);
-      placeFloating(composer, nextLeft, nextTop);
-    };
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  });
+  // 通用拖拽逻辑，供 composer 和 popover 复用
+  function makeDraggable(header: HTMLElement, panel: HTMLElement): void {
+    header.addEventListener('mousedown', (event) => {
+      if ((event.target as HTMLElement).closest('button, .annotation-row-actions')) return;
+      const rect = panel.getBoundingClientRect();
+      const startX = event.clientX;
+      const startY = event.clientY;
+      const baseLeft = rect.left;
+      const baseTop = rect.top;
+      event.preventDefault(); // 阻止 mousedown 导致 textarea 失焦
+
+      panel.classList.add('is-dragging');
+      header.style.cursor = 'grabbing';
+
+      const onMove = (moveEvent: MouseEvent) => {
+        const nextLeft = baseLeft + (moveEvent.clientX - startX);
+        const nextTop = baseTop + (moveEvent.clientY - startY);
+        placeFloating(panel, nextLeft, nextTop);
+      };
+      const onUp = () => {
+        panel.classList.remove('is-dragging');
+        header.style.cursor = '';
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+      };
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    });
+  }
+
+  const el = getElements();
+  if (el.composerHeader && el.composer) makeDraggable(el.composerHeader, el.composer);
+  if (el.popoverHeader && el.popover) makeDraggable(el.popoverHeader, el.popover);
 
   loadQuickComments();
 }

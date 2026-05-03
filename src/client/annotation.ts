@@ -31,10 +31,6 @@ import {
   type Annotation,
   type AnnotationThreadItem,
   type AnnotationFilter,
-  ANNOTATION_WIDTH_KEY,
-  ANNOTATION_WIDTH_DEFAULT,
-  ANNOTATION_WIDTH_MIN,
-  ANNOTATION_WIDTH_MAX,
   state,
   _lastQuickAddX,
   _lastQuickAddY,
@@ -52,6 +48,21 @@ import {
   getAnnotations,
   getAnnotationCurrentFilePath,
 } from './annotation-state';
+import {
+  getElements,
+  invalidateAnnotationElementsCache,
+  registerCollapseCallback,
+  setSidebarCollapsed,
+  loadAnnotationPanelOpen,
+  persistCurrentFilePanelOpen,
+  setAnnotationSidebarWidth,
+  initAnnotationSidebarWidth,
+  syncAnnotationSidebarLayout,
+  syncAnnotationScrollWithContent,
+  openAnnotationSidebar,
+  closeAnnotationSidebar,
+  toggleAnnotationSidebar,
+} from './annotation-layout';
 
 export type { Annotation, AnnotationThreadItem };
 export {
@@ -61,9 +72,12 @@ export {
   mergeAnnotationStatus,
   getAnnotations,
   getAnnotationCurrentFilePath,
+  invalidateAnnotationElementsCache,
+  syncAnnotationSidebarLayout,
+  openAnnotationSidebar,
+  closeAnnotationSidebar,
+  toggleAnnotationSidebar,
 };
-
-const ANNOTATION_PANEL_OPEN_KEY = 'md-viewer:annotation-panel-open';
 
 export async function loadQuickComments(): Promise<void> {
   const items = await fetchQuickComments();
@@ -175,45 +189,6 @@ async function hydrateAnnotationsFromRemote(filePath: string): Promise<void> {
   }
 }
 
-// ==================== DOM 元素引用 ====================
-function queryAnnotationElements() {
-  return {
-    sidebar: document.getElementById('annotationSidebar'),
-    sidebarResizer: document.getElementById('annotationSidebarResizer'),
-    reader: document.getElementById('reader'),
-    content: document.getElementById('content'),
-    composer: document.getElementById('annotationComposer'),
-    composerHeader: document.getElementById('annotationComposerHeader'),
-    composerNote: document.getElementById('composerNote') as HTMLTextAreaElement | null,
-    quickAddWrap: document.getElementById('annotationQuickAddWrap') as HTMLElement | null,
-    quickAddComment: document.getElementById('quickAddComment') as HTMLButtonElement | null,
-    quickAddTodo: document.getElementById('quickAddTodo') as HTMLButtonElement | null,
-    popover: document.getElementById('annotationPopover'),
-    popoverTitle: document.getElementById('popoverTitle'),
-    popoverNote: document.getElementById('popoverNote'),
-    popoverResolveBtn: document.getElementById('popoverResolveBtn') as HTMLButtonElement | null,
-    popoverPrevBtn: document.getElementById('popoverPrevBtn') as HTMLButtonElement | null,
-    popoverNextBtn: document.getElementById('popoverNextBtn') as HTMLButtonElement | null,
-    annotationList: document.getElementById('annotationList'),
-    filterMenu: document.getElementById('annotationFilterMenu'),
-    filterToggle: document.getElementById('annotationFilterToggle'),
-    densityToggle: document.getElementById('annotationDensityToggle'),
-    closeToggle: document.getElementById('annotationSidebarClose'),
-    floatingOpenBtn: document.getElementById('annotationFloatingOpenBtn'),
-  };
-}
-
-type AnnotationElements = ReturnType<typeof queryAnnotationElements>;
-let _cachedElements: AnnotationElements | null = null;
-
-function getElements(): AnnotationElements {
-  return _cachedElements ??= queryAnnotationElements();
-}
-
-export function invalidateAnnotationElementsCache(): void {
-  _cachedElements = null;
-}
-
 // ==================== 工具函数 ====================
 
 function getActiveAnnotationFilePath(): string | null {
@@ -263,78 +238,6 @@ function updateAnnotationCount(): void {
   const count = getVisibleAnnotationsUtil(state.annotations, state.filter).length;
   const tabCount = document.getElementById('annotationTabCount');
   if (tabCount) tabCount.textContent = count > 0 ? `(${count})` : '';
-}
-
-function setSidebarCollapsed(collapsed: boolean): void {
-  const el = getElements();
-  if (!el.sidebar) return;
-  el.sidebar.classList.toggle('collapsed', collapsed);
-  document.body.classList.toggle('annotation-sidebar-collapsed', collapsed);
-  if (collapsed) {
-    el.filterMenu?.classList.add('hidden');
-    hideQuickAdd(true);
-    hidePopover(true);
-  }
-}
-
-function loadAnnotationPanelOpen(): boolean {
-  // Default: closed (only open if explicitly saved as '1')
-  return storageGet<string>(ANNOTATION_PANEL_OPEN_KEY, '0') === '1';
-}
-
-function persistCurrentFilePanelOpen(opened: boolean): void {
-  storageSet(ANNOTATION_PANEL_OPEN_KEY, opened ? '1' : '0');
-}
-
-function clampSidebarWidth(width: number): number {
-  return Math.max(ANNOTATION_WIDTH_MIN, Math.min(ANNOTATION_WIDTH_MAX, Math.round(width)));
-}
-
-function setAnnotationSidebarWidth(width: number): void {
-  const clamped = clampSidebarWidth(width);
-  document.documentElement.style.setProperty('--annotation-sidebar-width', `${clamped}px`);
-  storageSet(ANNOTATION_WIDTH_KEY, clamped);
-}
-
-function initAnnotationSidebarWidth(): void {
-  const width = storageGetNumber(ANNOTATION_WIDTH_KEY, ANNOTATION_WIDTH_DEFAULT);
-  setAnnotationSidebarWidth(width > 0 ? width : ANNOTATION_WIDTH_DEFAULT);
-}
-
-export function syncAnnotationSidebarLayout(): void {
-  const el = getElements();
-  if (!el.sidebar) return;
-  const tabs = document.getElementById('tabs');
-  const topOffset = Math.max(0, Math.round((tabs?.getBoundingClientRect().bottom || 84)));
-  const height = Math.max(0, window.innerHeight - topOffset);
-  el.sidebar.style.top = `${topOffset}px`;
-  el.sidebar.style.height = `${height}px`;
-  if (el.sidebarResizer) {
-    el.sidebarResizer.style.top = `${topOffset}px`;
-    el.sidebarResizer.style.height = `${height}px`;
-  }
-  if (el.floatingOpenBtn) {
-    el.floatingOpenBtn.style.top = `${topOffset + 6}px`;
-  }
-}
-
-export function openAnnotationSidebar(): void {
-  setSidebarCollapsed(false);
-  persistCurrentFilePanelOpen(true);
-  syncAnnotationSidebarLayout();
-  syncAnnotationScrollWithContent();
-  import('./ui/todo-panel').then(m => m.updateTodoTabCount());
-}
-
-export function closeAnnotationSidebar(): void {
-  setSidebarCollapsed(true);
-  persistCurrentFilePanelOpen(false);
-}
-
-export function toggleAnnotationSidebar(): void {
-  const sidebar = getElements().sidebar;
-  if (!sidebar) return;
-  setSidebarCollapsed(!sidebar.classList.contains('collapsed'));
 }
 
 // ==================== Tab ====================
@@ -1008,14 +911,6 @@ function getAnnotationAnchorTopById(id: string): number | null {
   return content.scrollTop + (markRect.top - contentRect.top);
 }
 
-function syncAnnotationScrollWithContent(): void {
-  if (state.density !== 'default') return;
-  const content = document.getElementById('content');
-  const list = document.getElementById('annotationList');
-  if (!content || !list) return;
-  list.scrollTop = content.scrollTop;
-}
-
 function toggleResolved(id: string, filePath: string): void {
   const ann = state.annotations.find((item) => item.id === id);
   if (!ann) return;
@@ -1537,7 +1432,11 @@ export function handleSelectionForAnnotation(filePath: string | null): void {
 
 // ==================== 初始化 ====================
 export function initAnnotationElements(): void {
-  _cachedElements = null;
+  invalidateAnnotationElementsCache();
+  registerCollapseCallback(() => {
+    hideQuickAdd(true);
+    hidePopover(true);
+  });
   initAnnotationSidebarWidth();
   setSidebarCollapsed(true);
 

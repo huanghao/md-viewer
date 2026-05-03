@@ -2845,8 +2845,12 @@
       border-left-color: #b99a55;
     }
     .annotation-item.status-unanchored {
-      border-left-color: #9a7b4f;
+      opacity: 0.65;
     }
+    .annotation-item.status-unanchored:hover {
+      opacity: 0.9;
+    }
+
     .annotation-item.is-resolved {
       opacity: 0.55;
       border-left-color: var(--color-text-muted);
@@ -3150,7 +3154,9 @@
       position: relative;
     }
     .annotation-list:not(.default-mode) .annotation-item.status-exact,
-    .annotation-list:not(.default-mode) .annotation-item.status-reanchored,
+    .annotation-list:not(.default-mode) .annotation-item.status-reanchored {
+      border-left-color: var(--color-border);
+    }
     .annotation-list:not(.default-mode) .annotation-item.status-unanchored {
       border-left-color: var(--color-border);
     }

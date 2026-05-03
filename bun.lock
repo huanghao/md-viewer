@@ -10,7 +10,6 @@
         "@mariozechner/pi-ai": "^0.69.0",
         "@mariozechner/pi-coding-agent": "^0.70.2",
         "chokidar": "^5.0.0",
-        "fuzzysort": "^3.1.0",
         "highlight.js": "^11.9.0",
         "hono": "^3.12.8",
         "marked": "^11.1.1",
@@ -512,8 +511,6 @@
     "formdata-polyfill": ["formdata-polyfill@4.0.10", "https://mirrors.cloud.tencent.com/npm/formdata-polyfill/-/formdata-polyfill-4.0.10.tgz", { "dependencies": { "fetch-blob": "^3.1.2" } }, "sha512-buewHzMvYL29jdeQTVILecSaZKnt/RJWjoZCF5OW60Z67/GmSLBkOFM7qh1PI3zFNtJbaZL5eQu1vLfazOwj4g=="],
 
     "fsevents": ["fsevents@2.3.3", "https://mirrors.cloud.tencent.com/npm/fsevents/-/fsevents-2.3.3.tgz", { "os": "darwin" }, "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw=="],
-
-    "fuzzysort": ["fuzzysort@3.1.0", "", {}, "sha512-sR9BNCjBg6LNgwvxlBd0sBABvQitkLzoVY9MYYROQVX/FvfJ4Mai9LsGhDgd8qYdds0bY77VzYd5iuB+v5rwQQ=="],
 
     "gaxios": ["gaxios@7.1.4", "https://mirrors.cloud.tencent.com/npm/gaxios/-/gaxios-7.1.4.tgz", { "dependencies": { "extend": "^3.0.2", "https-proxy-agent": "^7.0.1", "node-fetch": "^3.3.2" } }, "sha512-bTIgTsM2bWn3XklZISBTQX7ZSddGW+IO3bMdGaemHZ3tbqExMENHLx6kKZ/KlejgrMtj8q7wBItt51yegqalrA=="],
 

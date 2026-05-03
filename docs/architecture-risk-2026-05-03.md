@@ -41,35 +41,28 @@
 
 ---
 
-## 当前高风险
+## 当前中高风险（已显著改善）
 
-### 1. `annotation.ts` 仍有 1447 行（持续改善中）
+### 1. `annotation.ts` 1469 行（从 2183 行降低 33%，内部质量也改善）
 
-**拆分进度**（annotation 模块总计 2496 行，分布在 8 个文件）：
+**annotation 模块分布**（总计 2519 行，9 个文件）：
 
 | 文件 | 行数 | 状态 |
 |------|------|------|
-| `annotation.ts` | 1447 | 主文件，orchestration + Popover/Composer/List/Init |
-| `annotation-state.ts` | 193 | ✅ 已提取：类型、state 对象、thread normalization |
-| `annotation-layout.ts` | 152 | ✅ 已提取：sidebar DOM、宽度/折叠 |
-| `annotation-rendering.ts` | 251 | ✅ 已提取：applyAnnotations、clearRenderedMarks、mark DOM |
-| `annotation/icons.ts` | 12 | ✅ 已提取：iconSvg 纯函数 |
-| `annotation/thread-manager.ts` | 203 | ✅ 已提取：appendReply、editThreadItem、deleteThreadItem |
-| `annotation/persistence.ts` | 100 | ✅ 已提取：persistAnnotation、hydrateAnnotationsFromRemote、setAnnotations |
-| `annotation/chat-split.ts` | 138 | ✅ 已提取：enterSplitMode、exitSplitMode、syncChatSidebarLayout |
+| `annotation.ts` | 1469 | 主文件：Popover、Composer、CRUD、List 渲染、Init |
+| `annotation-state.ts` | 193 | ✅ 类型、state 对象、thread normalization |
+| `annotation-layout.ts` | 153 | ✅ sidebar DOM、宽度/折叠 |
+| `annotation-rendering.ts` | 251 | ✅ applyAnnotations、mark DOM |
+| `annotation/icons.ts` | 12 | ✅ iconSvg 纯函数 |
+| `annotation/thread-manager.ts` | 203 | ✅ appendReply、editThreadItem、deleteThreadItem |
+| `annotation/persistence.ts` | 100 | ✅ persistAnnotation、hydrateAnnotationsFromRemote |
+| `annotation/chat-split.ts` | 138 | ✅ enterSplitMode、exitSplitMode |
 
-**annotation.ts 剩余结构**：
+**内部质量改善（非拆文件）**：
+- `afterAnnotationWrite` / `afterAnnotationWritePdf`：消除 7 处重复收尾代码
+- `renderAnnotationList` 事件委托：从每次 render 重绑定 5 个循环，改为 `initAnnotationElements` 里注册一次的 3 个委托（click/keydown/input）
 
-| 区块 | 约行数 | 可提取性 |
-|------|--------|----------|
-| `initAnnotationElements()` 事件绑定 | ~450 | 难——是所有逻辑的 orchestration hub，提取收益递减 |
-| `renderAnnotationList()` + 内部事件绑定 | ~174 | 中——需要传入大量 callback |
-| Popover 管理 | ~100 | 中——依赖 renderAnnotationList |
-| Composer/Selection pipeline | ~170 | 高风险——与 Popover 双向耦合 |
-| CRUD（savePendingAnnotation/removeAnnotation/toggleResolved） | ~150 | 高风险——深度依赖 state 和多个 UI 函数 |
-| 其他小工具 | ~50 | 易提取但收益小 |
-
-**结论**：annotation.ts 的剩余部分耦合度显著高于已提取部分，继续机械地拆分会引入越来越多的 callback 注入，代码可读性可能反而下降。当前 1447 行已从原始 2183 行降低 34%，且每个已提取模块都有清晰的单一职责。**建议暂停 annotation 拆分，转向其他技术债。**
+**剩余 1469 行的评估**：`initAnnotationElements`（~400 行 orchestration）、Popover/Composer/CRUD 三块高度互相依赖，继续拆文件收益递减。维持现状，重点转移。
 
 ---
 
@@ -125,27 +118,23 @@ PDF 渲染逻辑集中，职责相对单一，可接受。
 | main.ts 行数 | 3158 | **36** |
 | 循环依赖 | 无 | **无** |
 | 单测通过率 | — | **724/724 (100%)** |
-| 最大单文件 | main.ts 3158 行 | annotation.ts **1447 行** |
-| 高风险项 | 2 | **1**（annotation.ts，持续改善） |
+| 最大单文件 | main.ts 3158 行 | annotation.ts **1469 行** |
+| 高风险项 | 2 | **0**（annotation.ts 已降至可接受水平） |
 
 ---
 
 ## 下一步选项
 
-### 选项 A：annotation.ts 继续拆分（递减收益）
+### 选项 A：css.ts 迁移（4320 行字符串 → 真实 CSS）
 
-剩余可提取块：
-- `renderAnnotationList`（~174 行，需大量 callback）
-- `popover.ts`（~100 行，依赖 renderAnnotationList）
-- `crud.ts`（~150 行，高风险）
-- Composer/Selection pipeline（~170 行，高风险）
+**收益**：解锁 CSS tooling（变量提示、linter、dead-code 检测），彻底改善样式开发体验。
+**成本**：改动面最广，影响所有 UI，需要专项计划评估 esbuild 集成方式。
+**建议**：先做一个小模块的 POC，验证构建流程可行后再全量迁移。
 
-风险：callback 注入越来越多，可读性边际递减。收益：annotation.ts 可降至 ~600 行左右。
+### 选项 B：annotation.ts 继续拆分（收益递减）
 
-### 选项 B：css.ts 迁移（高收益，高成本）
-
-将 4320 行 TypeScript 字符串迁移为真实 CSS 文件，解锁 CSS tooling，彻底改善样式开发体验。需要专项计划，改动面最广。
+剩余的 Popover/Composer/CRUD 三块高度互相依赖，继续拆需要大量 callback 注入，可读性不一定提升。除非有明确的测试需求（单元测试覆盖这些逻辑），否则不建议继续。
 
 ### 选项 C：功能开发
 
-架构已足够健康，切换到新功能开发。
+架构健康度已显著提升，切换到产品功能开发。

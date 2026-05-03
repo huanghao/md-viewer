@@ -124,7 +124,7 @@ async function syncOpenFilesAfterReconnect() {
     // 如果当前文件有更新且未在 diff 模式，给用户提示
     const currentFile = state.currentFile ? state.sessionFiles.get(state.currentFile) : null;
     if (currentFile && currentFile.pendingContent !== undefined && !getDiffViewActive()) {
-      showInfo('文件有更新，点击 Diff 查看差异', 3000);
+      showInfo('文件有更新，点击 Diff 查看差异');
     }
   }
 }

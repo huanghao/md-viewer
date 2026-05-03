@@ -151,7 +151,7 @@ export async function refreshCurrentFile(): Promise<void> {
 export async function refreshFile(path: string): Promise<void> {
   const updated = await syncFileFromDisk(path, { silent: false, highlight: true });
   if (updated && state.currentFile === path) {
-    showSuccess('文件已刷新', 2000);
+    showSuccess('文件已刷新');
   }
 }
 

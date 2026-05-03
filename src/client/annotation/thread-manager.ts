@@ -82,7 +82,7 @@ export function appendReply(annotationId: string, filePath: string, text: string
       _applyAnnotations();
     })
     .catch((error) => {
-      showError(`回复评论失败: ${error?.message || '未知错误'}`, 2600);
+      showError(`回复评论失败: ${error?.message || '未知错误'}`);
     });
 }
 

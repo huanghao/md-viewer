@@ -343,7 +343,7 @@ async function confirmAddWorkspaceDialog(): Promise<void> {
     const { renderSidebar } = await import('./sidebar');
     renderSidebar();
     closeAddWorkspaceDialog();
-    showSuccess(`已添加工作区: ${workspace.name}`, 2000);
+    showSuccess(`已添加工作区: ${workspace.name}`);
   } catch (error: any) {
     console.error('添加工作区失败:', error);
     showError(`添加工作区失败: ${error?.message || '未知错误'}`);
@@ -693,7 +693,7 @@ async function handleConfirmRemoveWorkspace(workspaceId: string): Promise<void> 
 
   const { renderSidebar } = await import('./sidebar');
   renderSidebar();
-  showSuccess(`已移除工作区: ${workspace.name}`, 2000);
+  showSuccess(`已移除工作区: ${workspace.name}`);
 }
 
 async function handleNodeClick(workspaceId: string, nodePath: string): Promise<void> {
@@ -732,7 +732,7 @@ async function handleRetryMissingFile(filePath: string): Promise<void> {
   addOrUpdateFile(fileData, state.currentFile === filePath);
   const main = await import('../main');
   (main as any).renderAll();
-  showSuccess('文件已重新加载', 2000);
+  showSuccess('文件已重新加载');
 }
 
 async function handleMoveWorkspaceUp(workspaceId: string): Promise<void> {

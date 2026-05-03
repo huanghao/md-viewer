@@ -156,7 +156,7 @@ async function executePendingAddAction(): Promise<void> {
 
   const workspace = addWorkspace(getWorkspaceNameFromPath(pendingAddAction.path), pendingAddAction.path);
   renderSidebar();
-  showSuccess(`已添加工作区: ${workspace.name}`, 2000);
+  showSuccess(`已添加工作区: ${workspace.name}`);
   setSearchQuery('');
   renderSidebar();
 }
@@ -334,7 +334,7 @@ export async function searchFilesHandler(rawQuery?: string) {
       // 显示搜索结果（简单实现：添加第一个）
       await addFileByPath(data.files[0].path);
     } else {
-      showInfo('没有找到匹配的文件', 3000);
+      showInfo('没有找到匹配的文件');
     }
   } catch (err: any) {
     showError('搜索失败: ' + err.message);

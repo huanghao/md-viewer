@@ -447,7 +447,7 @@ export async function showNearbyMenu(e: Event) {
   try {
     const data = await getNearbyFiles(state.currentFile);
     if (!data.files || data.files.length === 0) {
-      showInfo('附近没有其他 Markdown 文件', 3000);
+      showInfo('附近没有其他 Markdown 文件');
       return;
     }
 

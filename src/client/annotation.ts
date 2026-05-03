@@ -592,7 +592,7 @@ export function removeAnnotation(id: string, filePath: string): void {
         adjustAnnotationCount(filePath, +1);
         import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
       }
-      showError(`删除评论失败: ${error?.message || '未知错误'}`, 2600);
+      showError(`删除评论失败: ${error?.message || '未知错误'}`);
       afterAnnotationWrite(filePath, isPdf);
     });
   };
@@ -609,7 +609,7 @@ export function removeAnnotation(id: string, filePath: string): void {
   if (loadConfig().optimisticUndo !== false) {
     const label = `已删除评论${removed?.serial ? ` #${removed.serial}` : ''}`;
     enqueueOp(doDelete, doUndo, label, (msg, cancel) => {
-      showToast({ message: msg, type: 'info', duration: 4000, action: { label: '撤销', onClick: cancel } });
+      showToast({ message: msg, type: 'info', duration: 5000, action: { label: '撤销', onClick: cancel } });
     });
   } else {
     doDelete();
@@ -717,7 +717,7 @@ function toggleResolved(id: string, filePath: string): void {
       } else if (previousStatus === 'resolved' && isOpen(nextStatus as AnnotationStatus)) {
         adjustAnnotationCount(filePath, -1);
       }
-      showError(`更新评论状态失败: ${error?.message || '未知错误'}`, 2600);
+      showError(`更新评论状态失败: ${error?.message || '未知错误'}`);
       afterAnnotationWritePdf(filePath, isPdf);
       import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
     });
@@ -737,7 +737,7 @@ function toggleResolved(id: string, filePath: string): void {
   if (loadConfig().optimisticUndo !== false && nextStatus === 'resolved') {
     const serial = ann.serial ? ` #${ann.serial}` : '';
     enqueueOp(doUpdate, doUndo, `已解决评论${serial}`, (msg, cancel) => {
-      showToast({ message: msg, type: 'info', duration: 4000, action: { label: '撤销', onClick: cancel } });
+      showToast({ message: msg, type: 'info', duration: 5000, action: { label: '撤销', onClick: cancel } });
     });
   } else {
     doUpdate();

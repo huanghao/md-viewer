@@ -28,6 +28,8 @@ export function showToast(options: ToastOptions | string) {
   const config: ToastOptions = typeof options === 'string'
     ? { message: options, type: 'info', duration: 3000 }
     : { type: 'info', duration: 3000, ...options };
+  // Ensure duration is always a valid number (guard against undefined spread)
+  if (!config.duration || config.duration <= 0) config.duration = 3000;
 
   initToastContainer();
 
@@ -106,19 +108,19 @@ function hideToast(toast: HTMLElement) {
   }, 300); // 动画时长
 }
 
-// 便捷方法
-export function showSuccess(message: string, duration?: number) {
+// 便捷方法 — 统一默认 3000ms，调用方无需再传 duration
+export function showSuccess(message: string, duration = 3000) {
   return showToast({ message, type: 'success', duration });
 }
 
-export function showError(message: string, duration?: number) {
+export function showError(message: string, duration = 3000) {
   return showToast({ message, type: 'error', duration });
 }
 
-export function showWarning(message: string, duration?: number) {
+export function showWarning(message: string, duration = 3000) {
   return showToast({ message, type: 'warning', duration });
 }
 
-export function showInfo(message: string, duration?: number) {
+export function showInfo(message: string, duration = 3000) {
   return showToast({ message, type: 'info', duration });
 }

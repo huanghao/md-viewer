@@ -45,7 +45,7 @@ export function persistAnnotation(filePath: string, annotation: Annotation, erro
       _renderAnnotationList(filePath);
     })
     .catch((error) => {
-      showError(`${errorPrefix}: ${error?.message || '未知错误'}`, 2600);
+      showError(`${errorPrefix}: ${error?.message || '未知错误'}`);
       // 回滚创建时的乐观计数更新
       adjustAnnotationCount(filePath, -1);
       import('../ui/sidebar').then(({ renderSidebar }) => renderSidebar());
@@ -73,7 +73,7 @@ export async function hydrateAnnotationsFromRemote(filePath: string): Promise<vo
     _applyAnnotations();
   } catch (error: any) {
     if (state.currentFilePath !== filePath) return;
-    showError(`评论加载失败: ${error?.message || '未知错误'}`, 2600);
+    showError(`评论加载失败: ${error?.message || '未知错误'}`);
   }
 }
 

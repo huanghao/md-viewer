@@ -1,6 +1,11 @@
 // main.ts — entry point. All logic lives in focused modules; this file re-exports
 // the public API and triggers the app init side-effect.
 
+// CSS entry points — esbuild extracts these into dist/client.css
+import './vendor-github-markdown.css';
+import './vendor-highlight-github.css';
+import './styles.css';
+
 export { applyTheme, renderAll, scrollContentToTop } from './app-actions';
 export { pdfViewerRegistry, currentPdfBridgeRef, PDF_IDLE_TIMEOUT_MS, PDF_MODE_KEY } from './pdf-registry';
 export {

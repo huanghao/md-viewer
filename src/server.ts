@@ -98,27 +98,11 @@ app.get("/client.js", (c) => {
   return c.body(content);
 });
 
-app.get("/styles.css", (c) => {
-  const content = serveStatic('styles.css');
+app.get("/client.css", (c) => {
+  const content = serveStatic('client.css');
   if (!content) return c.notFound();
   c.header('Content-Type', 'text/css');
   c.header('Cache-Control', 'no-cache');
-  return c.body(content);
-});
-
-app.get("/vendor-github-markdown.css", (c) => {
-  const content = serveStatic('vendor-github-markdown.css');
-  if (!content) return c.notFound();
-  c.header('Content-Type', 'text/css');
-  c.header('Cache-Control', 'public, max-age=31536000');
-  return c.body(content);
-});
-
-app.get("/vendor-highlight-github.css", (c) => {
-  const content = serveStatic('vendor-highlight-github.css');
-  if (!content) return c.notFound();
-  c.header('Content-Type', 'text/css');
-  c.header('Cache-Control', 'public, max-age=31536000');
   return c.body(content);
 });
 

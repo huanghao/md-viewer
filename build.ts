@@ -14,16 +14,7 @@ const buildOptions: esbuild.BuildOptions = {
   format: 'iife',
   sourcemap: true,
   minify: !watch,
-  loader: { '.css': 'text' },
 };
-
-function copyStaticFiles() {
-  const srcDir = 'src/client';
-  const cssFiles = ['styles.css', 'vendor-github-markdown.css', 'vendor-highlight-github.css'];
-  for (const f of cssFiles) {
-    fs.copyFileSync(path.join(srcDir, f), path.join('dist', f));
-  }
-}
 
 async function build() {
   try {
@@ -31,8 +22,6 @@ async function build() {
     if (!fs.existsSync('dist')) {
       fs.mkdirSync('dist', { recursive: true });
     }
-
-    copyStaticFiles();
 
     if (watch) {
       const ctx = await esbuild.context(buildOptions);

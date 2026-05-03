@@ -177,15 +177,6 @@ function renderAppearanceTab(): string {
       </div>
     </div>
     <div class="settings-group">
-      <div class="settings-group-title">最近视图</div>
-      <div class="settings-section-desc">「最近」视图的文件排序策略。</div>
-      <div class="settings-row">
-        <label class="settings-label">排序策略</label>
-        <select id="focusStrategySelect" class="settings-select">
-          <option value="frecency"${(state.config.focusStrategy ?? 'frecency') === 'frecency' ? ' selected' : ''}>频率衰减（Frecency）— 综合打开次数和时间衰减</option>
-          <option value="mtime"${state.config.focusStrategy === 'mtime' ? ' selected' : ''}>修改时间 — 按文件最近修改时间筛选</option>
-        </select>
-      </div>
     </div>
     <div class="settings-group">
       <div class="settings-group-title">评论</div>
@@ -252,7 +243,6 @@ async function saveAndClose(): Promise<void> {
   if (mdSelect) state.config.markdownTheme = mdSelect.value;
   if (codeSelect) state.config.codeTheme = codeSelect.value;
   if (mathCheck) state.config.mathInline = mathCheck.checked;
-  if (focusSelect) state.config.focusStrategy = focusSelect.value as 'frecency' | 'mtime';
   if (pollSelect) state.config.workspacePollInterval = Number(pollSelect.value);
   if (undoCheck) state.config.optimisticUndo = undoCheck.checked;
 

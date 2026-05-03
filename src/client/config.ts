@@ -8,7 +8,7 @@ export const defaultConfig: AppConfig = {
   sidebarTab: 'focus',
   focusWindowKey: '8h',
   focusActiveTypes: ['md', 'pdf'],
-  focusStrategy: 'mtime', // 'mtime' = 写（按文件修改时间），'open' = 读（按最近打开时间）
+  focusStrategies: ['mtime'], // 多选：'mtime'（写）、'open'（读），默认只选写
   markdownTheme: 'github',
   codeTheme: 'github',
   mathInline: true,

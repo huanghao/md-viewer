@@ -163,8 +163,21 @@ function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>, query: str
   });
 }
 
-export function setFocusStrategy(strategy: 'mtime' | 'open'): void {
-  state.config.focusStrategy = strategy;
+function getActiveStrategies(): Set<string> {
+  const s = state.config.focusStrategies;
+  if (!Array.isArray(s) || s.length === 0) return new Set(['mtime']);
+  return new Set(s);
+}
+
+export function toggleFocusStrategy(strategy: string): void {
+  const active = getActiveStrategies();
+  if (active.has(strategy)) {
+    if (active.size <= 1) return; // 至少保留一个
+    active.delete(strategy);
+  } else {
+    active.add(strategy);
+  }
+  state.config.focusStrategies = [...active];
   saveConfig(state.config);
   import('./sidebar').then(({ renderSidebar }) => renderSidebar());
 }
@@ -184,7 +197,7 @@ export function closeFilterPopup(): void {
 
 function renderFilterBar(): string {
   const currentWindow = state.config.focusWindowKey || '8h';
-  const currentStrategy = state.config.focusStrategy ?? 'mtime';
+  const activeStrategies = getActiveStrategies();
   const activeTypes = getActiveTypes();
   const typeOptions: Array<{ ext: string; label: string }> = [
     { ext: 'md', label: 'MD' },
@@ -197,11 +210,13 @@ function renderFilterBar(): string {
     { key: '1d', label: '1d' },
     { key: '2d', label: '2d' },
   ];
-  const strategyLabel = currentStrategy === 'open' ? '读' : '写';
 
   // 当前生效的标签
+  const activeStrategyTags = [
+    activeStrategies.has('mtime') ? '<span class="focus-active-tag">写</span>' : '',
+    activeStrategies.has('open')  ? '<span class="focus-active-tag">读</span>' : '',
+  ].filter(Boolean).join('');
   const activeTimeLabel = `<span class="focus-active-tag">${currentWindow}</span>`;
-  const activeStrategyLabel = `<span class="focus-active-tag">${strategyLabel}</span>`;
   const activeTypeTags = typeOptions
     .filter(o => activeTypes.has(o.ext))
     .map(o => `<span class="focus-active-tag">${o.label}</span>`)
@@ -212,10 +227,10 @@ function renderFilterBar(): string {
     <div class="focus-popup-section">
       <div class="focus-popup-label">排序依据</div>
       <div class="focus-popup-options">
-        <button class="focus-popup-option${currentStrategy === 'mtime' ? ' active' : ''}"
-                data-action="set-focus-strategy" data-key="mtime">写（mtime）</button>
-        <button class="focus-popup-option${currentStrategy === 'open' ? ' active' : ''}"
-                data-action="set-focus-strategy" data-key="open">读（最近打开）</button>
+        <button class="focus-popup-option${activeStrategies.has('mtime') ? ' active' : ''}"
+                data-action="toggle-focus-strategy" data-key="mtime">写（mtime）</button>
+        <button class="focus-popup-option${activeStrategies.has('open') ? ' active' : ''}"
+                data-action="toggle-focus-strategy" data-key="open">读（最近打开）</button>
       </div>
     </div>
     <div class="focus-popup-divider"></div>`;
@@ -252,7 +267,7 @@ function renderFilterBar(): string {
 
   return `
     <div class="focus-filter-bar">
-      <div class="focus-active-tags">${activeStrategyLabel}<span class="focus-active-sep"></span>${activeTimeLabel}<span class="focus-active-sep"></span>${activeTypeTags}</div>
+      <div class="focus-active-tags">${activeStrategyTags}<span class="focus-active-sep"></span>${activeTimeLabel}<span class="focus-active-sep"></span>${activeTypeTags}</div>
       <div class="focus-filter-popup-wrap">
         <button class="focus-filter-btn${filterPopupOpen ? ' active' : ''}"
                 data-action="toggle-filter-popup" title="筛选">
@@ -305,7 +320,9 @@ export function renderFocusView(): string {
     return '<div class="focus-empty">暂无工作区</div>';
   }
 
-  const strategy = state.config.focusStrategy ?? 'mtime';
+  const activeStrategies = getActiveStrategies();
+  const useMtime = activeStrategies.has('mtime');
+  const useOpen  = activeStrategies.has('open');
   const windowMs = FOCUS_WINDOW_MS[state.config.focusWindowKey || '8h'] ?? FOCUS_WINDOW_MS['8h'];
   const cutoff = Date.now() - windowMs;
   const pinned = getPinnedFiles();
@@ -313,8 +330,8 @@ export function renderFocusView(): string {
   const collapsed = getFocusCollapsed();
   const activeTypes = getActiveTypes();
 
-  // 读模式：按最近 open/annotate 信号时间排序，只展示有信号的文件
-  const lastOpenMap = strategy === 'open'
+  // 读模式需要 open/annotate 信号
+  const lastOpenMap = useOpen
     ? buildLastOpenMap(signalCache, cutoff)
     : new Map<string, number>();
 
@@ -349,34 +366,34 @@ export function renderFocusView(): string {
         continue;
       }
 
-      if (strategy === 'open') {
-        // 读模式：只显示在时间窗口内有 open/annotate 信号的文件
-        if (!lastOpenMap.has(f.path)) continue;
-      } else {
-        // 写模式：只显示在时间窗口内有 mtime 变化的文件
+      // 取并集：满足任一启用的策略即可进入列表
+      const inMtime = useMtime && (() => {
         const annotationUpdatedAt = state.annotationSummaries?.get(f.path)?.updatedAt;
         const recentAnnotation = annotationUpdatedAt && annotationUpdatedAt >= cutoff;
         const recentMtime = typeof f.lastModified === 'number' && f.lastModified >= cutoff;
-        if (!recentMtime && !recentAnnotation) continue;
-      }
+        return recentMtime || recentAnnotation;
+      })();
+      const inOpen = useOpen && lastOpenMap.has(f.path);
+      if (!inMtime && !inOpen) continue;
 
       allCandidates.push({ file: f, ws });
     }
   }
 
-  // Sort: pinned first, then by relevant time descending
+  // Sort: pinned first, then by the most recent relevant time descending
   allCandidates.sort((a, b) => {
     const aPinned = pinned.has(a.file.path);
     const bPinned = pinned.has(b.file.path);
     if (aPinned !== bPinned) return aPinned ? -1 : 1;
 
-    if (strategy === 'open') {
-      const aTs = lastOpenMap.get(a.file.path) ?? 0;
-      const bTs = lastOpenMap.get(b.file.path) ?? 0;
-      return bTs - aTs;
-    } else {
-      return (b.file.lastModified || 0) - (a.file.lastModified || 0);
-    }
+    // Pick the most recent timestamp across enabled strategies for each file
+    const getTs = (f: FileTreeNode) => {
+      let ts = 0;
+      if (useMtime) ts = Math.max(ts, f.lastModified || 0);
+      if (useOpen)  ts = Math.max(ts, lastOpenMap.get(f.path) ?? 0);
+      return ts;
+    };
+    return getTs(b.file) - getTs(a.file);
   });
 
   // Search filter
@@ -399,10 +416,12 @@ export function renderFocusView(): string {
     byWs.set(ws.id, arr);
   }
 
+  // 读模式下显示最近打开时间；写+读同时开时也用最近打开时间（更能反映"最近活跃"）
+  const displayTimeMap = useOpen ? lastOpenMap : undefined;
+
   const groups = workspaces.map((ws) => {
     const files = byWs.get(ws.id);
     if (!files?.length) return '';
-    const displayTimeMap = strategy === 'open' ? lastOpenMap : undefined;
     return renderFocusWorkspaceGroup(ws, files, pinned, false, query, collapsed, displayTimeMap);
   }).join('');
 
@@ -464,8 +483,8 @@ if (typeof window !== 'undefined') {
         case 'toggle-focus-type-filter':
           if (key) toggleFocusTypeFilter(key);
           break;
-        case 'set-focus-strategy':
-          if (key) setFocusStrategy(key as 'mtime' | 'open');
+        case 'toggle-focus-strategy':
+          if (key) toggleFocusStrategy(key);
           break;
         case 'toggle-filter-popup':
           toggleFilterPopup();

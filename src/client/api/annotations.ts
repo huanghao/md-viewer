@@ -87,7 +87,7 @@ export async function fetchAnnotationSummaries(): Promise<Map<string, Annotation
     return new Map(
       Object.entries(data.summaries).map(([k, v]) => [
         k,
-        { count: (v as any).count || 0, updatedAt: (v as any).updatedAt || 0 },
+        { count: (v as any).count || 0, unanchoredCount: (v as any).unanchoredCount || 0, updatedAt: (v as any).updatedAt || 0 },
       ])
     );
   } catch {

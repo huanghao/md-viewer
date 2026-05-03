@@ -56,6 +56,14 @@ describe('matchesFilter', () => {
     expect(matchesFilter(makeAnn({ status: 'anchored' }), 'open')).toBe(true);
     expect(matchesFilter(makeAnn({ status: 'resolved' }), 'open')).toBe(false);
   });
+  it('open filter excludes unanchored when includeUnanchored=false', () => {
+    expect(matchesFilter(makeAnn({ status: 'unanchored' }), 'open', false)).toBe(false);
+  });
+  it('open filter includes unanchored when includeUnanchored=true', () => {
+    expect(matchesFilter(makeAnn({ status: 'unanchored' }), 'open', true)).toBe(true);
+    expect(matchesFilter(makeAnn({ status: 'anchored' }), 'open', true)).toBe(true);
+    expect(matchesFilter(makeAnn({ status: 'resolved' }), 'open', true)).toBe(false);
+  });
   it('resolved filter matches resolved non-unanchored annotations', () => {
     expect(matchesFilter(makeAnn({ status: 'resolved' }), 'resolved')).toBe(true);
     expect(matchesFilter(makeAnn({ status: 'unanchored' }), 'resolved')).toBe(false);
@@ -83,5 +91,18 @@ describe('getVisibleAnnotations', () => {
       makeAnn({ id: 'b', start: 1, status: 'resolved' }),
     ];
     expect(getVisibleAnnotations(anns, 'all').length).toBe(2);
+  });
+
+  it('open+includeUnanchored includes unanchored alongside anchored', () => {
+    const anns = [
+      makeAnn({ id: 'a', start: 1, status: 'anchored' }),
+      makeAnn({ id: 'b', start: 2, status: 'unanchored' }),
+      makeAnn({ id: 'c', start: 3, status: 'resolved' }),
+    ];
+    const withUnanchored = getVisibleAnnotations(anns, 'open', true);
+    expect(withUnanchored.map(a => a.id)).toEqual(['a', 'b']);
+
+    const withoutUnanchored = getVisibleAnnotations(anns, 'open', false);
+    expect(withoutUnanchored.map(a => a.id)).toEqual(['a']);
   });
 });

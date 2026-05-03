@@ -264,25 +264,26 @@ export function setSearchQuery(query: string): void {
   state.searchQuery = query;
 }
 
-export function setAnnotationSummaries(summaries: Map<string, { count: number; updatedAt: number }>): void {
+export function setAnnotationSummaries(summaries: Map<string, { count: number; unanchoredCount: number; updatedAt: number }>): void {
   state.annotationSummaries = summaries;
 }
 
 /** @deprecated 使用 setAnnotationSummaries */
 export function setAnnotationCounts(counts: Map<string, number>): void {
   state.annotationSummaries = new Map(
-    Array.from(counts.entries()).map(([k, v]) => [k, { count: v, updatedAt: 0 }])
+    Array.from(counts.entries()).map(([k, v]) => [k, { count: v, unanchoredCount: 0, updatedAt: 0 }])
   );
 }
 
 export function adjustAnnotationCount(path: string, delta: number): void {
   const current = state.annotationSummaries.get(path)?.count ?? 0;
   const next = current + delta;
-  if (next <= 0) {
+  const unanchoredCount = state.annotationSummaries.get(path)?.unanchoredCount ?? 0;
+  if (next <= 0 && unanchoredCount <= 0) {
     state.annotationSummaries.delete(path);
   } else {
     const updatedAt = Date.now();
-    state.annotationSummaries.set(path, { count: next, updatedAt });
+    state.annotationSummaries.set(path, { count: Math.max(0, next), unanchoredCount, updatedAt });
   }
 }
 

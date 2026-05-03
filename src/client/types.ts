@@ -62,7 +62,7 @@ export interface AppState {
   // 工作区模式相关
   currentWorkspace: string | null;  // 当前工作区 ID
   fileTree: Map<string, FileTreeNode>;  // 工作区文件树缓存
-  annotationSummaries: Map<string, { count: number; updatedAt: number }>;  // path → 批注摘要
+  annotationSummaries: Map<string, { count: number; unanchoredCount: number; updatedAt: number }>;  // path → 批注摘要
   workspaceLoadingIds: Set<string>;  // 正在扫描中的工作区
   workspaceFailedIds: Set<string>;   // 扫描失败的工作区（直到重试前永久）
 }

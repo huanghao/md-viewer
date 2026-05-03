@@ -129,7 +129,7 @@ export function getActiveFiles(
   tree: FileTreeNode | undefined,
   windowMs: number,
   pinned: Set<string>,
-  annotationSummaries?: Map<string, { count: number; updatedAt: number }>
+  annotationSummaries?: Map<string, { count: number; unanchoredCount: number; updatedAt: number }>
 ): FileTreeNode[] {
   if (!tree) return [];
   const cutoff = Date.now() - windowMs;

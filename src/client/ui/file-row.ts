@@ -1,4 +1,5 @@
 import { state, getSessionFile } from '../state';
+import { state as annotationState } from '../annotation-state';
 import { hasListDiff, hasWorkspaceModified, isWorkspacePathMissing } from '../workspace-state';
 import { getFileListStatus } from '../utils/file-status';
 import { getFileTypeIcon } from '../utils/file-type';
@@ -71,7 +72,10 @@ export function renderFileRow(
   const highlightedName = highlightQuery(displayName, opts.query);
 
   // 批注计数 badge
-  const annotationCount = state.annotationSummaries.get(path)?.count ?? 0;
+  const summary = state.annotationSummaries.get(path);
+  const anchoredCount = summary?.count ?? 0;
+  const unanchoredCount = summary?.unanchoredCount ?? 0;
+  const annotationCount = annotationState.includeUnanchored ? anchoredCount + unanchoredCount : anchoredCount;
   const annotationBadge = annotationCount > 0
     ? `<span class="annotation-count-badge">${annotationCount}</span>`
     : '';

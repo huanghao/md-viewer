@@ -5,7 +5,7 @@
  * counted in the badge (same as open/anchored).
  */
 import { describe, expect, it, beforeEach } from 'bun:test';
-import { adjustAnnotationCount, setAnnotationSummaries } from '../../src/client/state';
+import { adjustAnnotationCount, setAnnotationSummaries, state } from '../../src/client/state';
 import { isOpen } from '../../src/annotation-status';
 import type { AnnotationStatus } from '../../src/annotation-status';
 
@@ -98,5 +98,28 @@ describe('toggleResolved badge 计数语义', () => {
     const prev: AnnotationStatus = 'resolved';
     const next: AnnotationStatus = 'unanchored';
     if (prev === 'resolved' && isOpen(next)) adjustAnnotationCount('/a.md', +1);
+  });
+});
+
+describe('unanchoredCount 在 adjustAnnotationCount 中保持不变', () => {
+  it('adjustAnnotationCount 不影响 unanchoredCount', () => {
+    setAnnotationSummaries(new Map([['/a.md', { count: 2, unanchoredCount: 3, updatedAt: 0 }]]));
+    adjustAnnotationCount('/a.md', -1);
+    expect(state.annotationSummaries.get('/a.md')?.count).toBe(1);
+    expect(state.annotationSummaries.get('/a.md')?.unanchoredCount).toBe(3);
+  });
+
+  it('count 归零但 unanchoredCount > 0 时条目保留', () => {
+    setAnnotationSummaries(new Map([['/a.md', { count: 1, unanchoredCount: 2, updatedAt: 0 }]]));
+    adjustAnnotationCount('/a.md', -1);
+    expect(state.annotationSummaries.has('/a.md')).toBe(true);
+    expect(state.annotationSummaries.get('/a.md')?.count).toBe(0);
+    expect(state.annotationSummaries.get('/a.md')?.unanchoredCount).toBe(2);
+  });
+
+  it('count 和 unanchoredCount 都归零时条目删除', () => {
+    setAnnotationSummaries(new Map([['/a.md', { count: 1, unanchoredCount: 0, updatedAt: 0 }]]));
+    adjustAnnotationCount('/a.md', -1);
+    expect(state.annotationSummaries.has('/a.md')).toBe(false);
   });
 });

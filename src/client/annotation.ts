@@ -561,8 +561,7 @@ export function savePendingAnnotation(filePath: string): void {
   } else {
     hideComposer();
   }
-  if (!isPdf) applyAnnotations();
-  renderAnnotationList(filePath);
+  afterAnnotationWrite(filePath, isPdf);
   document.dispatchEvent(new CustomEvent('annotation:created', { detail: { annotation: ann, filePath } }));
 }
 
@@ -575,8 +574,7 @@ export function removeAnnotation(id: string, filePath: string): void {
   state.annotations = state.annotations.filter((a) => a.id !== id);
   if (state.pinnedAnnotationId === id) { state.pinnedAnnotationId = null; hidePopover(true); }
   if (state.activeAnnotationId === id) { state.activeAnnotationId = null; }
-  if (!isPdf) applyAnnotations();
-  renderAnnotationList(filePath);
+  afterAnnotationWrite(filePath, isPdf);
   document.dispatchEvent(new CustomEvent('annotation:deleted', { detail: { id, filePath } }));
   if (removed && isOpen(removed.status as AnnotationStatus)) {
     adjustAnnotationCount(filePath, -1);
@@ -592,8 +590,7 @@ export function removeAnnotation(id: string, filePath: string): void {
         import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
       }
       showError(`删除评论失败: ${error?.message || '未知错误'}`, 2600);
-      if (!isPdf) applyAnnotations();
-      renderAnnotationList(filePath);
+      afterAnnotationWrite(filePath, isPdf);
     });
   };
 
@@ -603,8 +600,7 @@ export function removeAnnotation(id: string, filePath: string): void {
       adjustAnnotationCount(filePath, +1);
       import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
     }
-    if (!isPdf) applyAnnotations();
-    renderAnnotationList(filePath);
+    afterAnnotationWrite(filePath, isPdf);
   };
 
   if (loadConfig().optimisticUndo !== false) {
@@ -702,9 +698,7 @@ function toggleResolved(id: string, filePath: string): void {
   // 乐观更新客户端状态
   ann.status = nextStatus;
   hidePopover(true);
-  if (!isPdf) applyAnnotations();
-  else document.dispatchEvent(new CustomEvent('annotation:highlights-changed'));
-  renderAnnotationList(filePath);
+  afterAnnotationWritePdf(filePath, isPdf);
   if (isOpen(previousStatus as AnnotationStatus) && nextStatus === 'resolved') {
     adjustAnnotationCount(filePath, -1);
   } else if (previousStatus === 'resolved' && isOpen(nextStatus as AnnotationStatus)) {
@@ -721,9 +715,7 @@ function toggleResolved(id: string, filePath: string): void {
         adjustAnnotationCount(filePath, -1);
       }
       showError(`更新评论状态失败: ${error?.message || '未知错误'}`, 2600);
-      if (!isPdf) applyAnnotations();
-      else document.dispatchEvent(new CustomEvent('annotation:highlights-changed'));
-      renderAnnotationList(filePath);
+      afterAnnotationWritePdf(filePath, isPdf);
       import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
     });
   };
@@ -735,9 +727,7 @@ function toggleResolved(id: string, filePath: string): void {
     } else if (previousStatus === 'resolved' && isOpen(nextStatus as AnnotationStatus)) {
       adjustAnnotationCount(filePath, -1);
     }
-    if (!isPdf) applyAnnotations();
-    else document.dispatchEvent(new CustomEvent('annotation:highlights-changed'));
-    renderAnnotationList(filePath);
+    afterAnnotationWritePdf(filePath, isPdf);
     import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
   };
 
@@ -749,6 +739,19 @@ function toggleResolved(id: string, filePath: string): void {
   } else {
     doUpdate();
   }
+}
+
+// 写操作完成后的统一收尾：同步正文高亮 + 侧边栏列表
+function afterAnnotationWrite(filePath: string, isPdf: boolean | undefined): void {
+  if (!isPdf) applyAnnotations();
+  renderAnnotationList(filePath);
+}
+
+// 同上，但 PDF 模式下用 CustomEvent 触发高亮重绘（PDF viewer 监听此事件）
+function afterAnnotationWritePdf(filePath: string, isPdf: boolean | undefined): void {
+  if (!isPdf) applyAnnotations();
+  else document.dispatchEvent(new CustomEvent('annotation:highlights-changed'));
+  renderAnnotationList(filePath);
 }
 
 function resolvePositionedAnnotationOverlaps(listEl: HTMLElement, contentScrollHeight: number): void {

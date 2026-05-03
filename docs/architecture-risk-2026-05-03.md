@@ -49,15 +49,32 @@
 
 ## 当前高风险
 
-### 1. `annotation.ts` 仍有 1946 行
+### 1. `annotation.ts` 仍有 1762 行
 
-已完成两次提取：
+已完成三次提取：
 - `annotation-state.ts`（189 行）：类型定义、state 对象、thread normalization、state 访问器
 - `annotation-layout.ts`（152 行）：sidebar DOM 管理、宽度/折叠、syncAnnotationSidebarLayout
+- `annotation-rendering.ts`（251 行）：applyAnnotations、clearRenderedMarks、applySingleAnnotation、mark DOM
 
-**剩余 1946 行**包含渲染（applyAnnotations）、Popover/Thread、Composer/Selection、init 全部耦合在一起，继续拆需要 callback 或 event 解耦，改动较大。
+**剩余结构分析（annotation.ts 1762 行）**：
 
-**建议**：可在 annotation-state.ts / annotation-layout.ts 已分离的基础上，下一步提取 `annotation-rendering.ts`（applyAnnotations、renderAnnotationList、mark DOM 操作），约 400 行，依赖最少。
+| 区块 | 大概行数 | 可提取性 |
+|------|----------|----------|
+| `initAnnotationElements()` 事件绑定 | ~514 | 难——是所有逻辑的 orchestration hub |
+| `renderAnnotationList()` + 事件绑定 | ~174 | 中——需要传入 callback 解耦 |
+| Popover 管理 | ~110 | 中——依赖 thread-manager |
+| Thread 管理（appendReply/editThreadItem 等） | ~150 | 中——可提取为 annotation/thread-manager.ts |
+| CRUD（savePendingAnnotation/removeAnnotation） | ~95 | 高风险——深度依赖 state |
+| Composer/Selection pipeline | ~160 | 高风险——与 Popover 双向耦合 |
+| 小工具（iconSvg、persistence、tabs、chat-split） | ~200 | 易提取 |
+
+**现实目标**：把 "小工具" 和 "Thread 管理" 先提取出去，annotation.ts 可降到约 1200 行；`initAnnotationElements` 514 行保留作 orchestration 入口。
+
+**下一步优先级**：
+1. `annotation/thread-manager.ts`（~110 行，中难度）
+2. `annotation/icons.ts`（~15 行，零风险）
+3. `annotation/persistence.ts`（~55 行，中难度）
+4. `annotation/chat-split.ts`（~80 行，中难度）
 
 ---
 
@@ -120,13 +137,22 @@ PDF 渲染逻辑集中，职责相对单一，可接受。
 
 ## 推荐下一步（优先级排序）
 
-1. **annotation-rendering.ts 提取**（高价值，中难度）
-   - 从 annotation.ts 提取 `applyAnnotations`、`renderAnnotationList`、`applySingleAnnotation`、mark DOM 操作，约 400 行
-   - 纯渲染逻辑，与 Popover/Composer 解耦度较好
+### annotation.ts 继续拆分（当前 1762 行，目标 ~1200 行）
 
-2. **AGENTS.md 补充 initXxx 规则**（低成本，防御性）
-   - 防止未来 agent 再次引入循环依赖
+按风险从低到高：
 
-3. **css.ts 迁移**（高收益但高成本）
-   - 改用真实 CSS 文件 + esbuild 内联，解锁 CSS tooling
-   - 影响所有 UI，需要专项计划
+1. **`annotation/icons.ts`**（零风险，~15 行）— `iconSvg()` 纯函数，无依赖
+2. **`annotation/thread-manager.ts`**（中难度，~110 行）— appendReply、editThreadItem、deleteThreadItem、renderThreadListHTML；需要把 renderAnnotationList 改为回调注入
+3. **`annotation/persistence.ts`**（中难度，~55 行）— persistAnnotation、hydrateAnnotationsFromRemote、setAnnotations；需要把 applyAnnotations/renderAnnotationList 改为回调注入
+4. **`annotation/chat-split.ts`**（中难度，~80 行）— enterSplitMode、exitSplitMode、syncChatSidebarLayout；相对独立
+
+以上 4 步完成后，annotation.ts 预计降到 ~1200 行，`initAnnotationElements`（514 行）保留作 orchestration 入口。
+
+更激进的后续（需要大量 callback 重构，评估后再决定）：
+- `annotation/popover.ts`（~110 行）
+- `annotation/list-renderer.ts`（~170 行，最复杂）
+- `annotation/crud.ts`（~85 行）
+
+### 其他技术债
+
+5. **css.ts 迁移**（高收益但高成本）— 改用真实 CSS 文件 + esbuild 内联，影响所有 UI，需要专项计划，暂不优先

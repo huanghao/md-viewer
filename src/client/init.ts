@@ -69,31 +69,38 @@ import { initMemoryMonitor, switchMonitorTab, toggleMonitorPanel } from './memor
 import { resolveMarkdownLinkPath } from './utils/md-link';
 import { initSSEConnection, connectSSE } from './sse-connection';
 import { initBrowsingSignals } from './utils/browsing-signals';
-import { pdfViewerRegistry, currentPdfBridgeRef } from './pdf-registry';
+import {
+  pdfViewerRegistry,
+  currentPdfBridgeRef,
+  evictPdfViewer,
+  scheduleEviction,
+  cancelEviction,
+  setPdfMode,
+} from './pdf-registry';
 import {
   applyTheme,
   renderAll,
   onFileLoaded,
   syncAnnotationsForCurrentFile,
   updateToolbarButtons,
-  evictPdfViewer,
-  scheduleEviction,
-  cancelEviction,
+  startWorkspacePolling,
+  handleRefreshButtonClick,
+  refreshFile,
+  refreshCurrentFile,
   _resetDwell,
   _setPendingAnnotation,
   set_setPendingAnnotation,
+} from './app-actions';
+import {
   initSidebarWidth,
   initSidebarCollapsed,
   setupSidebarCollapse,
   setupSidebarResize,
-  startWorkspacePolling,
-  handleRefreshButtonClick,
-  setPdfMode,
-  refreshFile,
-  refreshCurrentFile,
+} from './ui/sidebar-layout';
+import {
   copyRelativePath,
   copyAbsolutePath,
-} from './main';
+} from './utils/clipboard';
 
 (async () => {
   console.time('[init] total');

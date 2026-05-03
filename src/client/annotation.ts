@@ -196,6 +196,9 @@ function updateAnnotationCount(): void {
 
 let _currentAnnotationTab: 'comments' | 'chat' | 'todo' = 'comments';
 
+// 当前渲染的 filePath，供事件委托读取（renderAnnotationList 每次更新）
+let _listFilePath: string | null = null;
+
 export function switchAnnotationTab(tab: 'comments' | 'chat' | 'todo'): void {
   _currentAnnotationTab = tab;
   const commentsList = document.getElementById('annotationList');
@@ -785,6 +788,7 @@ function resolvePositionedAnnotationOverlaps(listEl: HTMLElement, contentScrollH
 }
 
 export function renderAnnotationList(filePath: string | null): void {
+  _listFilePath = filePath;
   const el = getElements();
   if (!el.annotationList) return;
   updateAnnotationCount();
@@ -847,72 +851,6 @@ export function renderAnnotationList(filePath: string | null): void {
     el.annotationList.innerHTML = sorted.map((ann, index) => renderItem(ann, index)).join('');
   }
 
-  el.annotationList.querySelectorAll('.annotation-icon-action').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const target = e.currentTarget as HTMLElement;
-      const action = target.getAttribute('data-action');
-      const id = target.getAttribute('data-id');
-      if (!id || !filePath) return;
-
-      if (action === 'prev') {
-        jumpToRelative(id, -1, filePath);
-      } else if (action === 'next') {
-        jumpToRelative(id, 1, filePath);
-      } else if (action === 'resolve') {
-        toggleResolved(id, filePath);
-      } else if (action === 'delete') {
-        removeAnnotation(id, filePath);
-      }
-    });
-  });
-
-  el.annotationList.querySelectorAll('[data-edit-thread-item]').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const itemId = (btn as HTMLElement).getAttribute('data-edit-thread-item');
-      const annotationId = (btn as HTMLElement).getAttribute('data-annotation-id');
-      if (!itemId || !annotationId || !filePath) return;
-      editThreadItem(annotationId, itemId, filePath);
-    });
-  });
-
-  el.annotationList.querySelectorAll('[data-delete-thread-item]').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const itemId = (btn as HTMLElement).getAttribute('data-delete-thread-item');
-      const annotationId = (btn as HTMLElement).getAttribute('data-annotation-id');
-      if (!itemId || !annotationId || !filePath) return;
-      deleteThreadItem(annotationId, itemId, filePath);
-    });
-  });
-
-  el.annotationList.querySelectorAll('[data-reply-entry]').forEach((entry) => {
-    entry.addEventListener('click', (event) => {
-      event.stopPropagation();
-      const id = (entry as HTMLElement).getAttribute('data-reply-entry');
-      if (!id) return;
-      const input = el.annotationList?.querySelector(`[data-reply-input="${id}"]`) as HTMLTextAreaElement | null;
-      if (!input) return;
-      autoResizeReplyInput(input);
-      input.focus();
-    });
-    entry.addEventListener('keydown', (event) => {
-      const keyboardEvent = event as KeyboardEvent;
-      const target = event.target as HTMLElement;
-      if (target instanceof HTMLTextAreaElement) return;
-      if (keyboardEvent.key !== 'Enter' && keyboardEvent.key !== ' ') return;
-      keyboardEvent.preventDefault();
-      keyboardEvent.stopPropagation();
-      const id = (entry as HTMLElement).getAttribute('data-reply-entry');
-      if (!id) return;
-      const input = el.annotationList?.querySelector(`[data-reply-input="${id}"]`) as HTMLTextAreaElement | null;
-      if (!input) return;
-      autoResizeReplyInput(input);
-      input.focus();
-    });
-  });
-
   // 恢复 reply input 草稿
   if (replyDrafts.size > 0) {
     el.annotationList.querySelectorAll<HTMLTextAreaElement>('[data-reply-input]').forEach((input) => {
@@ -925,36 +863,6 @@ export function renderAnnotationList(filePath: string | null): void {
   requestAnimationFrame(() => {
     el.annotationList?.querySelectorAll('[data-reply-input]').forEach((inputEl) => {
       autoResizeReplyInput(inputEl as HTMLTextAreaElement);
-    });
-  });
-
-  el.annotationList.querySelectorAll('[data-reply-input]').forEach((inputEl) => {
-    const input = inputEl as HTMLTextAreaElement;
-    input.addEventListener('input', () => autoResizeReplyInput(input));
-    input.addEventListener('click', (event) => event.stopPropagation());
-    inputEl.addEventListener('keydown', (event) => {
-      const keyboardEvent = event as KeyboardEvent;
-      if (handleEmacsKeys(keyboardEvent, keyboardEvent.currentTarget as HTMLTextAreaElement)) {
-        keyboardEvent.preventDefault();
-        return;
-      }
-      if (keyboardEvent.key !== 'Enter') return;
-      if (!(keyboardEvent.metaKey || keyboardEvent.ctrlKey)) return; // Cmd/Ctrl+Enter 提交
-      keyboardEvent.preventDefault();
-      const input = keyboardEvent.currentTarget as HTMLTextAreaElement;
-      const id = input.getAttribute('data-reply-input');
-      if (!id || !filePath) return;
-      appendReply(id, filePath, input.value);
-      input.value = '';
-      renderAnnotationList(filePath);
-    });
-  });
-
-  el.annotationList.querySelectorAll('.annotation-item').forEach((itemEl) => {
-    itemEl.addEventListener('click', () => {
-      const id = (itemEl as HTMLElement).getAttribute('data-annotation-id');
-      if (!id || !filePath) return;
-      setActiveAnnotation(id, filePath);
     });
   });
 }
@@ -1047,6 +955,106 @@ export function initAnnotationElements(): void {
   });
   initAnnotationSidebarWidth();
   setSidebarCollapsed(true);
+
+  // 事件委托：annotation list 容器上统一处理所有交互
+  // _listFilePath 由 renderAnnotationList 每次更新，委托无需关心 filePath 参数
+  document.getElementById('annotationList')?.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const fp = _listFilePath;
+    if (!fp) return;
+
+    // 操作按钮（prev/next/resolve/delete）
+    const actionBtn = target.closest('.annotation-icon-action') as HTMLElement | null;
+    if (actionBtn) {
+      e.stopPropagation();
+      const action = actionBtn.getAttribute('data-action');
+      const id = actionBtn.getAttribute('data-id');
+      if (!id) return;
+      if (action === 'prev') jumpToRelative(id, -1, fp);
+      else if (action === 'next') jumpToRelative(id, 1, fp);
+      else if (action === 'resolve') toggleResolved(id, fp);
+      else if (action === 'delete') removeAnnotation(id, fp);
+      return;
+    }
+
+    // 编辑 thread item
+    const editBtn = target.closest('[data-edit-thread-item]') as HTMLElement | null;
+    if (editBtn) {
+      e.stopPropagation();
+      const itemId = editBtn.getAttribute('data-edit-thread-item');
+      const annotationId = editBtn.getAttribute('data-annotation-id');
+      if (itemId && annotationId) editThreadItem(annotationId, itemId, fp);
+      return;
+    }
+
+    // 删除 thread item
+    const deleteBtn = target.closest('[data-delete-thread-item]') as HTMLElement | null;
+    if (deleteBtn) {
+      e.stopPropagation();
+      const itemId = deleteBtn.getAttribute('data-delete-thread-item');
+      const annotationId = deleteBtn.getAttribute('data-annotation-id');
+      if (itemId && annotationId) deleteThreadItem(annotationId, itemId, fp);
+      return;
+    }
+
+    // reply entry 区域点击 → 聚焦 textarea
+    const replyEntry = target.closest('[data-reply-entry]') as HTMLElement | null;
+    if (replyEntry && !(target instanceof HTMLTextAreaElement)) {
+      e.stopPropagation();
+      const id = replyEntry.getAttribute('data-reply-entry');
+      if (!id) return;
+      const input = document.querySelector(`[data-reply-input="${id}"]`) as HTMLTextAreaElement | null;
+      if (input) { autoResizeReplyInput(input); input.focus(); }
+      return;
+    }
+
+    // annotation item 点击 → 激活
+    const annotationItem = target.closest('.annotation-item') as HTMLElement | null;
+    if (annotationItem && !target.closest('.annotation-reply-entry') && !target.closest('.annotation-row-actions')) {
+      const id = annotationItem.getAttribute('data-annotation-id');
+      if (id) setActiveAnnotation(id, fp);
+    }
+  });
+
+  document.getElementById('annotationList')?.addEventListener('keydown', (e) => {
+    const target = e.target as HTMLElement;
+    const fp = _listFilePath;
+    if (!fp) return;
+
+    // reply entry keydown → Enter/Space 聚焦
+    const replyEntry = target.closest('[data-reply-entry]') as HTMLElement | null;
+    if (replyEntry && !(target instanceof HTMLTextAreaElement)) {
+      const ke = e as KeyboardEvent;
+      if (ke.key !== 'Enter' && ke.key !== ' ') return;
+      ke.preventDefault();
+      ke.stopPropagation();
+      const id = replyEntry.getAttribute('data-reply-entry');
+      if (!id) return;
+      const input = document.querySelector(`[data-reply-input="${id}"]`) as HTMLTextAreaElement | null;
+      if (input) { autoResizeReplyInput(input); input.focus(); }
+      return;
+    }
+
+    // reply input keydown → Cmd+Enter 提交，Emacs keys
+    if (target instanceof HTMLTextAreaElement && target.hasAttribute('data-reply-input')) {
+      const ke = e as KeyboardEvent;
+      if (handleEmacsKeys(ke, target)) { ke.preventDefault(); return; }
+      if (ke.key !== 'Enter' || !(ke.metaKey || ke.ctrlKey)) return;
+      ke.preventDefault();
+      const id = target.getAttribute('data-reply-input');
+      if (!id) return;
+      appendReply(id, fp, target.value);
+      target.value = '';
+      renderAnnotationList(fp);
+    }
+  });
+
+  document.getElementById('annotationList')?.addEventListener('input', (e) => {
+    const target = e.target as HTMLElement;
+    if (target instanceof HTMLTextAreaElement && target.hasAttribute('data-reply-input')) {
+      autoResizeReplyInput(target);
+    }
+  });
 
   document.addEventListener('annotation:created', (e: Event) => {
     const { filePath } = (e as CustomEvent).detail;

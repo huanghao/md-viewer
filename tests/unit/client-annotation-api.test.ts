@@ -116,7 +116,7 @@ describe('client annotation api', () => {
     globalThis.fetch = mock(() =>
       Promise.resolve(new Response(JSON.stringify({
         summaries: {
-          '/tmp/a.md': { count: 2, updatedAt: 123 },
+          '/tmp/a.md': { count: 2, unanchoredCount: 1, updatedAt: 123 },
           '/tmp/b.md': { count: undefined, updatedAt: undefined },
         },
       }), {
@@ -126,8 +126,8 @@ describe('client annotation api', () => {
     ) as typeof fetch;
 
     const summaries = await fetchAnnotationSummaries();
-    expect(summaries.get('/tmp/a.md')).toEqual({ count: 2, updatedAt: 123 });
-    expect(summaries.get('/tmp/b.md')).toEqual({ count: 0, updatedAt: 0 });
+    expect(summaries.get('/tmp/a.md')).toEqual({ count: 2, unanchoredCount: 1, updatedAt: 123 });
+    expect(summaries.get('/tmp/b.md')).toEqual({ count: 0, unanchoredCount: 0, updatedAt: 0 });
 
     globalThis.fetch = mock(() =>
       Promise.resolve(new Response(JSON.stringify({ error: 'nope' }), {

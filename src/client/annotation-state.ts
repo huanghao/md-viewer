@@ -47,6 +47,7 @@ export interface AnnotationState {
   activeAnnotationId: string | null;
   currentFilePath: string | null;
   filter: AnnotationFilter;
+  includeUnanchored: boolean; // 「打开」filter 下是否同时显示失锚评论
   density: AnnotationDensity;
 }
 
@@ -64,6 +65,9 @@ export const state: AnnotationState = {
   activeAnnotationId: null,
   currentFilePath: null,
   filter: 'open',
+  includeUnanchored: typeof localStorage !== 'undefined'
+    ? storageGet<boolean>('md-viewer:annotation-include-unanchored', false)
+    : false,
   density: getInitialDensity(),
 };
 

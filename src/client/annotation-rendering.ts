@@ -242,7 +242,7 @@ export function applyAnnotations(): void {
     }
   }
 
-  const sorted = [...getVisibleAnnotationsUtil(state.annotations, state.filter)]
+  const sorted = [...getVisibleAnnotationsUtil(state.annotations, state.filter, state.includeUnanchored)]
     .sort((a, b) => b.start - a.start);
   for (const ann of sorted) {
     applySingleAnnotation(ann, index);

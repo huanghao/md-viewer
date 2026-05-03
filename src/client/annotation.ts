@@ -165,6 +165,12 @@ function updateControlState(): void {
     const button = node as HTMLElement;
     button.classList.toggle('is-active', button.getAttribute('data-filter') === state.filter);
   });
+  // 「含失锚」子选项：仅在 open filter 下显示
+  const includeBtn = el.filterMenu?.querySelector('[data-action="toggle-include-unanchored"]') as HTMLElement | null;
+  if (includeBtn) {
+    includeBtn.classList.toggle('hidden', state.filter !== 'open');
+    includeBtn.classList.toggle('is-active', state.includeUnanchored);
+  }
   if (el.densityToggle) {
     el.densityToggle.classList.toggle('is-simple', state.density === 'simple');
     el.densityToggle.title = state.density === 'simple' ? '切换到默认列表' : '切换到极简列表';
@@ -181,7 +187,7 @@ function updateControlState(): void {
 }
 
 function updateAnnotationCount(): void {
-  const count = getVisibleAnnotationsUtil(state.annotations, state.filter).length;
+  const count = getVisibleAnnotationsUtil(state.annotations, state.filter, state.includeUnanchored).length;
   const tabCount = document.getElementById('annotationTabCount');
   if (tabCount) tabCount.textContent = count > 0 ? `(${count})` : '';
 }
@@ -667,7 +673,7 @@ function setActiveAnnotation(id: string | null, filePath: string | null): void {
 }
 
 function jumpToRelative(id: string, delta: number, filePath: string): void {
-  const sorted = getVisibleAnnotationsUtil(state.annotations, state.filter);
+  const sorted = getVisibleAnnotationsUtil(state.annotations, state.filter, state.includeUnanchored);
   const index = sorted.findIndex((item) => item.id === id);
   if (index < 0) return;
   const target = sorted[index + delta];
@@ -793,7 +799,7 @@ export function renderAnnotationList(filePath: string | null): void {
     return;
   }
 
-  const sorted = getVisibleAnnotationsUtil(state.annotations, state.filter);
+  const sorted = getVisibleAnnotationsUtil(state.annotations, state.filter, state.includeUnanchored);
   if (sorted.length === 0) {
     el.annotationList.innerHTML = '<div class="annotation-empty">当前筛选下无评论</div>';
     return;
@@ -1254,6 +1260,16 @@ export function initAnnotationElements(): void {
       applyAnnotations();
       renderAnnotationList(currentFile || null);
     });
+  });
+
+  getElements().filterMenu?.querySelector('[data-action="toggle-include-unanchored"]')?.addEventListener('click', (event) => {
+    event.stopPropagation(); // 点击不关闭菜单
+    state.includeUnanchored = !state.includeUnanchored;
+    storageSet('md-viewer:annotation-include-unanchored', state.includeUnanchored);
+    updateControlState();
+    const currentFile = getActiveAnnotationFilePath();
+    applyAnnotations();
+    renderAnnotationList(currentFile || null);
   });
 
   getElements().filterToggle?.addEventListener('click', (event) => {

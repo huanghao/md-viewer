@@ -13,17 +13,28 @@ export function getAnchorTrack(ann: Annotation): 'exact' | 'reanchored' | 'unanc
   return 'reanchored';
 }
 
-export function matchesFilter(ann: Annotation, filter: AnnotationFilter): boolean {
+export function matchesFilter(
+  ann: Annotation,
+  filter: AnnotationFilter,
+  includeUnanchored = false,
+): boolean {
   const unanchored = isUnanchored(ann.status as AnnotationStatus) || getAnchorTrack(ann) === 'unanchored';
   if (filter === 'all') return true;
-  if (filter === 'open') return isOpen(ann.status as AnnotationStatus);
+  if (filter === 'open') {
+    if (includeUnanchored) return isOpen(ann.status as AnnotationStatus) || unanchored;
+    return isOpen(ann.status as AnnotationStatus);
+  }
   if (filter === 'resolved') return isResolved(ann.status as AnnotationStatus) && !unanchored;
   if (filter === 'unanchored') return unanchored;
   return true;
 }
 
-export function getVisibleAnnotations(annotations: Annotation[], filter: AnnotationFilter): Annotation[] {
+export function getVisibleAnnotations(
+  annotations: Annotation[],
+  filter: AnnotationFilter,
+  includeUnanchored = false,
+): Annotation[] {
   return [...annotations]
-    .filter((ann) => matchesFilter(ann, filter))
+    .filter((ann) => matchesFilter(ann, filter, includeUnanchored))
     .sort((a, b) => a.start - b.start);
 }

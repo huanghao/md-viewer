@@ -225,6 +225,7 @@ export function generateClientHTML(): string {
         <div class="annotation-filter-menu hidden" id="annotationFilterMenu">
           <button class="annotation-filter-item" data-filter="all">全部</button>
           <button class="annotation-filter-item is-active" data-filter="open">未解决</button>
+          <button class="annotation-filter-item annotation-filter-sub hidden" data-action="toggle-include-unanchored">+ 含失锚</button>
           <button class="annotation-filter-item" data-filter="resolved">已解决</button>
           <button class="annotation-filter-item" data-filter="unanchored">失锚</button>
         </div>

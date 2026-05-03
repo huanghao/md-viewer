@@ -2803,6 +2803,11 @@ export const styles = `
       border-color: var(--color-accent);
       color: var(--color-accent);
     }
+    .annotation-filter-sub {
+      margin-left: 10px;
+      font-size: 11px;
+      opacity: 0.85;
+    }
 
     .annotation-list {
       flex: 1;

@@ -6,9 +6,9 @@ import * as path from 'path';
 const watch = process.argv.includes('--watch');
 
 const buildOptions: esbuild.BuildOptions = {
-  entryPoints: ['src/client/main.ts'],
+  entryPoints: { client: 'src/client/main.ts' },
   bundle: true,
-  outfile: 'dist/client.js',
+  outdir: 'dist',
   platform: 'browser',
   target: 'es2020',
   format: 'iife',

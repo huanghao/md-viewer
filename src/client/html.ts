@@ -1,8 +1,12 @@
-import { styles } from "./css.ts";
-import { githubMarkdownCSS, highlightGithubCSS } from "./vendor-css.ts";
 import { readFileSync, existsSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import { EMBEDDED_CLIENT_JS } from "./embedded-client.ts";
+
+const _dir = dirname(fileURLToPath(import.meta.url));
+const styles = readFileSync(join(_dir, 'styles.css'), 'utf8');
+const githubMarkdownCSS = readFileSync(join(_dir, 'vendor-github-markdown.css'), 'utf8');
+const highlightGithubCSS = readFileSync(join(_dir, 'vendor-highlight-github.css'), 'utf8');
 
 // 判断是否为开发模式
 const isDev = process.env.NODE_ENV !== 'production';

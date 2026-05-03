@@ -30,8 +30,8 @@ describe('isResolvedAnn', () => {
 });
 
 describe('getAnchorTrack', () => {
-  it('returns orphan for unanchored status', () => {
-    expect(getAnchorTrack(makeAnn({ status: 'unanchored' }))).toBe('orphan');
+  it('returns unanchored for unanchored status', () => {
+    expect(getAnchorTrack(makeAnn({ status: 'unanchored' }))).toBe('unanchored');
   });
   it('returns exact for high confidence', () => {
     expect(getAnchorTrack(makeAnn({ confidence: 0.95 }))).toBe('exact');
@@ -56,13 +56,13 @@ describe('matchesFilter', () => {
     expect(matchesFilter(makeAnn({ status: 'anchored' }), 'open')).toBe(true);
     expect(matchesFilter(makeAnn({ status: 'resolved' }), 'open')).toBe(false);
   });
-  it('resolved filter matches resolved non-orphan annotations', () => {
+  it('resolved filter matches resolved non-unanchored annotations', () => {
     expect(matchesFilter(makeAnn({ status: 'resolved' }), 'resolved')).toBe(true);
     expect(matchesFilter(makeAnn({ status: 'unanchored' }), 'resolved')).toBe(false);
   });
-  it('orphan filter matches unanchored annotations', () => {
-    expect(matchesFilter(makeAnn({ status: 'unanchored' }), 'orphan')).toBe(true);
-    expect(matchesFilter(makeAnn({ status: 'anchored' }), 'orphan')).toBe(false);
+  it('unanchored filter matches unanchored annotations', () => {
+    expect(matchesFilter(makeAnn({ status: 'unanchored' }), 'unanchored')).toBe(true);
+    expect(matchesFilter(makeAnn({ status: 'anchored' }), 'unanchored')).toBe(false);
   });
 });
 

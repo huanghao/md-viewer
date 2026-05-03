@@ -32,7 +32,7 @@ export interface AnnotationThreadItem {
   createdAt: number;
 }
 
-export type AnnotationFilter = 'all' | 'open' | 'resolved' | 'orphan';
+export type AnnotationFilter = 'all' | 'open' | 'resolved' | 'unanchored';
 export type AnnotationDensity = 'default' | 'simple';
 export const ANNOTATION_WIDTH_KEY = 'md-viewer:annotation-sidebar-width';
 export const ANNOTATION_WIDTH_DEFAULT = 320;

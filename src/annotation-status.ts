@@ -10,8 +10,8 @@ export function isOpen(status: AnnotationStatus | undefined): boolean {
   return status === 'anchored';
 }
 
-/** orphan = 失锚（unanchored） */
-export function isOrphan(status: AnnotationStatus | undefined): boolean {
+/** unanchored = 失锚 */
+export function isUnanchored(status: AnnotationStatus | undefined): boolean {
   return status === 'unanchored';
 }
 

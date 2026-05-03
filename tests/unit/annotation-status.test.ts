@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { mergeAnnotationStatus } from '../../src/client/annotation';
-import { isOpen, isResolved, isOrphan, calculateOpenCount } from '../../src/annotation-status';
+import { isOpen, isResolved, isUnanchored, calculateOpenCount } from '../../src/annotation-status';
 
 describe('mergeAnnotationStatus', () => {
   it('keeps resolved status when anchor re-check returns anchored', () => {

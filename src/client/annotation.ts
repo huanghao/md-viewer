@@ -11,7 +11,7 @@ import {
 import { showError, showToast } from './ui/toast';
 import { enqueueOp } from './utils/undo-queue';
 import { setChatContext } from './ui/chat-panel.js';
-import { isOpen, isResolved, isOrphan, type AnnotationStatus } from '../annotation-status';
+import { isOpen, isResolved, isUnanchored, type AnnotationStatus } from '../annotation-status';
 import { adjustAnnotationCount } from './state';
 import { loadConfig } from './config';
 import { formatRelativeTimeShort } from './utils/format';
@@ -174,7 +174,7 @@ function updateControlState(): void {
       all: '筛选：全部',
       open: '筛选：未解决',
       resolved: '筛选：已解决',
-      orphan: '筛选：定位失败',
+      unanchored: '筛选：失锚',
     };
     el.filterToggle.title = map[state.filter];
   }

@@ -2840,7 +2840,7 @@ export const styles = `
     .annotation-item.status-reanchored {
       border-left-color: #b99a55;
     }
-    .annotation-item.status-orphan {
+    .annotation-item.status-unanchored {
       border-left-color: #9a7b4f;
     }
     .annotation-item.is-resolved {
@@ -3147,7 +3147,7 @@ export const styles = `
     }
     .annotation-list:not(.default-mode) .annotation-item.status-exact,
     .annotation-list:not(.default-mode) .annotation-item.status-reanchored,
-    .annotation-list:not(.default-mode) .annotation-item.status-orphan {
+    .annotation-list:not(.default-mode) .annotation-item.status-unanchored {
       border-left-color: var(--color-border);
     }
     .annotation-list:not(.default-mode) .annotation-item.is-active::before {

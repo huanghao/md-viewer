@@ -27,81 +27,47 @@ import { currentPdfViewer } from './pdf-state';
 import { isResolvedAnn, getAnchorTrack, matchesFilter, getVisibleAnnotations as getVisibleAnnotationsUtil } from './annotation/query';
 import { handleEmacsKeys } from './utils/emacs-keys';
 import { recordSignal } from './utils/focus-signals';
+import {
+  type Annotation,
+  type AnnotationThreadItem,
+  type AnnotationFilter,
+  ANNOTATION_WIDTH_KEY,
+  ANNOTATION_WIDTH_DEFAULT,
+  ANNOTATION_WIDTH_MIN,
+  ANNOTATION_WIDTH_MAX,
+  state,
+  _lastQuickAddX,
+  _lastQuickAddY,
+  _quickComments,
+  setLastQuickAddPosition,
+  setQuickComments,
+  getLastQuickAddPosition,
+  nextAnnotationSerial,
+  normalizeThread,
+  ensureAnnotationThread,
+  ensureAnnotationThreads,
+  ensureAnnotationSerials,
+  replaceAnnotationInState,
+  mergeAnnotationStatus,
+  getAnnotations,
+  getAnnotationCurrentFilePath,
+} from './annotation-state';
 
-// ==================== 类型定义 ====================
-export interface Annotation {
-  id: string;
-  serial?: number;
-  start: number;
-  length: number;
-  quote: string;
-  /** Original selection text for display; may include KaTeX chars absent in quote. */
-  displayQuote?: string;
-  note: string;
-  createdAt: number;
-  quotePrefix?: string;
-  quoteSuffix?: string;
-  status?: 'anchored' | 'unanchored' | 'resolved';
-  confidence?: number;
-  thread?: AnnotationThreadItem[];
-  /** PDF only: bounding box in PDF coordinate system (pt, unscaled) */
-  rectCoords?: { x1: number; y1: number; x2: number; y2: number };
-}
-
-export interface AnnotationThreadItem {
-  id: string;
-  type: 'comment' | 'reply';
-  note: string;
-  createdAt: number;
-}
-
-type AnnotationFilter = 'all' | 'open' | 'resolved' | 'orphan';
-type AnnotationDensity = 'default' | 'simple';
-const ANNOTATION_WIDTH_KEY = 'md-viewer:annotation-sidebar-width';
-const ANNOTATION_WIDTH_DEFAULT = 320;
-const ANNOTATION_WIDTH_MIN = 260;
-const ANNOTATION_WIDTH_MAX = 540;
-
-interface AnnotationState {
-  annotations: Annotation[];
-  pendingAnnotation: Annotation | null;
-  pendingAnnotationFilePath: string | null;
-  pinnedAnnotationId: string | null;
-  activeAnnotationId: string | null;
-  currentFilePath: string | null;
-  filter: AnnotationFilter;
-  density: AnnotationDensity;
-}
-
-function getInitialDensity(): AnnotationDensity {
-  if (typeof localStorage === 'undefined') return 'default';
-  return storageGet<string>('md-viewer:annotation-density', 'default') === 'simple' ? 'simple' : 'default';
-}
-
-// ==================== 状态管理 ====================
-const state: AnnotationState = {
-  annotations: [],
-  pendingAnnotation: null,
-  pendingAnnotationFilePath: null,
-  pinnedAnnotationId: null,
-  activeAnnotationId: null,
-  currentFilePath: null,
-  filter: 'open',
-  density: getInitialDensity(),
+export type { Annotation, AnnotationThreadItem };
+export {
+  getLastQuickAddPosition,
+  nextAnnotationSerial,
+  ensureAnnotationSerials,
+  mergeAnnotationStatus,
+  getAnnotations,
+  getAnnotationCurrentFilePath,
 };
+
 const ANNOTATION_PANEL_OPEN_KEY = 'md-viewer:annotation-panel-open';
-
-let _lastQuickAddX = 0;
-let _lastQuickAddY = 0;
-let _quickComments: string[] = [];
-
-export function getLastQuickAddPosition(): { x: number; y: number } {
-  return { x: _lastQuickAddX, y: _lastQuickAddY };
-}
 
 export async function loadQuickComments(): Promise<void> {
   const items = await fetchQuickComments();
-  _quickComments = items.map((it) => it.text);
+  setQuickComments(items.map((it) => it.text));
   renderQuickPromptBtns();
 }
 
@@ -145,94 +111,6 @@ function onQuickCommentClick(note: string): void {
   if (el.composerNote) el.composerNote.value = note;
   hideQuickAdd(false);
   savePendingAnnotation(filePath);
-}
-
-export function nextAnnotationSerial(annotations: Annotation[]): number {
-  const maxSerial = annotations.reduce((max, ann) => {
-    if (typeof ann.serial !== 'number' || !Number.isFinite(ann.serial)) return max;
-    return Math.max(max, ann.serial);
-  }, 0);
-  return maxSerial + 1;
-}
-
-function normalizeThread(annotation: Annotation): AnnotationThreadItem[] {
-  const fallbackCreatedAt = Number.isFinite(annotation.createdAt) ? annotation.createdAt : Date.now();
-  const incoming = Array.isArray(annotation.thread) ? annotation.thread : [];
-  const normalized = incoming
-    .map((item, index) => {
-      if (!item || typeof item !== 'object') return null;
-      const note = String((item as any).note || '').trim();
-      if (!note) return null;
-      const typeRaw = String((item as any).type || (index === 0 ? 'comment' : 'reply'));
-      const type: AnnotationThreadItem['type'] = typeRaw === 'reply' ? 'reply' : 'comment';
-      const createdAtRaw = Number((item as any).createdAt);
-      const createdAt = Number.isFinite(createdAtRaw) ? Math.floor(createdAtRaw) : fallbackCreatedAt + index;
-      const id = String((item as any).id || '').trim() || `${type}-${createdAt}-${Math.random().toString(16).slice(2, 8)}`;
-      return { id, type, note, createdAt } as AnnotationThreadItem;
-    })
-    .filter((item): item is AnnotationThreadItem => !!item)
-    .sort((a, b) => a.createdAt - b.createdAt);
-  if (normalized.length === 0) {
-    const note = String(annotation.note || '').trim();
-    if (!note) return [];
-    return [{
-      id: `c-${annotation.id || fallbackCreatedAt}`,
-      type: 'comment',
-      note,
-      createdAt: fallbackCreatedAt,
-    }];
-  }
-  normalized[0].type = 'comment';
-  for (let i = 1; i < normalized.length; i += 1) normalized[i].type = 'reply';
-  return normalized;
-}
-
-function ensureAnnotationThread(annotation: Annotation): boolean {
-  const nextThread = normalizeThread(annotation);
-  const prev = JSON.stringify(annotation.thread || []);
-  const next = JSON.stringify(nextThread);
-  annotation.thread = nextThread;
-  annotation.note = nextThread[0]?.note || annotation.note || '';
-  return prev !== next;
-}
-
-function ensureAnnotationThreads(annotations: Annotation[]): boolean {
-  let changed = false;
-  for (const ann of annotations) {
-    if (ensureAnnotationThread(ann)) changed = true;
-  }
-  return changed;
-}
-
-export function ensureAnnotationSerials(annotations: Annotation[]): boolean {
-  let changed = false;
-  const withIndex = annotations.map((ann, index) => ({ ann, index }));
-  withIndex.sort((a, b) => {
-    const leftTime = Number.isFinite(a.ann.createdAt) ? a.ann.createdAt : 0;
-    const rightTime = Number.isFinite(b.ann.createdAt) ? b.ann.createdAt : 0;
-    if (leftTime !== rightTime) return leftTime - rightTime;
-    return a.index - b.index;
-  });
-  let cursor = 1;
-  for (const { ann } of withIndex) {
-    if (typeof ann.serial === 'number' && Number.isFinite(ann.serial) && ann.serial > 0) {
-      cursor = Math.max(cursor, ann.serial + 1);
-      continue;
-    }
-    ann.serial = cursor;
-    cursor += 1;
-    changed = true;
-  }
-  return changed;
-}
-
-function replaceAnnotationInState(next: Annotation): void {
-  const index = state.annotations.findIndex((item) => item.id === next.id);
-  if (index >= 0) {
-    state.annotations[index] = next;
-    return;
-  }
-  state.annotations.push(next);
 }
 
 function persistAnnotation(filePath: string, annotation: Annotation, errorPrefix = '评论保存失败'): void {
@@ -297,10 +175,6 @@ async function hydrateAnnotationsFromRemote(filePath: string): Promise<void> {
   }
 }
 
-export function getAnnotations(): Annotation[] {
-  return state.annotations;
-}
-
 // ==================== DOM 元素引用 ====================
 function queryAnnotationElements() {
   return {
@@ -341,10 +215,6 @@ export function invalidateAnnotationElementsCache(): void {
 }
 
 // ==================== 工具函数 ====================
-
-export function getAnnotationCurrentFilePath(): string | null {
-  return state.currentFilePath;
-}
 
 function getActiveAnnotationFilePath(): string | null {
   const currentFilePath = state.currentFilePath;
@@ -528,14 +398,6 @@ export function dismissAnnotationPopupByEscape(): boolean {
   return false;
 }
 
-export function mergeAnnotationStatus(
-  currentStatus: Annotation['status'] | undefined,
-  resolvedStatus: 'anchored' | 'unanchored',
-): Annotation['status'] {
-  if (currentStatus === 'resolved') return 'resolved';
-  return resolvedStatus;
-}
-
 // ==================== UI 操作 ====================
 export function showQuickAdd(x: number, y: number, pendingData: Omit<Annotation, 'note' | 'createdAt'>): void {
   renderQuickPromptBtns();
@@ -553,8 +415,10 @@ export function showQuickAdd(x: number, y: number, pendingData: Omit<Annotation,
     fallbackHeight: 96,
     flipY: true,
   });
-  _lastQuickAddX = Number.parseFloat(el.quickAddWrap.style.left || '0');
-  _lastQuickAddY = Number.parseFloat(el.quickAddWrap.style.top || '0');
+  setLastQuickAddPosition(
+    Number.parseFloat(el.quickAddWrap.style.left || '0'),
+    Number.parseFloat(el.quickAddWrap.style.top || '0'),
+  );
 }
 
 function hideQuickAdd(clearPending = false): void {

@@ -48,6 +48,27 @@ Do not place tool-operational playbooks here unless they are temporary workaroun
 - 服务端聚合（`calculateOpenCount`）、客户端增量（`adjustAnnotationCount` 的调用处）、UI 过滤（`matchesFilter`）三处逻辑必须基于同一函数，改一处必须同步检查其他处
 - 新增状态枚举值时，必须同步更新 `annotation-status.ts` 中的所有判断函数，并补充 `annotation-count-badge.test.ts` 中的覆盖用例
 
+## Module Import Rules — Avoid Circular Dependencies
+
+前端客户端代码（`src/client/`）的模块依赖有一条硬规则：
+
+**`init.ts` 不得 import `main.ts`，`main.ts` 不得 import `init.ts` 以外的启动模块。**
+
+历史教训：`init.ts ↔ main.ts` 循环依赖曾导致 esbuild 打包后 `pdfViewerRegistry` 求值为 `undefined`，在页面加载时 crash（`Cannot read properties of undefined (reading 'entries')`）。已通过提取 `pdf-registry.ts`、`app-actions.ts` 彻底消除。
+
+### 判断何时用 `initXxx(deps)` 注入 vs 直接 import
+
+直接 import 是默认做法。只在以下情况改用 `initXxx(deps)` 注入：
+
+> **规则**：如果模块 A 需要模块 B 的函数，但模块 B（或其上层调用链）已经 import 了模块 A，就不能直接 import——改用 initXxx 传入回调。
+
+具体场景：
+- `content-renderer.ts` 需要 `evictPdfViewer`（在 `pdf-registry.ts`）、`updateToolbarButtons`（在 `app-actions.ts`）——后两者不 import content-renderer，可以直接传入，用 `initContentRenderer(deps)`
+- `file-switcher.ts` 需要 `onFileLoaded`（在 `app-actions.ts`）——app-actions 不 import file-switcher，用 `initFileSwitcher(deps)`
+- `annotation-rendering.ts` 需要 `showPopover`、`persistAnnotations`（在 `annotation.ts`）——annotation.ts 会 import annotation-rendering，直接 import 会成环，用 `registerRenderingCallbacks()`
+
+**检测方法**：新增 import 后运行 `npx tsc --noEmit`，若编译通过但页面行为异常（变量为 undefined），用 `grep -rn "from './xxx'" src/client/ --include="*.ts"` 检查是否形成环。
+
 ## Collaboration Principles
 
 - 提交应聚焦单一目标，避免把无关改动混入同一提交。

@@ -1,4 +1,4 @@
-import { githubMarkdownCSS } from '../vendor-css';
+import githubMarkdownCSS from '../vendor-github-markdown.css';
 
 // Notion 主题：在 GitHub baseline 上叠加 typography/color overrides
 // 保留所有 GFM 特性样式（task list、alert、footnote 等），只覆盖视觉 token

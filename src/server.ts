@@ -9,7 +9,6 @@ import { marked } from "marked";
 import { markedHighlight } from "marked-highlight";
 import hljs from "highlight.js";
 import { log } from "./utils.ts";
-import { generateClientHTML } from "./client/html.ts";
 import { serveStatic } from "./static.ts";
 import { broadcastEvent } from "./sse.ts";
 import {
@@ -79,14 +78,14 @@ marked.use(
 
 const app = new Hono();
 
-// 前端页面（开发模式：静态文件；生产模式：内联 HTML）
+// 前端页面
 app.get("/", (c) => {
   c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
   c.header('Pragma', 'no-cache');
   c.header('Expires', '0');
   const html = serveStatic('index.html');
   if (html) return c.html(html);
-  return c.html(generateClientHTML());
+  return c.notFound();
 });
 
 // 静态资源（CSS、JS）

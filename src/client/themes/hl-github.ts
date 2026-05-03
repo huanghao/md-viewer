@@ -1,2 +1,2 @@
-import { highlightGithubCSS } from '../vendor-css';
+import highlightGithubCSS from '../vendor-highlight-github.css';
 export const hlGithub = highlightGithubCSS;

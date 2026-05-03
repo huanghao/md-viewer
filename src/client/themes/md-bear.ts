@@ -1,4 +1,4 @@
-import { githubMarkdownCSS } from '../vendor-css';
+import githubMarkdownCSS from '../vendor-github-markdown.css';
 
 // Bear/iA Writer 主题：在 GitHub baseline 上叠加衬线字体 overrides
 // 保留所有 GFM 特性样式，只覆盖字体和颜色 token

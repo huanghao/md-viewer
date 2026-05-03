@@ -6,18 +6,13 @@ set -euo pipefail
 echo "🔨 打包 Server 源码..."
 echo ""
 
-# 1. 构建前端
+# 1. 构建前端（输出 dist/client.js + dist/client.css）
 echo "1️⃣  构建前端资源..."
 bun run build:client
 echo ""
 
-# 2. 嵌入客户端脚本
-echo "2️⃣  嵌入客户端脚本..."
-bun run scripts/embed-client.ts
-echo ""
-
-# 3. 打包 server 源码 + node_modules 到 dist-server/server/
-echo "3️⃣  打包 Server 源码..."
+# 2. 打包 server 源码 + node_modules 到 dist-server/server/
+echo "2️⃣  打包 Server 源码..."
 SERVER_DST="dist-server/server"
 rm -rf dist-server
 mkdir -p "$SERVER_DST"
@@ -27,6 +22,16 @@ cp -R node_modules "$SERVER_DST/"
 cp package.json "$SERVER_DST/"
 cp tsconfig.json "$SERVER_DST/"
 echo "  ✓ 源码已打包到 $SERVER_DST"
+echo ""
+
+# 3. 复制静态前端文件（server 运行时从 static/ 目录 serve）
+echo "3️⃣  复制静态前端文件..."
+STATIC_DST="$SERVER_DST/static"
+mkdir -p "$STATIC_DST"
+cp public/index.html "$STATIC_DST/"
+cp dist/client.js "$STATIC_DST/"
+cp dist/client.css "$STATIC_DST/"
+echo "  ✓ 静态文件已复制到 $STATIC_DST"
 echo ""
 
 # 4. 复制模型文件

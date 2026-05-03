@@ -69,6 +69,7 @@ import { initMemoryMonitor, switchMonitorTab, toggleMonitorPanel } from './memor
 import { resolveMarkdownLinkPath } from './utils/md-link';
 import { initSSEConnection, connectSSE } from './sse-connection';
 import { initBrowsingSignals } from './utils/browsing-signals';
+import { pdfViewerRegistry, currentPdfBridgeRef } from './pdf-registry';
 import {
   applyTheme,
   renderAll,
@@ -78,8 +79,6 @@ import {
   evictPdfViewer,
   scheduleEviction,
   cancelEviction,
-  pdfViewerRegistry,
-  currentPdfBridgeRef,
   _resetDwell,
   _setPendingAnnotation,
   set_setPendingAnnotation,

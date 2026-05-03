@@ -4,7 +4,6 @@ import {
   initMemoryMonitor,
   switchMonitorTab,
   toggleMonitorPanel,
-  type PdfViewerEntry,
 } from './memory-monitor';
 
 import {
@@ -87,6 +86,7 @@ import { initTodoPanel, initTodoExternalCallbacks } from './ui/todo-panel';
 
 import { createPdfAnnotationBridge } from "./pdf-annotation.js";
 import { currentPdfViewer, setCurrentPdfViewer, setPdfDefaultScale } from './pdf-state';
+import { pdfViewerRegistry, currentPdfBridgeRef, type PdfViewerEntry } from './pdf-registry';
 import {
   initTocManager,
   updateToc,
@@ -160,11 +160,9 @@ export function applyTheme(): void {
 export const PDF_MODE_KEY = 'md-viewer:pdf-mode';
 const fileRefreshSeq = new Map<string, number>();
 export let workspacePollRunning = false;
-export const currentPdfBridgeRef = { value: null as ReturnType<typeof createPdfAnnotationBridge> | null };
-
-// PDF viewer registry: tracks all open PDF viewers and their idle timers
+// PDF viewer registry and bridge ref live in pdf-registry.ts to avoid circular deps with init.ts
+export { pdfViewerRegistry, currentPdfBridgeRef } from './pdf-registry';
 export const PDF_IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
-export const pdfViewerRegistry = new Map<string, PdfViewerEntry>();
 
 export function applyPdfModeButtons(mode: 'select' | 'annotate'): void {
   const isAnnotate = mode === 'annotate';

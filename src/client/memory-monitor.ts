@@ -1,7 +1,9 @@
-import type { PdfViewerInstance } from './pdf-viewer.js';
 import { state } from './state';
 import { getAgentUrl } from './ui/chat-panel.js';
 import { switchAnnotationTab } from './annotation';
+import { type PdfViewerEntry } from './pdf-registry';
+
+export type { PdfViewerEntry };
 
 // ==================== 系统监控浮窗 ====================
 const MEM_PER_PAGE_MB = 27; // A4 @ scale=1.5, dpr=2
@@ -9,13 +11,6 @@ const PDF_IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
 let monitorPollTimer: ReturnType<typeof setInterval> | null = null;
 let monitorActiveTab: 'memory' | 'sessions' = 'memory';
-
-export interface PdfViewerEntry {
-  viewer: PdfViewerInstance;
-  lastActiveAt: number;
-  idleTimer: ReturnType<typeof setTimeout> | null;
-  savedScrollTop?: number;
-}
 
 let _registry: Map<string, PdfViewerEntry> | null = null;
 

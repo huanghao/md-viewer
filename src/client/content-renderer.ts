@@ -4,7 +4,7 @@
 //           renderContent, renderBreadcrumb, showNearbyMenu, flashContentUpdated
 //           and helper functions: isHtmlPath, isJsonPath, isPdfPath, isUrlPath, applyPdfModeButtons
 
-import type { PdfViewerEntry } from './memory-monitor';
+import type { PdfViewerEntry } from './pdf-registry';
 import type { PdfViewerInstance } from './pdf-viewer.js';
 
 import { state, saveScrollPosition } from './state';

@@ -38,7 +38,7 @@ export interface AppConfig {
   sidebarTab: 'focus' | 'full' | 'list' | 'search';
   focusWindowKey: '8h' | '2d' | '1w' | '1m';
   focusActiveTypes: string[];
-  focusStrategy: 'frecency' | 'mtime'; // 最近视图排序策略，默认 frecency
+  focusStrategy: 'frecency' | 'mtime' | 'open'; // 最近视图排序依据
   markdownTheme: string;  // 'github' | 'notion' | 'bear'
   codeTheme: string;      // 'github' | 'github-dark' | 'atom-one-dark'
   mathInline: boolean;    // render $...$ inline math (disable if $ is used as currency)

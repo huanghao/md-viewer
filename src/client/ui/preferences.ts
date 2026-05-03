@@ -236,7 +236,6 @@ async function saveAndClose(): Promise<void> {
   const mdSelect = document.getElementById('markdownThemeSelect') as HTMLSelectElement | null;
   const codeSelect = document.getElementById('codeThemeSelect') as HTMLSelectElement | null;
   const mathCheck = document.getElementById('mathInlineCheckbox') as HTMLInputElement | null;
-  const focusSelect = document.getElementById('focusStrategySelect') as HTMLSelectElement | null;
   const pollSelect = document.getElementById('pollIntervalSelect') as HTMLSelectElement | null;
   const undoCheck = document.getElementById('optimisticUndoCheckbox') as HTMLInputElement | null;
 

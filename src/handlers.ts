@@ -14,6 +14,7 @@ import {
   log,
   isSupportedTextFile,
 } from "./utils.ts";
+import { fuzzyScore } from "./client/utils/fuzzy-search.ts";
 import { broadcastFileOpened, addClient, removeClient, broadcastEvent } from "./sse.ts";
 
 const encoder = new TextEncoder();
@@ -1007,7 +1008,7 @@ export function handleWorkspaceSearch(c: Context) {
       const fullPath = join(dir, entry.name);
       if (entry.isDirectory()) {
         walkDir(fullPath, workspaceRoot);
-      } else if (entry.isFile() && isMarkdownFilename(entry.name) && entry.name.toLowerCase().includes(q)) {
+      } else if (entry.isFile() && isMarkdownFilename(entry.name) && fuzzyScore(entry.name, q) !== 0) {
         results.push({ path: fullPath, display: entry.name, workspaceRoot });
       }
     }

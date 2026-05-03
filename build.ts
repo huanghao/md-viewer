@@ -14,6 +14,7 @@ const buildOptions: esbuild.BuildOptions = {
   format: 'iife',
   sourcemap: true,
   minify: !watch,
+  loader: { '.css': 'text' },
 };
 
 async function build() {

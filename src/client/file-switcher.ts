@@ -24,7 +24,6 @@ export interface FileSwitcherDeps {
   syncAnnotationsForCurrentFile: (force?: boolean) => void;
   updateToolbarButtons: () => Promise<void>;
   evictPdfViewer: (filePath: string) => void;
-  resetDwell: () => void;
 }
 
 let _deps: FileSwitcherDeps | null = null;
@@ -242,7 +241,6 @@ export async function switchFile(path: string) {
     const banner = document.getElementById('diffBanner');
     if (banner) banner.remove();
   }
-  deps.resetDwell();
   switchToFile(path);
   updateZoomDisplay(true);
   renderSidebar();

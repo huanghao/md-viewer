@@ -1,7 +1,6 @@
 import type { Workspace, FileTreeNode } from './types';
 import { state } from './state';
 import { updateWorkspaceListDiff, removeWorkspaceTracking } from './workspace-state';
-import { recordSignal } from './utils/focus-signals';
 import { saveConfig } from './config';
 import { storageGet, storageSet } from './utils/storage';
 import { mergeDirectoryExpandedState, applyDirectoryExpandedState } from './workspace-tree-expansion';
@@ -203,17 +202,6 @@ export async function scanWorkspace(workspaceId: string): Promise<FileTreeNode |
 
     void isFirstLoad; // suppress unused warning
 
-    // 记录 mtime 变化信号（仅增量，不含首次加载）
-    if (previousTree) {
-      const prevMtimes = collectMtimes(previousTree);
-      for (const { path, lastModified } of collectFileNodes(tree)) {
-        const prev = prevMtimes.get(path);
-        if (prev !== undefined && lastModified && lastModified !== prev) {
-          recordSignal(path, 'mtime');
-        }
-      }
-    }
-
     // 缓存文件树（内存 + localStorage）
     state.fileTree.set(workspaceId, tree);
     setWorkspaceExpandedState(workspaceId, collectExpandedStateFromTree(tree));
@@ -251,14 +239,6 @@ function collectFilePaths(node: FileTreeNode | undefined): string[] {
     paths.push(...collectFilePaths(child));
   }
   return paths;
-}
-
-function collectMtimes(node: FileTreeNode): Map<string, number> {
-  const map = new Map<string, number>();
-  for (const f of collectFileNodes(node)) {
-    if (f.lastModified) map.set(f.path, f.lastModified);
-  }
-  return map;
 }
 
 // 递归折叠所有目录（根目录除外）

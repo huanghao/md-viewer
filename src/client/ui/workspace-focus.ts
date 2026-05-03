@@ -86,49 +86,29 @@ const FOCUS_WINDOW_MS: Record<string, number> = {
   '2d':  2  * 86400 * 1000,
 };
 
-// ── Frecency ──────────────────────────────────────────────────────────────────
+// ── Open-signal cache (for 读 strategy) ──────────────────────────────────────
 
-const FRECENCY_WEIGHTS = { open: 10, annotate: 15, mtime: 1, dwell: 8, scroll: 4 } as const;
-const FRECENCY_HALF_LIFE_HOURS = { open: 48, annotate: 48, mtime: 8, dwell: 48, scroll: 24 } as const;
-type FrecencySignalType = keyof typeof FRECENCY_WEIGHTS;
+interface OpenSignal { ts: number; type: string; file: string; }
 
-interface FrecencySignal { ts: number; type: string; file: string; }
-
-// In-memory signal cache, refreshed periodically
-let signalCache: FrecencySignal[] = [];
+let signalCache: OpenSignal[] = [];
 
 export async function refreshFrecencySignals(): Promise<void> {
   try {
     const res = await fetch('/api/focus-signals?days=7');
     if (!res.ok) return;
-    const data = await res.json() as { signals: FrecencySignal[] };
+    const data = await res.json() as { signals: OpenSignal[] };
     signalCache = data.signals;
   } catch { /* server not available */ }
 }
 
-function getSignalCache(): FrecencySignal[] {
-  return signalCache;
-}
-
-// Compute frecency score for a single file
-function computeFrecencyScore(filePath: string, signals: FrecencySignal[]): number {
-  const now = Date.now();
-  return signals
-    .filter((s) => s.file === filePath)
-    .reduce((sum, s) => {
-      const type = (s.type in FRECENCY_WEIGHTS ? s.type : 'mtime') as FrecencySignalType;
-      const ageHours = (now - s.ts) / 3_600_000;
-      const lambda = Math.LN2 / FRECENCY_HALF_LIFE_HOURS[type];
-      return sum + FRECENCY_WEIGHTS[type] * Math.exp(-lambda * ageHours);
-    }, 0);
-}
-
-// Build a score map for all files that appear in signals
-export function buildFrecencyMap(signals: FrecencySignal[]): Map<string, number> {
-  const files = new Set(signals.map((s) => s.file));
+// Returns the most recent 'open' signal timestamp per file
+function buildLastOpenMap(signals: OpenSignal[], cutoff: number): Map<string, number> {
   const map = new Map<string, number>();
-  for (const f of files) {
-    map.set(f, computeFrecencyScore(f, signals));
+  for (const s of signals) {
+    if (s.type !== 'open' && s.type !== 'annotate') continue;
+    if (s.ts < cutoff) continue;
+    const prev = map.get(s.file);
+    if (prev === undefined || s.ts > prev) map.set(s.file, s.ts);
   }
   return map;
 }
@@ -143,7 +123,7 @@ function collectFiles(node: FileTreeNode): FileTreeNode[] {
   return results;
 }
 
-// Returns files that are active: mtime within window OR recent annotation OR pinned, minus .mdvignore matches
+// Returns files active within window: mtime (写) or last open (读), plus pinned
 export function getActiveFiles(
   workspacePath: string,
   tree: FileTreeNode | undefined,
@@ -171,8 +151,8 @@ export function getActiveFiles(
 }
 
 
-function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>, query: string, lastActivity?: number): string {
-  return renderFileRow(file.path, file.name, lastActivity ?? file.lastModified, {
+function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>, query: string, displayTime?: number): string {
+  return renderFileRow(file.path, file.name, displayTime ?? file.lastModified, {
     containerClass: 'tree-item file-node focus-file-item',
     onClickAction: 'focus-file-click',
     showPin: true,
@@ -183,7 +163,7 @@ function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>, query: str
   });
 }
 
-export function setFocusStrategy(strategy: 'frecency' | 'mtime'): void {
+export function setFocusStrategy(strategy: 'mtime' | 'open'): void {
   state.config.focusStrategy = strategy;
   saveConfig(state.config);
   import('./sidebar').then(({ renderSidebar }) => renderSidebar());
@@ -204,6 +184,7 @@ export function closeFilterPopup(): void {
 
 function renderFilterBar(): string {
   const currentWindow = state.config.focusWindowKey || '8h';
+  const currentStrategy = state.config.focusStrategy ?? 'mtime';
   const activeTypes = getActiveTypes();
   const typeOptions: Array<{ ext: string; label: string }> = [
     { ext: 'md', label: 'MD' },
@@ -216,15 +197,29 @@ function renderFilterBar(): string {
     { key: '1d', label: '1d' },
     { key: '2d', label: '2d' },
   ];
+  const strategyLabel = currentStrategy === 'open' ? '读' : '写';
 
-  // 当前生效的标签（只展示已选中的）
+  // 当前生效的标签
   const activeTimeLabel = `<span class="focus-active-tag">${currentWindow}</span>`;
+  const activeStrategyLabel = `<span class="focus-active-tag">${strategyLabel}</span>`;
   const activeTypeTags = typeOptions
     .filter(o => activeTypes.has(o.ext))
     .map(o => `<span class="focus-active-tag">${o.label}</span>`)
     .join('');
 
   // popup 内容
+  const strategySection = `
+    <div class="focus-popup-section">
+      <div class="focus-popup-label">排序依据</div>
+      <div class="focus-popup-options">
+        <button class="focus-popup-option${currentStrategy === 'mtime' ? ' active' : ''}"
+                data-action="set-focus-strategy" data-key="mtime">写（mtime）</button>
+        <button class="focus-popup-option${currentStrategy === 'open' ? ' active' : ''}"
+                data-action="set-focus-strategy" data-key="open">读（最近打开）</button>
+      </div>
+    </div>
+    <div class="focus-popup-divider"></div>`;
+
   const timeSection = `
     <div class="focus-popup-section">
       <div class="focus-popup-label">时间窗口</div>
@@ -250,16 +245,14 @@ function renderFilterBar(): string {
 
   const popup = filterPopupOpen ? `
     <div class="focus-filter-popup">
+      ${strategySection}
       ${timeSection}
       ${typeSection}
     </div>` : '';
 
-  const sep = activeTimeLabel && activeTypeTags
-    ? `<span class="focus-active-sep"></span>` : '';
-
   return `
     <div class="focus-filter-bar">
-      <div class="focus-active-tags">${activeTimeLabel}${sep}${activeTypeTags}</div>
+      <div class="focus-active-tags">${activeStrategyLabel}<span class="focus-active-sep"></span>${activeTimeLabel}<span class="focus-active-sep"></span>${activeTypeTags}</div>
       <div class="focus-filter-popup-wrap">
         <button class="focus-filter-btn${filterPopupOpen ? ' active' : ''}"
                 data-action="toggle-filter-popup" title="筛选">
@@ -280,7 +273,7 @@ function renderFocusWorkspaceGroup(
   loading: boolean,
   query: string,
   collapsed: Set<string>,
-  lastActivityMap?: Map<string, number>
+  displayTimeMap?: Map<string, number>
 ): string {
   const hasFiles = activeFiles.length > 0;
   const isCollapsed = collapsed.has(workspace.id);
@@ -291,7 +284,7 @@ function renderFocusWorkspaceGroup(
     : `<span class="focus-ws-badge empty">0</span>`;
 
   const filesHtml = hasFiles
-    ? activeFiles.map((f) => renderFocusFileItem(f, pinned, query, lastActivityMap?.get(f.path))).join('')
+    ? activeFiles.map((f) => renderFocusFileItem(f, pinned, query, displayTimeMap?.get(f.path))).join('')
     : '';
 
   return `
@@ -306,83 +299,27 @@ function renderFocusWorkspaceGroup(
   `;
 }
 
-
-function renderFocusViewMtime(): string {
-  const workspaces = state.config.workspaces;
-  const windowMs = FOCUS_WINDOW_MS[state.config.focusWindowKey || '8h'] ?? FOCUS_WINDOW_MS['8h'];
-  const pinned = getPinnedFiles();
-  const query = state.searchQuery.trim().toLowerCase();
-  const collapsed = getFocusCollapsed();
-  const activeTypes = getActiveTypes();
-
-  const groups = workspaces.map((ws) => {
-    const tree = state.fileTree.get(ws.id);
-    const loading = !tree;
-    if (!tree && !pendingScanIds.has(ws.id) && !isWorkspaceFailed(ws.id)) {
-      pendingScanIds.add(ws.id);
-      void scanWorkspace(ws.id).then((scanned) => {
-        pendingScanIds.delete(ws.id);
-        if (scanned) {
-          import('./sidebar').then(({ renderSidebar }) => renderSidebar());
-        } else {
-          markWorkspaceFailed(ws.id);
-          import('./sidebar').then(({ renderSidebar }) => renderSidebar());
-        }
-      });
-    }
-    let activeFiles = getActiveFiles(ws.path, tree, windowMs, pinned, state.annotationSummaries);
-    if (query) {
-      activeFiles = activeFiles.filter((f) => {
-        const name = stripWorkspaceTreeDisplayExtension(f.name) || f.name;
-        return !!fuzzyMatch(name, query) || !!fuzzyMatch(f.path, query);
-      });
-    }
-    activeFiles = activeFiles.filter((f) => {
-      if (pinned.has(f.path)) return true;
-      return activeTypes.has(normalizeFocusFileType(getFileExtension(f.path)));
-    });
-    if (!loading && activeFiles.length === 0) return '';
-    return renderFocusWorkspaceGroup(ws, activeFiles, pinned, loading, query, collapsed);
-  }).join('');
-
-  const allEmpty = !groups.replace(/\s/g, '');
-  return `<div class="focus-view">${renderFilterBar()}${allEmpty ? '<div class="focus-empty">暂无最近文件</div>' : groups}</div>`;
-}
-
 export function renderFocusView(): string {
   const workspaces = state.config.workspaces;
   if (workspaces.length === 0) {
     return '<div class="focus-empty">暂无工作区</div>';
   }
 
-  const strategy = state.config.focusStrategy ?? 'frecency';
-
-  // mtime strategy: delegate to original time-window logic
-  if (strategy === 'mtime') {
-    return renderFocusViewMtime();
-  }
-
+  const strategy = state.config.focusStrategy ?? 'mtime';
+  const windowMs = FOCUS_WINDOW_MS[state.config.focusWindowKey || '8h'] ?? FOCUS_WINDOW_MS['8h'];
+  const cutoff = Date.now() - windowMs;
   const pinned = getPinnedFiles();
   const query = state.searchQuery.trim().toLowerCase();
-  const allSignals = getSignalCache();
   const collapsed = getFocusCollapsed();
   const activeTypes = getActiveTypes();
 
-  const NEW_WINDOW_MS = FOCUS_WINDOW_MS[state.config.focusWindowKey || '8h'] ?? FOCUS_WINDOW_MS['8h'];
-  const newCutoff = Date.now() - NEW_WINDOW_MS;
-  // Only count signals within the selected time window for frecency scoring
-  const signals = allSignals.filter((s) => s.ts >= newCutoff);
-  const frecencyMap = buildFrecencyMap(signals);
+  // 读模式：按最近 open/annotate 信号时间排序，只展示有信号的文件
+  const lastOpenMap = strategy === 'open'
+    ? buildLastOpenMap(signalCache, cutoff)
+    : new Map<string, number>();
 
-  // Latest signal ts per file (for display — shows last activity time instead of mtime)
-  const lastActivityMap = new Map<string, number>();
-  for (const s of signals) {
-    const prev = lastActivityMap.get(s.file);
-    if (prev === undefined || s.ts > prev) lastActivityMap.set(s.file, s.ts);
-  }
-
-  // Collect all files across workspaces, trigger scans as needed
   const allCandidates: Array<{ file: FileTreeNode; ws: typeof workspaces[0] }> = [];
+
   for (const ws of workspaces) {
     const tree = state.fileTree.get(ws.id);
     if (!tree && !pendingScanIds.has(ws.id) && !isWorkspaceFailed(ws.id)) {
@@ -398,33 +335,52 @@ export function renderFocusView(): string {
       });
     }
     if (!tree) continue;
+
     for (const f of collectFiles(tree)) {
+      // Type filter (pinned bypass)
       if (!pinned.has(f.path)) {
         const ext = getFileExtension(f.path);
         if (ext === 'jsonl' || ext === 'log') continue;
         if (!activeTypes.has(normalizeFocusFileType(ext))) continue;
       }
-      const score = frecencyMap.get(f.path) ?? 0;
-      // Include if: pinned, has frecency score, or recently modified (new file — shown with existing new-dot)
-      const recentlyModified = typeof f.lastModified === 'number' && f.lastModified >= newCutoff;
-      if (!pinned.has(f.path) && score === 0 && !recentlyModified) continue;
+
+      if (pinned.has(f.path)) {
+        allCandidates.push({ file: f, ws });
+        continue;
+      }
+
+      if (strategy === 'open') {
+        // 读模式：只显示在时间窗口内有 open/annotate 信号的文件
+        if (!lastOpenMap.has(f.path)) continue;
+      } else {
+        // 写模式：只显示在时间窗口内有 mtime 变化的文件
+        const annotationUpdatedAt = state.annotationSummaries?.get(f.path)?.updatedAt;
+        const recentAnnotation = annotationUpdatedAt && annotationUpdatedAt >= cutoff;
+        const recentMtime = typeof f.lastModified === 'number' && f.lastModified >= cutoff;
+        if (!recentMtime && !recentAnnotation) continue;
+      }
+
       allCandidates.push({ file: f, ws });
     }
   }
 
-  // Sort: pinned first, then frecency desc (new files with score=0 sort last by mtime)
+  // Sort: pinned first, then by relevant time descending
   allCandidates.sort((a, b) => {
     const aPinned = pinned.has(a.file.path);
     const bPinned = pinned.has(b.file.path);
     if (aPinned !== bPinned) return aPinned ? -1 : 1;
-    const aScore = frecencyMap.get(a.file.path) ?? 0;
-    const bScore = frecencyMap.get(b.file.path) ?? 0;
-    if (bScore !== aScore) return bScore - aScore;
-    return (b.file.lastModified || 0) - (a.file.lastModified || 0);
+
+    if (strategy === 'open') {
+      const aTs = lastOpenMap.get(a.file.path) ?? 0;
+      const bTs = lastOpenMap.get(b.file.path) ?? 0;
+      return bTs - aTs;
+    } else {
+      return (b.file.lastModified || 0) - (a.file.lastModified || 0);
+    }
   });
 
   // Search filter
-  let filtered = query
+  const filtered = query
     ? allCandidates.filter(({ file: f }) => {
         const name = stripWorkspaceTreeDisplayExtension(f.name) || f.name;
         return !!fuzzyMatch(name, query) || !!fuzzyMatch(f.path, query);
@@ -435,7 +391,7 @@ export function renderFocusView(): string {
     return `<div class="focus-view">${renderFilterBar()}<div class="focus-empty">暂无最近文件</div></div>`;
   }
 
-  // Group all files by workspace for display
+  // Group by workspace
   const byWs = new Map<string, FileTreeNode[]>();
   for (const { file, ws } of filtered) {
     const arr = byWs.get(ws.id) ?? [];
@@ -446,7 +402,8 @@ export function renderFocusView(): string {
   const groups = workspaces.map((ws) => {
     const files = byWs.get(ws.id);
     if (!files?.length) return '';
-    return renderFocusWorkspaceGroup(ws, files, pinned, false, query, collapsed, lastActivityMap);
+    const displayTimeMap = strategy === 'open' ? lastOpenMap : undefined;
+    return renderFocusWorkspaceGroup(ws, files, pinned, false, query, collapsed, displayTimeMap);
   }).join('');
 
   return `<div class="focus-view">${renderFilterBar()}${groups}</div>`;
@@ -457,7 +414,7 @@ export function renderFocusView(): string {
 function setFocusWindowKey(key: string): void {
   state.config.focusWindowKey = key as '8h' | '2d' | '1w' | '1m';
   saveConfig(state.config);
-  // Refresh signals so the new window filter picks up the latest data, then re-render
+  // 切换时间窗口后，读模式需要重新拉信号（窗口可能扩大）
   refreshFrecencySignals().then(() =>
     import('./sidebar').then(({ renderSidebar }) => renderSidebar())
   );
@@ -508,7 +465,7 @@ if (typeof window !== 'undefined') {
           if (key) toggleFocusTypeFilter(key);
           break;
         case 'set-focus-strategy':
-          if (key) setFocusStrategy(key as 'frecency' | 'mtime');
+          if (key) setFocusStrategy(key as 'mtime' | 'open');
           break;
         case 'toggle-filter-popup':
           toggleFilterPopup();

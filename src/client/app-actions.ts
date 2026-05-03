@@ -16,16 +16,9 @@ import {
   renderAnnotationList,
 } from './annotation';
 import { getDiffViewActive, setDiffViewActive } from './diff-view';
-import { resetDwellOnFileSwitch } from './utils/browsing-signals';
 
-// ── Browsing signal callback ────────────────────────────────────────────────
-export let _resetDwell: (() => void) | null = null;
 export let _setPendingAnnotation: ((ann: any, filePath: string, x: number, y: number) => void) | null = null;
 export function set_setPendingAnnotation(fn: typeof _setPendingAnnotation) { _setPendingAnnotation = fn; }
-
-if (typeof window !== 'undefined') {
-  _resetDwell = () => resetDwellOnFileSwitch();
-}
 
 // ── Theme ───────────────────────────────────────────────────────────────────
 export function applyTheme(): void {

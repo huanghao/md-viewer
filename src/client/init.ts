@@ -68,7 +68,6 @@ import {
 import { initMemoryMonitor, switchMonitorTab, toggleMonitorPanel } from './memory-monitor';
 import { resolveMarkdownLinkPath } from './utils/md-link';
 import { initSSEConnection, connectSSE } from './sse-connection';
-import { initBrowsingSignals } from './utils/browsing-signals';
 import {
   pdfViewerRegistry,
   currentPdfBridgeRef,
@@ -87,7 +86,6 @@ import {
   handleRefreshButtonClick,
   refreshFile,
   refreshCurrentFile,
-  _resetDwell,
   _setPendingAnnotation,
   set_setPendingAnnotation,
 } from './app-actions';
@@ -111,7 +109,6 @@ import {
     syncAnnotationsForCurrentFile,
     updateToolbarButtons,
     evictPdfViewer,
-    resetDwell: () => _resetDwell?.(),
   });
 
   // 初始化内容渲染模块
@@ -142,8 +139,6 @@ import {
   initSidebarWidth();
   initSidebarCollapsed();
   setupSidebarCollapse();
-  initBrowsingSignals();
-
   // 初始化字体缩放
   initZoom({
     getCurrentFile: () => state.currentFile ?? undefined,

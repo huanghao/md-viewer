@@ -171,7 +171,13 @@ function scrollCurrentFileIntoView(container: HTMLElement): void {
     const currentItem = container.querySelector('.file-item.current, .tree-item.current') as HTMLElement;
     if (!currentItem) return;
 
-    const targetScrollTop = currentItem.offsetTop - (container.clientHeight * 0.4);
+    // Use getBoundingClientRect to get position relative to the container,
+    // avoiding offsetTop's dependency on offsetParent which may not be container.
+    const containerRect = container.getBoundingClientRect();
+    const itemRect = currentItem.getBoundingClientRect();
+    const itemTopRelative = itemRect.top - containerRect.top + container.scrollTop;
+
+    const targetScrollTop = itemTopRelative - (container.clientHeight * 0.4);
     const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
     const clampedTop = Math.max(0, Math.min(targetScrollTop, maxScrollTop));
 

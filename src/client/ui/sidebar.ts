@@ -158,6 +158,10 @@ let fileDragState: FileDragState | null = null;
 import { attachPathAutocomplete } from './path-autocomplete';
 import { renderRagSearchPanel } from './rag-search-panel';
 
+export function resetSidebarFileAnchor(): void {
+  hasAutoAnchoredCurrentFile = false;
+}
+
 // 将当前打开的文件滚动到侧边栏40%位置
 function scrollCurrentFileIntoView(container: HTMLElement): void {
   if (!state.currentFile) return;

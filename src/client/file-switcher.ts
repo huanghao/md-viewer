@@ -8,7 +8,7 @@ import {
 } from './state';
 import { addWorkspace } from './workspace';
 import { loadFile, searchFiles, openFile, detectPathType } from './api/files';
-import { renderSidebar } from './ui/sidebar';
+import { renderSidebar, resetSidebarFileAnchor } from './ui/sidebar';
 import { showSuccess, showError, showInfo } from './ui/toast';
 import { renderContent } from './content-renderer';
 import { isHtmlPath, isPdfPath, isUrlPath } from './content-renderer';
@@ -243,6 +243,7 @@ export async function switchFile(path: string) {
   }
   switchToFile(path);
   updateZoomDisplay(true);
+  resetSidebarFileAnchor();
   renderSidebar();
 
   // Immediately show loading state to avoid stale TOC during transition

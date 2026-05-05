@@ -126,7 +126,7 @@ export function renderTabsHTML(
     <div class="tab-manager-wrap">
       <button class="tab-manager-toggle ${tabManagerIsOpen ? 'active' : ''}" type="button"
               data-action="toggle-tab-manager">≡ Tabs (${filesWithDisplay.length})</button>
-      <div class="tab-manager-panel ${tabManagerIsOpen ? 'show' : ''}" onclick="event.stopPropagation()">
+      <div class="tab-manager-panel ${tabManagerIsOpen ? 'show' : ''}"
         <div class="tab-manager-row tab-manager-actions-row">
           <button class="tab-manager-action" type="button" data-action="batch-action" data-batch="close-others">关闭其他 (${batchCount.others})</button>
           <button class="tab-manager-action" type="button" data-action="batch-action" data-batch="close-right">关闭右侧 (${batchCount.right})</button>
@@ -170,18 +170,7 @@ function scrollCurrentFileIntoView(container: HTMLElement): void {
   requestAnimationFrame(() => {
     const currentItem = container.querySelector('.file-item.current, .tree-item.current') as HTMLElement;
     if (!currentItem) return;
-
-    // Use getBoundingClientRect to get position relative to the container,
-    // avoiding offsetTop's dependency on offsetParent which may not be container.
-    const containerRect = container.getBoundingClientRect();
-    const itemRect = currentItem.getBoundingClientRect();
-    const itemTopRelative = itemRect.top - containerRect.top + container.scrollTop;
-
-    const targetScrollTop = itemTopRelative - (container.clientHeight * 0.4);
-    const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
-    const clampedTop = Math.max(0, Math.min(targetScrollTop, maxScrollTop));
-
-    container.scrollTo({ top: clampedTop, behavior: 'auto' });
+    currentItem.scrollIntoView({ block: 'nearest' });
     hasAutoAnchoredCurrentFile = true;
   });
 }

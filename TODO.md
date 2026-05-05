@@ -1,17 +1,7 @@
 # 待完成任务
 
-## Swift App 集成改造（打包时）
-当前开发模式已改为标准静态文件架构（public/index.html + dist/），但 Swift App 打包时
-仍使用旧的内联 HTML 方案（embedded-client.ts + html.ts 动态生成）。
-后续改造方向：
-- 把 dist/ 静态文件放入 Swift App Bundle Resources
-- Swift WebView 改为 loadFileURL 加载本地文件（或让 Bun 服务静态文件）
-- 删除 embedded-client.ts、html.ts、css.ts、vendor-css.ts
-
 ## 一堆小问题
 - 评论还有bug，测试一下看看
-- review测试
-- 哪些通知消息是不会自动消失的，各个消息的消失时间都看一下
 
 ## 页面列表一致在定时刷新，还有哪些地方，要怎么处理
 

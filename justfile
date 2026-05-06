@@ -26,9 +26,6 @@ test coverage="":
         bun test --only-failures tests/unit/
     fi
 
-e2e:
-    bun run test:e2e
-
 # ── 构建 ──────────────────────────────────────────────
 # 构建前端资源（一次性，不 watch）
 build-client:

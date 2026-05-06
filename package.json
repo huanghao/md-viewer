@@ -12,6 +12,7 @@
     "dev": "bun --watch run src/server.ts",
     "build": "bun run build:client && bun run scripts/embed-client.ts && bun build src/cli.ts --compile --outfile=mdv",
     "cli": "bun run src/cli.ts",
+    "test": "bun test tests/unit",
     "test:e2e": "playwright test",
     "test:e2e:video": "playwright test -c playwright.video.config.ts",
     "test:e2e:headed": "playwright test --headed",

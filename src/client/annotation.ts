@@ -79,6 +79,7 @@ import {
   autoResizeReplyInput,
   autoResizeComposerInput,
 } from './annotation/thread-manager';
+import { getDiffViewActive } from './diff-view';
 
 export type { Annotation, AnnotationThreadItem };
 export {
@@ -879,6 +880,19 @@ export function handleSelectionForAnnotation(filePath: string | null): void {
   const range = selection.getRangeAt(0);
   if (!el.reader.contains(range.commonAncestorContainer)) return;
 
+  const diffActive = getDiffViewActive();
+
+  // In diff view: block annotations on deleted text; allow on inserted/equal text
+  if (diffActive) {
+    const ancestor = range.commonAncestorContainer as Element;
+    const inDeleteBlock = !!(ancestor.closest?.('.diff-block-delete, .diff-block-modify-del') ||
+      (ancestor.nodeType === 3 && (ancestor.parentElement?.closest('.diff-block-delete, .diff-block-modify-del'))));
+    if (inDeleteBlock) {
+      showToast({ message: '旧版本文字无法评论', type: 'warning', duration: 2500 });
+      return;
+    }
+  }
+
   const selectionText = selection.toString().trim();
   if (!selectionText) return;
 
@@ -890,10 +904,15 @@ export function handleSelectionForAnnotation(filePath: string | null): void {
     start = -1;
     end = 0;
   }
+
+  // In diff view the DOM contains both old and new text so global offsets are
+  // wrong relative to the normal-view render. Force fuzzy-anchor mode so that
+  // resolveAnnotationAnchor uses quote+prefix+suffix matching instead.
+  const effectiveStart = diffActive ? -1 : start;
+  const effectiveLength = diffActive ? 0 : (positionValid ? end - start : 0);
+  const effectiveConfidence = diffActive ? 0 : (positionValid ? 1 : 0);
+
   const fullText = getReaderText(el.reader);
-  // Use fullText slice as quote so it matches the anchor text (katex skipped).
-  // quote = fullText slice for stable anchor matching (katex skipped).
-  // displayQuote = original selection text so the formula renders in the UI.
   const quote = positionValid ? fullText.slice(start, end) : selectionText;
   const displayQuote = positionValid && selectionText !== quote ? selectionText : undefined;
   const prefixWindow = 200;
@@ -908,22 +927,18 @@ export function handleSelectionForAnnotation(filePath: string | null): void {
     quoteSuffix,
   });
 
-  // For multi-line selections getBoundingClientRect().right is the rightmost edge
-  // of the entire selection box (often the content area edge), not the end of the
-  // selected text. Use the last client rect so the toolbar appears near where the
-  // selection actually ends.
   const rects = range.getClientRects();
   const lastRect = rects.length > 0 ? rects[rects.length - 1] : range.getBoundingClientRect();
   showQuickAdd(lastRect.right + 6, lastRect.top - 8, {
     id: `ann-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-    start,
-    length: positionValid ? end - start : 0,
+    start: effectiveStart,
+    length: effectiveLength,
     quote,
     displayQuote,
     quotePrefix,
     quoteSuffix: positionValid ? fullText.slice(end, Math.min(fullText.length, end + suffixWindow)) : '',
     status: 'anchored',
-    confidence: positionValid ? 1 : 0,
+    confidence: effectiveConfidence,
   });
 }
 

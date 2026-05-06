@@ -656,6 +656,42 @@ export function updateAnnotationStatus(
   return { ok: true, updated: updatedRow ? mapRowToAnnotation(updatedRow) : undefined };
 }
 
+export interface ResolvedAnnotationEntry extends StoredAnnotation {
+  docPath: string;
+  updatedAt: number;
+}
+
+export function listRecentlyResolvedAnnotations(
+  limit: number = 10,
+  docPath?: string
+): ResolvedAnnotationEntry[] {
+  const db = getDb();
+  const rows = docPath
+    ? db.query(
+        `SELECT id, serial, doc_path, start, length, quote, note, thread_json,
+                created_at, updated_at, quote_prefix, quote_suffix, status,
+                confidence, page, file_type, rect_coords_json
+         FROM annotations
+         WHERE status = 'resolved' AND doc_path = ?
+         ORDER BY updated_at DESC
+         LIMIT ?`
+      ).all(normalizeDocPath(docPath), limit)
+    : db.query(
+        `SELECT id, serial, doc_path, start, length, quote, note, thread_json,
+                created_at, updated_at, quote_prefix, quote_suffix, status,
+                confidence, page, file_type, rect_coords_json
+         FROM annotations
+         WHERE status = 'resolved'
+         ORDER BY updated_at DESC
+         LIMIT ?`
+      ).all(limit);
+  return (rows as any[]).map((row) => ({
+    ...mapRowToAnnotation(row),
+    docPath: row.doc_path as string,
+    updatedAt: row.updated_at as number,
+  }));
+}
+
 export function clearAllAnnotations(): { deleted: number; documents: number } {
   const database = getDb();
   const row = database

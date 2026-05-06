@@ -84,6 +84,7 @@ const FOCUS_WINDOW_MS: Record<string, number> = {
   '8h':  8  * 3600 * 1000,
   '1d':  1  * 86400 * 1000,
   '2d':  2  * 86400 * 1000,
+  '1w':  7  * 86400 * 1000,
 };
 
 // ── Open-signal cache (for 读 strategy) ──────────────────────────────────────
@@ -209,6 +210,7 @@ function renderFilterBar(): string {
     { key: '8h', label: '8h' },
     { key: '1d', label: '1d' },
     { key: '2d', label: '2d' },
+    { key: '1w', label: '1w' },
   ];
 
   // 当前生效的标签

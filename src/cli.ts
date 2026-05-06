@@ -8,7 +8,7 @@ import { resolve, join, dirname } from "path";
 import { existsSync, readFileSync, writeFileSync, unlinkSync, statSync, openSync } from "fs";
 import { spawn } from "child_process";
 import { loadConfig, getConfigDir, getConfigPath, initConfig } from "./config.ts";
-import { appendAnnotationReply, getAnnotationsByDocument, listAnnotatedDocuments, tidyAnnotations, tidyMissingFiles } from "./annotation-storage.ts";
+import { appendAnnotationReply, getAnnotationsByDocument, listAnnotatedDocuments, listRecentlyResolvedAnnotations, tidyAnnotations, tidyMissingFiles, updateAnnotationStatus, type ResolvedAnnotationEntry } from "./annotation-storage.ts";
 import { findGitRoot, filterCommentDocsByWorkspace } from "./comments-filter.ts";
 
 function formatRelativeTime(ts: number): string {
@@ -770,6 +770,89 @@ function runTidy(days: number, missing: boolean, json: boolean): void {
   }
 }
 
+async function reopenComment(filePath: string | undefined, nth: number | undefined): Promise<void> {
+  const LIMIT = 10;
+  const resolved = listRecentlyResolvedAnnotations(LIMIT, filePath);
+
+  if (resolved.length === 0) {
+    console.log(filePath
+      ? `✅ ${filePath} 没有已解决的评论`
+      : '✅ 没有已解决的评论');
+    return;
+  }
+
+  // --nth 直接指定，不弹交互
+  if (nth !== undefined) {
+    if (nth < 1 || nth > resolved.length) {
+      console.error(`❌ --nth ${nth} 超出范围，最近共 ${resolved.length} 条已解决评论`);
+      process.exit(1);
+    }
+    const ann = resolved[nth - 1];
+    const nextStatus = (ann.confidence || 0) <= 0 ? 'unanchored' : 'anchored';
+    const result = updateAnnotationStatus(ann.docPath, { id: ann.id }, nextStatus as any);
+    if (!result.ok) {
+      console.error(`❌ 重新打开失败: ${result.error}`);
+      process.exit(1);
+    }
+    const displayPath = ann.docPath.split('/').slice(-2).join('/');
+    const quote = ann.quote.substring(0, 30);
+    console.log(`✓ 已重新打开：[${displayPath}] #${ann.serial} "${quote}${quote.length >= 30 ? '…' : ''}"`);
+    return;
+  }
+
+  // 交互式
+  const relPath = (p: string) => p.split('/').slice(-2).join('/');
+  const formatTime = (ts: number) => {
+    const diff = Date.now() - ts;
+    const d = Math.floor(diff / 86400000);
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor(diff / 60000);
+    if (d >= 1) return `${d} 天前`;
+    if (h >= 1) return `${h} 小时前`;
+    return `${Math.max(1, m)} 分钟前`;
+  };
+
+  console.log(`最近已解决的评论（最近 ${resolved.length} 条）：\n`);
+  for (const [i, ann] of resolved.entries()) {
+    const quote = ann.quote.substring(0, 30);
+    const ellipsis = quote.length >= 30 ? '…' : '';
+    console.log(`  #${i + 1}  [${relPath(ann.docPath)}]  #${ann.serial} | "${quote}${ellipsis}"   解决于 ${formatTime(ann.updatedAt)}`);
+  }
+
+  process.stdout.write(`\n输入序号 (1-${resolved.length}) 重新打开，或按 Ctrl+C 取消：> `);
+
+  const input = await new Promise<string>((resolveInput) => {
+    process.stdin.resume();
+    process.stdin.setEncoding('utf8');
+    let buf = '';
+    process.stdin.on('data', (chunk: string) => {
+      buf += chunk;
+      const nl = buf.indexOf('\n');
+      if (nl >= 0) {
+        process.stdin.pause();
+        resolveInput(buf.slice(0, nl).trim());
+      }
+    });
+  });
+
+  const idx = parseInt(input, 10);
+  if (!Number.isFinite(idx) || idx < 1 || idx > resolved.length) {
+    console.error('❌ 无效序号，已取消');
+    process.exit(1);
+  }
+
+  const ann = resolved[idx - 1];
+  const nextStatus = (ann.confidence || 0) <= 0 ? 'unanchored' : 'anchored';
+  const result = updateAnnotationStatus(ann.docPath, { id: ann.id }, nextStatus as any);
+  if (!result.ok) {
+    console.error(`❌ 重新打开失败: ${result.error}`);
+    process.exit(1);
+  }
+  const displayPath = ann.docPath.split('/').slice(-2).join('/');
+  const quote = ann.quote.substring(0, 30);
+  console.log(`✓ 已重新打开：[${displayPath}] #${ann.serial} "${quote}${quote.length >= 30 ? '…' : ''}"`);
+}
+
 function showCommentsStats(): void {
   const docs = listAnnotatedDocuments(1000, 0);
 
@@ -878,6 +961,8 @@ MD Viewer CLI - 命令行工具
                                        批量回复评论
   mdv comments stats                   评论统计
   mdv comments tidy [--days <N>] [--missing]  清理过期评论；--missing 同时清理已删除文件的评论
+  mdv comments reopen [--file <FILE>] [--nth <N>]
+                                       重新打开已解决评论（不加 --nth 则交互式选择）
   mdv todos [list]                    列出所有 Todo（默认全部）
   mdv todos list --done false         只看未完成
   mdv todos list --done true          只看已完成
@@ -899,6 +984,7 @@ MD Viewer CLI - 命令行工具
   --input <PATH|->                     批量回复输入（JSON 文件路径或 stdin）
   --days <N>                           清理天数阈值（用于 tidy，默认 7）
   --missing                            同时清理已删除文件的评论（用于 tidy）
+  --nth <N>                            倒数第 N 个已解决评论（用于 reopen）
 
 示例:
   mdv README.md                        打开文件
@@ -918,6 +1004,9 @@ MD Viewer CLI - 命令行工具
   mdv comments reply --file README.md --seq 2 --author codex --text "我会补充这部分"
   mdv comments reply-batch --file README.md --author codex --input replies.json
   mdv comments stats                   评论统计
+  mdv comments reopen                  交互式选择重新打开已解决评论
+  mdv comments reopen --nth 2          重新打开倒数第 2 条已解决评论
+  mdv comments reopen --file README.md --nth 1  指定文件的倒数第 1 条
 
 配置文件:
   ${getConfigPath()}
@@ -943,6 +1032,7 @@ interface CliOptions {
   days?: number;
   missing?: boolean;
   done?: string;
+  nth?: number;
 }
 
 function parseArgs(args: string[]): {
@@ -999,6 +1089,8 @@ function parseArgs(args: string[]): {
       options.missing = true;
     } else if (arg === "--done") {
       options.done = args[++i];
+    } else if (arg === "--nth") {
+      options.nth = parseInt(args[++i], 10);
     } else if (arg === "--all") {
       options.all = true;
     } else if (!arg.startsWith("-")) {
@@ -1151,9 +1243,11 @@ async function main() {
         ? Math.floor(Number(options.days))
         : 7;
       runTidy(days, options.missing === true, options.json);
+    } else if (subcmd === "reopen") {
+      await reopenComment(options.file, options.nth);
     } else {
       console.error(`❌ 未知的 comments 子命令: ${subcmd}`);
-      console.error(`   可用: list, get, reply, reply-batch, stats, tidy`);
+      console.error(`   可用: list, get, reply, reply-batch, stats, tidy, reopen`);
       process.exit(1);
     }
   } else if (cmd === "todos") {

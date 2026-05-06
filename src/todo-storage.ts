@@ -56,13 +56,19 @@ function withFileMissing(todo: StoredTodo): StoredTodo {
   return { ...todo, fileMissing: !existsSync(todo.filePath) };
 }
 
-export function listTodos(filter: { done?: boolean } = {}): StoredTodo[] {
+export function listTodos(filter: { done?: boolean; workspaceRoot?: string | null } = {}): StoredTodo[] {
+  let rows: any[];
   if (filter.done === undefined) {
-    const rows = getDb().query('SELECT * FROM todos ORDER BY created_at DESC').all();
-    return (rows as any[]).map(rowToTodo).map(withFileMissing);
+    rows = getDb().query('SELECT * FROM todos ORDER BY created_at DESC').all() as any[];
+  } else {
+    rows = getDb().query('SELECT * FROM todos WHERE done = ? ORDER BY created_at DESC').all(filter.done ? 1 : 0) as any[];
   }
-  const rows = getDb().query('SELECT * FROM todos WHERE done = ? ORDER BY created_at DESC').all(filter.done ? 1 : 0);
-  return (rows as any[]).map(rowToTodo).map(withFileMissing);
+  let todos = rows.map(rowToTodo).map(withFileMissing);
+  if (filter.workspaceRoot) {
+    const prefix = filter.workspaceRoot + '/';
+    todos = todos.filter(t => t.filePath === filter.workspaceRoot || t.filePath.startsWith(prefix));
+  }
+  return todos;
 }
 
 export function updateTodo(id: string, patch: { done?: boolean; note?: string }): StoredTodo | null {

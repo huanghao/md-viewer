@@ -963,9 +963,9 @@ MD Viewer CLI - 命令行工具
   mdv comments tidy [--days <N>] [--missing]  清理过期评论；--missing 同时清理已删除文件的评论
   mdv comments reopen [--file <FILE>] [--nth <N>]
                                        重新打开已解决评论（不加 --nth 则交互式选择）
-  mdv todos [list]                    列出所有 Todo（默认全部）
-  mdv todos list --done false         只看未完成
-  mdv todos list --done true          只看已完成
+  mdv todos [list]                    列出当前工作区未完成的 Todo（默认）
+  mdv todos list --all                列出全库 Todo（跨工作区）
+  mdv todos list --include-done       同时包含已完成的 Todo
   mdv todos list --json               JSON 格式输出
   mdv todos tidy [--days <N>]         清理 N 天前已完成的 Todo（默认 30 天）
   mdv todos tidy --missing            同时清理来源文件已删除的 Todo
@@ -1031,7 +1031,7 @@ interface CliOptions {
   daemon: boolean;
   days?: number;
   missing?: boolean;
-  done?: string;
+  includeDone?: boolean;
   nth?: number;
 }
 
@@ -1087,8 +1087,8 @@ function parseArgs(args: string[]): {
       options.days = parseInt(args[++i], 10);
     } else if (arg === "--missing") {
       options.missing = true;
-    } else if (arg === "--done") {
-      options.done = args[++i];
+    } else if (arg === "--include-done") {
+      options.includeDone = true;
     } else if (arg === "--nth") {
       options.nth = parseInt(args[++i], 10);
     } else if (arg === "--all") {
@@ -1255,14 +1255,13 @@ async function main() {
 
     if (todosSubcmd === "list") {
       const { listTodos } = await import("./todo-storage.ts");
-      const doneFlag = options.done;
-      const filter = doneFlag === "true" ? { done: true }
-                   : doneFlag === "false" ? { done: false }
-                   : {};
-      const todos = listTodos(filter);
+      const workspaceRoot = options.all ? null : findGitRoot(process.cwd());
+      const doneFilter = options.includeDone ? {} : { done: false as const };
+      const todos = listTodos({ ...doneFilter, workspaceRoot });
       if (options.json) {
-        console.log(JSON.stringify(todos, null, 2));
+        console.log(JSON.stringify({ workspaceRoot, todos }, null, 2));
       } else {
+        if (workspaceRoot) console.log(`# Todo（${workspaceRoot}）`);
         if (todos.length === 0) {
           console.log("暂无 Todo");
         } else {

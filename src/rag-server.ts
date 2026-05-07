@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { loadModel, scanWorkspace, watchWorkspace, getEmbedder } from "./rag-indexer.ts";
+import { loadModel, scanWorkspace, watchWorkspace, getEmbedder, getIndexStats, embedTextsForSearch } from "./rag-indexer.ts";
 import { getWorkspacePaths } from "./rag-storage.ts";
 import { getVectorCache } from "./rag-vector-cache.ts";
 
@@ -19,12 +19,16 @@ app.get("/search", async (c) => {
   const limit = Math.min(parseInt(c.req.query("limit") ?? "10"), 50);
   if (!q) return c.json({ results: [], queryTime: 0 });
 
-  const embedder = getEmbedder();
-  if (!embedder) return c.json({ results: [], error: "model_loading" });
+  if (!getEmbedder()) return c.json({ results: [], error: "model_loading" });
 
   const t0 = Date.now();
-  const out = await (embedder as any)([q], { pooling: "mean", normalize: true });
-  const queryVec = out.data.slice(0, out.data.length) as Float32Array;
+  let queryVec: Float32Array;
+  try {
+    const vecs = await embedTextsForSearch([q]);
+    queryVec = vecs[0];
+  } catch {
+    return c.json({ results: [], error: "embed_failed" });
+  }
 
   const chunks = getVectorCache();
   const scored = chunks.map(ch => ({ ...ch, score: cosine(queryVec, ch.vector) }));
@@ -41,6 +45,8 @@ app.get("/search", async (c) => {
 });
 
 app.get("/health", (c) => c.json({ status: "ok" }));
+
+app.get("/status", (c) => c.json(getIndexStats()));
 
 async function fetchWorkspacePaths(): Promise<string[]> {
   try {

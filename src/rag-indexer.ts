@@ -1,58 +1,123 @@
-import { pipeline, env } from "@huggingface/transformers";
 import { statSync, existsSync } from "fs";
 import { join, extname } from "path";
 import { collectWorkspaceMdFiles } from "./workspace-scanner.ts";
 import chokidar from "chokidar";
 import { chunkMarkdown } from "./rag-chunker.ts";
 import { upsertFileChunks, deleteFileChunks, getFileMtime, getMeta, setMeta } from "./rag-storage.ts";
-import { invalidateChunksForPath, appendChunks } from "./rag-vector-cache.ts";
+import { invalidateChunksForPath, appendChunks, getVectorCache } from "./rag-vector-cache.ts";
 
 export const MODEL_NAME = "Xenova/paraphrase-multilingual-MiniLM-L12-v2";
 const MODEL_DTYPE = "q8";
-env.cacheDir = join(process.env.HOME ?? "~", ".cache", "huggingface");
 
-let embedder: Awaited<ReturnType<typeof pipeline>> | null = null;
+// ── Worker state ─────────────────────────────────────────────────────────────
 
-export function getEmbedder() {
-  return embedder;
+type ModelStatus = "loading" | "ready" | "error";
+
+let worker: Worker | null = null;
+let modelStatus: ModelStatus = "loading";
+let pendingId = 0;
+const pending = new Map<number, { resolve: (v: Float32Array[]) => void; reject: (e: Error) => void }>();
+
+export function getModelStatus(): ModelStatus {
+  return modelStatus;
 }
 
-export async function loadModel(): Promise<void> {
-  console.log("[rag] Loading embedding model (first run downloads ~118MB to ~/.cache/huggingface)...");
-  embedder = await pipeline("feature-extraction", MODEL_NAME, { dtype: MODEL_DTYPE });
-  console.log("[rag] Model ready.");
+// Backwards-compat shim used by rag-server.ts search handler
+export function getEmbedder(): unknown {
+  return modelStatus === "ready" ? true : null;
+}
 
-  const { getDb } = await import("./rag-storage.ts");
-  const storedName = getMeta("model_name");
-  const storedDtype = getMeta("model_dtype");
-  if ((storedName && storedName !== MODEL_NAME) || (storedDtype && storedDtype !== MODEL_DTYPE)) {
-    console.log("[rag] Model config changed, clearing old vectors...");
-    getDb().exec("DELETE FROM rag_vectors; DELETE FROM rag_chunks;");
-    const { resetCache } = await import("./rag-vector-cache.ts");
-    resetCache();
+// ── Index queue stats (exported for /status) ─────────────────────────────────
+
+let _queueSize = 0;
+let _indexedFiles = 0;
+let _lastIndexedAt: number | null = null;
+
+export function getIndexStats() {
+  return {
+    modelStatus,
+    queueSize: _queueSize,
+    indexedFiles: _indexedFiles,
+    totalChunks: getVectorCache().length,
+    lastIndexedAt: _lastIndexedAt,
+  };
+}
+
+// ── Worker init ───────────────────────────────────────────────────────────────
+
+export function loadModel(): Promise<void> {
+  console.log("[rag] Starting embed worker (model: " + MODEL_NAME + ")...");
+
+  worker = new Worker(new URL("./rag-embed-worker.ts", import.meta.url), { type: "module" });
+
+  // Resolve once model signals "ready"
+  return new Promise<void>((resolve, reject) => {
+    worker!.onmessage = async (event: MessageEvent) => {
+      const msg = event.data;
+      if (msg.type === "status") {
+        modelStatus = msg.status;
+        if (msg.status === "ready") {
+          console.log("[rag] Model ready.");
+          // Check if model config changed → clear old vectors
+          const { getDb } = await import("./rag-storage.ts");
+          const storedName = getMeta("model_name");
+          const storedDtype = getMeta("model_dtype");
+          if ((storedName && storedName !== MODEL_NAME) || (storedDtype && storedDtype !== MODEL_DTYPE)) {
+            console.log("[rag] Model config changed, clearing old vectors...");
+            getDb().exec("DELETE FROM rag_vectors; DELETE FROM rag_chunks;");
+            const { resetCache } = await import("./rag-vector-cache.ts");
+            resetCache();
+          }
+          setMeta("model_name", MODEL_NAME);
+          setMeta("model_dtype", MODEL_DTYPE);
+          // Switch to normal message handler for embed requests
+          worker!.onmessage = handleWorkerMessage;
+          resolve();
+        }
+        return;
+      }
+      // embed responses that arrive before ready (shouldn't happen, but safe)
+      handleWorkerMessage(event);
+    };
+    worker!.onerror = (e) => {
+      console.error("[rag] Worker error:", e.message);
+      modelStatus = "error";
+      reject(new Error(e.message));
+    };
+  });
+}
+
+function handleWorkerMessage(event: MessageEvent) {
+  const msg = event.data;
+  if (msg.type === "status") {
+    modelStatus = msg.status;
+    return;
   }
-  setMeta("model_name", MODEL_NAME);
-  setMeta("model_dtype", MODEL_DTYPE);
+  const p = pending.get(msg.id);
+  if (!p) return;
+  pending.delete(msg.id);
+  if (msg.error) p.reject(new Error(msg.error));
+  else p.resolve(msg.vectors as Float32Array[]);
 }
 
-const EMBED_BATCH_SIZE = 4;
+// ── Embed via worker ──────────────────────────────────────────────────────────
 
 async function embedTexts(texts: string[]): Promise<Float32Array[]> {
-  if (!embedder) throw new Error("Model not loaded");
-  const results: Float32Array[] = [];
-  for (let i = 0; i < texts.length; i += EMBED_BATCH_SIZE) {
-    const batch = texts.slice(i, i + EMBED_BATCH_SIZE);
-    const output = await (embedder as any)(batch, { pooling: "mean", normalize: true });
-    const dim = output.data.length / batch.length;
-    for (let j = 0; j < batch.length; j++) {
-      results.push(output.data.slice(j * dim, (j + 1) * dim) as Float32Array);
-    }
-  }
-  return results;
+  if (!worker || modelStatus !== "ready") throw new Error("model_not_ready");
+  const id = ++pendingId;
+  return new Promise((resolve, reject) => {
+    pending.set(id, { resolve, reject });
+    worker!.postMessage({ id, texts });
+  });
 }
 
+// Exported for rag-server.ts /search handler
+export { embedTexts as embedTextsForSearch };
+
+// ── File indexing ─────────────────────────────────────────────────────────────
+
 export async function indexFile(filePath: string): Promise<void> {
-  if (!embedder) return;
+  if (modelStatus !== "ready") return;
   try {
     const stat = statSync(filePath);
     const mtime = stat.mtimeMs;
@@ -86,18 +151,19 @@ export async function indexFile(filePath: string): Promise<void> {
     upsertFileChunks(ragChunks, vectors);
     invalidateChunksForPath(filePath);
     appendChunks(ragChunks.map((c, i) => ({
-      id: -1, // not used in search
+      id: -1,
       path: c.path,
       heading: c.heading,
       text: c.text,
       charStart: c.charStart,
       vector: vectors[i],
     })));
+    _indexedFiles++;
+    _lastIndexedAt = Date.now();
   } catch (e) {
     console.error(`[rag] Error indexing ${filePath}:`, e);
   }
 }
-
 
 export async function scanWorkspace(workspacePath: string): Promise<void> {
   console.log(`[rag] Scanning workspace: ${workspacePath}`);
@@ -107,9 +173,10 @@ export async function scanWorkspace(workspacePath: string): Promise<void> {
     await indexFile(f);
     await new Promise(r => setTimeout(r, 0));
   }
-
   console.log(`[rag] Workspace scan complete: ${workspacePath}`);
 }
+
+// ── Index queue ───────────────────────────────────────────────────────────────
 
 const indexQueue: Set<string> = new Set();
 let queueRunning = false;
@@ -118,10 +185,12 @@ async function drainQueue(): Promise<void> {
   if (queueRunning) return;
   queueRunning = true;
   while (indexQueue.size > 0) {
+    _queueSize = indexQueue.size;
     const path = indexQueue.values().next().value!;
     indexQueue.delete(path);
     await indexFile(path);
   }
+  _queueSize = 0;
   queueRunning = false;
 }
 
@@ -145,9 +214,7 @@ export function watchWorkspace(workspacePath: string): void {
     ignored: (p: string) => {
       const name = p.split("/").pop() ?? "";
       if (name.startsWith(".")) return true;
-      // skip non-md files (avoid watching large binary/data dirs)
       if (name.includes(".") && ![".md", ".markdown"].includes(extname(name))) return true;
-      // skip always-ignored dirs by name
       if (/(node_modules|\.git|\.pytest_cache|\.claude)/.test(p)) return true;
       return false;
     },

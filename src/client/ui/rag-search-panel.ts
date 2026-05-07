@@ -132,10 +132,14 @@ async function runSearch(q: string): Promise<void> {
     const data = await resp.json() as { results: RagResult[]; error?: string };
     results = data.results ?? [];
     activeIdx = 0;
+    if (data.error === 'rag_unavailable' && results.length === 0) {
+      if (area) area.innerHTML = `<div class="rag-empty">语义搜索服务启动中，请稍后重试</div>`;
+      return;
+    }
     renderRagResults();
   } catch {
     results = [];
-    renderRagResults();
+    if (area) area.innerHTML = `<div class="rag-empty">搜索服务暂不可用</div>`;
   }
 }
 

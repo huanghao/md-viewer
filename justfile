@@ -44,7 +44,6 @@ build-app: build-server
     bash scripts/build/build_app_bundle.sh --ad-hoc
 
 # ── 发布 ──────────────────────────────────────────────
-# 发布新版本（构建所有平台 + 打包）
+# 构建所有平台二进制
 release version:
     bash scripts/build-all.sh {{version}}
-    bash scripts/package.sh {{version}}

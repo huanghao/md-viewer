@@ -16,41 +16,15 @@
 
 ## 安装
 
-### Homebrew（推荐）
-
 ```bash
-# 添加 tap
-brew tap huanghao/tap
-
-# 安装
-brew install md-viewer
-```
-
-或直接安装：
-
-```bash
-brew install huanghao/tap/md-viewer
-```
-
-### 从源码安装
-
-```bash
-# 克隆仓库
-git clone https://github.com/huanghao/md-viewer.git
-cd md-viewer
-
 # 安装依赖
 bun install
 
 # 构建
 ./scripts/build-all.sh 1.0.0
 
-# 打包
-./scripts/package.sh 1.0.0
-
 # 手动安装（复制到 PATH）
 sudo cp dist/mdv /usr/local/bin/
-sudo cp dist/mdv-iterm2-dispatcher /usr/local/bin/
 ```
 
 ## 快速开始

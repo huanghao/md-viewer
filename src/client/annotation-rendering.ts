@@ -79,14 +79,14 @@ function applySingleAnnotation(ann: Annotation, index?: TextNodeIndex): void {
 
   // 同一文本节点
   if (startPos.node === endPos.node) {
-    const range = document.createRange();
-    range.setStart(startPos.node, startPos.offset);
-    range.setEnd(endPos.node, endPos.offset);
-
-    const wrapper = document.createElement('span');
-    decorateMark(wrapper, ann);
-
     try {
+      const range = document.createRange();
+      range.setStart(startPos.node, startPos.offset);
+      range.setEnd(endPos.node, endPos.offset);
+
+      const wrapper = document.createElement('span');
+      decorateMark(wrapper, ann);
+
       range.surroundContents(wrapper);
     } catch (_err) {
       // Skip

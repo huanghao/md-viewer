@@ -73,7 +73,9 @@ export async function hydrateAnnotationsFromRemote(filePath: string): Promise<vo
     _applyAnnotations();
   } catch (error: any) {
     if (state.currentFilePath !== filePath) return;
-    showError(`评论加载失败: ${error?.message || '未知错误'}`);
+    const msg = error?.message || '未知错误';
+    console.error('[annotation] 评论加载失败:', msg, error);
+    showError(`评论加载失败: ${msg}`);
   }
 }
 

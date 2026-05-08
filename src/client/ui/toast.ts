@@ -28,8 +28,8 @@ export function showToast(options: ToastOptions | string) {
   const config: ToastOptions = typeof options === 'string'
     ? { message: options, type: 'info', duration: 3000 }
     : { type: 'info', duration: 3000, ...options };
-  // Ensure duration is always a valid number (guard against undefined spread)
-  if (!config.duration || config.duration <= 0) config.duration = 3000;
+  // duration=0 means sticky (no auto-close); undefined/negative falls back to 3000
+  if (config.duration === undefined || config.duration < 0) config.duration = 3000;
 
   initToastContainer();
 
@@ -45,8 +45,12 @@ export function showToast(options: ToastOptions | string) {
     info: 'ℹ'
   };
 
+  const isSticky = config.duration === 0;
   const actionHtml = config.action
     ? `<button class="toast-action">${config.action.label}</button>`
+    : '';
+  const closeHtml = isSticky
+    ? `<button class="toast-close" title="关闭">×</button>`
     : '';
   const progressHtml = config.duration && config.duration > 0
     ? `<div class="toast-progress"><div class="toast-progress-bar"></div></div>`
@@ -55,6 +59,7 @@ export function showToast(options: ToastOptions | string) {
     <span class="toast-icon">${icons[config.type!]}</span>
     <span class="toast-message">${config.message}</span>
     ${actionHtml}
+    ${closeHtml}
     ${progressHtml}
   `;
 
@@ -90,10 +95,19 @@ export function showToast(options: ToastOptions | string) {
     });
   }
 
-  // 点击 toast 本身关闭（不含 action 按钮）
-  toast.addEventListener('click', () => {
-    hideToast(toast);
-  });
+  if (isSticky) {
+    // sticky toast：只有 × 按钮关闭，允许用户选中文字复制
+    const closeBtn = toast.querySelector('.toast-close') as HTMLButtonElement | null;
+    closeBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      hideToast(toast);
+    });
+  } else {
+    // 普通 toast：点击任意位置关闭
+    toast.addEventListener('click', () => {
+      hideToast(toast);
+    });
+  }
 
   return toast;
 }
@@ -113,7 +127,7 @@ export function showSuccess(message: string, duration = 3000) {
   return showToast({ message, type: 'success', duration });
 }
 
-export function showError(message: string, duration = 3000) {
+export function showError(message: string, duration = 0) {
   return showToast({ message, type: 'error', duration });
 }
 

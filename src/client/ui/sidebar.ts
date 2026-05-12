@@ -182,6 +182,14 @@ export function setSidebarTab(tab: 'focus' | 'full' | 'list' | 'search'): void {
     import('./workspace-focus').then(({ refreshFrecencySignals, renderFocusView: _ }) => {
       void refreshFrecencySignals().then(() => renderSidebar());
     });
+  } else if (tab === 'full' && state.currentFile) {
+    // 切换到工作区视图时，自动展开并定位当前文件
+    import('../workspace').then(({ revealFileInWorkspace }) => {
+      void revealFileInWorkspace(state.currentFile!).then(() => {
+        hasAutoAnchoredCurrentFile = false;
+        renderSidebar();
+      });
+    });
   } else {
     renderSidebar();
   }

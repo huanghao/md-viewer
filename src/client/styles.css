@@ -2860,9 +2860,14 @@
     }
     .annotation-item.status-unanchored {
       opacity: 0.65;
+      border-left-color: #c4bda8;
     }
     .annotation-item.status-unanchored:hover {
       opacity: 0.9;
+    }
+    .annotation-item.status-unanchored.is-active {
+      background: #f5f3ee;
+      border-color: #c4bda8;
     }
 
     .annotation-item.is-resolved {
@@ -3273,6 +3278,17 @@
     .annotation-mark.is-active {
       background: #ffe58f;
       border-bottom-color: #d4b106;
+    }
+    .annotation-mark.status-unanchored {
+      background: #f7f4e8;
+      border-bottom-color: #c9b86a;
+    }
+    .annotation-mark.status-unanchored:hover {
+      background: #f0ede0;
+    }
+    .annotation-mark.status-unanchored.is-active {
+      background: #edeadb;
+      border-bottom-color: #b0a05a;
     }
     .annotation-mark-temp {
       background: transparent;

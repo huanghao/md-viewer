@@ -975,7 +975,7 @@ MD Viewer CLI - 命令行工具
 选项:
   --no-focus                           添加文件但不切换焦点
   --json                               JSON 输出（用于脚本）
-  --limit <N>                          结果数量限制（默认 20）
+  --limit <N>                          结果数量限制（默认 100）
   --offset <N>                         结果偏移（默认 0）
   --seq <N>                            评论序号（用于 reply，推荐）
   --id <ID>                            评论唯一 ID（用于 reply）
@@ -1044,7 +1044,7 @@ function parseArgs(args: string[]): {
     noFocus: false,
     json: false,
     all: false,
-    limit: 20,
+    limit: 100,
     offset: 0,
     daemon: false,
   };

@@ -6,7 +6,8 @@ import {
   replaceAnnotationInState,
 } from '../annotation-state';
 import { upsertAnnotationRemote, fetchAnnotations } from '../api/annotations';
-import { adjustAnnotationCount } from '../state';
+import { adjustAnnotationCount, state as appState } from '../state';
+import { isOpen, isUnanchored } from '../../annotation-status';
 import { showError } from '../ui/toast';
 import {
   setSidebarCollapsed,
@@ -69,8 +70,23 @@ export async function hydrateAnnotationsFromRemote(filePath: string): Promise<vo
     if (threadChanged || serialChanged) {
       persistAnnotations(filePath, state.annotations);
     }
+    // 根据真实数据校正 badge 计数，防止乐观更新累计漂移
+    const anchoredCount = remote.filter(a => isOpen(a.status as any)).length;
+    const unanchoredCount = remote.filter(a => isUnanchored(a.status as any)).length;
+    const existing = appState.annotationSummaries.get(filePath);
+    if (anchoredCount === 0 && unanchoredCount === 0) {
+      appState.annotationSummaries.delete(filePath);
+    } else {
+      appState.annotationSummaries.set(filePath, {
+        count: anchoredCount,
+        unanchoredCount,
+        updatedAt: existing?.updatedAt ?? Date.now(),
+      });
+    }
+
     _renderAnnotationList(filePath);
     _applyAnnotations();
+    import('../ui/sidebar').then(({ renderSidebar }) => renderSidebar());
   } catch (error: any) {
     if (state.currentFilePath !== filePath) return;
     const msg = error?.message || '未知错误';

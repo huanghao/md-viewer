@@ -331,6 +331,13 @@ import {
     if (!btn?.dataset.path) return;
     if (btn.dataset.action === 'copy-relative-path') copyRelativePath(btn.dataset.path, ev);
     else if (btn.dataset.action === 'copy-absolute-path') copyAbsolutePath(btn.dataset.path, ev);
+    else if (btn.dataset.action === 'open-in-editor') {
+      fetch('/api/open-in-editor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: btn.dataset.path }),
+      }).catch(() => {});
+    }
   });
 
   setupDragAndDrop();

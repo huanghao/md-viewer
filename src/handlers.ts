@@ -522,6 +522,30 @@ export async function handleOpenLocalFile(c: Context) {
   }
 }
 
+export async function handleOpenInEditor(c: Context) {
+  try {
+    const body = await c.req.json<{ path?: string }>();
+    const rawPath = body?.path?.trim();
+    if (!rawPath) return c.json({ error: "缺少 path 参数" }, 400);
+
+    const resolvedPath = resolve(rawPath);
+    if (!existsSync(resolvedPath)) return c.json({ error: "文件不存在" }, 404);
+
+    const proc = Bun.spawn(["code", resolvedPath], {
+      stdout: "ignore",
+      stderr: "pipe",
+    });
+    const code = await proc.exited;
+    if (code !== 0) {
+      const err = await new Response(proc.stderr).text();
+      return c.json({ error: err || `code 失败，退出码 ${code}` }, 500);
+    }
+    return c.json({ success: true });
+  } catch (error: any) {
+    return c.json({ error: error?.message || "打开失败" }, 500);
+  }
+}
+
 // API: SSE 事件流
 export function handleEvents(c: Context) {
   let client: { controller: ReadableStreamDefaultController<Uint8Array> } | null = null;

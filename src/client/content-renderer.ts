@@ -391,22 +391,18 @@ export function renderBreadcrumb() {
   if (!file) return;
 
   const parts = file.path.split('/').filter(Boolean);
+  const visibleParts = parts.slice(-2);
+  const hasPrefix = parts.length > 2;
 
-  const breadcrumbItems = parts.map((part, index) => {
-    const isLast = index === parts.length - 1;
-    const path = '/' + parts.slice(0, index + 1).join('/');
-
-    if (isLast) {
-      return `<span class="breadcrumb-item active">${escapeHtml(part)}</span>`;
-    }
-
-    return `
-      <span class="breadcrumb-item" title="${escapeAttr(path)}">
-        ${escapeHtml(part)}
-      </span>
-      <span class="breadcrumb-separator">/</span>
-    `;
-  }).join('');
+  const breadcrumbItems = [
+    hasPrefix ? `<span class="breadcrumb-item breadcrumb-ellipsis" title="${escapeAttr(file.path)}">…</span><span class="breadcrumb-separator">/</span>` : '',
+    ...visibleParts.map((part, i) => {
+      const isLast = i === visibleParts.length - 1;
+      return isLast
+        ? `<span class="breadcrumb-item active" title="${escapeAttr(file.path)}">${escapeHtml(part)}</span>`
+        : `<span class="breadcrumb-item" title="${escapeAttr(file.path)}">${escapeHtml(part)}</span><span class="breadcrumb-separator">/</span>`;
+    }),
+  ].join('');
 
   // 显示面包屑路径和复制按钮
   container.innerHTML = `
@@ -429,7 +425,16 @@ export function renderBreadcrumb() {
       </span>
       <span class="copy-tooltip">复制绝对路径</span>
     </button>
+    <button class="copy-filename-button open-in-editor-button" data-action="open-in-editor" data-path="${escapeAttr(file.path)}" title="在 VS Code 中打开">
+      <span class="open-editor-icon">↗</span>
+    </button>
   `;
+
+  const metaEl = document.getElementById('fileMeta');
+  if (metaEl) {
+    const charCount = file.content.trim().length;
+    metaEl.textContent = charCount > 0 ? `${charCount.toLocaleString()} 字` : '';
+  }
 }
 
 // ── Nearby menu ───────────────────────────────────────────────────────────────

@@ -47,6 +47,7 @@ import {
   handleWorkspaceSearch,
   handleGetQuickComments,
   handleUpsertQuickComments,
+  handleOpenInEditor,
 } from "./handlers.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
 
@@ -132,6 +133,7 @@ app.post("/api/detect-path", handleDetectPath);
 // API: CLI 调用 - 打开文件
 app.post("/api/open-file", handleOpenFile);
 app.post("/api/open-local-file", handleOpenLocalFile);
+app.post("/api/open-in-editor", handleOpenInEditor);
 
 // API: SSE 事件流
 app.get("/api/events", handleEvents);

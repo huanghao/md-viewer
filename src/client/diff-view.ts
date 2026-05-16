@@ -86,7 +86,12 @@ export function renderInlineDiffHTML(lines: import('./utils/diff').DiffLine[]): 
   }
 
   const md = (s: string) => {
-    const g = protectMath(s);
+    // Prevent setext heading false-positives: a line of dashes/equals that
+    // immediately follows a non-empty line gets parsed as an h2/h1 underline.
+    // We insert a blank line before any such underline-only line so marked
+    // treats it as a thematic break (hr) instead.
+    const safe = s.replace(/^([^\n]+)\n([-=]{2,}[ \t]*)$/mg, '$1\n\n$2');
+    const g = protectMath(safe);
     return g.restore((window as any).marked.parse(g.protected));
   };
 

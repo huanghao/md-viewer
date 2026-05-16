@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Status Bar Prototype</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #e8eaed;
+    padding: 24px;
+  }
+  :root {
+    --color-text-primary:   #24292e;
+    --color-text-secondary: #57606a;
+    --color-text-muted:     #8b949e;
+    --color-border:         #d0d7de;
+    --color-border-subtle:  #e8ecf0;
+    --color-bg-subtle:      #f6f8fa;
+  }
+
+  .demo-label { font-size: 11px; font-family: monospace; color: #555; margin: 20px 0 6px; }
+  .demo-label:first-of-type { margin-top: 0; }
+
+  /* ── Outer shell: flex column ── */
+  .shell {
+    display: flex;
+    flex-direction: column;
+    height: 240px;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+    border: 1px solid var(--color-border);
+  }
+
+  /* ── Middle row: left sidebar + main + right sidebar ── */
+  .middle {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .left-sidebar {
+    width: 200px;
+    background: #fff;
+    border-right: 1px solid var(--color-border);
+    flex-shrink: 0;
+    padding: 8px 0;
+  }
+  .ls-item { padding: 4px 14px; font-size: 12px; color: var(--color-text-muted); }
+  .ls-item.active { color: var(--color-text-primary); background: #f0f4f8; font-weight: 500; }
+
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    min-width: 0;
+  }
+  .toolbar {
+    height: 48px;
+    background: #fff;
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .breadcrumb { font-size: 12px; color: var(--color-text-secondary); display: flex; align-items: center; gap: 2px; }
+  .breadcrumb .sep { color: #d1d5da; margin: 0 2px; }
+  .breadcrumb .active { color: var(--color-text-primary); font-weight: 500; }
+  .spacer { flex: 1; }
+  .tb-btn {
+    padding: 3px 7px; border: none; background: transparent;
+    color: var(--color-text-secondary); cursor: pointer;
+    border-radius: 4px; font-size: 12px; white-space: nowrap;
+  }
+  .tb-btn:hover { background: var(--color-bg-subtle); }
+  .tb-sep { width: 1px; height: 16px; background: var(--color-border); margin: 0 2px; flex-shrink: 0; }
+  .content { flex: 1; padding: 16px 20px; overflow: hidden; }
+  .content p { font-size: 13px; color: var(--color-text-secondary); line-height: 1.6; }
+
+  .right-sidebar {
+    width: 280px;
+    background: var(--color-bg-subtle);
+    border-left: 1px solid var(--color-border);
+    flex-shrink: 0;
+    padding: 10px 12px;
+  }
+  .rs-header { font-size: 11px; font-weight: 600; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .rs-item { font-size: 12px; color: var(--color-text-secondary); padding: 5px 8px; border-radius: 4px; border-left: 2px solid #3b82f6; background: rgba(59,130,246,0.06); margin-bottom: 5px; line-height: 1.4; }
+
+  /* ── Status bar: child of .shell, below .middle ── */
+  .statusbar {
+    height: 22px;
+    background: var(--color-bg-subtle);
+    border-top: 1px solid var(--color-border-subtle);
+    display: flex;
+    align-items: center;
+    padding: 0 4px;
+    flex-shrink: 0;
+    user-select: none;
+    /* full width of .shell — not affected by any sidebar */
+  }
+  .sb {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 7px;
+    height: 100%;
+    font-size: 11px;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    border-radius: 3px;
+  }
+  .sb:hover { background: rgba(0,0,0,0.05); color: var(--color-text-secondary); }
+  .sb .dot { width: 6px; height: 6px; border-radius: 50%; background: #10b981; flex-shrink: 0; }
+  .sb-spacer { flex: 1; }
+</style>
+</head>
+<body>
+
+<p class="demo-label">▸ 右侧批注栏 关闭</p>
+<div class="shell">
+  <div class="middle">
+    <div class="left-sidebar">
+      <div class="ls-item active">kv-cache.md</div>
+      <div class="ls-item">rag-design.md</div>
+      <div class="ls-item">planning.md</div>
+    </div>
+    <div class="main">
+      <div class="toolbar">
+        <span class="breadcrumb">
+          <span>…</span><span class="sep">/</span>
+          <span>20-concepts</span><span class="sep">/</span>
+          <span class="active">kv-cache.md</span>
+        </span>
+        <button class="tb-btn">⊞</button>
+        <button class="tb-btn">/</button>
+        <span class="spacer"></span>
+        <button class="tb-btn">[± Diff]</button>
+        <button class="tb-btn">[↻ 刷新]</button>
+        <button class="tb-btn">[译]</button>
+        <div class="tb-sep"></div>
+        <button class="tb-btn">− 100% +</button>
+        <div class="tb-sep"></div>
+        <button class="tb-btn">[◫ 监控]</button>
+        <button class="tb-btn">[⚙ 设置]</button>
+      </div>
+      <div class="content"><p>正文内容区域…</p></div>
+    </div>
+  </div>
+  <div class="statusbar">
+    <div class="sb-spacer"></div>
+    <div class="sb">创建于 2025-11-03</div>
+    <div class="sb">3,412 字</div>
+    <div class="sb"><span class="dot"></span> 已连接</div>
+  </div>
+</div>
+
+<p class="demo-label">▸ 右侧批注栏 打开 — 状态栏仍然全宽，不被遮挡</p>
+<div class="shell">
+  <div class="middle">
+    <div class="left-sidebar">
+      <div class="ls-item active">kv-cache.md</div>
+      <div class="ls-item">rag-design.md</div>
+    </div>
+    <div class="main">
+      <div class="toolbar">
+        <span class="breadcrumb">
+          <span>…</span><span class="sep">/</span>
+          <span class="active">kv-cache.md</span>
+        </span>
+        <button class="tb-btn">⊞</button>
+        <span class="spacer"></span>
+        <button class="tb-btn">[± Diff]</button>
+        <button class="tb-btn">[↻ 刷新]</button>
+        <button class="tb-btn">[译]</button>
+        <div class="tb-sep"></div>
+        <button class="tb-btn">− 100% +</button>
+        <div class="tb-sep"></div>
+        <button class="tb-btn">[◫ 监控]</button>
+        <button class="tb-btn">[⚙ 设置]</button>
+      </div>
+      <div class="content"><p>内容区正常，批注栏在右边…</p></div>
+    </div>
+    <div class="right-sidebar">
+      <div class="rs-header">批注 · 3</div>
+      <div class="rs-item">KV Cache 避免重复计算</div>
+      <div class="rs-item">内存随序列长度线性增长</div>
+    </div>
+  </div>
+  <div class="statusbar">
+    <div class="sb-spacer"></div>
+    <div class="sb">创建于 2025-11-03</div>
+    <div class="sb">3,412 字</div>
+    <div class="sb"><span class="dot"></span> 已连接</div>
+  </div>
+</div>
+
+</body>
+</html>

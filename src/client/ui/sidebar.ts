@@ -856,6 +856,20 @@ export function renderTabs(): void {
     if (tabsScrollEl) {
       if (tabsScrollLeft > 0) tabsScrollEl.scrollLeft = tabsScrollLeft;
       bindTabDragEvents(tabsScrollEl);
+      // 将当前 active tab 滚动到可视区域
+      const activeTab = tabsScrollEl.querySelector('.tab.active') as HTMLElement | null;
+      if (activeTab) {
+        const scrollEl = tabsScrollEl;
+        const tabLeft = activeTab.offsetLeft;
+        const tabRight = tabLeft + activeTab.offsetWidth;
+        const visibleLeft = scrollEl.scrollLeft;
+        const visibleRight = visibleLeft + scrollEl.clientWidth;
+        if (tabLeft < visibleLeft) {
+          scrollEl.scrollLeft = tabLeft - 8;
+        } else if (tabRight > visibleRight) {
+          scrollEl.scrollLeft = tabRight - scrollEl.clientWidth + 8;
+        }
+      }
     }
     syncAnnotationSidebarLayout();
   });

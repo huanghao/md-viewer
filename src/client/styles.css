@@ -53,7 +53,16 @@
     }
     .app {
       display: flex;
+      flex-direction: column;
       height: 100vh;
+      overflow: hidden;
+    }
+    .app-body {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      max-height: calc(100vh - 22px);
+      overflow: hidden;
     }
 
     /* 左侧边栏 */
@@ -945,6 +954,44 @@
       font-weight: 400;
       white-space: nowrap;
     }
+
+    /* ── Status bar ── */
+    .statusbar {
+      height: 22px;
+      background: var(--color-bg-subtle);
+      border-top: 1px solid var(--color-border-subtle);
+      display: flex;
+      align-items: center;
+      padding: 0 4px;
+      flex-shrink: 0;
+      user-select: none;
+      overflow: hidden;
+    }
+    .sb-spacer { flex: 1; }
+    .sb-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 0 7px;
+      height: 100%;
+      font-size: var(--text-xs);
+      color: var(--color-text-muted);
+      white-space: nowrap;
+      border-radius: 3px;
+    }
+    .sb-item:hover { background: rgba(0,0,0,0.05); color: var(--color-text-secondary); }
+    .sb-item:empty { display: none; }
+    .sb-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #d1d5db;
+      flex-shrink: 0;
+      transition: background 0.2s;
+    }
+    .sb-dot.connected    { background: #10b981; }
+    .sb-dot.connecting   { background: #f59e0b; animation: pulse 1.5s ease-in-out infinite; }
+    .sb-dot.disconnected { background: #ef4444; }
 
     /* 连接状态指示器 */
     .connection-status {
@@ -2677,7 +2724,7 @@
       position: fixed;
       right: 0;
       top: 84px;
-      height: calc(100vh - 84px);
+      height: calc(100vh - 84px - 22px);
       z-index: var(--z-sidebar);
     }
     .annotation-sidebar.collapsed {
@@ -2697,7 +2744,7 @@
       position: fixed;
       right: var(--annotation-sidebar-width);
       top: 84px;
-      height: calc(100vh - 84px);
+      height: calc(100vh - 84px - 22px);
       z-index: var(--z-sidebar);
     }
     .chat-sidebar .chat-list {
@@ -2722,7 +2769,7 @@
       top: 84px;
       right: calc(var(--annotation-sidebar-width) - 4px);
       width: 8px;
-      height: calc(100vh - 84px);
+      height: calc(100vh - 84px - 22px);
       cursor: col-resize;
       background: transparent;
       z-index: var(--z-sidebar-resizer);
@@ -2743,7 +2790,7 @@
       top: 84px;
       right: calc(var(--annotation-sidebar-width) + var(--chat-sidebar-width) - 4px);
       width: 8px;
-      height: calc(100vh - 84px);
+      height: calc(100vh - 84px - 22px);
       cursor: col-resize;
       background: transparent;
       z-index: var(--z-sidebar-resizer);

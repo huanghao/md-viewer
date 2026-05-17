@@ -109,7 +109,8 @@ export function syncAnnotationSidebarLayout(): void {
   if (!el.sidebar) return;
   const tabs = document.getElementById('tabs');
   const topOffset = Math.max(0, Math.round((tabs?.getBoundingClientRect().bottom || 84)));
-  const height = Math.max(0, window.innerHeight - topOffset);
+  const statusbarHeight = (document.getElementById('statusbar')?.offsetHeight ?? 22);
+  const height = Math.max(0, window.innerHeight - topOffset - statusbarHeight);
   el.sidebar.style.top = `${topOffset}px`;
   el.sidebar.style.height = `${height}px`;
   if (el.sidebarResizer) {

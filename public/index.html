@@ -23,8 +23,9 @@
 </head>
 <body>
   <div class="app">
-    <!-- 侧边栏 -->
-    <aside class="sidebar">
+    <div class="app-body">
+      <!-- 侧边栏 -->
+      <aside class="sidebar">
       <div class="sidebar-header">
         <!-- 搜索框 -->
         <div class="sidebar-search-row">
@@ -64,14 +65,14 @@
           <div class="toc-empty">无目录</div>
         </div>
       </div>
-    </aside>
-    <div class="sidebar-resizer" id="sidebarResizer" title="拖拽调整侧边栏宽度"></div>
-    <button class="sidebar-floating-open-btn" id="sidebarFloatingOpenBtn" title="展开侧边栏" aria-label="展开侧边栏">
-      <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5" fill="none"/><path d="M6 2.5v11"/><path d="M9 6l2 2-2 2"/></svg>
-    </button>
+      </aside>
+      <div class="sidebar-resizer" id="sidebarResizer" title="拖拽调整侧边栏宽度"></div>
+      <button class="sidebar-floating-open-btn" id="sidebarFloatingOpenBtn" title="展开侧边栏" aria-label="展开侧边栏">
+        <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5" fill="none"/><path d="M6 2.5v11"/><path d="M9 6l2 2-2 2"/></svg>
+      </button>
 
-    <!-- 主区域 -->
-    <main class="main">
+      <!-- 主区域 -->
+      <main class="main">
       <!-- 工具栏 -->
       <div class="toolbar">
         <div class="breadcrumb" id="breadcrumb"></div>
@@ -82,31 +83,26 @@
         <button class="toolbar-text-button" id="pdfModeAnnotateBtn" data-action="set-pdf-mode" data-mode="annotate" title="拉框批注模式" style="display:none">
           <span>[⬚ 批注]</span>
         </button>
-        <button class="toolbar-text-button" data-action="show-settings" title="设置">
-          <span id="settingsButtonText">[⚙ 设置]</span>
-        </button>
-        <button class="toolbar-text-button" id="translateButton" data-action="translate-button" title="切换段落翻译（英→中）">
-          <span id="translateButtonText">[译]</span>
-        </button>
         <button class="toolbar-text-button" id="diffButton" data-action="diff-button" style="display: none;" title="查看修改内容">
           <span id="diffButtonText">[± Diff]</span>
         </button>
         <button class="toolbar-text-button" id="refreshButton" data-action="refresh-button" style="display: none;" title="文件已更新，点击刷新">
           <span id="refreshButtonText">[↻ 刷新]</span>
         </button>
-        <button class="toolbar-text-button" id="monitorButton" data-action="toggle-monitor" title="系统监控">
-          <span>[◫ 监控]</span>
+        <button class="toolbar-text-button" id="translateButton" data-action="translate-button" title="切换段落翻译（英→中）">
+          <span id="translateButtonText">[译]</span>
         </button>
         <div class="zoom-control" id="zoomControl">
           <button class="zoom-step-btn" id="zoomOutBtn" data-action="zoom-out" title="缩小 (⌘−)">−</button>
           <input class="zoom-input" id="fontScaleInput" type="text" value="100%" title="缩放比例，可直接输入（如 150%）" />
           <button class="zoom-step-btn" id="zoomInBtn" data-action="zoom-in" title="放大 (⌘+)">+</button>
         </div>
-        <span class="connection-status" id="connectionStatus" title="连接状态">
-          <span class="connection-indicator" id="connectionIndicator"></span>
-          <span class="connection-text" id="connectionText"></span>
-        </span>
-        <span class="file-meta" id="fileMeta"></span>
+        <button class="toolbar-text-button" id="monitorButton" data-action="toggle-monitor" title="系统监控">
+          <span>[◫ 监控]</span>
+        </button>
+        <button class="toolbar-text-button" data-action="show-settings" title="设置">
+          <span id="settingsButtonText">[⚙ 设置]</span>
+        </button>
       </div>
 
       <!-- 系统监控浮窗 -->
@@ -144,7 +140,8 @@
         <span class="pdf-page-indicator-label"></span>
         <input class="pdf-page-indicator-input" type="number" min="1" style="display:none" />
       </div>
-    </main>
+      </main>
+    </div><!-- /.app-body -->
 
     <!-- 评论侧边栏 -->
     <aside class="annotation-sidebar" id="annotationSidebar">
@@ -214,6 +211,17 @@
       <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 8l3.5 3.5L13 4.5"/></svg>
       <span class="todo-floating-badge hidden" id="todoFloatingBadge"></span>
     </button>
+
+    <!-- 状态栏：全宽，不受左右 sidebar 影响 -->
+    <div class="statusbar" id="statusbar">
+      <div class="sb-spacer"></div>
+      <span class="sb-item" id="sbCreatedAt"></span>
+      <span class="sb-item" id="sbCharCount"></span>
+      <span class="sb-item sb-connection" id="sbConnection">
+        <span class="sb-dot" id="sbDot"></span>
+        <span id="sbConnectionText"></span>
+      </span>
+    </div>
   </div>
 
   <!-- 评论创建浮窗 -->

@@ -7,6 +7,7 @@ import { renderContent } from './content-renderer';
 import { showError, showInfo } from './ui/toast';
 import { getDiffViewActive, refreshDiffIfActive } from './diff-view';
 import { markWorkspaceModified, clearWorkspacePathMissing, markWorkspacePathMissing } from './workspace-state';
+import { updateStatusbarConnection } from './statusbar';
 
 export interface SSEDeps {
   onFileLoaded: (data: FileData, focus?: boolean) => Promise<void>;
@@ -30,32 +31,7 @@ let sseReconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 function updateConnectionStatus(status: typeof sseConnectionState, retryInfo?: string) {
   sseConnectionState = status;
-  const indicator = document.getElementById('connectionIndicator');
-  const text = document.getElementById('connectionText');
-  const statusEl = document.getElementById('connectionStatus');
-  if (!indicator || !text || !statusEl) return;
-
-  indicator.className = 'connection-indicator';
-  statusEl.style.cursor = status === 'failed' ? 'pointer' : 'default';
-  statusEl.onclick = status === 'failed' ? () => resetAndReconnectSSE() : null;
-
-  if (status === 'connected') {
-    indicator.classList.add('connected');
-    text.textContent = '';
-    statusEl.title = '已连接';
-  } else if (status === 'connecting') {
-    indicator.classList.add('connecting');
-    text.textContent = retryInfo || '重连中...';
-    statusEl.title = `正在重新连接... (${retryInfo})`;
-  } else if (status === 'failed') {
-    indicator.classList.add('disconnected');
-    text.textContent = '点击重连';
-    statusEl.title = '重连失败，点击手动重连';
-  } else {
-    indicator.classList.add('disconnected');
-    text.textContent = '未连接';
-    statusEl.title = '连接已断开';
-  }
+  updateStatusbarConnection(status === 'failed' ? 'disconnected' : status);
 }
 
 function resetAndReconnectSSE() {

@@ -471,6 +471,7 @@ export async function handleOpenFile(c: Context) {
     filename: basename(resolvedPath),
     content,
     lastModified: getLastModified(resolvedPath) ?? Date.now(),
+    createdAt: (() => { try { return statSync(resolvedPath).birthtimeMs; } catch { return undefined; } })(),
     isRemote: false,
   };
 

@@ -8,6 +8,7 @@ import type { PdfViewerEntry } from './pdf-registry';
 import type { PdfViewerInstance } from './pdf-viewer.js';
 
 import { state, saveScrollPosition } from './state';
+import { updateStatusbarFile } from './statusbar';
 import { getNearbyFiles } from './api/files';
 import { escapeHtml, escapeAttr } from './utils/escape';
 import { normalizeJoinedPath } from './utils/md-link';
@@ -430,11 +431,8 @@ export function renderBreadcrumb() {
     </button>
   `;
 
-  const metaEl = document.getElementById('fileMeta');
-  if (metaEl) {
-    const charCount = file.content.trim().length;
-    metaEl.textContent = charCount > 0 ? `${charCount.toLocaleString()} 字` : '';
-  }
+  const charCount = file.content.trim().length;
+  updateStatusbarFile(charCount, file.createdAt);
 }
 
 // ── Nearby menu ───────────────────────────────────────────────────────────────

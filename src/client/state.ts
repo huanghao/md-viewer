@@ -184,6 +184,7 @@ export function addOrUpdateFile(fileData: FileData, switchTo: boolean = false): 
     content: fileData.content,
     lastModified,
     displayedModified,
+    createdAt: fileData.createdAt ?? existing?.createdAt,
     isRemote: fileData.isRemote || false,
     isMissing: false,
     lastAccessed: Date.now(),

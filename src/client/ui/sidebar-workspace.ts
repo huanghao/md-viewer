@@ -431,6 +431,11 @@ function renderWorkspaceItem(workspace: Workspace, index: number, total: number,
             >↓</button>
             ` : ''}
             <button
+              class="workspace-order-btn"
+              title="在 VS Code 中打开目录"
+              data-action="workspace-open-in-editor" data-workspace-id="${escapeAttr(workspace.id)}" data-path="${escapeAttr(workspace.path)}"
+            >↗</button>
+            <button
               class="workspace-remove-confirm"
               title="确认移除"
               data-action="workspace-confirm-remove" data-workspace-id="${escapeAttr(workspace.id)}"
@@ -452,6 +457,11 @@ function renderWorkspaceItem(workspace: Workspace, index: number, total: number,
               data-action="workspace-move-down" data-workspace-id="${escapeAttr(workspace.id)}"
             >↓</button>
             ` : ''}
+          <button
+            class="workspace-order-btn"
+            title="在 VS Code 中打开目录"
+            data-action="workspace-open-in-editor" data-workspace-id="${escapeAttr(workspace.id)}" data-path="${escapeAttr(workspace.path)}"
+          >↗</button>
           <button
             class="workspace-remove"
             title="移除工作区"
@@ -847,6 +857,16 @@ export function bindWorkspaceEvents(callbacks?: WorkspaceCallbacks): void {
           break;
         case 'workspace-move-down':
           if (workspaceId) await handleMoveWorkspaceDown(workspaceId);
+          break;
+        case 'workspace-open-in-editor':
+          e.stopPropagation();
+          if (path) {
+            fetch('/api/open-in-editor', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ path }),
+            }).catch((err) => console.error('打开目录失败:', err));
+          }
           break;
         case 'focus-file-click':
           if (path) await handleFocusFileClick(path);

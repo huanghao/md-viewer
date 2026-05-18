@@ -16,6 +16,7 @@ import {
   renderAnnotationList,
 } from './annotation';
 import { getDiffViewActive, setDiffViewActive } from './diff-view';
+import { clearDiffMarkers } from './ui/doc-scrollbar';
 
 export let _setPendingAnnotation: ((ann: any, filePath: string, x: number, y: number) => void) | null = null;
 export function set_setPendingAnnotation(fn: typeof _setPendingAnnotation) { _setPendingAnnotation = fn; }
@@ -129,6 +130,8 @@ async function syncFileFromDisk(path: string, options: { silent?: boolean; highl
       if (diffBtn) diffBtn.classList.remove('active');
       const banner = document.getElementById('diffBanner');
       if (banner) banner.remove();
+      document.getElementById('content')?.classList.remove('diff-active');
+      clearDiffMarkers();
     }
     renderContent();
     if (state.currentFile) updateToc(state.currentFile);

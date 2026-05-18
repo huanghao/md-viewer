@@ -432,7 +432,7 @@ export function renderBreadcrumb() {
   `;
 
   const charCount = file.content.trim().length;
-  updateStatusbarFile(charCount, file.createdAt);
+  updateStatusbarFile(charCount, file.createdAt, file.gitCreatedAt);
 }
 
 // ── Nearby menu ───────────────────────────────────────────────────────────────

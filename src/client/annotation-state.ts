@@ -66,8 +66,8 @@ export const state: AnnotationState = {
   currentFilePath: null,
   filter: 'open',
   includeUnanchored: typeof localStorage !== 'undefined'
-    ? storageGet<boolean>('md-viewer:annotation-include-unanchored', false)
-    : false,
+    ? storageGet<boolean>('md-viewer:annotation-include-unanchored', true)
+    : true,
   density: getInitialDensity(),
 };
 

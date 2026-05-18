@@ -4,7 +4,7 @@ const sseClients = new Set<SSEClient>();
 const encoder = new TextEncoder();
 
 export function broadcastFileOpened(
-  fileInfo: { path: string; filename: string; content: string; lastModified: number; createdAt?: number; isRemote: boolean },
+  fileInfo: { path: string; filename: string; content: string; lastModified: number; createdAt?: number; gitCreatedAt?: number; isRemote: boolean },
   focus: boolean
 ) {
   const message = `event: file-opened\ndata: ${JSON.stringify({ ...fileInfo, focus })}\n\n`;

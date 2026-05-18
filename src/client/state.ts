@@ -54,6 +54,8 @@ function buildStateData() {
       isMissing: file.isMissing || false,
       lastModified: file.lastModified,
       displayedModified: file.displayedModified,
+      createdAt: file.createdAt,
+      gitCreatedAt: file.gitCreatedAt,
       lastAccessed: file.lastAccessed || Date.now()
     }]),
     currentFile: state.currentFile,
@@ -109,6 +111,8 @@ export async function restoreState(loadFile: (path: string, silent: boolean) => 
         content: '',
         lastModified: fileInfo.lastModified || 0,
         displayedModified: fileInfo.displayedModified || fileInfo.lastModified || 0,
+        createdAt: fileInfo.createdAt,
+        gitCreatedAt: fileInfo.gitCreatedAt,
         isRemote: fileInfo.isRemote || false,
         isMissing: fileInfo.isMissing || false,
         lastAccessed: fileInfo.lastAccessed || 0,
@@ -185,6 +189,7 @@ export function addOrUpdateFile(fileData: FileData, switchTo: boolean = false): 
     lastModified,
     displayedModified,
     createdAt: fileData.createdAt ?? existing?.createdAt,
+    gitCreatedAt: fileData.gitCreatedAt ?? existing?.gitCreatedAt,
     isRemote: fileData.isRemote || false,
     isMissing: false,
     lastAccessed: Date.now(),
@@ -285,6 +290,18 @@ export function adjustAnnotationCount(path: string, delta: number): void {
   } else {
     const updatedAt = Date.now();
     state.annotationSummaries.set(path, { count: Math.max(0, next), unanchoredCount, updatedAt });
+  }
+}
+
+export function adjustUnanchoredCount(path: string, delta: number): void {
+  const count = state.annotationSummaries.get(path)?.count ?? 0;
+  const current = state.annotationSummaries.get(path)?.unanchoredCount ?? 0;
+  const next = current + delta;
+  if (count <= 0 && next <= 0) {
+    state.annotationSummaries.delete(path);
+  } else {
+    const updatedAt = Date.now();
+    state.annotationSummaries.set(path, { count, unanchoredCount: Math.max(0, next), updatedAt });
   }
 }
 

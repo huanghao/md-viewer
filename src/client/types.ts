@@ -5,7 +5,8 @@ export interface FileInfo {
   content: string;
   lastModified: number;
   displayedModified: number;  // 展示内容对应的修改时间
-  createdAt?: number;         // 文件创建时间（仅本地文件）
+  createdAt?: number;         // 文件系统创建时间（birthtime，仅本地文件）
+  gitCreatedAt?: number;      // git 首次提交时间（仅 git 仓库内文件）
   isRemote: boolean;
   displayName?: string;
   isMissing?: boolean;        // 标识文件是否不存在
@@ -75,6 +76,7 @@ export interface FileData {
   content: string;
   lastModified: number;
   createdAt?: number;
+  gitCreatedAt?: number;
   isRemote?: boolean;
   error?: string;
 }

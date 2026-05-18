@@ -48,6 +48,7 @@ import {
   handleGetQuickComments,
   handleUpsertQuickComments,
   handleOpenInEditor,
+  handleFileCreatedAt,
 } from "./handlers.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
 
@@ -134,6 +135,7 @@ app.post("/api/detect-path", handleDetectPath);
 app.post("/api/open-file", handleOpenFile);
 app.post("/api/open-local-file", handleOpenLocalFile);
 app.post("/api/open-in-editor", handleOpenInEditor);
+app.post("/api/file-created-at", handleFileCreatedAt);
 
 // API: SSE 事件流
 app.get("/api/events", handleEvents);

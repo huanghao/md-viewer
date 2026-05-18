@@ -12,7 +12,7 @@ import { showError, showToast } from './ui/toast';
 import { enqueueOp } from './utils/undo-queue';
 import { setChatContext } from './ui/chat-panel.js';
 import { isOpen, isResolved, isUnanchored, type AnnotationStatus } from '../annotation-status';
-import { adjustAnnotationCount } from './state';
+import { adjustAnnotationCount, adjustUnanchoredCount } from './state';
 import { loadConfig } from './config';
 import { formatRelativeTimeShort } from './utils/format';
 import { storageSet } from './utils/storage';
@@ -707,6 +707,10 @@ function toggleResolved(id: string, filePath: string): void {
     adjustAnnotationCount(filePath, -1);
   } else if (previousStatus === 'resolved' && isOpen(nextStatus as AnnotationStatus)) {
     adjustAnnotationCount(filePath, +1);
+  } else if (previousStatus === 'unanchored' && nextStatus === 'resolved') {
+    adjustUnanchoredCount(filePath, -1);
+  } else if (previousStatus === 'resolved' && nextStatus === 'unanchored') {
+    adjustUnanchoredCount(filePath, +1);
   }
   import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
 
@@ -717,6 +721,10 @@ function toggleResolved(id: string, filePath: string): void {
         adjustAnnotationCount(filePath, +1);
       } else if (previousStatus === 'resolved' && isOpen(nextStatus as AnnotationStatus)) {
         adjustAnnotationCount(filePath, -1);
+      } else if (previousStatus === 'unanchored' && nextStatus === 'resolved') {
+        adjustUnanchoredCount(filePath, +1);
+      } else if (previousStatus === 'resolved' && nextStatus === 'unanchored') {
+        adjustUnanchoredCount(filePath, -1);
       }
       showError(`更新评论状态失败: ${error?.message || '未知错误'}`);
       afterAnnotationWritePdf(filePath, isPdf);
@@ -730,6 +738,10 @@ function toggleResolved(id: string, filePath: string): void {
       adjustAnnotationCount(filePath, +1);
     } else if (previousStatus === 'resolved' && isOpen(nextStatus as AnnotationStatus)) {
       adjustAnnotationCount(filePath, -1);
+    } else if (previousStatus === 'unanchored' && nextStatus === 'resolved') {
+      adjustUnanchoredCount(filePath, +1);
+    } else if (previousStatus === 'resolved' && nextStatus === 'unanchored') {
+      adjustUnanchoredCount(filePath, -1);
     }
     afterAnnotationWritePdf(filePath, isPdf);
     import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());

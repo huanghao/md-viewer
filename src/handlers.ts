@@ -3,6 +3,7 @@ import { scanWorkspaceTree } from "./workspace-scanner.ts";
 import { existsSync, readdirSync, statSync, readFileSync } from "fs";
 import type { Dirent } from "fs";
 import { homedir } from "os";
+import { spawnSync } from "child_process";
 import type { Context } from "hono";
 import {
   isUrl,
@@ -18,6 +19,23 @@ import { fuzzyScore } from "./client/utils/fuzzy-search.ts";
 import { broadcastFileOpened, addClient, removeClient, broadcastEvent } from "./sse.ts";
 
 const encoder = new TextEncoder();
+
+function getGitCreatedAt(filePath: string): number | undefined {
+  try {
+    const result = spawnSync(
+      'git',
+      ['log', '--follow', '--diff-filter=A', '--format=%at', '--', filePath],
+      { cwd: dirname(filePath), encoding: 'utf8', timeout: 3000 }
+    );
+    if (result.status === 0) {
+      const lines = result.stdout.trim().split('\n').filter(Boolean);
+      // git log 从新到旧，取最后一行（最早的 commit）
+      const ts = lines.length > 0 ? parseInt(lines[lines.length - 1], 10) * 1000 : NaN;
+      return isNaN(ts) ? undefined : ts;
+    }
+  } catch { /* not a git repo or git not available */ }
+  return undefined;
+}
 import { watchFile, watchWorkspace } from "./file-watcher.ts";
 import {
   listAnnotations,
@@ -472,6 +490,7 @@ export async function handleOpenFile(c: Context) {
     content,
     lastModified: getLastModified(resolvedPath) ?? Date.now(),
     createdAt: (() => { try { return statSync(resolvedPath).birthtimeMs; } catch { return undefined; } })(),
+    gitCreatedAt: getGitCreatedAt(resolvedPath),
     isRemote: false,
   };
 
@@ -520,6 +539,26 @@ export async function handleOpenLocalFile(c: Context) {
     return c.json({ success: true });
   } catch (error: any) {
     return c.json({ error: error?.message || "打开失败" }, 500);
+  }
+}
+
+
+export async function handleFileCreatedAt(c: Context) {
+  try {
+    const body = await c.req.json<{ paths: string[] }>();
+    const paths = Array.isArray(body?.paths) ? body.paths : [];
+    const result: Record<string, { createdAt?: number; gitCreatedAt?: number }> = {};
+    for (const p of paths) {
+      const resolved = resolve(p);
+      let createdAt: number | undefined;
+      let gitCreatedAt: number | undefined;
+      try { createdAt = statSync(resolved).birthtimeMs; } catch { /* skip */ }
+      gitCreatedAt = getGitCreatedAt(resolved);
+      result[p] = { createdAt, gitCreatedAt };
+    }
+    return c.json(result);
+  } catch (error: any) {
+    return c.json({ error: error?.message }, 500);
   }
 }
 
@@ -636,7 +675,7 @@ export async function handleGetAnnotationSummaries(c: Context) {
     for (const doc of docs) {
       const openCount = calculateOpenCount(doc.anchoredCount, doc.unanchoredCount, doc.resolvedCount);
       const unanchoredCount = doc.unanchoredCount ?? 0;
-      if (openCount > 0) {
+      if (openCount > 0 || unanchoredCount > 0) {
         summaries[doc.path] = {
           count: openCount,
           unanchoredCount,

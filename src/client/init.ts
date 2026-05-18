@@ -1,5 +1,5 @@
 // App initialization — runs the IIFE startup sequence
-import { state, restoreState, markFileMissing, markWorkspaceFailed } from './state';
+import { state, restoreState, saveState, markFileMissing, markWorkspaceFailed } from './state';
 import { setAnnotationSummaries } from './state';
 import { hydrateExpandedWorkspaces } from './workspace';
 import { loadFile } from './api/files';
@@ -209,6 +209,27 @@ import {
   console.time('[init] restoreState');
   await restoreState(loadFile);
   console.timeEnd('[init] restoreState');
+
+  // 补全缺失的 createdAt / gitCreatedAt
+  const missingTimes = Array.from(state.sessionFiles.values())
+    .filter(f => !f.isRemote && (f.createdAt == null || f.gitCreatedAt == null))
+    .map(f => f.path);
+  if (missingTimes.length > 0) {
+    fetch('/api/file-created-at', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paths: missingTimes }),
+    }).then(r => r.json()).then((result: Record<string, { createdAt?: number; gitCreatedAt?: number }>) => {
+      let changed = false;
+      for (const [path, info] of Object.entries(result)) {
+        const file = state.sessionFiles.get(path);
+        if (!file) continue;
+        if (info.createdAt != null && file.createdAt == null) { file.createdAt = info.createdAt; changed = true; }
+        if (info.gitCreatedAt != null && file.gitCreatedAt == null) { file.gitCreatedAt = info.gitCreatedAt; changed = true; }
+      }
+      if (changed) saveState();
+    }).catch(() => {});
+  }
 
   applyTheme();
 

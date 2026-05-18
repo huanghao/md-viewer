@@ -76,6 +76,7 @@ export async function updateAnnotationStatusRemote(
 
 export interface AnnotationSummary {
   count: number;
+  unanchoredCount: number;
   updatedAt: number;
 }
 

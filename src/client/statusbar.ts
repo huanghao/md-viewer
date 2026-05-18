@@ -6,11 +6,13 @@ function fmt(ts: number): string {
   return `${y}-${m}-${day}`;
 }
 
-export function updateStatusbarFile(charCount: number, createdAt?: number): void {
+export function updateStatusbarFile(charCount: number, createdAt?: number, gitCreatedAt?: number): void {
   const charEl = document.getElementById('sbCharCount');
   const createdEl = document.getElementById('sbCreatedAt');
   if (charEl) charEl.textContent = charCount > 0 ? `${charCount.toLocaleString()} 字` : '';
-  if (createdEl) createdEl.textContent = createdAt ? `创建于 ${fmt(createdAt)}` : '';
+  const ts = createdAt && gitCreatedAt ? Math.min(createdAt, gitCreatedAt)
+    : createdAt ?? gitCreatedAt;
+  if (createdEl) createdEl.textContent = ts ? `创建于 ${fmt(ts)}` : '';
 }
 
 export function updateStatusbarConnection(status: 'connecting' | 'connected' | 'disconnected' | 'failed'): void {

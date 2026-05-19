@@ -1455,7 +1455,7 @@
     .breadcrumb {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 3px;
       font-size: var(--text-sm);
       color: var(--color-text-primary);
     }

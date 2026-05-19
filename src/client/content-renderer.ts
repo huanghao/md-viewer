@@ -391,19 +391,20 @@ export function renderBreadcrumb() {
   const file = state.sessionFiles.get(state.currentFile);
   if (!file) return;
 
-  const parts = file.path.split('/').filter(Boolean);
-  const visibleParts = parts.slice(-2);
-  const hasPrefix = parts.length > 2;
+  const homePrefixRe = /^\/(?:Users|home)\/[^/]+/;
+  const homeMatch = file.path.match(homePrefixRe);
+  const displayPath = homeMatch ? '~' + file.path.slice(homeMatch[0].length) : file.path;
+  // split on '/' but keep leading '~' as first segment
+  const rawParts = displayPath.startsWith('~/')
+    ? ['~', ...displayPath.slice(2).split('/').filter(Boolean)]
+    : displayPath.split('/').filter(Boolean);
 
-  const breadcrumbItems = [
-    hasPrefix ? `<span class="breadcrumb-item breadcrumb-ellipsis" title="${escapeAttr(file.path)}">…</span><span class="breadcrumb-separator">/</span>` : '',
-    ...visibleParts.map((part, i) => {
-      const isLast = i === visibleParts.length - 1;
-      return isLast
-        ? `<span class="breadcrumb-item active" title="${escapeAttr(file.path)}">${escapeHtml(part)}</span>`
-        : `<span class="breadcrumb-item" title="${escapeAttr(file.path)}">${escapeHtml(part)}</span><span class="breadcrumb-separator">/</span>`;
-    }),
-  ].join('');
+  const breadcrumbItems = rawParts.map((part, i) => {
+    const isLast = i === rawParts.length - 1;
+    return isLast
+      ? `<span class="breadcrumb-item active" title="${escapeAttr(file.path)}">${escapeHtml(part)}</span>`
+      : `<span class="breadcrumb-item" title="${escapeAttr(file.path)}">${escapeHtml(part)}</span><span class="breadcrumb-separator">/</span>`;
+  }).join('');
 
   // 显示面包屑路径和复制按钮
   container.innerHTML = `

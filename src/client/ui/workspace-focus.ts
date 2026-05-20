@@ -158,7 +158,7 @@ function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>, query: str
     onClickAction: 'focus-file-click',
     showPin: true,
     showTime: true,
-    indentPx: 8,
+    indentPx: 0,
     query,
     showClose: false,
   });

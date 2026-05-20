@@ -811,7 +811,8 @@
       background: var(--color-error-bg);
       color: var(--color-error);
     }
-    .file-item .tree-toggle {
+    .file-item .tree-toggle,
+    .focus-file-item .tree-toggle {
       display: none;
     }
     .file-type-icon {

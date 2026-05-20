@@ -81,6 +81,9 @@ import {
 } from './annotation/thread-manager';
 import { getDiffViewActive } from './diff-view';
 
+// 用于在 popover 关闭/切换时保留 reply 草稿，与 DOM 生命周期解耦
+const popoverReplyDrafts = new Map<string, string>();
+
 export type { Annotation, AnnotationThreadItem };
 export {
   getLastQuickAddPosition,
@@ -445,9 +448,7 @@ export function showPopover(ann: Annotation, x: number, y: number): void {
   const snippet = dq.substring(0, 22);
   el.popoverTitle.textContent = `#${ann.serial || 0} | ${snippet}${dq.length > 22 ? '...' : ''}`;
   const threadHTML = renderThreadListHTML(ann, false);
-  // 保存 popover reply input 草稿，重建 HTML 后恢复
-  const existingReplyInput = el.popoverNote.querySelector<HTMLTextAreaElement>(`[data-popover-reply-input="${ann.id}"]`);
-  const replyDraft = existingReplyInput?.value ?? '';
+  const replyDraft = popoverReplyDrafts.get(ann.id) ?? '';
   el.popoverNote.innerHTML = `
     <div class="annotation-thread">${threadHTML}</div>
     <div class="annotation-reply-entry" data-popover-reply-entry="${ann.id}" role="button" tabindex="0">
@@ -1277,6 +1278,7 @@ export function initAnnotationElements(): void {
     event.preventDefault();
     appendReply(id, filePath, target.value);
     target.value = '';
+    popoverReplyDrafts.delete(id);
     const ann = state.annotations.find((item) => item.id === id);
     const mark = document.querySelector(`[data-annotation-id="${id}"]`) as HTMLElement | null;
     const rect = mark?.getBoundingClientRect();
@@ -1286,7 +1288,9 @@ export function initAnnotationElements(): void {
   document.getElementById('annotationPopover')?.addEventListener('input', (event) => {
     const target = event.target as HTMLElement;
     if (!(target instanceof HTMLTextAreaElement)) return;
-    if (!target.hasAttribute('data-popover-reply-input')) return;
+    const id = target.getAttribute('data-popover-reply-input');
+    if (!id) return;
+    popoverReplyDrafts.set(id, target.value);
     autoResizeReplyInput(target);
   });
 

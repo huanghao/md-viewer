@@ -8,10 +8,10 @@ dev:
     trap 'kill 0' INT TERM
     bun run build.ts --watch &
     bun --watch run src/server.ts &
-    bun --watch run src/rag-server.ts &
-    bun --watch run agent-server/server.ts &
-    python3 translate-server/server.py &
     wait
+#    bun --watch run src/rag-server.ts &
+#    bun --watch run agent-server/server.ts &
+#    python3 translate-server/server.py &
 
 # 构建并安装 Mac App 到 /Applications
 install:

@@ -1,6 +1,7 @@
 import { state, saveState } from './state';
 import { loadFile } from './api/files';
 import { diffLines } from './utils/diff';
+import { diffBlocks } from './utils/diff-blocks';
 import { mountScrollbar, unmountScrollbar, updateDiffMarkers, clearDiffMarkers } from './ui/doc-scrollbar';
 import { shouldRefreshDiff, refreshDiffBannerLabel } from './ui/diff-refresh';
 import { buildDiffBannerHTML, initDiffBannerActions } from './ui/diff-banner';
@@ -10,6 +11,7 @@ import { protectMath } from './utils/math-protect';
 // Module-level variables
 let diffViewActive = false;
 let currentDiffBlockIndex = -1; // -1 表示未激活任何 block
+let diffMode: 'paragraph' | 'line' = 'paragraph';
 
 // Injected callbacks from main.ts (to avoid circular imports)
 let _renderContent: () => void = () => {};
@@ -41,6 +43,14 @@ export function getDiffViewActive(): boolean {
 
 export function setDiffViewActive(value: boolean): void {
   diffViewActive = value;
+}
+
+export function getDiffMode(): 'paragraph' | 'line' {
+  return diffMode;
+}
+
+export function setDiffMode(mode: 'paragraph' | 'line'): void {
+  diffMode = mode;
 }
 
 export async function loadPendingContent(path: string): Promise<string | null> {
@@ -152,7 +162,100 @@ export function renderInlineDiffHTML(lines: import('./utils/diff').DiffLine[]): 
   return { html, totalBlocks: blockIndex };
 }
 
+export function navigateParagraphBlock(direction: 1 | -1, changedEls?: HTMLElement[]): void {
+  const container = document.getElementById('content');
+  if (!container) return;
+
+  const blockEls: HTMLElement[] = changedEls ?? Array.from(
+    container.querySelectorAll<HTMLElement>('[data-para-changed]')
+  );
+  const total = blockEls.length;
+  if (total === 0) return;
+
+  const nextIndex = currentDiffBlockIndex === -1
+    ? (direction === 1 ? 0 : total - 1)
+    : Math.max(0, Math.min(total - 1, currentDiffBlockIndex + direction));
+
+  if (nextIndex === currentDiffBlockIndex && currentDiffBlockIndex !== -1) return;
+
+  container.querySelectorAll<HTMLElement>('.diff-focused').forEach(el => {
+    el.classList.remove('diff-focused');
+  });
+
+  blockEls[nextIndex]?.classList.add('diff-focused');
+  blockEls[nextIndex]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  currentDiffBlockIndex = nextIndex;
+
+  const countEl = document.getElementById('diffNavCount');
+  if (countEl) countEl.textContent = `${nextIndex + 1} / ${total}`;
+  const prevBtn = document.getElementById('diffNavPrev') as HTMLButtonElement | null;
+  const nextBtn = document.getElementById('diffNavNext') as HTMLButtonElement | null;
+  if (prevBtn) prevBtn.disabled = nextIndex === 0;
+  if (nextBtn) nextBtn.disabled = nextIndex === total - 1;
+}
+
+export function renderParagraphDiffView(oldContent: string, newContent: string): void {
+  currentDiffBlockIndex = -1;
+  const container = document.getElementById('content');
+  if (!container) return;
+
+  const blocks = diffBlocks(oldContent, newContent);
+  const changedBlocks = blocks.filter(b => b.changed);
+
+  if (changedBlocks.length === 0) {
+    container.innerHTML = `<div class="diff-no-changes">文件内容与磁盘一致，无差异</div>`;
+    return;
+  }
+
+  // Render newContent directly (not _renderContent which renders file.content/old version)
+  const safeNew = newContent.replace(/^([^\n]+)\n([-=]{2,}[ \t]*)$/mg, '$1\n\n$2');
+  const g = protectMath(safeNew);
+  container.innerHTML = `<div class="markdown-body">${g.restore((window as any).marked.parse(g.protected))}</div>`;
+  _renderMath(container);
+
+  // Map rendered top-level block elements to diffBlocks[] by index
+  const sel = 'p,h1,h2,h3,h4,h5,h6,ul,ol,pre,blockquote,hr,table';
+  const blockEls = Array.from(
+    container.querySelectorAll<HTMLElement>(sel.split(',').map(s => `.markdown-body > ${s}`).join(','))
+  );
+
+  // Mark changed block elements
+  const changedEls: HTMLElement[] = [];
+  blocks.forEach((block, idx) => {
+    if (!block.changed) return;
+    const el = blockEls[idx];
+    if (!el) return;
+    el.dataset.paraChanged = 'true';
+    changedEls.push(el);
+  });
+
+  // Update banner count
+  const banner = document.getElementById('diffBanner');
+  if (banner) {
+    const countEl = banner.querySelector<HTMLElement>('#diffNavCount');
+    if (countEl) countEl.textContent = `1 / ${changedEls.length}`;
+    const prevBtn = banner.querySelector<HTMLButtonElement>('#diffNavPrev');
+    const nextBtn = banner.querySelector<HTMLButtonElement>('#diffNavNext');
+    if (prevBtn) prevBtn.disabled = true;
+    if (nextBtn) nextBtn.disabled = changedEls.length <= 1;
+  }
+
+  // Update scrollbar markers
+  unmountScrollbar();
+  mountScrollbar();
+  const markerGroups = changedEls.map(el => ({ el, kind: 'modify' as const }));
+  updateDiffMarkers(markerGroups);
+
+  // Navigate to first changed block
+  navigateParagraphBlock(1, changedEls);
+}
+
 export function renderDiffView(oldContent: string, newContent: string): void {
+  if (diffMode === 'paragraph') {
+    renderParagraphDiffView(oldContent, newContent);
+    return;
+  }
   currentDiffBlockIndex = -1;
   const container = document.getElementById('content');
   if (!container) return;
@@ -258,6 +361,10 @@ export function closeDiffView(): void {
   if (banner) banner.remove();
 
   clearDiffMarkers();
+  document.querySelectorAll<HTMLElement>('[data-para-changed]').forEach(el => {
+    delete el.dataset.paraChanged;
+  });
+  diffMode = 'paragraph';
   _renderContent();
 }
 

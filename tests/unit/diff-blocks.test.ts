@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { splitBlocks } from '../../src/client/utils/diff-blocks';
+import { splitBlocks, diffBlocks } from '../../src/client/utils/diff-blocks';
 
 describe('splitBlocks', () => {
   it('empty string → []', () => {
@@ -44,5 +44,57 @@ describe('splitBlocks', () => {
 
   it('multi-line paragraph stays as one block', () => {
     expect(splitBlocks('line1\nline2\nline3')).toEqual(['line1\nline2\nline3']);
+  });
+});
+
+describe('diffBlocks', () => {
+  it('identical documents → all changed=false', () => {
+    const text = 'para one\n\npara two\n\npara three';
+    const result = diffBlocks(text, text);
+    expect(result.every(b => !b.changed)).toBe(true);
+    expect(result.map(b => b.content)).toEqual(['para one', 'para two', 'para three']);
+  });
+
+  it('one paragraph modified → that block changed=true', () => {
+    const old = 'first\n\nsecond\n\nthird';
+    const newText = 'first\n\nSECOND CHANGED\n\nthird';
+    const result = diffBlocks(old, newText);
+    expect(result[0].changed).toBe(false);
+    expect(result[1].changed).toBe(true);
+    expect(result[2].changed).toBe(false);
+  });
+
+  it('new paragraph added → added block changed=true', () => {
+    const old = 'first\n\nthird';
+    const newText = 'first\n\nnew middle\n\nthird';
+    const result = diffBlocks(old, newText);
+    expect(result[0].changed).toBe(false);
+    expect(result[1].changed).toBe(true);
+    expect(result[2].changed).toBe(false);
+  });
+
+  it('paragraph deleted from old → remaining new blocks correct', () => {
+    const old = 'first\n\nsecond\n\nthird';
+    const newText = 'first\n\nthird';
+    const result = diffBlocks(old, newText);
+    expect(result).toHaveLength(2);
+    expect(result[0].changed).toBe(false);
+    expect(result[1].changed).toBe(false);
+  });
+
+  it('all paragraphs changed', () => {
+    const old = 'aaa\n\nbbb';
+    const newText = 'AAA\n\nBBB';
+    const result = diffBlocks(old, newText);
+    expect(result.every(b => b.changed)).toBe(true);
+  });
+
+  it('empty old → all blocks changed=true', () => {
+    const result = diffBlocks('', 'para one\n\npara two');
+    expect(result.every(b => b.changed)).toBe(true);
+  });
+
+  it('empty new → []', () => {
+    expect(diffBlocks('para one\n\npara two', '')).toEqual([]);
   });
 });

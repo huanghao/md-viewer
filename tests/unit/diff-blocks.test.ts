@@ -97,4 +97,37 @@ describe('diffBlocks', () => {
   it('empty new → []', () => {
     expect(diffBlocks('para one\n\npara two', '')).toEqual([]);
   });
+
+  it('heading block changed → changed=true', () => {
+    const old = '# Title\n\nContent';
+    const newText = '# New Title\n\nContent';
+    const result = diffBlocks(old, newText);
+    expect(result[0].changed).toBe(true);  // heading changed
+    expect(result[1].changed).toBe(false); // paragraph unchanged
+  });
+
+  it('paragraph added at start → only new block changed', () => {
+    const old = 'second\n\nthird';
+    const newText = 'new first\n\nsecond\n\nthird';
+    const result = diffBlocks(old, newText);
+    expect(result[0].changed).toBe(true);  // new first
+    expect(result[1].changed).toBe(false); // second matched
+    expect(result[2].changed).toBe(false); // third matched
+  });
+
+  it('last paragraph changed', () => {
+    const old = 'first\n\nlast';
+    const newText = 'first\n\nLAST CHANGED';
+    const result = diffBlocks(old, newText);
+    expect(result[0].changed).toBe(false);
+    expect(result[1].changed).toBe(true);
+  });
+
+  it('code fence block changed → changed=true', () => {
+    const old = 'intro\n\n```\nold code\n```';
+    const newText = 'intro\n\n```\nnew code\n```';
+    const result = diffBlocks(old, newText);
+    expect(result[0].changed).toBe(false); // intro unchanged
+    expect(result[1].changed).toBe(true);  // code block changed
+  });
 });

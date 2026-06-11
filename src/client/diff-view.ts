@@ -4,7 +4,7 @@ import { diffLines } from './utils/diff';
 import { diffBlocks } from './utils/diff-blocks';
 import { mountScrollbar, unmountScrollbar, updateDiffMarkers, clearDiffMarkers } from './ui/doc-scrollbar';
 import { shouldRefreshDiff, refreshDiffBannerLabel } from './ui/diff-refresh';
-import { buildDiffBannerHTML, initDiffBannerActions } from './ui/diff-banner';
+import { buildDiffBannerHTML, initDiffBannerActions, updateBannerForMode } from './ui/diff-banner';
 import { renderSidebar } from './ui/sidebar';
 import { protectMath } from './utils/math-protect';
 
@@ -160,6 +160,19 @@ export function renderInlineDiffHTML(lines: import('./utils/diff').DiffLine[]): 
 
   html += '</div>';
   return { html, totalBlocks: blockIndex };
+}
+
+function switchDiffMode(): void {
+  if (!state.currentFile) return;
+  const file = state.sessionFiles.get(state.currentFile);
+  if (!file || file.pendingContent === undefined) return;
+
+  diffMode = diffMode === 'paragraph' ? 'line' : 'paragraph';
+
+  const banner = document.getElementById('diffBanner');
+  if (banner) updateBannerForMode(banner, diffMode);
+
+  renderDiffView(file.content, file.pendingContent);
 }
 
 export function navigateParagraphBlock(direction: 1 | -1, changedEls?: HTMLElement[]): void {
@@ -337,9 +350,16 @@ export async function handleDiffButtonClick(): Promise<void> {
     banner.className = 'diff-banner';
     banner.innerHTML = buildDiffBannerHTML();
     initDiffBannerActions(banner, {
-      onNavigate: (dir) => navigateDiffBlock(dir),
+      onNavigate: (dir) => {
+        if (diffMode === 'paragraph') {
+          navigateParagraphBlock(dir);
+        } else {
+          navigateDiffBlock(dir);
+        }
+      },
       onAccept: () => acceptDiffUpdate(),
       onClose: () => closeDiffView(),
+      onSwitchMode: () => switchDiffMode(),
     });
     const prevBtn = banner.querySelector<HTMLButtonElement>('#diffNavPrev');
     if (prevBtn) prevBtn.disabled = true;

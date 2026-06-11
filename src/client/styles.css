@@ -1619,6 +1619,16 @@
       cursor: pointer;
     }
     .diff-close-btn:hover { background: var(--color-bg-subtle); }
+    .diff-mode-btn {
+      padding: 4px 10px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--color-border-subtle);
+      background: #fff;
+      color: var(--color-text-secondary);
+      font-size: var(--text-sm);
+      cursor: pointer;
+    }
+    .diff-mode-btn:hover { background: var(--color-bg-subtle); }
 
     /* Inline diff 内容区 */
     .diff-inline-body {
@@ -1666,6 +1676,12 @@
     .diff-group.diff-focused .diff-block-delete { background: #ffd7d5; }
     .diff-group.diff-focused .diff-block-modify-del { background: #ffd7d5; }
     .diff-group.diff-focused .diff-block-modify-ins { background: #abf2bc; }
+
+    /* 段落 diff：聚焦时高亮当前段落 */
+    [data-para-changed].diff-focused {
+      outline: 2px solid #f0a500;
+      border-radius: var(--radius-sm);
+    }
 
     /* group 内的 equal 上下文行 */
     .diff-group-context {

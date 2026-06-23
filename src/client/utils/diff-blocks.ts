@@ -55,37 +55,20 @@ export function diffBlocks(oldText: string, newText: string): BlockDiff[] {
 
   if (newBlocks.length === 0) return [];
 
-  const n = oldBlocks.length;
-  const m = newBlocks.length;
-  const dp: number[][] = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
-
-  for (let i = 1; i <= n; i++) {
-    for (let j = 1; j <= m; j++) {
-      if (oldBlocks[i - 1] === newBlocks[j - 1]) {
-        dp[i][j] = dp[i - 1][j - 1] + 1;
-      } else {
-        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
-      }
-    }
+  // Use a multiset of old block contents. A new block is "unchanged" if its
+  // exact content existed in the old document, regardless of position (handles
+  // moved paragraphs). Only truly new or modified content is marked changed.
+  const oldCount = new Map<string, number>();
+  for (const b of oldBlocks) {
+    oldCount.set(b, (oldCount.get(b) ?? 0) + 1);
   }
 
-  const matchedNew = new Set<number>();
-  let i = n;
-  let j = m;
-  while (i > 0 && j > 0) {
-    if (oldBlocks[i - 1] === newBlocks[j - 1]) {
-      matchedNew.add(j - 1);
-      i--;
-      j--;
-    } else if (dp[i - 1][j] >= dp[i][j - 1]) {
-      i--;
-    } else {
-      j--;
+  return newBlocks.map(content => {
+    const count = oldCount.get(content) ?? 0;
+    if (count > 0) {
+      oldCount.set(content, count - 1);
+      return { content, changed: false };
     }
-  }
-
-  return newBlocks.map((content, idx) => ({
-    content,
-    changed: !matchedNew.has(idx),
-  }));
+    return { content, changed: true };
+  });
 }

@@ -213,7 +213,11 @@ export function renderParagraphDiffView(oldContent: string, newContent: string):
   const container = document.getElementById('content');
   if (!container) return;
 
-  const blocks = diffBlocks(oldContent, newContent);
+  // Normalize setext headings before both diffing and rendering so that
+  // splitBlocks() and marked() see the same number of blocks/elements.
+  const safeOld = oldContent.replace(/^([^\n]+)\n([-=]{2,}[ \t]*)$/mg, '$1\n\n$2');
+  const safeNew = newContent.replace(/^([^\n]+)\n([-=]{2,}[ \t]*)$/mg, '$1\n\n$2');
+  const blocks = diffBlocks(safeOld, safeNew);
   const changedBlocks = blocks.filter(b => b.changed);
 
   if (changedBlocks.length === 0) {
@@ -221,8 +225,7 @@ export function renderParagraphDiffView(oldContent: string, newContent: string):
     return;
   }
 
-  // Render newContent directly (not _renderContent which renders file.content/old version)
-  const safeNew = newContent.replace(/^([^\n]+)\n([-=]{2,}[ \t]*)$/mg, '$1\n\n$2');
+  // Render safeNew (setext-normalized) so block count matches diffBlocks(safeOld, safeNew)
   const g = protectMath(safeNew);
   container.innerHTML = `<div class="markdown-body">${g.restore((window as any).marked.parse(g.protected))}</div>`;
   _renderMath(container);

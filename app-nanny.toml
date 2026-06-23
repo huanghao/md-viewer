@@ -1,0 +1,11 @@
+name = "md-viewer"
+restart = "on-failure"
+
+[processes.server]
+command = "bun --watch run src/server.ts"
+port = 3000
+
+[xxx-processes.rag]
+command = "bun --watch run src/rag-server.ts"
+port = 3001
+memory_warn_mb = 512

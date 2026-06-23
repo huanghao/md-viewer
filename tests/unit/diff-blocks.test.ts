@@ -123,6 +123,13 @@ describe('diffBlocks', () => {
     expect(result[1].changed).toBe(true);
   });
 
+  it('moved paragraph (same content, different position) → changed=false', () => {
+    const old = 'first\n\nsecond\n\nthird';
+    const newText = 'third\n\nfirst\n\nsecond';
+    const result = diffBlocks(old, newText);
+    expect(result.every(b => !b.changed)).toBe(true);
+  });
+
   it('code fence block changed → changed=true', () => {
     const old = 'intro\n\n```\nold code\n```';
     const newText = 'intro\n\n```\nnew code\n```';

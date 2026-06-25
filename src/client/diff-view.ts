@@ -173,6 +173,7 @@ function switchDiffMode(): void {
   if (banner) updateBannerForMode(banner, diffMode);
 
   renderDiffView(file.content, file.pendingContent);
+  _syncAnnotationsForCurrentFile(false);
 }
 
 export function navigateParagraphBlock(direction: 1 | -1, changedEls?: HTMLElement[]): void {
@@ -324,6 +325,7 @@ export function refreshDiffIfActive(): void {
   if (!shouldRefreshDiff({ diffViewActive, pendingContent: file?.pendingContent })) return;
   refreshDiffBannerLabel(document);
   renderDiffView(file!.content, file!.pendingContent!);
+  _syncAnnotationsForCurrentFile(false);
 }
 
 export async function handleDiffButtonClick(): Promise<void> {
@@ -370,6 +372,7 @@ export async function handleDiffButtonClick(): Promise<void> {
   }
 
   renderDiffView(file.content, newContent);
+  _syncAnnotationsForCurrentFile(false);
 }
 
 export function closeDiffView(): void {

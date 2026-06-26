@@ -1677,10 +1677,29 @@
     .diff-group.diff-focused .diff-block-modify-del { background: #ffd7d5; }
     .diff-group.diff-focused .diff-block-modify-ins { background: #abf2bc; }
 
-    /* 段落 diff：聚焦时高亮当前段落 */
+    /* 段落 diff：所有变更段落左侧竖线，聚焦时加底色并加粗竖线 */
+    [data-para-changed] {
+      position: relative;
+      padding-left: 14px;
+      margin-left: -17px;
+    }
+    [data-para-changed]::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: #e6a817;
+      border-radius: 0 2px 2px 0;
+    }
+    [data-para-changed].diff-focused::before {
+      background: #f0a500;
+      width: 4px;
+    }
     [data-para-changed].diff-focused {
-      outline: 2px solid #f0a500;
-      border-radius: var(--radius-sm);
+      background: rgba(240, 165, 0, 0.07);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
     }
 
     /* group 内的 equal 上下文行 */

@@ -15,7 +15,9 @@ export interface FileTreeNode {
   ignorePatterns?: string[];
 }
 
-const ALWAYS_SKIP = new Set(["node_modules", "dist", "build", ".git"]);
+// Built-in default patterns, equivalent to a global .mdvignore that ships with the tool.
+// Users can override via ~/.mdvignore or a per-directory .mdvignore.
+const DEFAULT_PATTERNS = ["node_modules", "dist", "build", ".git"];
 
 function loadLocalPatterns(dir: string): string[] {
   const p = join(dir, ".mdvignore");
@@ -30,7 +32,7 @@ function loadLocalPatterns(dir: string): string[] {
 let _globalPatterns: string[] | null = null;
 function globalPatterns(): string[] {
   if (_globalPatterns !== null) return _globalPatterns;
-  _globalPatterns = loadLocalPatterns(homedir());
+  _globalPatterns = [...DEFAULT_PATTERNS, ...loadLocalPatterns(homedir())];
   return _globalPatterns;
 }
 
@@ -63,8 +65,6 @@ async function walk(
   let fileCount = 0;
 
   for (const e of entries) {
-    if (e.name.startsWith(".")) continue;
-    if (ALWAYS_SKIP.has(e.name)) continue;
     const fullPath = join(dir, e.name);
     if (isIgnored(fullPath, patterns)) continue;
 
@@ -150,8 +150,6 @@ export async function collectWorkspaceMdFiles(rootPath: string): Promise<string[
     catch { return; }
 
     for (const e of entries) {
-      if (e.name.startsWith(".")) continue;
-      if (ALWAYS_SKIP.has(e.name)) continue;
       const fullPath = join(dir, e.name);
       if (isIgnored(fullPath, patterns)) continue;
       if (e.isDirectory()) {

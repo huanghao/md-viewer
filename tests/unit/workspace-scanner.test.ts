@@ -60,13 +60,13 @@ describe('collectWorkspaceMdFiles', () => {
     expect(files.some(f => f.includes('dist'))).toBe(false);
   });
 
-  it('skips hidden directories', async () => {
+  it('includes hidden directories (dot-prefix no longer auto-skipped)', async () => {
     const { collectWorkspaceMdFiles } = await getScanner();
     write(join(tempRoot, '.cache', 'README.md'));
     write(join(tempRoot, 'visible.md'));
     const files = await collectWorkspaceMdFiles(tempRoot);
     expect(files).toContain(join(tempRoot, 'visible.md'));
-    expect(files.some(f => f.includes('.cache'))).toBe(false);
+    expect(files).toContain(join(tempRoot, '.cache', 'README.md'));
   });
 
   it('respects local .mdvignore — skips matching directory', async () => {

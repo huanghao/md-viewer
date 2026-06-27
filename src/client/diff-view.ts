@@ -63,12 +63,40 @@ export async function loadPendingContent(path: string): Promise<string | null> {
   return data.content;
 }
 
+type DiffLineArr = import('./utils/diff').DiffLine[];
+type Segment =
+  | { kind: 'equal'; lines: DiffLineArr }
+  | { kind: 'delete'; lines: DiffLineArr }
+  | { kind: 'insert'; lines: DiffLineArr }
+  | { kind: 'modify'; delLines: DiffLineArr; insLines: DiffLineArr };
+type DiffGroup = { segments: Segment[]; hasChange: boolean };
+
+/** 将 Segment 列表合并为 group，空行 equal 段不切断相邻变更。
+ *  可单独测试，不依赖 DOM 或 marked。 */
+export function buildDiffGroups(segments: Segment[]): DiffGroup[] {
+  const groups: DiffGroup[] = [];
+  let current: DiffGroup = { segments: [], hasChange: false };
+
+  for (const seg of segments) {
+    if (seg.kind !== 'equal') {
+      current.segments.push(seg);
+      current.hasChange = true;
+    } else {
+      const isBlankOnly = seg.lines.every(l => l.content.trim() === '');
+      if (current.hasChange && isBlankOnly) {
+        current.segments.push(seg);
+      } else {
+        if (current.hasChange) groups.push(current);
+        groups.push({ segments: [seg], hasChange: false });
+        current = { segments: [], hasChange: false };
+      }
+    }
+  }
+  if (current.hasChange) groups.push(current);
+  return groups;
+}
+
 export function renderInlineDiffHTML(lines: import('./utils/diff').DiffLine[]): { html: string; totalBlocks: number } {
-  type Segment =
-    | { kind: 'equal'; lines: typeof lines }
-    | { kind: 'delete'; lines: typeof lines }
-    | { kind: 'insert'; lines: typeof lines }
-    | { kind: 'modify'; delLines: typeof lines; insLines: typeof lines };
 
   const segments: Segment[] = [];
   let i = 0;
@@ -105,22 +133,8 @@ export function renderInlineDiffHTML(lines: import('./utils/diff').DiffLine[]): 
     return g.restore((window as any).marked.parse(g.protected));
   };
 
-  // 将严格相邻（无 equal 间隔）的变更段合并为 group
-  type Group = { segments: Segment[]; hasChange: boolean };
-  const groups: Group[] = [];
-  let currentGroup: Group = { segments: [], hasChange: false };
-
-  for (const seg of segments) {
-    if (seg.kind !== 'equal') {
-      currentGroup.segments.push(seg);
-      currentGroup.hasChange = true;
-    } else {
-      if (currentGroup.hasChange) groups.push(currentGroup);
-      groups.push({ segments: [seg], hasChange: false });
-      currentGroup = { segments: [], hasChange: false };
-    }
-  }
-  if (currentGroup.hasChange) groups.push(currentGroup);
+  // 将变更段合并为 group，空行 equal 段不切断相邻变更
+  const groups = buildDiffGroups(segments);
 
   let blockIndex = 0;
   let html = '<div class="markdown-body diff-inline-body">';
@@ -237,15 +251,33 @@ export function renderParagraphDiffView(oldContent: string, newContent: string):
     container.querySelectorAll<HTMLElement>(sel.split(',').map(s => `.markdown-body > ${s}`).join(','))
   );
 
-  // Mark changed block elements
-  const changedEls: HTMLElement[] = [];
+  // 把连续的改动块归组，整组包在一个 wrapper div 里，作为一个导航单元
+  const changedGroups: HTMLElement[][] = [];
+  let run: HTMLElement[] = [];
   blocks.forEach((block, idx) => {
-    if (!block.changed) return;
     const el = blockEls[idx];
-    if (!el) return;
-    el.dataset.paraChanged = 'true';
-    changedEls.push(el);
+    if (block.changed && el) {
+      run.push(el);
+    } else {
+      if (run.length > 0) { changedGroups.push(run); run = []; }
+    }
   });
+  if (run.length > 0) changedGroups.push(run);
+
+  const changedEls: HTMLElement[] = [];
+  for (const group of changedGroups) {
+    let target: HTMLElement;
+    if (group.length === 1) {
+      target = group[0];
+    } else {
+      const wrapper = document.createElement('div');
+      group[0].parentElement!.insertBefore(wrapper, group[0]);
+      for (const el of group) wrapper.appendChild(el);
+      target = wrapper;
+    }
+    target.dataset.paraChanged = 'true';
+    changedEls.push(target);
+  }
 
   // Update banner count
   const banner = document.getElementById('diffBanner');

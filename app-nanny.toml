@@ -5,6 +5,9 @@ restart = "on-failure"
 command = "bun --watch run src/server.ts"
 port = 3000
 
+[processes.client]
+command = "bun run build:client:watch"
+
 [xxx-processes.rag]
 command = "bun --watch run src/rag-server.ts"
 port = 3001

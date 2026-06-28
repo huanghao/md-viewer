@@ -7,6 +7,7 @@ import { shouldRefreshDiff, refreshDiffBannerLabel } from './ui/diff-refresh';
 import { buildDiffBannerHTML, initDiffBannerActions, updateBannerForMode } from './ui/diff-banner';
 import { renderSidebar } from './ui/sidebar';
 import { protectMath } from './utils/math-protect';
+import { invalidateAnnotationElementsCache } from './annotation-layout';
 
 // Module-level variables
 let diffViewActive = false;
@@ -137,7 +138,7 @@ export function renderInlineDiffHTML(lines: import('./utils/diff').DiffLine[]): 
   const groups = buildDiffGroups(segments);
 
   let blockIndex = 0;
-  let html = '<div class="markdown-body diff-inline-body">';
+  let html = '<div class="markdown-body diff-inline-body" id="reader">';
 
   for (const group of groups) {
     if (!group.hasChange) {
@@ -242,7 +243,8 @@ export function renderParagraphDiffView(oldContent: string, newContent: string):
 
   // Render safeNew (setext-normalized) so block count matches diffBlocks(safeOld, safeNew)
   const g = protectMath(safeNew);
-  container.innerHTML = `<div class="markdown-body">${g.restore((window as any).marked.parse(g.protected))}</div>`;
+  container.innerHTML = `<div class="markdown-body" id="reader">${g.restore((window as any).marked.parse(g.protected))}</div>`;
+  invalidateAnnotationElementsCache();
   _renderMath(container);
 
   // Map rendered top-level block elements to diffBlocks[] by index
@@ -333,6 +335,7 @@ export function renderDiffView(oldContent: string, newContent: string): void {
   }
 
   container.innerHTML = bodyHTML;
+  invalidateAnnotationElementsCache();
   _renderMath(container);
 
   // 更新滚动条 diff 标记

@@ -1115,7 +1115,7 @@ export function initAnnotationElements(): void {
     event.stopPropagation();
     const pending = state.pendingAnnotation;
     if (!pending) { hideQuickAdd(true); return; }
-    if (pending.start < 0) {
+    if (pending.start < 0 && !getDiffViewActive()) {
       hideQuickAdd(true);
       showToast({ message: '无法定位评论位置（公式内无法锚定，请选取公式外的文字）', type: 'warning', duration: 3500 });
       return;

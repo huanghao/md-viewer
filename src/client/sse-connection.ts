@@ -6,6 +6,7 @@ import { renderSidebar } from './ui/sidebar';
 import { renderContent } from './content-renderer';
 import { showError, showInfo } from './ui/toast';
 import { getDiffViewActive, refreshDiffIfActive } from './diff-view';
+import { saveSnapshot } from './api/snapshots';
 import { markWorkspaceModified, clearWorkspacePathMissing, markWorkspacePathMissing } from './workspace-state';
 import { updateStatusbarConnection } from './statusbar';
 
@@ -82,6 +83,8 @@ async function syncOpenFilesAfterReconnect() {
       // 如果文件有更新
       if (data.lastModified > file.lastModified) {
         file.lastModified = data.lastModified;
+        // 重连时也保存快照（幂等：已存在则跳过）
+        if (file.content) void saveSnapshot(file.path, file.content);
         file.pendingContent = data.content;
         hasUpdate = true;
         // 若当前文件正在 diff 模式，刷新 diff 界面
@@ -133,6 +136,9 @@ export function connectSSE(isReconnect = false) {
     const file = getSessionFile(data.path);
 
     if (file) {
+      // 首次变化时保存 base 快照（服务端幂等：已存在则跳过）
+      if (file.content) void saveSnapshot(data.path, file.content);
+
       // 已打开的文件：更新 lastModified，M 标记由 getFileListStatus 计算
       file.lastModified = data.lastModified;
       // 原子保存后文件重新出现，清除 isMissing 标记

@@ -50,6 +50,7 @@ import {
   replaceQuickComments,
 } from "./annotation-storage.ts";
 import { createTodo, listTodos, updateTodo, deleteTodo, tidyTodos } from './todo-storage.ts';
+import { getSnapshot, saveSnapshot, deleteSnapshot } from './snapshot-storage.ts';
 import { upsertWorkspacePath, getWorkspacePaths, deleteWorkspacePath, searchByFilename } from './rag-storage.ts';
 import { calculateOpenCount } from "./annotation-status.ts";
 
@@ -1085,4 +1086,33 @@ export function handleWorkspaceSearch(c: Context) {
   }
 
   return c.json({ results });
+}
+
+// ── Snapshot handlers ─────────────────────────────────────────────────────────
+
+export async function handleGetSnapshot(c: Context) {
+  const path = c.req.query("path");
+  if (!path) return c.json({ error: "缺少 path 参数" }, 400);
+  const snap = getSnapshot(path);
+  if (!snap) return c.json({ exists: false }, 404);
+  return c.json({ exists: true, content: snap.content, savedAt: snap.savedAt });
+}
+
+export async function handleSaveSnapshot(c: Context) {
+  try {
+    const body = await c.req.json();
+    const { path, content } = body ?? {};
+    if (!path || typeof content !== "string") return c.json({ error: "缺少 path 或 content 参数" }, 400);
+    const created = saveSnapshot(path, content);
+    return c.json({ ok: true, created });
+  } catch (e: any) {
+    return c.json({ error: e?.message || "保存失败" }, 500);
+  }
+}
+
+export async function handleDeleteSnapshot(c: Context) {
+  const path = c.req.query("path");
+  if (!path) return c.json({ error: "缺少 path 参数" }, 400);
+  deleteSnapshot(path);
+  return c.json({ ok: true });
 }

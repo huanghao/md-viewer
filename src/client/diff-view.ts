@@ -8,9 +8,11 @@ import { buildDiffBannerHTML, initDiffBannerActions, updateBannerForMode } from 
 import { renderSidebar } from './ui/sidebar';
 import { protectMath } from './utils/math-protect';
 import { invalidateAnnotationElementsCache } from './annotation-layout';
+import { deleteSnapshot } from './api/snapshots';
 
 // Module-level variables
 let diffViewActive = false;
+let diffViewFilePath: string | null = null; // diff 是为哪个文件开启的（accept/revert 用此路径）
 let currentDiffBlockIndex = -1; // -1 表示未激活任何 block
 let diffMode: 'paragraph' | 'line' = 'paragraph';
 
@@ -44,6 +46,10 @@ export function getDiffViewActive(): boolean {
 
 export function setDiffViewActive(value: boolean): void {
   diffViewActive = value;
+}
+
+export function getDiffViewFilePath(): string | null {
+  return diffViewFilePath;
 }
 
 export function getDiffMode(): 'paragraph' | 'line' {
@@ -377,6 +383,7 @@ export async function handleDiffButtonClick(): Promise<void> {
   if (newContent === null) return;
 
   diffViewActive = true;
+  diffViewFilePath = state.currentFile;
   const diffBtn = document.getElementById('diffButton');
   if (diffBtn) diffBtn.classList.add('active');
   document.getElementById('content')?.classList.add('diff-active');
@@ -412,6 +419,7 @@ export async function handleDiffButtonClick(): Promise<void> {
 
 export function closeDiffView(): void {
   diffViewActive = false;
+  diffViewFilePath = null;
   currentDiffBlockIndex = -1;
   const diffBtn = document.getElementById('diffButton');
   if (diffBtn) diffBtn.classList.remove('active');
@@ -472,8 +480,10 @@ export function navigateDiffBlock(direction: 1 | -1): void {
 }
 
 export async function acceptDiffUpdate(): Promise<void> {
-  if (!state.currentFile) return;
-  const file = state.sessionFiles.get(state.currentFile);
+  // 始终操作 diff 打开时绑定的文件，而非 state.currentFile（防止切换文件后错误接受）
+  const targetPath = diffViewFilePath ?? state.currentFile;
+  if (!targetPath) return;
+  const file = state.sessionFiles.get(targetPath);
   if (!file || file.pendingContent === undefined) return;
 
   file.content = file.pendingContent;
@@ -481,7 +491,11 @@ export async function acceptDiffUpdate(): Promise<void> {
   file.displayedModified = file.lastModified;
   saveState();
 
+  // 删除服务端快照
+  void deleteSnapshot(targetPath);
+
   diffViewActive = false;
+  diffViewFilePath = null;
   const diffBtn = document.getElementById('diffButton');
   if (diffBtn) diffBtn.classList.remove('active');
   const banner = document.getElementById('diffBanner');
@@ -490,7 +504,7 @@ export async function acceptDiffUpdate(): Promise<void> {
   currentDiffBlockIndex = -1;
   clearDiffMarkers();
   _renderContent();
-  _updateToc(state.currentFile);
+  if (state.currentFile) _updateToc(state.currentFile);
   _syncAnnotationsForCurrentFile(false);
   _flashContentUpdated();
   renderSidebar();

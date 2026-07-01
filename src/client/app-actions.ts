@@ -16,6 +16,7 @@ import {
   renderAnnotationList,
 } from './annotation';
 import { getDiffViewActive, setDiffViewActive } from './diff-view';
+import { fetchSnapshot } from './api/snapshots';
 import { clearDiffMarkers } from './ui/doc-scrollbar';
 
 export let _setPendingAnnotation: ((ann: any, filePath: string, x: number, y: number) => void) | null = null;
@@ -46,6 +47,22 @@ export function syncAnnotationsForCurrentFile(force = false): void {
 export async function onFileLoaded(data: FileData, focus = false): Promise<void> {
   const previousFile = state.currentFile;
   addOrUpdateFile(data, focus);
+
+  // 刷新页面后，从服务端快照恢复 diff 状态（base vs 磁盘当前版本）
+  const file = state.sessionFiles.get(data.path);
+  if (file && file.pendingContent === undefined && !isHtmlPath(data.path)) {
+    void fetchSnapshot(data.path).then(snap => {
+      if (!snap) return;
+      // 快照与磁盘内容相同说明已过期，不需要恢复
+      if (snap.content === file.content) return;
+      // 还原：base = 快照，pending = 磁盘当前内容
+      file.pendingContent = file.content;
+      file.content = snap.content;
+      saveState();
+      renderSidebar();   // 让 M 标记出现
+    });
+  }
+
   if (focus && (state.config.sidebarTab === 'focus' || state.config.sidebarTab === 'full')) {
     await revealFileInWorkspace(data.path);
   }

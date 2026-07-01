@@ -49,6 +49,9 @@ import {
   handleUpsertQuickComments,
   handleOpenInEditor,
   handleFileCreatedAt,
+  handleGetSnapshot,
+  handleSaveSnapshot,
+  handleDeleteSnapshot,
 } from "./handlers.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
 
@@ -158,6 +161,11 @@ app.post("/api/annotations/clear", handleClearAllAnnotations);
 // API: Quick comments
 app.get("/api/quick-comments", handleGetQuickComments);
 app.post("/api/quick-comments", handleUpsertQuickComments);
+
+// API: Snapshots（base 快照，用于 diff 模式持久化）
+app.get("/api/snapshot", handleGetSnapshot);
+app.post("/api/snapshot", handleSaveSnapshot);
+app.delete("/api/snapshot", handleDeleteSnapshot);
 
 // API: Todos
 app.get('/api/todos', handleListTodos);

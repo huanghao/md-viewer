@@ -47,6 +47,11 @@ export function getConfigDir(): string {
   return join(configHome, "md-viewer");
 }
 
+export function getDataDir(): string {
+  const dataHome = process.env.XDG_DATA_HOME || join(homedir(), ".local", "share");
+  return join(dataHome, "md-viewer");
+}
+
 export function getConfigPath(): string {
   return join(getConfigDir(), "config.json");
 }

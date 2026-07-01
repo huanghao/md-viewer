@@ -13,7 +13,7 @@ import { showSuccess, showError, showInfo } from './ui/toast';
 import { renderContent } from './content-renderer';
 import { isHtmlPath, isPdfPath, isUrlPath } from './content-renderer';
 import { saveState } from './state';
-import { getDiffViewActive, setDiffViewActive } from './diff-view';
+import { getDiffViewActive, closeDiffView } from './diff-view';
 import { renderTocPanel } from './ui/toc-panel.js';
 import { updateToc } from './toc-manager';
 import { updateZoomDisplay } from './zoom-controller';
@@ -233,13 +233,9 @@ export async function handleSmartAddInput(path: string): Promise<void> {
 // 切换文件
 export async function switchFile(path: string) {
   const deps = getDeps();
-  // 切换文件时关闭 diff 视图
+  // 切换文件时完整关闭 diff 视图（清理 diffViewFilePath、markers、content class 等）
   if (getDiffViewActive()) {
-    setDiffViewActive(false);
-    const diffBtn = document.getElementById('diffButton');
-    if (diffBtn) diffBtn.classList.remove('active');
-    const banner = document.getElementById('diffBanner');
-    if (banner) banner.remove();
+    closeDiffView();
   }
   switchToFile(path);
   updateZoomDisplay(true);

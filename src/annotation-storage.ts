@@ -259,7 +259,9 @@ function normalizeAnnotation(input: any): StoredAnnotation | null {
   const note = String(input.note || "");
   const createdAt = Number(input.createdAt || Date.now());
   const isPdfAnnotation = input.fileType === "pdf";
-  if (!id || !Number.isFinite(start) || !Number.isFinite(length) || (!isPdfAnnotation && length <= 0) || !quote) {
+  // start < 0 表示 fuzzy anchor（diff 模式下的模糊定位），此时 length 允许为 0
+  const isFuzzyAnchor = start < 0 && length === 0;
+  if (!id || !Number.isFinite(start) || !Number.isFinite(length) || (!isPdfAnnotation && length <= 0 && !isFuzzyAnchor) || !quote) {
     return null;
   }
   const statusRaw = String(input.status || "anchored");
@@ -296,8 +298,8 @@ function normalizeAnnotation(input: any): StoredAnnotation | null {
   return {
     id,
     serial,
-    start: Math.max(0, Math.floor(start)),
-    length: Math.max(1, Math.floor(length)),
+    start: isFuzzyAnchor ? -1 : Math.max(0, Math.floor(start)),
+    length: isFuzzyAnchor ? 0 : Math.max(1, Math.floor(length)),
     quote,
     note: topNote,
     thread,

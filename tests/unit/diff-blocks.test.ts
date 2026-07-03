@@ -137,4 +137,33 @@ describe('diffBlocks', () => {
     expect(result[0].changed).toBe(false); // intro unchanged
     expect(result[1].changed).toBe(true);  // code block changed
   });
+
+  it('rewrapped paragraph (same words, different line breaks) → changed=false', () => {
+    const old = 'This is a fairly long paragraph\nthat has been hard-wrapped at a\ncertain width.';
+    const newText = 'This is a fairly long paragraph that has been hard-wrapped at a certain width.';
+    const result = diffBlocks(old, newText);
+    expect(result[0].changed).toBe(false);
+  });
+
+  it('paragraph with extra internal whitespace only → changed=false', () => {
+    const old = 'hello   world\nfoo bar';
+    const newText = 'hello world foo bar';
+    const result = diffBlocks(old, newText);
+    expect(result[0].changed).toBe(false);
+  });
+
+  it('rewrap plus real content change → still changed=true', () => {
+    const old = 'This is a fairly long paragraph\nthat has been hard-wrapped at a\ncertain width.';
+    const newText = 'This is a fairly long paragraph that has been hard-wrapped at a DIFFERENT width.';
+    const result = diffBlocks(old, newText);
+    expect(result[0].changed).toBe(true);
+  });
+
+  it('code fence with only whitespace/indentation change → still changed=true', () => {
+    const old = 'intro\n\n```\nconst x = 1;\n```';
+    const newText = 'intro\n\n```\nconst x   =   1;\n```';
+    const result = diffBlocks(old, newText);
+    expect(result[0].changed).toBe(false);
+    expect(result[1].changed).toBe(true); // whitespace matters inside code fences
+  });
 });

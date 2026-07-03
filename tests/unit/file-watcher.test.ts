@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { mkdtempSync, rmSync, writeFileSync, unlinkSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { closeWatcher, watchFile, watchWorkspace } from '../../src/file-watcher';
+import { closeWatcher, watchFile, watchWorkspace, pollForFileReturn } from '../../src/file-watcher';
 import { addClient, getClients, removeClient } from '../../src/sse';
 import { getFileList } from '../../src/utils';
 
@@ -88,6 +88,46 @@ describe('file watcher integration', () => {
 
     removeClient(client as any);
     expect(chunks).toContain(`event: file-deleted\ndata: ${JSON.stringify({ path: filePath })}\n\n`);
+  });
+
+  it('pollForFileReturn: broadcasts file-changed (not file-deleted) when the file reappears before the deadline', async () => {
+    // 模拟 agent 用 unlink+recreate 整体重写文件，重建耗时较长（但仍在宽限期内）
+    const filePath = join(tempRoot, 'slow-rewrite.md');
+    writeFileSync(filePath, 'v1');
+    const { client, chunks } = makeCaptureClient();
+    addClient(client as any);
+
+    watchFile(filePath);
+    await wait(200);
+
+    unlinkSync(filePath);
+    setTimeout(() => writeFileSync(filePath, 'v2 rewritten'), 300);
+
+    // deadline 500ms > 300ms 重建耗时 → 应判定为原子保存，不应误报删除
+    await pollForFileReturn(filePath, 500, 20);
+
+    removeClient(client as any);
+    const events = chunks.map(parseSseChunk).map((c) => c.event);
+    expect(events).toContain('file-changed');
+    expect(events).not.toContain('file-deleted');
+  });
+
+  it('pollForFileReturn: broadcasts file-deleted when the file never reappears within the deadline', async () => {
+    const filePath = join(tempRoot, 'really-deleted.md');
+    writeFileSync(filePath, 'v1');
+    const { client, chunks } = makeCaptureClient();
+    addClient(client as any);
+
+    watchFile(filePath);
+    await wait(200);
+
+    unlinkSync(filePath);
+    await pollForFileReturn(filePath, 150, 20);
+
+    removeClient(client as any);
+    const events = chunks.map(parseSseChunk).map((c) => c.event);
+    expect(events).toContain('file-deleted');
+    expect(events).not.toContain('file-changed');
   });
 
   it('ignores unsupported file changes in workspace watchers', async () => {

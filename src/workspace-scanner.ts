@@ -41,8 +41,8 @@ type Pattern = { base: string; pattern: string };
 function isIgnored(fullPath: string, patterns: Pattern[]): boolean {
   return patterns.some(({ base, pattern }) => {
     const rel = relative(base, fullPath);
-    return minimatch(rel, pattern, { dot: true }) ||
-           minimatch(rel + "/", pattern, { dot: true });
+    return minimatch(rel, pattern, { dot: true, matchBase: true }) ||
+           minimatch(rel + "/", pattern, { dot: true, matchBase: true });
   });
 }
 

@@ -99,6 +99,16 @@ describe('collectWorkspaceMdFiles', () => {
     expect(files.some(f => f.includes('venv'))).toBe(false);
   });
 
+  it('respects ~/.mdvignore global patterns nested multiple levels deep', async () => {
+    const { collectWorkspaceMdFiles } = await getScanner();
+    write(join(tempRoot, 'a', 'b', 'c', 'node_modules', 'pkg', 'README.md'));
+    write(join(tempRoot, 'src', 'main.md'));
+    writeFileSync(join(tempHome, '.mdvignore'), 'node_modules\n');
+    const files = await collectWorkspaceMdFiles(tempRoot);
+    expect(files).toContain(join(tempRoot, 'src', 'main.md'));
+    expect(files.some(f => f.includes('node_modules'))).toBe(false);
+  });
+
   it('returns empty array for non-existent path', async () => {
     const { collectWorkspaceMdFiles } = await getScanner();
     expect(await collectWorkspaceMdFiles('/nonexistent/path')).toEqual([]);

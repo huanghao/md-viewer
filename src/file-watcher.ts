@@ -43,10 +43,12 @@ const watchedPaths = new Set<string>();
 const watchedWorkspaceRoots = new Set<string>();
 
 // vi/vim 等编辑器用 rename 原子保存时，chokidar 的 add 事件在 macOS 上可能延迟数分钟。
-// 对已监听文件，unlink 后主动 poll 等文件重新出现，最多等 2 秒，每 50ms 检查一次。
-async function pollForFileReturn(path: string): Promise<void> {
-  const deadline = Date.now() + 2000;
-  const interval = 50;
+// agent 用 unlink+recreate 方式整体重写文件时，网络盘/慢磁盘上两步之间的间隔可能达数秒，
+// 窗口太短会把这类"假删除"误判为真删除，弹出"文件已不存在"提示。
+// 对已监听文件，unlink 后主动 poll 等文件重新出现，最多等 8 秒，每 50ms 检查一次。
+export async function pollForFileReturn(path: string, deadlineMs = 8000, intervalMs = 50): Promise<void> {
+  const deadline = Date.now() + deadlineMs;
+  const interval = intervalMs;
   while (Date.now() < deadline) {
     await new Promise(r => setTimeout(r, interval));
     try {

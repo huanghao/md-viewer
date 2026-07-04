@@ -4,7 +4,17 @@ import { stat } from "fs/promises";
 import { resolve } from "path";
 import { broadcastFileChanged, broadcastFileDeleted } from "./sse.ts";
 import { isSupportedTextFile, invalidateFileListCache } from "./utils.ts";
+import { DEFAULT_PATTERNS } from "./workspace-scanner.ts";
 import { dirname } from "path";
+
+// watchWorkspace() 会把整个目录树交给 chokidar 递归监听；不排除的话，node_modules/.git/dist/build
+// 这些目录树可能有几万到几十万个文件，usePolling 每 300ms 全部重新 stat 一遍，是服务端 CPU/内存
+// 占用的主要来源。workspace-scanner.ts 的目录树展示本就排除了这些目录，这里保持一致。
+// chokidar v5 的 ignored 只接受函数/正则/字面路径，不再支持 glob 字符串。
+const IGNORED_SEGMENTS = new Set(DEFAULT_PATTERNS);
+function isIgnoredPath(path: string): boolean {
+  return path.split(/[\\/]/).some((segment) => IGNORED_SEGMENTS.has(segment));
+}
 
 /**
  * 原子保存检测器（可独立测试）
@@ -74,6 +84,7 @@ function ensureWatcher() {
   watcher = chokidar.watch([], {
     persistent: true,
     ignoreInitial: true,
+    ignored: isIgnoredPath,
     usePolling: true,
     interval: 300,
     awaitWriteFinish: {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { mkdtempSync, rmSync, writeFileSync, unlinkSync } from 'fs';
+import { mkdtempSync, rmSync, writeFileSync, unlinkSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { closeWatcher, watchFile, watchWorkspace, pollForFileReturn } from '../../src/file-watcher';
@@ -136,6 +136,26 @@ describe('file watcher integration', () => {
     await wait(500);
     writeFileSync(filePath, 'after');
     unlinkSync(filePath);
+    await wait(1200);
+
+    removeClient(client as any);
+    expect(chunks).toEqual([]);
+  });
+
+  it('does not poll/broadcast changes for files under node_modules or .git (avoids watching huge dep trees)', async () => {
+    const nmFile = join(tempRoot, 'node_modules', 'pkg', 'README.md');
+    const gitFile = join(tempRoot, '.git', 'HEAD');
+    mkdirSync(join(tempRoot, 'node_modules', 'pkg'), { recursive: true });
+    mkdirSync(join(tempRoot, '.git'), { recursive: true });
+    writeFileSync(nmFile, 'before');
+    writeFileSync(gitFile, 'before');
+    const { client, chunks } = makeCaptureClient();
+    addClient(client as any);
+
+    watchWorkspace(tempRoot);
+    await wait(500);
+    writeFileSync(nmFile, 'after');
+    writeFileSync(gitFile, 'after');
     await wait(1200);
 
     removeClient(client as any);

@@ -3,22 +3,34 @@ export interface BlockDiff {
   changed: boolean;
 }
 
+// 列表起始行：`- `/`* `/`+ ` 或 `1. `/`1) `。要求标记后紧跟空格，避免误判 "---"（hr）或 "**加粗**"。
+const LIST_ITEM_RE = /^(\s*)([-*+]|\d+[.)])\s/;
+
 export function splitBlocks(text: string): string[] {
   if (!text.trim()) return [];
   const lines = text.split('\n');
   const blocks: string[] = [];
   let current: string[] = [];
   let inFence = false;
+  // current 是否正在累积一个列表：段落与紧邻（无空行）的列表之间，marked 会渲染成两个
+  // 独立顶层元素（<p> + <ul>），splitBlocks 的分块边界需要与之对齐，否则段落 diff 渲染时
+  // DOM 元素与 diff 块的下标会错位，导致后面所有块的高亮全部错位。
+  let currentIsList = false;
+
+  const flush = () => {
+    if (current.length > 0) {
+      blocks.push(current.join('\n'));
+      current = [];
+    }
+    currentIsList = false;
+  };
 
   for (const line of lines) {
     const isFenceBoundary = /^(`{3,}|~{3,})/.test(line);
 
     if (isFenceBoundary) {
       if (!inFence) {
-        if (current.length > 0) {
-          blocks.push(current.join('\n'));
-          current = [];
-        }
+        flush();
         inFence = true;
         current.push(line);
       } else {
@@ -27,25 +39,47 @@ export function splitBlocks(text: string): string[] {
         blocks.push(current.join('\n'));
         current = [];
       }
-    } else if (inFence) {
+      continue;
+    }
+
+    if (inFence) {
       current.push(line);
-    } else if (line.trim() === '') {
-      if (current.length > 0) {
-        blocks.push(current.join('\n'));
-        current = [];
-      }
-    } else if (/^#{1,6}\s/.test(line)) {
-      if (current.length > 0) {
-        blocks.push(current.join('\n'));
-        current = [];
-      }
+      continue;
+    }
+
+    if (line.trim() === '') {
+      flush();
+      continue;
+    }
+
+    if (/^#{1,6}\s/.test(line)) {
+      flush();
       blocks.push(line);
+      continue;
+    }
+
+    const isListStart = LIST_ITEM_RE.test(line);
+    const isIndented = /^\s+/.test(line);
+
+    if (current.length === 0) {
+      current.push(line);
+      currentIsList = isListStart;
+    } else if (currentIsList && !isListStart && !isIndented) {
+      // 列表 → 段落（无空行）：另起一块
+      flush();
+      current.push(line);
+      currentIsList = false;
+    } else if (!currentIsList && isListStart) {
+      // 段落 → 列表（无空行）：另起一块
+      flush();
+      current.push(line);
+      currentIsList = true;
     } else {
       current.push(line);
     }
   }
 
-  if (current.length > 0) blocks.push(current.join('\n'));
+  flush();
   return blocks;
 }
 

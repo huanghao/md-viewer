@@ -45,6 +45,41 @@ describe('splitBlocks', () => {
   it('multi-line paragraph stays as one block', () => {
     expect(splitBlocks('line1\nline2\nline3')).toEqual(['line1\nline2\nline3']);
   });
+
+  it('paragraph directly followed by a list (no blank line) splits into two blocks', () => {
+    const text = '**标签：**\n- item1\n- item2';
+    expect(splitBlocks(text)).toEqual(['**标签：**', '- item1\n- item2']);
+  });
+
+  it('numbered list directly following a paragraph also splits', () => {
+    const text = '**步骤：**\n1. first\n2. second';
+    expect(splitBlocks(text)).toEqual(['**步骤：**', '1. first\n2. second']);
+  });
+
+  it('list directly followed by a paragraph (no blank line) splits into two blocks', () => {
+    const text = '- item1\n- item2\nfollowing prose';
+    expect(splitBlocks(text)).toEqual(['- item1\n- item2', 'following prose']);
+  });
+
+  it('indented continuation line under a list item stays in the same block', () => {
+    const text = '- item one\n  continues on next line\n- item two';
+    expect(splitBlocks(text)).toEqual([text]);
+  });
+
+  it('list surrounded by blank lines is unaffected (still one block)', () => {
+    const text = 'intro\n\n- item1\n- item2\n\noutro';
+    expect(splitBlocks(text)).toEqual(['intro', '- item1\n- item2', 'outro']);
+  });
+
+  it('does not treat "---" (hr) as a list item', () => {
+    const text = 'para one\n\n---\n\npara two';
+    expect(splitBlocks(text)).toEqual(['para one', '---', 'para two']);
+  });
+
+  it('does not treat bold text starting with ** as a list item', () => {
+    const text = '**bold label** more text\n- item';
+    expect(splitBlocks(text)).toEqual(['**bold label** more text', '- item']);
+  });
 });
 
 describe('diffBlocks', () => {
@@ -165,5 +200,20 @@ describe('diffBlocks', () => {
     const result = diffBlocks(old, newText);
     expect(result[0].changed).toBe(false);
     expect(result[1].changed).toBe(true); // whitespace matters inside code fences
+  });
+
+  // 段落紧跟列表（无空行）曾被 splitBlocks 当成一个块，但 marked 渲染成两个 DOM 元素，
+  // 导致渲染时块下标与 DOM 元素下标错位，越往后错位越大（真实文档复现：附录改动被误判到别处）。
+  it('editing content after a "label + adjacent list" block does not misattribute changes to earlier blocks', () => {
+    const old = '**标签一：**\n- item1\n- item2\n\n**标签二：**\n- item3\n- item4\n\nlast paragraph';
+    const newText = '**标签一：**\n- item1\n- item2\n\n**标签二：**\n- item3\n- item4\n\nLAST PARAGRAPH CHANGED';
+    const result = diffBlocks(old, newText);
+    // 5 blocks: label1, list1, label2, list2, last-paragraph
+    expect(result).toHaveLength(5);
+    expect(result[0].changed).toBe(false); // 标签一
+    expect(result[1].changed).toBe(false); // list1
+    expect(result[2].changed).toBe(false); // 标签二
+    expect(result[3].changed).toBe(false); // list2
+    expect(result[4].changed).toBe(true);  // last paragraph — the only real edit
   });
 });

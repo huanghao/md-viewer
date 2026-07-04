@@ -90,6 +90,8 @@ describe('file watcher integration', () => {
     expect(chunks).toContain(`event: file-deleted\ndata: ${JSON.stringify({ path: filePath })}\n\n`);
   });
 
+  // 直接调用 pollForFileReturn，不经过 watchFile()/真实 chokidar unlink 事件——避免生产路径
+  // 用默认 8s 宽限期的那次调用和本测试注入的短宽限期调用并发竞争，产生两次广播的假失败。
   it('pollForFileReturn: broadcasts file-changed (not file-deleted) when the file reappears before the deadline', async () => {
     // 模拟 agent 用 unlink+recreate 整体重写文件，重建耗时较长（但仍在宽限期内）
     const filePath = join(tempRoot, 'slow-rewrite.md');
@@ -97,14 +99,11 @@ describe('file watcher integration', () => {
     const { client, chunks } = makeCaptureClient();
     addClient(client as any);
 
-    watchFile(filePath);
-    await wait(200);
-
     unlinkSync(filePath);
     setTimeout(() => writeFileSync(filePath, 'v2 rewritten'), 300);
 
-    // deadline 500ms > 300ms 重建耗时 → 应判定为原子保存，不应误报删除
-    await pollForFileReturn(filePath, 500, 20);
+    // deadline 2000ms 远大于 300ms 重建耗时 → 应判定为原子保存，不应误报删除
+    await pollForFileReturn(filePath, 2000, 20);
 
     removeClient(client as any);
     const events = chunks.map(parseSseChunk).map((c) => c.event);
@@ -117,9 +116,6 @@ describe('file watcher integration', () => {
     writeFileSync(filePath, 'v1');
     const { client, chunks } = makeCaptureClient();
     addClient(client as any);
-
-    watchFile(filePath);
-    await wait(200);
 
     unlinkSync(filePath);
     await pollForFileReturn(filePath, 150, 20);

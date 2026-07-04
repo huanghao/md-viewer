@@ -620,9 +620,19 @@ export function handleEvents(c: Context) {
 // API: 推断工作区（从文件路径推断 git 仓库根目录）
 // API: 扫描工作区，构建文件树
 // 扫描结果缓存 + in-flight dedup：同路径并发请求共享同一次扫描
-const scanCache = new Map<string, { tree: any; ts: number }>();
+export const scanCache = new Map<string, { tree: any; ts: number }>();
 const scanInFlight = new Map<string, Promise<any>>();
 const SCAN_CACHE_TTL_MS = 10_000;
+const SCAN_CACHE_MAX_ENTRIES = 30;
+
+function setScanCache(path: string, tree: any) {
+  scanCache.delete(path); // 若已存在，删除后重新插入以更新为最近使用
+  scanCache.set(path, { tree, ts: Date.now() });
+  if (scanCache.size > SCAN_CACHE_MAX_ENTRIES) {
+    const oldest = scanCache.keys().next().value;
+    if (oldest !== undefined) scanCache.delete(oldest);
+  }
+}
 
 export async function handleScanWorkspace(c: Context) {
   try {
@@ -638,6 +648,9 @@ export async function handleScanWorkspace(c: Context) {
 
     const cached = scanCache.get(resolvedPath);
     if (cached && Date.now() - cached.ts < SCAN_CACHE_TTL_MS) {
+      // 命中后移到 Map 末尾，维持近似 LRU 顺序
+      scanCache.delete(resolvedPath);
+      scanCache.set(resolvedPath, cached);
       return c.json(cached.tree);
     }
 
@@ -651,7 +664,7 @@ export async function handleScanWorkspace(c: Context) {
     watchWorkspace(resolvedPath);
 
     const scanPromise = scanWorkspaceTree(resolvedPath).then((tree) => {
-      scanCache.set(resolvedPath, { tree, ts: Date.now() });
+      setScanCache(resolvedPath, tree);
       scanInFlight.delete(resolvedPath);
       return tree;
     }).catch((err) => {

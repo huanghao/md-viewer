@@ -17,6 +17,7 @@ import {
   handleUpdateAnnotationStatus,
   handleUpsertAnnotation,
   handleWriteFile,
+  scanCache,
 } from '../../src/handlers';
 import { closeWatcher } from '../../src/file-watcher';
 import { replaceAnnotations, resetDbForTesting } from '../../src/annotation-storage';
@@ -214,6 +215,22 @@ describe('handlers — path and workspace APIs', () => {
     expect(data.fileCount).toBe(2);
     expect(data.children.map((child: any) => child.name)).toEqual(['docs', 'index.md']);
     expect(data.children[0].children.map((child: any) => child.name)).toEqual(['page.html']);
+  });
+
+  it('handleScanWorkspace caps the scan result cache so it does not grow unbounded', async () => {
+    scanCache.clear();
+    // scan 32 distinct roots (cap is 30) and confirm old entries get evicted
+    for (let i = 0; i < 32; i++) {
+      const root = join(tempRoot, `root-${i}`);
+      mkdirSync(root, { recursive: true });
+      writeFileSync(join(root, 'a.md'), '# a');
+      await handleScanWorkspace(makeContext({ body: { path: root } }));
+    }
+    expect(scanCache.size).toBeLessThanOrEqual(30);
+    // oldest scanned roots should have been evicted
+    expect(scanCache.has(resolve(join(tempRoot, 'root-0')))).toBe(false);
+    // most recently scanned root should still be cached
+    expect(scanCache.has(resolve(join(tempRoot, 'root-31')))).toBe(true);
   });
 });
 

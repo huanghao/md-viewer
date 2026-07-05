@@ -10,8 +10,23 @@ import {
   removeWorkspaceExpandedState,
   setWorkspaceExpandedState,
 } from './workspace-tree-expansion-persistence';
+import { showWarning } from './ui/toast';
 
 const FILE_TREE_CACHE_KEY = 'md-viewer:fileTreeCache';
+
+// 熔断告警只在每个路径第一次出现时提示一次，避免轮询扫描反复弹同一个提示
+const warnedExplodedPaths = new Set<string>();
+function warnAboutExplodedDirs(tree: FileTreeNode): void {
+  for (const w of tree.scanWarnings ?? []) {
+    if (warnedExplodedPaths.has(w.path)) continue;
+    warnedExplodedPaths.add(w.path);
+    showWarning(
+      `目录 ${w.path} 下有 ${w.entryCount} 个条目，超出扫描上限，已跳过（不会显示在文件树里）。` +
+      `如果确认不需要浏览，可以加进 .mdvignore 里彻底忽略。`,
+      8000,
+    );
+  }
+}
 
 // 生成唯一 ID
 function generateId(): string {
@@ -184,6 +199,7 @@ export async function scanWorkspace(workspaceId: string): Promise<FileTreeNode |
     }
 
     const tree: FileTreeNode = await response.json();
+    warnAboutExplodedDirs(tree);
 
     // Keep user's directory expand/collapse preference across polling rescans.
     const previousTree = state.fileTree.get(workspaceId);

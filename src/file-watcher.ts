@@ -5,6 +5,7 @@ import { resolve } from "path";
 import { broadcastFileChanged, broadcastFileDeleted } from "./sse.ts";
 import { isSupportedTextFile, invalidateFileListCache } from "./utils.ts";
 import { DEFAULT_PATTERNS } from "./workspace-scanner.ts";
+import { isKnownExploded, onExploded } from "./scan-guard.ts";
 import { dirname } from "path";
 
 // watchWorkspace() 会把整个目录树交给 chokidar 递归监听；不排除的话，node_modules/.git/dist/build
@@ -13,8 +14,27 @@ import { dirname } from "path";
 // chokidar v5 的 ignored 只接受函数/正则/字面路径，不再支持 glob 字符串。
 const IGNORED_SEGMENTS = new Set(DEFAULT_PATTERNS);
 function isIgnoredPath(path: string): boolean {
-  return path.split(/[\\/]/).some((segment) => IGNORED_SEGMENTS.has(segment));
+  if (path.split(/[\\/]/).some((segment) => IGNORED_SEGMENTS.has(segment))) return true;
+  // 熔断：workspace-scanner 运行时发现的"爆炸目录"（叫不出名字、没被上面的
+  // 固定名单覆盖），一旦被扫描发现，这里立刻跟着拒绝继续监听，不用等下次改名单再上线。
+  return isKnownExploded(path);
 }
+
+// 扫描过程中如果动态发现新的爆炸目录，且它已经被 chokidar 加入监听，主动退订，
+// 立刻停止对它的 usePolling 轮询，而不是等到下次重启才生效。
+// chokidar v4+ 的 unwatch() 不会自动级联到已经发现的子路径，需要用 getWatched()
+// 找出这个目录下已被单独追踪的所有子路径，一并退订。
+onExploded((dir) => {
+  if (!watcher) return;
+  const watched = watcher.getWatched();
+  const toUnwatch = [dir.path];
+  for (const [parent, names] of Object.entries(watched)) {
+    if (parent !== dir.path && !parent.startsWith(dir.path + "/")) continue;
+    toUnwatch.push(parent);
+    for (const name of names) toUnwatch.push(`${parent}/${name}`);
+  }
+  watcher.unwatch(toUnwatch);
+});
 
 /**
  * 原子保存检测器（可独立测试）

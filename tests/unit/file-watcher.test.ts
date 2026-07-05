@@ -5,6 +5,7 @@ import { join } from 'path';
 import { closeWatcher, watchFile, watchWorkspace, pollForFileReturn } from '../../src/file-watcher';
 import { addClient, getClients, removeClient } from '../../src/sse';
 import { getFileList } from '../../src/utils';
+import { markExploded, resetExplodedForTesting } from '../../src/scan-guard';
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -34,11 +35,13 @@ let tempRoot = '';
 beforeEach(() => {
   tempRoot = mkdtempSync(join(tmpdir(), 'mdv-watcher-'));
   getClients().clear();
+  resetExplodedForTesting();
 });
 
 afterEach(async () => {
   await closeWatcher();
   getClients().clear();
+  resetExplodedForTesting();
   rmSync(tempRoot, { recursive: true, force: true });
 });
 
@@ -156,6 +159,30 @@ describe('file watcher integration', () => {
     await wait(500);
     writeFileSync(nmFile, 'after');
     writeFileSync(gitFile, 'after');
+    await wait(1200);
+
+    removeClient(client as any);
+    expect(chunks).toEqual([]);
+  });
+
+  it('circuit breaker: a dynamically-discovered exploded dir (unknown name) stops being polled once marked, even if already watched', async () => {
+    const explodedDir = join(tempRoot, 'some-unrecognized-dump');
+    const fileInside = join(explodedDir, 'a.md');
+    mkdirSync(explodedDir, { recursive: true });
+    writeFileSync(fileInside, 'before');
+    const { client, chunks } = makeCaptureClient();
+    addClient(client as any);
+
+    watchWorkspace(tempRoot);
+    await wait(500);
+
+    // A scan (elsewhere in the codebase) discovers this directory is huge and
+    // marks it exploded — file-watcher must react immediately, not just on
+    // the next restart.
+    markExploded(explodedDir, 5000);
+    await wait(200);
+
+    writeFileSync(fileInside, 'after');
     await wait(1200);
 
     removeClient(client as any);

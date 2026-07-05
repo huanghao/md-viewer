@@ -180,6 +180,36 @@ describe('scanWorkspaceTree', () => {
     expect(tree.children?.some(c => c.name === 'docs')).toBe(true);
   });
 
+  it('circuit-breaks a directory with too many entries: excludes it from the tree and reports a scanWarning', async () => {
+    const { scanWorkspaceTree, MAX_DIR_ENTRIES } = await getScanner();
+    const exploded = join(tempRoot, 'exploded-dump');
+    mkdirSync(exploded, { recursive: true });
+    for (let i = 0; i < MAX_DIR_ENTRIES + 1; i++) {
+      writeFileSync(join(exploded, `f${i}.md`), '');
+    }
+    write(join(tempRoot, 'docs', 'guide.md'));
+
+    const tree = await scanWorkspaceTree(tempRoot);
+
+    expect(tree.children?.some(c => c.name === 'exploded-dump')).toBe(false);
+    expect(tree.children?.some(c => c.name === 'docs')).toBe(true);
+    expect(tree.scanWarnings).toBeDefined();
+    expect(tree.scanWarnings?.[0].path).toBe(exploded);
+    expect(tree.scanWarnings?.[0].entryCount).toBe(MAX_DIR_ENTRIES + 1);
+  });
+
+  it('a directory just at the threshold is not flagged', async () => {
+    const { scanWorkspaceTree, MAX_DIR_ENTRIES } = await getScanner();
+    const okDir = join(tempRoot, 'ok-dir');
+    mkdirSync(okDir, { recursive: true });
+    for (let i = 0; i < MAX_DIR_ENTRIES; i++) {
+      writeFileSync(join(okDir, `f${i}.md`), '');
+    }
+    const tree = await scanWorkspaceTree(tempRoot);
+    expect(tree.scanWarnings).toBeUndefined();
+    expect(tree.children?.some(c => c.name === 'ok-dir')).toBe(true);
+  });
+
   it('attaches ignorePatterns to tree node for client-side filtering', async () => {
     const { scanWorkspaceTree } = await getScanner();
     write(join(tempRoot, 'docs', 'guide.md'));

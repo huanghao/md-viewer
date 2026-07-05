@@ -33,6 +33,7 @@ export interface FileTreeNode {
   fileCount?: number;  // 目录下的 md/html 文件数
   lastModified?: number; // 文件最后修改时间（仅 file 节点）
   ignorePatterns?: string[]; // .mdvignore patterns（仅工作区根节点，焦点视图使用）
+  scanWarnings?: { path: string; entryCount: number }[]; // 仅根节点：本次扫描熔断跳过的目录
 }
 
 // 应用配置类型

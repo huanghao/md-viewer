@@ -17,7 +17,7 @@ export interface FileTreeNode {
 
 // Built-in default patterns, equivalent to a global .mdvignore that ships with the tool.
 // Users can override via ~/.mdvignore or a per-directory .mdvignore.
-export const DEFAULT_PATTERNS = ["node_modules", "dist", "build", ".git"];
+export const DEFAULT_PATTERNS = ["node_modules", "dist", "build", ".git", ".venv", "venv"];
 
 function loadLocalPatterns(dir: string): string[] {
   const p = join(dir, ".mdvignore");

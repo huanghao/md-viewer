@@ -60,6 +60,17 @@ describe('collectWorkspaceMdFiles', () => {
     expect(files.some(f => f.includes('dist'))).toBe(false);
   });
 
+  it('skips Python virtualenv directories (.venv / venv) by default', async () => {
+    const { collectWorkspaceMdFiles } = await getScanner();
+    write(join(tempRoot, '.venv', 'lib', 'notes.md'));
+    write(join(tempRoot, 'venv', 'lib', 'notes.md'));
+    write(join(tempRoot, 'src', 'doc.md'));
+    const files = await collectWorkspaceMdFiles(tempRoot);
+    expect(files).toContain(join(tempRoot, 'src', 'doc.md'));
+    expect(files.some(f => f.includes('.venv'))).toBe(false);
+    expect(files.some(f => f.includes('/venv/'))).toBe(false);
+  });
+
   it('includes hidden directories (dot-prefix no longer auto-skipped)', async () => {
     const { collectWorkspaceMdFiles } = await getScanner();
     write(join(tempRoot, '.cache', 'README.md'));

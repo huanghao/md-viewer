@@ -1,5 +1,6 @@
 import chokidar from "chokidar";
 import type { FSWatcher } from "chokidar";
+import type { Stats } from "fs";
 import { stat } from "fs/promises";
 import { resolve } from "path";
 import { broadcastFileChanged, broadcastFileDeleted } from "./sse.ts";
@@ -13,8 +14,9 @@ import { dirname } from "path";
 // 占用的主要来源。workspace-scanner.ts 的目录树展示本就排除了这些目录，这里保持一致。
 // chokidar v5 的 ignored 只接受函数/正则/字面路径，不再支持 glob 字符串。
 const IGNORED_SEGMENTS = new Set(DEFAULT_PATTERNS);
-function isIgnoredPath(path: string): boolean {
+function isIgnoredPath(path: string, stats?: Stats): boolean {
   if (path.split(/[\\/]/).some((segment) => IGNORED_SEGMENTS.has(segment))) return true;
+  if (stats?.isFile() && !isSupportedTextFile(path.toLowerCase())) return true;
   // 熔断：workspace-scanner 运行时发现的"爆炸目录"（叫不出名字、没被上面的
   // 固定名单覆盖），一旦被扫描发现，这里立刻跟着拒绝继续监听，不用等下次改名单再上线。
   return isKnownExploded(path);
@@ -105,8 +107,8 @@ function ensureWatcher() {
     persistent: true,
     ignoreInitial: true,
     ignored: isIgnoredPath,
-    usePolling: true,
-    interval: 300,
+    usePolling: process.env.MDV_USE_POLLING === "1",
+    interval: 1000,
     awaitWriteFinish: {
       stabilityThreshold: 200,
       pollInterval: 100
@@ -200,9 +202,9 @@ export function watchWorkspace(rootPath: string) {
 /**
  * 从监听列表移除文件
  */
-export function unwatchFile(filePath: string) {
+export function unwatchFile(filePath: string): boolean {
   if (!watchedPaths.has(filePath)) {
-    return;
+    return false;
   }
 
   watchedPaths.delete(filePath);
@@ -210,6 +212,11 @@ export function unwatchFile(filePath: string) {
   if (watcher) {
     watcher.unwatch(filePath);
   }
+  return true;
+}
+
+export function getWatchedFileCountForTesting(): number {
+  return watchedPaths.size;
 }
 
 /**

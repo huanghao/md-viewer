@@ -80,8 +80,6 @@ export function renderFileRow(
     ? `<span class="annotation-count-badge">${annotationCount}</span>`
     : '';
 
-  const chatBadge = '';
-
   // 相对修改时间（仅焦点视图）
   const timeStr = opts.showTime && lastModified
     ? `<span class="focus-file-time">${escapeHtml(formatRelativeTimeShort(lastModified))}</span>`
@@ -132,7 +130,7 @@ export function renderFileRow(
       <span class="file-type-icon ${typeIcon.cls}">${escapeHtml(typeIcon.label)}</span>
       <span class="tree-status-inline">${statusBadge}</span>
       <span class="tree-name" title="${escapeAttr(name)}"><span class="tree-name-full">${highlightedName}</span></span>
-      ${annotationBadge}${chatBadge}
+      ${annotationBadge}
       ${timeStr}
       ${pinBtn}
       ${closeBtn}

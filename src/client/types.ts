@@ -38,7 +38,7 @@ export interface FileTreeNode {
 
 // 应用配置类型
 export interface AppConfig {
-  sidebarTab: 'focus' | 'full' | 'list' | 'search';
+  sidebarTab: 'focus' | 'full' | 'list';
   focusWindowKey: '8h' | '2d' | '1w' | '1m';
   focusActiveTypes: string[];
   focusStrategies: string[]; // 最近视图排序依据，多选：'mtime'（写）、'open'（读）
@@ -112,14 +112,6 @@ export interface PathDetectResponse {
   ext?: string | null;
   isUrl?: boolean;
   error?: string;
-}
-
-export interface RagResult {
-  path: string;
-  heading: string | null;
-  text: string;
-  score: number;
-  charStart: number;
 }
 
 export type RagStatus =

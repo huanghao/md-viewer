@@ -104,6 +104,40 @@ describe('removeFile — cleanup after deletion', () => {
 
     expect(state.currentFile).not.toBe('/b.md');
   });
+
+  it('clears the file\'s per-file localStorage entries (pdf zoom/scroll) so they don\'t accumulate forever', () => {
+    addOrUpdateFile(makeFileData({ path: '/a.pdf' }));
+    storage.setItem('md-viewer:pdf-zoom:/a.pdf', '1.5');
+    storage.setItem('md-viewer:pdf-scroll:/a.pdf', '420');
+    storage.setItem('md-viewer:pdf-zoom:/other.pdf', '2'); // 应保留：不属于被移除的文件
+
+    removeFile('/a.pdf');
+
+    expect(storage.getItem('md-viewer:pdf-zoom:/a.pdf')).toBeNull();
+    expect(storage.getItem('md-viewer:pdf-scroll:/a.pdf')).toBeNull();
+    expect(storage.getItem('md-viewer:pdf-zoom:/other.pdf')).toBe('2');
+  });
+});
+
+describe('addOrUpdateFile — LRU eviction beyond MAX_FILES also clears per-file storage', () => {
+  beforeEach(resetState);
+
+  it('clears pdf-zoom/pdf-scroll entries for files evicted by the 100-file cap', () => {
+    // cleanupOldFiles() 的清理判定用的是插入前的 size，所以要先撑到 101 个文件
+    // （size 越过上限但还没真正触发裁剪），再插入第 102 个才会真正触发一次淘汰。
+    for (let i = 0; i <= 100; i++) {
+      addOrUpdateFile(makeFileData({ path: `/f${i}.md`, lastModified: i }));
+      state.sessionFiles.get(`/f${i}.md`)!.lastAccessed = i;
+    }
+    storage.setItem('md-viewer:pdf-zoom:/f0.md', '1.5');
+
+    // /f0.md 是最久未访问的，应被淘汰
+    addOrUpdateFile(makeFileData({ path: '/f101.md', lastModified: 101 }));
+    state.sessionFiles.get('/f101.md')!.lastAccessed = 101;
+
+    expect(state.sessionFiles.has('/f0.md')).toBe(false);
+    expect(storage.getItem('md-viewer:pdf-zoom:/f0.md')).toBeNull();
+  });
 });
 
 describe('addOrUpdateFile — recreate after deletion', () => {

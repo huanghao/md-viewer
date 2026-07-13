@@ -181,28 +181,14 @@ Temporary Items
 
 ########## Global/macOS END ##########
 
-# MDViewer Resources (generated)
-MDViewer/Resources/mdv-server
-
-# Swift Package Manager
-.build/
-.swiftpm/
-
-# App Bundle (generated)
+# 构建产物
 dist/
 src/client/embedded-client.ts
 .superpowers/
 .worktrees/
 models/
-dist-server/
-
-# Translation server runtime files
-translate-server/cache.db
-translate-server/__pycache__/
 
 # Build artifacts
-mdv-server-arm64
-mdv-server-*
 packages/*.tar.gz
 
 # Vim swap files

@@ -1,8 +1,10 @@
 import type { AppState, FileInfo, FileData } from './types';
+import { unwatchFile } from './api/files';
 import { loadConfig } from './config';
-import { storageGet, storageSet } from './utils/storage';
+import { storageGet, storageSet, storageRemove } from './utils/storage';
 import { recordSignal } from './utils/focus-signals';
 import { fuzzyMatch } from './utils/fuzzy-search';
+import { pdfZoomKey, pdfScrollKey } from './zoom';
 import {
   clearListDiff,
   clearWorkspacePathMissing,
@@ -32,6 +34,13 @@ export const state: AppState = {
 // 状态持久化
 const STORAGE_KEY = 'md-viewer:openFiles';
 const MAX_FILES = 100; // 最大保存文件数量（LRU 限制）
+
+// 文件彻底离开会话（关闭 tab / 被 LRU 淘汰）时，一并清掉它专属的 localStorage 条目
+// （PDF 缩放/滚动位置），否则这些 key 会随着历史打开过的文件数量无限累积。
+function clearPerFileStorage(path: string): void {
+  storageRemove(pdfZoomKey(path));
+  storageRemove(pdfScrollKey(path));
+}
 
 export function getSessionFile(path: string): FileInfo | undefined {
   return state.sessionFiles.get(path);
@@ -84,6 +93,7 @@ function cleanupOldFiles(): void {
   // 保留最近的 MAX_FILES 个
   const filesToKeep = sortedFiles.slice(0, MAX_FILES);
   const keepPaths = new Set(filesToKeep.map(([path]) => path));
+  const removedPaths = sortedFiles.slice(MAX_FILES).map(([path]) => path);
 
   // 清理旧文件
   state.sessionFiles.clear();
@@ -91,6 +101,10 @@ function cleanupOldFiles(): void {
     state.sessionFiles.set(path, file);
   });
   state.tabOrder = state.tabOrder.filter(p => keepPaths.has(p));
+  for (const path of removedPaths) {
+    unwatchFile(path);
+    clearPerFileStorage(path);
+  }
 
   console.log(`已清理 ${sortedFiles.length - MAX_FILES} 个旧文件`);
 }
@@ -216,6 +230,8 @@ export function removeFile(path: string): void {
   const idx = state.tabOrder.indexOf(path);
   state.sessionFiles.delete(path);
   state.tabOrder = state.tabOrder.filter(p => p !== path);
+  unwatchFile(path);
+  clearPerFileStorage(path);
   clearListDiff(path);
   clearWorkspacePathMissing(path);
   if (state.currentFile === path) {

@@ -83,3 +83,11 @@ export async function openFile(path: string, focus: boolean = true): Promise<voi
     body: JSON.stringify({ path, focus })
   });
 }
+
+export function unwatchFile(path: string): void {
+  void fetch('/api/unwatch-file', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path })
+  }).catch(() => {});
+}

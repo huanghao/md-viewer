@@ -26,7 +26,7 @@ import { createPdfAnnotationBridge } from './pdf-annotation.js';
 import { currentPdfViewer, setCurrentPdfViewer } from './pdf-state';
 import { storageGet, storageGetNumber, storageSet } from './utils/storage';
 import { getPdfZoom } from './zoom-controller';
-import { injectParaIds, initTranslation } from './translation';
+import { pdfScrollKey } from './zoom';
 import { getDiffViewActive } from './diff-view';
 import { protectMath } from './utils/math-protect';
 import { showInfo, showError } from './ui/toast';
@@ -507,7 +507,7 @@ export function renderContent() {
   for (const [path, entry] of pdfViewerRegistry.entries()) {
     if (entry.viewer.el.parentNode) {
       entry.savedScrollTop = container.scrollTop;
-      storageSet(`md-viewer:pdf-scroll:${path}`, container.scrollTop);
+      storageSet(pdfScrollKey(path), container.scrollTop);
       entry.viewer.el.remove();
     }
     if (path !== state.currentFile) _scheduleEviction!(path);
@@ -621,7 +621,7 @@ export function renderContent() {
       },
     }).then((pdfViewerInstance) => {
       container.setAttribute('data-current-file', filePath);
-      const savedScroll = storageGetNumber(`md-viewer:pdf-scroll:${filePath}`, 0);
+      const savedScroll = storageGetNumber(pdfScrollKey(filePath), 0);
       pdfViewerRegistry.set(filePath, {
         viewer: pdfViewerInstance,
         lastActiveAt: Date.now(),
@@ -677,7 +677,6 @@ export function renderContent() {
 
   // 应用批注高亮
   applyAnnotations();
-  injectParaIds();
 
   // 更新面包屑
   renderBreadcrumb();
@@ -689,5 +688,4 @@ export function renderContent() {
 
   // 更新工具栏按钮
   _updateToolbarButtons!();
-  if (file.path) initTranslation(file.path);
 }

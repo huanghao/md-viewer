@@ -10,7 +10,6 @@ import {
 } from './api/annotations';
 import { showError, showToast } from './ui/toast';
 import { enqueueOp } from './utils/undo-queue';
-import { setChatContext } from './ui/chat-panel.js';
 import { isOpen, isResolved, isUnanchored, type AnnotationStatus } from '../annotation-status';
 import { adjustAnnotationCount, adjustUnanchoredCount } from './state';
 import { loadConfig } from './config';
@@ -18,7 +17,6 @@ import { formatRelativeTimeShort } from './utils/format';
 import { storageSet } from './utils/storage';
 import { createResizer } from './utils/resizer';
 import { getTextNodes, globalOffsetForPosition, globalOffsetForPositionEnd, positionForGlobalOffset, clamp, placeFloating, getReaderText } from './annotation/position';
-import { registerChatSplitCallbacks, initChatSplit } from './annotation/chat-split';
 import { currentPdfViewer } from './pdf-state';
 import { isResolvedAnn, getAnchorTrack, matchesFilter, getVisibleAnnotations as getVisibleAnnotationsUtil } from './annotation/query';
 import { handleEmacsKeys } from './utils/emacs-keys';
@@ -198,12 +196,12 @@ function updateAnnotationCount(): void {
 
 // ==================== Tab ====================
 
-let _currentAnnotationTab: 'comments' | 'chat' | 'todo' = 'comments';
+let _currentAnnotationTab: 'comments' = 'comments';
 
 // 当前渲染的 filePath，供事件委托读取（renderAnnotationList 每次更新）
 let _listFilePath: string | null = null;
 
-export function switchAnnotationTab(tab: 'comments' | 'chat' | 'todo'): void {
+export function switchAnnotationTab(tab: 'comments'): void {
   _currentAnnotationTab = tab;
   const commentsList = document.getElementById('annotationList');
   const commentsActions = document.getElementById('annotationCommentsActions');
@@ -213,29 +211,10 @@ export function switchAnnotationTab(tab: 'comments' | 'chat' | 'todo'): void {
     btn.classList.toggle('is-active', (btn as HTMLElement).dataset.tab === tab);
   });
 
-  const chatList = document.getElementById('chatList');
   if (commentsList) commentsList.style.display = tab === 'comments' ? '' : 'none';
-  if (chatList) chatList.style.display = tab === 'chat' ? '' : 'none';
-  const todoPanel = document.getElementById('todoPanel');
-  if (todoPanel) todoPanel.style.display = tab === 'todo' ? '' : 'none';
   if (commentsActions) commentsActions.classList.toggle('hidden', tab !== 'comments');
-  const todoActions = document.getElementById('annotationTodoActions');
-  if (todoActions) todoActions.classList.toggle('hidden', tab !== 'todo');
-  // Close both filter menus when switching tabs
+  // Close filter menu when switching tabs
   document.getElementById('annotationFilterMenu')?.classList.add('hidden');
-  document.getElementById('todoFilterMenu')?.classList.add('hidden');
-
-  if (tab === 'todo') {
-    // Dynamic import to avoid circular deps
-    import('./ui/todo-panel').then(m => m.loadAndRenderTodos());
-  }
-}
-
-export function openChatTab(): void {
-  setSidebarCollapsed(false);
-  persistCurrentFilePanelOpen(true);
-  syncAnnotationSidebarLayout();
-  switchAnnotationTab('chat');
 }
 
 export function dismissAnnotationPopupByEscape(): boolean {
@@ -484,21 +463,6 @@ export function showPopover(ann: Annotation, x: number, y: number): void {
       menu.classList.toggle('hidden');
       // Store current annotation for menu handlers
       (menu as any)._ann = ann;
-    });
-  }
-  const askAiBtn = document.getElementById('popoverAskAiBtn') as HTMLButtonElement | null;
-  if (askAiBtn) {
-    const fresh = askAiBtn.cloneNode(true) as HTMLButtonElement;
-    askAiBtn.replaceWith(fresh);
-    fresh.addEventListener('click', () => {
-      setChatContext({
-        filePath: state.currentFilePath ?? undefined,
-        quote: displayQuoteOf(ann),
-        quotePrefix: ann.quotePrefix,
-        quoteSuffix: ann.quoteSuffix,
-      });
-      openChatTab();
-      hidePopover(true);
     });
   }
   placeFloating(el.popover, x, y);
@@ -911,7 +875,7 @@ export function handleSelectionForAnnotation(filePath: string | null): void {
 
   let start = globalOffsetForPosition(el.reader, range.startContainer, range.startOffset);
   let end = globalOffsetForPositionEnd(el.reader, range.endContainer, range.endOffset);
-  // Degraded: position failed (formula/table), but keep selection text for Todo
+  // Degraded: position failed (formula/table), but keep selection text for anchoring
   const positionValid = start >= 0 && end > start;
   if (!positionValid) {
     start = -1;
@@ -932,13 +896,6 @@ export function handleSelectionForAnnotation(filePath: string | null): void {
   const suffixWindow = 200;
   const quotePrefix = positionValid ? fullText.slice(Math.max(0, start - prefixWindow), start) : '';
   const quoteSuffix = positionValid ? fullText.slice(end, Math.min(fullText.length, end + suffixWindow)) : '';
-
-  setChatContext({
-    filePath: state.currentFilePath ?? undefined,
-    quote,
-    quotePrefix,
-    quoteSuffix,
-  });
 
   const rects = range.getClientRects();
   const lastRect = rects.length > 0 ? rects[rects.length - 1] : range.getBoundingClientRect();
@@ -1124,24 +1081,6 @@ export function initAnnotationElements(): void {
     openComposerFromPending();
   });
 
-  getElements().quickAddTodo?.addEventListener('click', (event) => {
-    event.stopPropagation();
-    const pending = state.pendingAnnotation;
-    const filePath = state.pendingAnnotationFilePath;
-    hideQuickAdd(true);
-    if (!pending || !filePath) return;
-    document.dispatchEvent(new CustomEvent('todo:open-composer', {
-      detail: {
-        quote: displayQuoteOf(pending),
-        filePath,
-        quotePrefix: pending.quotePrefix,
-        quoteSuffix: pending.quoteSuffix,
-        x: _lastQuickAddX,
-        y: _lastQuickAddY,
-      },
-    }));
-  });
-
   document.getElementById('popoverCloseBtn')?.addEventListener('click', () => {
     state.pinnedAnnotationId = null;
     hidePopover(true);
@@ -1323,25 +1262,6 @@ export function initAnnotationElements(): void {
     menu.classList.toggle('hidden');
   });
 
-  document.getElementById('todoFilterToggle')?.addEventListener('click', (event) => {
-    event.stopPropagation();
-    const menu = document.getElementById('todoFilterMenu');
-    if (!menu) return;
-    menu.classList.toggle('hidden');
-  });
-
-  document.getElementById('todoFilterMenu')?.querySelectorAll('.annotation-filter-item[data-todo-filter]').forEach((node) => {
-    const button = node as HTMLButtonElement;
-    button.addEventListener('click', () => {
-      const filter = button.getAttribute('data-todo-filter') as 'open' | 'all';
-      document.getElementById('todoFilterMenu')?.querySelectorAll('.annotation-filter-item').forEach(b =>
-        b.classList.toggle('is-active', b === button)
-      );
-      document.getElementById('todoFilterMenu')?.classList.add('hidden');
-      import('./ui/todo-panel').then(m => m.setTodoFilter(filter));
-    });
-  });
-
   getElements().densityToggle?.addEventListener('click', () => {
     state.density = state.density === 'default' ? 'simple' : 'default';
     storageSet('md-viewer:annotation-density', state.density);
@@ -1354,11 +1274,6 @@ export function initAnnotationElements(): void {
   });
   getElements().floatingOpenBtn?.addEventListener('click', () => {
     openAnnotationSidebar();
-  });
-
-  document.getElementById('todoFloatingBtn')?.addEventListener('click', () => {
-    openAnnotationSidebar();
-    switchAnnotationTab('todo');
   });
 
   const resizerEl = getElements().sidebarResizer;
@@ -1387,10 +1302,6 @@ export function initAnnotationElements(): void {
     syncAnnotationSidebarLayout();
     syncPinnedPopoverPosition();
   });
-
-  // ── 拆分 / 合并 Chat 面板 ──────────────────────────────────────────────────
-  registerChatSplitCallbacks({ switchAnnotationTab });
-  initChatSplit();
 
   // PDF annotation popover 事件
   document.addEventListener('pdf:show-popover', (e: Event) => {
@@ -1436,16 +1347,6 @@ export function initAnnotationElements(): void {
       !((target as HTMLElement).closest('#annotationFilterToggle'))
     ) {
       els.filterMenu.classList.add('hidden');
-    }
-
-    const todoFilterMenu = document.getElementById('todoFilterMenu');
-    if (
-      todoFilterMenu &&
-      !todoFilterMenu.classList.contains('hidden') &&
-      !todoFilterMenu.contains(target) &&
-      !((target as HTMLElement).closest('#todoFilterToggle'))
-    ) {
-      todoFilterMenu.classList.add('hidden');
     }
 
     if (

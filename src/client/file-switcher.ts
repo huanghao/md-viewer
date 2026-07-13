@@ -17,7 +17,6 @@ import { getDiffViewActive, closeDiffView } from './diff-view';
 import { renderTocPanel } from './ui/toc-panel.js';
 import { updateToc } from './toc-manager';
 import { updateZoomDisplay } from './zoom-controller';
-import { onChatFileSwitch } from './ui/chat-panel.js';
 
 export interface FileSwitcherDeps {
   onFileLoaded: (data: FileData, focus?: boolean) => Promise<void>;
@@ -264,7 +263,6 @@ export async function switchFile(path: string) {
   renderContent();
   if (!isPdfPath(path)) updateToc(path);
   deps.syncAnnotationsForCurrentFile(true);
-  onChatFileSwitch(path);
   await deps.updateToolbarButtons();
 }
 

@@ -18,9 +18,10 @@ echo "1️⃣  构建前端资源..."
 bun run build:client
 echo ""
 
-# 嵌入客户端脚本
-echo "2️⃣  嵌入客户端脚本..."
-bun run scripts/embed-client.ts
+# 复制静态资源到二进制旁边
+echo "2️⃣  复制静态资源..."
+mkdir -p "${BUILD_DIR}/static"
+cp public/index.html dist/client.js dist/client.css "${BUILD_DIR}/static/"
 echo ""
 
 # 目标平台

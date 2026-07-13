@@ -77,6 +77,21 @@ function expandDirectoryChain(workspaceId: string, workspacePath: string, filePa
   }
 }
 
+function registerWorkspacePath(path: string): void {
+  fetch('/api/register-workspace', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path }),
+  }).catch(() => {});
+}
+
+export function registerConfiguredWorkspaces(): void {
+  for (const workspace of state.config.workspaces) {
+    const path = normalizeWorkspacePath(workspace.path);
+    if (path) registerWorkspacePath(path);
+  }
+}
+
 // 添加工作区
 export function addWorkspace(name: string, path: string): Workspace {
   const normalizedPath = normalizeWorkspacePath(path);
@@ -101,11 +116,7 @@ export function addWorkspace(name: string, path: string): Workspace {
   // 添加后切换到新工作区
   state.currentWorkspace = workspace.id;
 
-  fetch('/api/register-workspace', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path: normalizedPath }),
-  }).catch(() => {});
+  registerWorkspacePath(normalizedPath);
 
   return workspace;
 }
@@ -314,6 +325,8 @@ function expandRecentFileDirs(root: FileTreeNode, maxCount: number): void {
 // 刷新后恢复已展开工作区的目录树。
 // 先从 localStorage 缓存立即恢复（同步，不阻塞），再后台异步重新扫描刷新。
 export async function hydrateExpandedWorkspaces(): Promise<string[]> {
+  registerConfiguredWorkspaces();
+
   const expanded = state.config.workspaces.filter((ws) => ws.isExpanded);
 
   // 从缓存同步恢复，立即可渲染

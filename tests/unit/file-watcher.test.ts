@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { mkdtempSync, rmSync, writeFileSync, unlinkSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { closeWatcher, watchFile, watchWorkspace, pollForFileReturn } from '../../src/file-watcher';
+import { closeWatcher, getWatchedFileCountForTesting, pollForFileReturn, unwatchFile, watchFile, watchWorkspace } from '../../src/file-watcher';
 import { addClient, getClients, removeClient } from '../../src/sse';
-import { getFileList } from '../../src/utils';
+import { getFileList, getFileListCacheSizeForTesting } from '../../src/utils';
 import { markExploded, resetExplodedForTesting } from '../../src/scan-guard';
 
 function wait(ms: number) {
@@ -63,6 +63,26 @@ describe('file watcher integration', () => {
     expect(typeof changed?.data.lastModified).toBe('number');
   });
 
+  it('unwatchFile releases an opened file watcher', async () => {
+    const filePath = join(tempRoot, 'closed.md');
+    writeFileSync(filePath, 'before');
+    const { client, chunks } = makeCaptureClient();
+    addClient(client as any);
+
+    watchFile(filePath);
+    await wait(500);
+    expect(getWatchedFileCountForTesting()).toBe(1);
+    expect(unwatchFile(filePath)).toBe(true);
+    expect(getWatchedFileCountForTesting()).toBe(0);
+
+    await wait(200);
+    writeFileSync(filePath, 'after');
+    await wait(1200);
+
+    removeClient(client as any);
+    expect(chunks.map(parseSseChunk).find((chunk) => chunk.event === 'file-changed')).toBeUndefined();
+  });
+
   it('watchWorkspace invalidates cached workspace file lists when a supported file is added', async () => {
     const existingPath = join(tempRoot, 'existing.md');
     const newPath = join(tempRoot, 'new.md');
@@ -76,6 +96,17 @@ describe('file watcher integration', () => {
     await wait(1200);
 
     expect(getFileList(tempRoot)).toEqual([existingPath, newPath]);
+  });
+
+  it('file list cache is bounded across many path suggestion roots', () => {
+    for (let i = 0; i < 230; i++) {
+      const dir = join(tempRoot, `root-${i}`);
+      mkdirSync(dir);
+      writeFileSync(join(dir, 'a.md'), 'x');
+      getFileList(dir);
+    }
+
+    expect(getFileListCacheSizeForTesting()).toBeLessThanOrEqual(200);
   });
 
   it('watchWorkspace broadcasts file-deleted for unlinked supported files under the workspace', async () => {
@@ -166,26 +197,36 @@ describe('file watcher integration', () => {
   });
 
   it('circuit breaker: a dynamically-discovered exploded dir (unknown name) stops being polled once marked, even if already watched', async () => {
-    const explodedDir = join(tempRoot, 'some-unrecognized-dump');
-    const fileInside = join(explodedDir, 'a.md');
-    mkdirSync(explodedDir, { recursive: true });
-    writeFileSync(fileInside, 'before');
-    const { client, chunks } = makeCaptureClient();
-    addClient(client as any);
+    const previousPolling = process.env.MDV_USE_POLLING;
+    process.env.MDV_USE_POLLING = '1';
+    try {
+      const explodedDir = join(tempRoot, 'some-unrecognized-dump');
+      const fileInside = join(explodedDir, 'a.md');
+      mkdirSync(explodedDir, { recursive: true });
+      writeFileSync(fileInside, 'before');
+      const { client, chunks } = makeCaptureClient();
+      addClient(client as any);
 
-    watchWorkspace(tempRoot);
-    await wait(500);
+      watchWorkspace(tempRoot);
+      await wait(500);
 
-    // A scan (elsewhere in the codebase) discovers this directory is huge and
-    // marks it exploded — file-watcher must react immediately, not just on
-    // the next restart.
-    markExploded(explodedDir, 5000);
-    await wait(200);
+      // A scan (elsewhere in the codebase) discovers this directory is huge and
+      // marks it exploded — file-watcher must react immediately, not just on
+      // the next restart.
+      markExploded(explodedDir, 5000);
+      await wait(200);
 
-    writeFileSync(fileInside, 'after');
-    await wait(1200);
+      writeFileSync(fileInside, 'after');
+      await wait(1200);
 
-    removeClient(client as any);
-    expect(chunks).toEqual([]);
+      removeClient(client as any);
+      expect(chunks).toEqual([]);
+    } finally {
+      if (previousPolling === undefined) {
+        delete process.env.MDV_USE_POLLING;
+      } else {
+        process.env.MDV_USE_POLLING = previousPolling;
+      }
+    }
   });
 });

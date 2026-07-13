@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { state } from "../../src/client/state";
-import { removeWorkspace } from "../../src/client/workspace";
+import { hydrateExpandedWorkspaces, removeWorkspace } from "../../src/client/workspace";
 import {
   getWorkspaceExpandedState,
   removeWorkspaceExpandedState,
@@ -37,6 +37,7 @@ if (!(globalThis as any).localStorage) {
 describe("workspace tree expansion persistence", () => {
   beforeEach(() => {
     localStorage.clear();
+    globalThis.fetch = mock(async () => Response.json({ ok: true })) as any;
     state.config.workspaces = [];
     state.fileTree.clear();
     state.currentWorkspace = null;
@@ -79,5 +80,19 @@ describe("workspace tree expansion persistence", () => {
     // cleanup explicit call should be idempotent
     removeWorkspaceExpandedState(wsId);
     expect(getWorkspaceExpandedState(wsId)).toBeUndefined();
+  });
+
+  test("hydrate registers all configured workspaces with the server", async () => {
+    state.config.workspaces = [
+      { id: "ws-collapsed", name: "repo-a", path: "/repo-a", isExpanded: false },
+      { id: "ws-collapsed-2", name: "repo-b", path: "/repo-b/", isExpanded: false },
+    ];
+
+    await hydrateExpandedWorkspaces();
+
+    const calls = (globalThis.fetch as any).mock.calls
+      .filter((call: any[]) => call[0] === "/api/register-workspace");
+    expect(calls).toHaveLength(2);
+    expect(calls.map((call: any[]) => JSON.parse(call[1].body).path)).toEqual(["/repo-a", "/repo-b"]);
   });
 });

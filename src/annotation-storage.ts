@@ -1,7 +1,10 @@
-import { Database } from "bun:sqlite";
-import { existsSync, mkdirSync } from "fs";
-import { join, resolve } from "path";
-import { getConfigDir } from "./config.ts";
+import { existsSync } from "fs";
+import { resolve } from "path";
+import { getDb, resetDbForTesting } from "./annotation-db.ts";
+
+export { getDb, resetDbForTesting };
+export { insertFocusSignal, pruneFocusSignals, queryFocusSignals } from "./focus-signal-storage.ts";
+export { listQuickComments, replaceQuickComments, type QuickComment } from "./quick-comment-storage.ts";
 
 export interface StoredAnnotationThreadItem {
   id: string;
@@ -40,14 +43,6 @@ export interface AnnotationDocSummary {
   anchoredCount: number;
   unanchoredCount: number;
   resolvedCount: number;
-}
-
-let db: Database | null = null;
-
-/** Close and reset the DB singleton. Only for use in tests. */
-export function resetDbForTesting(): void {
-  if (db) { try { db.close(); } catch { /* ignore */ } }
-  db = null;
 }
 
 function normalizeDocPath(path: string): string {
@@ -138,114 +133,6 @@ function mapRowToAnnotation(row: any): StoredAnnotation {
     fileType: (row.file_type as "md" | "pdf") ?? "md",
     rectCoords,
   };
-}
-
-export function getDb(): Database {
-  if (db) return db;
-
-  const dir = getConfigDir();
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
-  const dbPath = join(dir, "annotations.db");
-  db = new Database(dbPath);
-
-  db.exec(`
-    PRAGMA journal_mode = WAL;
-    PRAGMA synchronous = NORMAL;
-    CREATE TABLE IF NOT EXISTS annotations (
-      id TEXT PRIMARY KEY,
-      serial INTEGER,
-      doc_path TEXT NOT NULL,
-      start INTEGER NOT NULL,
-      length INTEGER NOT NULL,
-      quote TEXT NOT NULL,
-      note TEXT NOT NULL DEFAULT '',
-      thread_json TEXT,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      quote_prefix TEXT,
-      quote_suffix TEXT,
-      status TEXT NOT NULL DEFAULT 'anchored',
-      confidence REAL
-    );
-    CREATE INDEX IF NOT EXISTS idx_annotations_doc_path ON annotations(doc_path);
-    CREATE INDEX IF NOT EXISTS idx_annotations_doc_status ON annotations(doc_path, status);
-  `);
-
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS todos (
-      id TEXT PRIMARY KEY,
-      file_path TEXT NOT NULL,
-      quote TEXT NOT NULL,
-      quote_prefix TEXT,
-      quote_suffix TEXT,
-      note TEXT NOT NULL DEFAULT '',
-      done INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      done_at INTEGER
-    );
-    CREATE INDEX IF NOT EXISTS idx_todos_created_at ON todos(created_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_todos_done ON todos(done);
-  `);
-
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS focus_signals (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      ts INTEGER NOT NULL,
-      type TEXT NOT NULL,
-      file TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_focus_signals_ts ON focus_signals(ts);
-    CREATE INDEX IF NOT EXISTS idx_focus_signals_file ON focus_signals(file);
-  `);
-
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS quick_comments (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      text TEXT NOT NULL,
-      sort_order INTEGER NOT NULL DEFAULT 0
-    );
-  `);
-
-  const qcCount = (db.query('SELECT COUNT(*) as n FROM quick_comments').get() as { n: number }).n;
-  if (qcCount === 0) {
-    const defaults = [
-      '这是什么，解释一下',
-      '有点抽象，举个例子',
-      '单独写一篇文档介绍这个',
-      '给一些数字，让我有个体感',
-      '你确定吗？别猜，去代码里确认',
-    ];
-    const insertDefault = db.prepare('INSERT INTO quick_comments (text, sort_order) VALUES (?, ?)');
-    defaults.forEach((text, i) => insertDefault.run(text, i));
-  }
-
-  const columns = db.query(`PRAGMA table_info(annotations)`).all() as Array<{ name: string }>;
-  const hasSerial = columns.some((col) => col.name === "serial");
-  const hasThreadJson = columns.some((col) => col.name === "thread_json");
-  if (!hasSerial) {
-    db.exec(`ALTER TABLE annotations ADD COLUMN serial INTEGER`);
-  }
-  if (!hasThreadJson) {
-    db.exec(`ALTER TABLE annotations ADD COLUMN thread_json TEXT`);
-  }
-  const hasPage = columns.some((col) => col.name === "page");
-  const hasFileType = columns.some((col) => col.name === "file_type");
-  if (!hasPage) {
-    db.exec(`ALTER TABLE annotations ADD COLUMN page INTEGER`);
-  }
-  if (!hasFileType) {
-    db.exec(`ALTER TABLE annotations ADD COLUMN file_type TEXT NOT NULL DEFAULT 'md'`);
-    // TODO: file_type 列已冗余，文件类型可直接从 doc_path 后缀推断。
-    //       SQLite 不支持 DROP COLUMN（旧版本），需重建表时一并删除。
-  }
-  const hasRectCoords = columns.some((col) => col.name === "rect_coords_json");
-  if (!hasRectCoords) {
-    db.exec(`ALTER TABLE annotations ADD COLUMN rect_coords_json TEXT`);
-  }
-
-  return db;
 }
 
 function normalizeAnnotation(input: any): StoredAnnotation | null {
@@ -742,45 +629,4 @@ export function tidyAnnotations(olderThanDays = 7): { deleted: number; documents
     .query(`DELETE FROM annotations WHERE status IN ('resolved', 'unanchored') AND updated_at < ?`)
     .run(cutoff);
   return { deleted, documents };
-}
-
-// ── Focus signals ──────────────────────────────────────────────────────────────
-
-export function insertFocusSignal(type: string, file: string): void {
-  getDb().prepare(`INSERT INTO focus_signals (ts, type, file) VALUES (?, ?, ?)`).run(Date.now(), type, file);
-}
-
-export function queryFocusSignals(days: number): Array<{ ts: number; type: string; file: string }> {
-  const cutoff = Date.now() - days * 86400 * 1000;
-  return getDb()
-    .query(`SELECT ts, type, file FROM focus_signals WHERE ts >= ? ORDER BY ts ASC`)
-    .all(cutoff) as Array<{ ts: number; type: string; file: string }>;
-}
-
-export function pruneFocusSignals(olderThanDays = 7): void {
-  const cutoff = Date.now() - olderThanDays * 86400 * 1000;
-  getDb().prepare(`DELETE FROM focus_signals WHERE ts < ?`).run(cutoff);
-}
-
-// ==================== 快捷评论 ====================
-
-export interface QuickComment {
-  id: number;
-  text: string;
-  sortOrder: number;
-}
-
-export function listQuickComments(): QuickComment[] {
-  return getDb()
-    .query('SELECT id, text, sort_order as sortOrder FROM quick_comments ORDER BY sort_order ASC, id ASC')
-    .all() as QuickComment[];
-}
-
-export function replaceQuickComments(items: Array<{ text: string }>): void {
-  const database = getDb();
-  const insert = database.prepare('INSERT INTO quick_comments (text, sort_order) VALUES (?, ?)');
-  database.transaction(() => {
-    database.exec('DELETE FROM quick_comments');
-    items.forEach((item, i) => insert.run(item.text, i));
-  })();
 }

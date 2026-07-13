@@ -9,29 +9,21 @@
   "scripts": {
     "build:client": "bun run build.ts",
     "build:client:watch": "bun run build.ts --watch",
+    "build:scanner": "mkdir -p .cache && go build -o .cache/mdv-workspace-scanner ./cmd/workspace-scanner",
     "dev": "bun --watch run src/server.ts",
-    "build": "bun run build:client && bun run scripts/embed-client.ts && bun build src/cli.ts --compile --outfile=mdv",
+    "build": "rm -rf dist/static && bun run build:scanner && bun run build:client && mkdir -p dist/static && cp public/index.html dist/client.js dist/client.css dist/static/ && bun build src/cli.ts --compile --outfile=dist/mdv",
     "cli": "bun run src/cli.ts",
     "test": "bun test tests/unit"
   },
   "dependencies": {
-    "@huggingface/transformers": "^4.1.0",
-    "@mariozechner/pi-agent-core": "^0.69.0",
-    "@mariozechner/pi-ai": "^0.69.0",
-    "@mariozechner/pi-coding-agent": "^0.70.2",
     "chokidar": "^5.0.0",
-    "highlight.js": "^11.9.0",
-    "hono": "^3.12.8",
-    "marked": "^11.1.1",
-    "marked-highlight": "^2.0.6",
-    "onnxruntime-node": "^1.24.3",
-    "pdfjs-dist": "^5.6.205"
+    "hono": "^3.12.8"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "esbuild": "^0.27.3",
     "happy-dom": "14",
-    "tsx": "^4.21.0",
+    "pdfjs-dist": "^5.6.205",
     "typescript": "^5.9.3"
   }
 }

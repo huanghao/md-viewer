@@ -24,13 +24,10 @@ function makeCallbacks(): ToolbarCallbacks {
     handleDiffButtonClick: mock(() => {}),
     handleRefreshButtonClick: mock(() => {}),
     showSettingsDialog: mock(() => {}),
-    toggleMonitorPanel: mock(() => {}),
-    switchMonitorTab: mock((_tab: string) => {}),
     switchAnnotationTab: mock((_tab: string) => {}),
     zoomIn: mock(() => {}),
     zoomOut: mock(() => {}),
     setPdfMode: mock((_mode: string) => {}),
-    handleTranslateButtonClick: mock(() => {}),
     addFile: mock(() => {}),
     handleUnifiedInputSubmit: mock((_v?: string) => {}),
     dismissQuickActionConfirm: mock(() => {}),
@@ -63,22 +60,6 @@ describe('initToolbarActions — toolbar buttons', () => {
     expect(cbs.handleRefreshButtonClick).toHaveBeenCalledTimes(1);
   });
 
-  it('点击 data-action="toggle-monitor" 调用 toggleMonitorPanel()', () => {
-    doc.body.innerHTML = `<button data-action="toggle-monitor">监控</button>`;
-    const cbs = makeCallbacks();
-    initToolbarActions(doc.body, cbs);
-    (doc.querySelector('[data-action="toggle-monitor"]') as HTMLElement).click();
-    expect(cbs.toggleMonitorPanel).toHaveBeenCalledTimes(1);
-  });
-
-  it('点击 data-action="switch-monitor-tab" 调用 switchMonitorTab(tab)', () => {
-    doc.body.innerHTML = `<button data-action="switch-monitor-tab" data-tab="sessions">Sessions</button>`;
-    const cbs = makeCallbacks();
-    initToolbarActions(doc.body, cbs);
-    (doc.querySelector('[data-action="switch-monitor-tab"]') as HTMLElement).click();
-    expect(cbs.switchMonitorTab).toHaveBeenCalledWith('sessions');
-  });
-
   it('点击 data-action="zoom-in" 调用 zoomIn()', () => {
     doc.body.innerHTML = `<button data-action="zoom-in">+</button>`;
     const cbs = makeCallbacks();
@@ -106,10 +87,10 @@ describe('initToolbarActions — toolbar buttons', () => {
 
 describe('initToolbarActions — annotation tabs', () => {
   it('点击 data-action="switch-annotation-tab" 调用 switchAnnotationTab(tab)', () => {
-    doc.body.innerHTML = `<button data-action="switch-annotation-tab" data-tab="todo">Todo</button>`;
+    doc.body.innerHTML = `<button data-action="switch-annotation-tab" data-tab="comments">评论</button>`;
     const cbs = makeCallbacks();
     initToolbarActions(doc.body, cbs);
     (doc.querySelector('[data-action="switch-annotation-tab"]') as HTMLElement).click();
-    expect(cbs.switchAnnotationTab).toHaveBeenCalledWith('todo');
+    expect(cbs.switchAnnotationTab).toHaveBeenCalledWith('comments');
   });
 });

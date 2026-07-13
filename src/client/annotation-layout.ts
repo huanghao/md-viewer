@@ -24,7 +24,6 @@ function queryAnnotationElements() {
     composerNote: document.getElementById('composerNote') as HTMLTextAreaElement | null,
     quickAddWrap: document.getElementById('annotationQuickAddWrap') as HTMLElement | null,
     quickAddComment: document.getElementById('quickAddComment') as HTMLButtonElement | null,
-    quickAddTodo: document.getElementById('quickAddTodo') as HTMLButtonElement | null,
     popover: document.getElementById('annotationPopover'),
     popoverHeader: document.getElementById('annotationPopoverHeader'),
     popoverTitle: document.getElementById('popoverTitle'),
@@ -129,7 +128,6 @@ export function openAnnotationSidebar(): void {
   persistCurrentFilePanelOpen(true);
   syncAnnotationSidebarLayout();
   syncAnnotationScrollWithContent();
-  import('./ui/todo-panel').then(m => m.updateTodoTabCount());
 }
 
 export function closeAnnotationSidebar(): void {

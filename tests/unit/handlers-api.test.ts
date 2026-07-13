@@ -16,11 +16,16 @@ import {
   handleScanWorkspace,
   handleUpdateAnnotationStatus,
   handleUpsertAnnotation,
+  handleRegisterWorkspace,
+  handleUnwatchFile,
+  handleWorkspaceIndexStats,
+  handleWorkspaceSearch,
   handleWriteFile,
   scanCache,
 } from '../../src/handlers';
-import { closeWatcher } from '../../src/file-watcher';
+import { closeWatcher, getWatchedFileCountForTesting } from '../../src/file-watcher';
 import { replaceAnnotations, resetDbForTesting } from '../../src/annotation-storage';
+import { resetWorkspaceStorageForTesting } from '../../src/workspace-storage';
 
 interface TestContextOptions {
   url?: string;
@@ -59,11 +64,15 @@ beforeEach(() => {
   oldConfigHome = process.env.XDG_CONFIG_HOME;
   process.env.XDG_CONFIG_HOME = tempConfigHome;
   resetDbForTesting();
+  resetWorkspaceStorageForTesting();
+  scanCache.clear();
 });
 
 afterEach(async () => {
   await closeWatcher();
   resetDbForTesting();
+  resetWorkspaceStorageForTesting();
+  scanCache.clear();
   if (oldConfigHome === undefined) {
     delete process.env.XDG_CONFIG_HOME;
   } else {
@@ -92,6 +101,24 @@ describe('handlers — file APIs', () => {
     expect(data.filename).toBe('readme.md');
     expect(data.isRemote).toBe(false);
     expect(typeof data.lastModified).toBe('number');
+    expect(getWatchedFileCountForTesting()).toBe(1);
+  });
+
+  it('handleUnwatchFile releases a previously opened local file watcher', async () => {
+    const filePath = join(tempRoot, 'readme.md');
+    writeFileSync(filePath, '# Hello');
+
+    await handleGetFile(makeContext({
+      url: `http://localhost/api/file?path=${encodeURIComponent(filePath)}`,
+    }));
+    expect(getWatchedFileCountForTesting()).toBe(1);
+
+    const response = await handleUnwatchFile(makeContext({ body: { path: filePath } }));
+    const data = await readJson(response);
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({ success: true, unwatched: true });
+    expect(getWatchedFileCountForTesting()).toBe(0);
   });
 
   it('handleGetFile infers a remote filename extension from HTML content type', async () => {
@@ -201,7 +228,7 @@ describe('handlers — path and workspace APIs', () => {
     mkdirSync(empty);
     mkdirSync(ignored);
     writeFileSync(join(tempRoot, '.mdvignore'), 'tmp/\n# comment\n');
-    writeFileSync(join(tempRoot, 'index.md'), '# Index');
+    writeFileSync(join(tempRoot, 'main.md'), '# Main');
     writeFileSync(join(tempRoot, 'notes.txt'), 'skip');
     writeFileSync(join(docs, 'page.html'), '<p>Page</p>');
     writeFileSync(join(ignored, 'package.md'), 'skip');
@@ -213,12 +240,88 @@ describe('handlers — path and workspace APIs', () => {
     expect(data.path).toBe(resolve(tempRoot));
     expect(data.ignorePatterns).toEqual(['tmp/']);
     expect(data.fileCount).toBe(2);
-    expect(data.children.map((child: any) => child.name)).toEqual(['docs', 'index.md']);
+    expect(data.children.map((child: any) => child.name)).toEqual(['docs', 'main.md']);
     expect(data.children[0].children.map((child: any) => child.name)).toEqual(['page.html']);
   });
 
+  it('handleScanWorkspace does not silently fall back when a daemon socket is configured', async () => {
+    const oldSocket = process.env.MDV_WORKSPACE_DAEMON_SOCKET;
+    const oldScanner = process.env.MDV_WORKSPACE_SCANNER;
+    process.env.MDV_WORKSPACE_DAEMON_SOCKET = join(tempRoot, 'missing.sock');
+    delete process.env.MDV_WORKSPACE_SCANNER;
+    try {
+      writeFileSync(join(tempRoot, 'main.md'), '# Main');
+
+      const response = await handleScanWorkspace(makeContext({ body: { path: tempRoot } }));
+      const data = await readJson(response);
+
+      expect(response.status).toBe(500);
+      expect(data.error).toContain('Go daemon scan failed');
+      expect(scanCache.has(resolve(tempRoot))).toBe(false);
+    } finally {
+      if (oldSocket === undefined) {
+        delete process.env.MDV_WORKSPACE_DAEMON_SOCKET;
+      } else {
+        process.env.MDV_WORKSPACE_DAEMON_SOCKET = oldSocket;
+      }
+      if (oldScanner === undefined) {
+        delete process.env.MDV_WORKSPACE_SCANNER;
+      } else {
+        process.env.MDV_WORKSPACE_SCANNER = oldScanner;
+      }
+    }
+  });
+
+  it('ignores legacy MDV_WORKSPACE_DAEMON self-spawn mode and uses local scanner fallback', async () => {
+    const oldDaemon = process.env.MDV_WORKSPACE_DAEMON;
+    const oldSocket = process.env.MDV_WORKSPACE_DAEMON_SOCKET;
+    process.env.MDV_WORKSPACE_DAEMON = '1';
+    delete process.env.MDV_WORKSPACE_DAEMON_SOCKET;
+    try {
+      writeFileSync(join(tempRoot, 'main.md'), '# Main');
+
+      const response = await handleScanWorkspace(makeContext({ body: { path: tempRoot } }));
+      const data = await readJson(response);
+
+      expect(response.status).toBe(200);
+      expect(data.children.map((child: any) => child.name)).toEqual(['main.md']);
+    } finally {
+      if (oldDaemon === undefined) {
+        delete process.env.MDV_WORKSPACE_DAEMON;
+      } else {
+        process.env.MDV_WORKSPACE_DAEMON = oldDaemon;
+      }
+      if (oldSocket === undefined) {
+        delete process.env.MDV_WORKSPACE_DAEMON_SOCKET;
+      } else {
+        process.env.MDV_WORKSPACE_DAEMON_SOCKET = oldSocket;
+      }
+    }
+  });
+
+  it('handleWorkspaceIndexStats reports unavailable when no daemon socket is configured', async () => {
+    const oldSocket = process.env.MDV_WORKSPACE_DAEMON_SOCKET;
+    delete process.env.MDV_WORKSPACE_DAEMON_SOCKET;
+    try {
+      const response = await handleWorkspaceIndexStats(makeContext());
+      const data = await readJson(response);
+
+      expect(response.status).toBe(503);
+      expect(data).toMatchObject({
+        ok: false,
+        configured: false,
+      });
+      expect(data.error).toContain('not configured');
+    } finally {
+      if (oldSocket === undefined) {
+        delete process.env.MDV_WORKSPACE_DAEMON_SOCKET;
+      } else {
+        process.env.MDV_WORKSPACE_DAEMON_SOCKET = oldSocket;
+      }
+    }
+  });
+
   it('handleScanWorkspace caps the scan result cache so it does not grow unbounded', async () => {
-    scanCache.clear();
     // scan 32 distinct roots (cap is 30) and confirm old entries get evicted
     for (let i = 0; i < 32; i++) {
       const root = join(tempRoot, `root-${i}`);
@@ -231,6 +334,53 @@ describe('handlers — path and workspace APIs', () => {
     expect(scanCache.has(resolve(join(tempRoot, 'root-0')))).toBe(false);
     // most recently scanned root should still be cached
     expect(scanCache.has(resolve(join(tempRoot, 'root-31')))).toBe(true);
+  });
+
+  it('handleScanWorkspace returns cached trees immediately and refreshes stale entries in the background', async () => {
+    writeFileSync(join(tempRoot, 'a.md'), '# a');
+    const firstResponse = await handleScanWorkspace(makeContext({ body: { path: tempRoot } }));
+    const firstData = await readJson(firstResponse);
+    expect(firstData.children.map((child: any) => child.name)).toEqual(['a.md']);
+
+    writeFileSync(join(tempRoot, 'b.md'), '# b');
+    const resolvedRoot = resolve(tempRoot);
+    const cached = scanCache.get(resolvedRoot);
+    expect(cached).toBeDefined();
+    scanCache.set(resolvedRoot, { ...cached!, ts: Date.now() - 20_000 });
+
+    const cachedResponse = await handleScanWorkspace(makeContext({ body: { path: tempRoot } }));
+    const cachedData = await readJson(cachedResponse);
+    expect(cachedData.children.map((child: any) => child.name)).toEqual(['a.md']);
+
+    const deadline = Date.now() + 2000;
+    while (Date.now() < deadline) {
+      const names = scanCache.get(resolvedRoot)?.tree.children?.map((child: any) => child.name) ?? [];
+      if (names.includes('b.md')) break;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    expect(scanCache.get(resolvedRoot)?.tree.children?.map((child: any) => child.name)).toEqual(['a.md', 'b.md']);
+  });
+
+  it('handleWorkspaceSearch reads cached workspace trees and warms missing indexes without blocking', async () => {
+    writeFileSync(join(tempRoot, 'alpha.md'), '# alpha');
+    await handleRegisterWorkspace(makeContext({ body: { path: tempRoot } }));
+
+    const searchUrl = new URL('http://localhost/api/workspace-search');
+    searchUrl.searchParams.set('q', 'alpha');
+    const coldResponse = await handleWorkspaceSearch(makeContext({ url: searchUrl.toString() }));
+    const coldData = await readJson(coldResponse);
+    const coldDisplays = coldData.results.map((result: any) => result.display);
+    expect(coldDisplays.length === 0 || coldDisplays.join(',') === 'alpha.md').toBe(true);
+
+    const deadline = Date.now() + 2000;
+    let warmDisplays = coldDisplays;
+    while (Date.now() < deadline && warmDisplays.length === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      const response = await handleWorkspaceSearch(makeContext({ url: searchUrl.toString() }));
+      const data = await readJson(response);
+      warmDisplays = data.results.map((result: any) => result.display);
+    }
+    expect(warmDisplays).toEqual(['alpha.md']);
   });
 });
 

@@ -158,7 +158,7 @@ export async function scanWorkspaceTree(rootPath: string): Promise<FileTreeNode>
   return root;
 }
 
-// Returns a flat list of .md/.markdown files (for RAG indexer).
+// Returns a flat list of Markdown files for workspace-level file operations.
 export async function collectWorkspaceMdFiles(rootPath: string): Promise<string[]> {
   if (!existsSync(rootPath)) return [];
   const files: string[] = [];

@@ -1,17 +1,16 @@
 // App initialization — runs the IIFE startup sequence
 import { state, restoreState, saveState, markFileMissing, markWorkspaceFailed } from './state';
 import { setAnnotationSummaries } from './state';
+import { pruneDeadFeatureStorageKeys, pruneStalePerFileStorage } from './utils/storage';
 import { hydrateExpandedWorkspaces } from './workspace';
 import { loadFile } from './api/files';
 import { renderSidebar, initTabsActions, initFileListActions, initWorkspaceActions, initSearchBoxCallbacks, toggleTabManager, applyTabBatchAction } from './ui/sidebar';
 import { initToolbarActions } from './main-actions';
-import { setRagCallbacks } from './ui/rag-search-panel';
 import { showError } from './ui/toast';
 import { showPreferences, closePreferences } from './ui/preferences';
 import { hideShortcutsHelp, isShortcutsHelpVisible } from './ui/shortcuts-help';
 import { registerAction, initDispatcher } from './keybindings';
 import { initQuickOpen, showQuickOpen, hideQuickOpen } from './ui/quick-open';
-import { initChatPanel } from './ui/chat-panel.js';
 import { fetchAnnotationSummaries } from './api/annotations';
 import {
   initAnnotationElements,
@@ -21,10 +20,8 @@ import {
   getAnnotations,
   switchAnnotationTab,
   openComposerFromPending,
-  openAnnotationSidebar,
   handleSelectionForAnnotation,
 } from './annotation';
-import { initTodoPanel, initTodoExternalCallbacks } from './ui/todo-panel';
 import { currentPdfViewer, setPdfDefaultScale } from './pdf-state';
 import {
   initTocManager,
@@ -36,7 +33,6 @@ import {
 import { flushAll as flushUndoQueue } from './utils/undo-queue';
 import { setupFindBar } from './find-bar';
 import { initZoom, zoomIn, zoomOut, setZoomFromInput, updateZoomDisplay } from './zoom-controller';
-import { handleTranslateButtonClick } from './translation';
 import {
   initDiffView,
   getDiffViewActive,
@@ -65,7 +61,6 @@ import {
   flashContentUpdated,
   renderMath,
 } from './content-renderer';
-import { initMemoryMonitor, switchMonitorTab, toggleMonitorPanel } from './memory-monitor';
 import { resolveMarkdownLinkPath } from './utils/md-link';
 import { initSSEConnection, connectSSE } from './sse-connection';
 import {
@@ -102,6 +97,9 @@ import {
 
 (async () => {
   console.time('[init] total');
+
+  // 清理已下线功能遗留的 localStorage key（todo/chat/rag/translate/monitor）
+  pruneDeadFeatureStorageKeys();
 
   // 初始化文件切换模块
   initFileSwitcher({
@@ -172,30 +170,6 @@ import {
 
   // 初始化批注功能
   initAnnotationElements();
-  initTodoPanel();
-  initTodoExternalCallbacks({
-    switchFile: (path) => void switchFile(path),
-    switchAnnotationTab: (tab) => switchAnnotationTab(tab as 'comments' | 'chat' | 'todo'),
-    openAnnotationSidebar,
-  });
-
-  // 预设 RAG 面板 callbacks（renderRagSearchPanel 渲染时会绑定事件委托）
-  setRagCallbacks({
-    onOpen: () => {},
-    switchFile: (path, afterRender) => {
-      if (state.sessionFiles.has(path)) {
-        void switchFile(path).then(() => afterRender());
-      } else {
-        void (async () => {
-          const data = await loadFile(path);
-          if (data) await onFileLoaded(data, true);
-          afterRender();
-        })();
-      }
-    },
-  });
-  initChatPanel();
-  initMemoryMonitor(pdfViewerRegistry, switchFile, loadFile, onFileLoaded);
   set_setPendingAnnotation(setPendingAnnotation);
   syncAnnotationSidebarLayout();
   window.addEventListener('resize', () => {
@@ -209,6 +183,9 @@ import {
   console.time('[init] restoreState');
   await restoreState(loadFile);
   console.timeEnd('[init] restoreState');
+
+  // 回收不属于当前会话任何文件的 pdf-zoom/pdf-scroll 历史遗留 key
+  pruneStalePerFileStorage(state.sessionFiles.keys());
 
   // 补全缺失的 createdAt / gitCreatedAt
   const missingTimes = Array.from(state.sessionFiles.values())
@@ -260,13 +237,10 @@ import {
     handleDiffButtonClick: () => void handleDiffButtonClick(),
     handleRefreshButtonClick,
     showSettingsDialog: showPreferences,
-    toggleMonitorPanel,
-    switchMonitorTab: (tab) => switchMonitorTab(tab as 'memory' | 'sessions'),
-    switchAnnotationTab: (tab) => switchAnnotationTab(tab as 'comments' | 'chat' | 'todo'),
+    switchAnnotationTab: (tab) => switchAnnotationTab(tab as 'comments'),
     zoomIn,
     zoomOut,
     setPdfMode: (mode) => setPdfMode(mode as 'select' | 'annotate'),
-    handleTranslateButtonClick: () => handleTranslateButtonClick(state.currentFile ?? null),
     addFile: () => {
       const input = document.getElementById('searchInput') as HTMLInputElement;
       if (input) handleSmartAddInput(input.value).catch((err: any) => showError(`添加失败: ${err?.message || '未知错误'}`));
@@ -408,17 +382,6 @@ import {
     handler: () => {
       const input = document.getElementById('searchInput') as HTMLInputElement | null;
       if (input) { input.focus(); input.select(); }
-    },
-    shouldActivate: () => !isInputFocused(),
-  });
-
-  registerAction({
-    id: 'rag-search',
-    label: '内容搜索',
-    category: 'view',
-    defaultKey: `${modKey}+Shift+k`,
-    handler: () => {
-      document.dispatchEvent(new CustomEvent('sidebar:set-tab', { detail: { tab: 'search' } }));
     },
     shouldActivate: () => !isInputFocused(),
   });

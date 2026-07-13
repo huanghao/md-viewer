@@ -156,7 +156,6 @@ interface FileDragState {
 let tabDragState: TabDragState | null = null;
 let fileDragState: FileDragState | null = null;
 import { attachPathAutocomplete } from './path-autocomplete';
-import { renderRagSearchPanel } from './rag-search-panel';
 
 export function resetSidebarFileAnchor(): void {
   hasAutoAnchoredCurrentFile = false;
@@ -175,7 +174,7 @@ function scrollCurrentFileIntoView(container: HTMLElement): void {
   });
 }
 
-export function setSidebarTab(tab: 'focus' | 'full' | 'list' | 'search'): void {
+export function setSidebarTab(tab: 'focus' | 'full' | 'list'): void {
   state.config.sidebarTab = tab;
   saveConfig(state.config);
   if (tab === 'focus') {
@@ -415,11 +414,10 @@ function renderViewTabs(): void {
   if (!container) return;
 
   const tab = state.config.sidebarTab;
-  const tabs: Array<{ key: 'focus' | 'full' | 'list' | 'search'; label: string }> = [
+  const tabs: Array<{ key: 'focus' | 'full' | 'list'; label: string }> = [
     { key: 'focus', label: '最近' },
     { key: 'full', label: '工作区' },
     { key: 'list', label: '打开' },
-    { key: 'search', label: '搜索' },
   ];
 
   container.innerHTML = `
@@ -736,23 +734,6 @@ export function renderSidebar(): void {
   renderSearchBox();
   renderViewTabs();
 
-  if (tab === 'search') {
-    renderCurrentPath();
-    let searchContainer = document.getElementById('fileList');
-    if (!searchContainer) {
-      searchContainer = document.createElement('div');
-      searchContainer.id = 'fileList';
-      const sidebarEl = document.querySelector('.sidebar');
-      sidebarEl?.appendChild(searchContainer);
-    }
-    searchContainer.className = 'rag-search-container';
-    // Only build the panel once — rebuilding it resets input and scroll position
-    if (!searchContainer.querySelector('.rag-search-wrap')) {
-      renderRagSearchPanel(searchContainer);
-    }
-    renderTabs();
-    return;
-  }
   if (tab === 'list') {
     renderCurrentPath();
     const listEl = document.getElementById('fileList');

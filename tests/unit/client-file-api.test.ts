@@ -6,6 +6,7 @@ import {
   loadFile,
   openFile,
   searchFiles,
+  unwatchFile,
 } from '../../src/client/api/files';
 
 const originalFetch = globalThis.fetch;
@@ -115,5 +116,25 @@ describe('client file api', () => {
     expect(capturedInit?.method).toBe('POST');
     expect(capturedInit?.headers).toEqual({ 'Content-Type': 'application/json' });
     expect(JSON.parse(String(capturedInit?.body))).toEqual({ path: '/tmp/a.md', focus: false });
+  });
+
+  it('unwatchFile posts to the server unwatch-file endpoint without blocking callers', async () => {
+    let capturedInput = '';
+    let capturedInit: RequestInit | undefined;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      capturedInput = String(input);
+      capturedInit = init;
+      return Promise.resolve(new Response('{}', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }));
+    }) as typeof fetch;
+
+    unwatchFile('/tmp/a.md');
+    await Promise.resolve();
+
+    expect(capturedInput).toBe('/api/unwatch-file');
+    expect(capturedInit?.method).toBe('POST');
+    expect(JSON.parse(String(capturedInit?.body))).toEqual({ path: '/tmp/a.md' });
   });
 });

@@ -1,12 +1,11 @@
 #!/usr/bin/env bun
 /**
  * MD Viewer CLI - 统一命令行工具
- * 文件操作、服务管理、配置管理、运维统计
+ * 文件操作、配置管理、评论管理
  */
 
-import { resolve, join, dirname } from "path";
-import { existsSync, readFileSync, writeFileSync, unlinkSync, statSync, openSync } from "fs";
-import { spawn } from "child_process";
+import { resolve, join } from "path";
+import { existsSync, readFileSync, writeFileSync } from "fs";
 import { loadConfig, getConfigDir, getConfigPath, initConfig } from "./config.ts";
 import { appendAnnotationReply, getAnnotationsByDocument, listAnnotatedDocuments, listRecentlyResolvedAnnotations, tidyAnnotations, tidyMissingFiles, updateAnnotationStatus, type ResolvedAnnotationEntry } from "./annotation-storage.ts";
 import { findGitRoot, filterCommentDocsByWorkspace } from "./comments-filter.ts";
@@ -25,81 +24,7 @@ function formatRelativeTime(ts: number): string {
 const config = loadConfig();
 const DEFAULT_HOST = config.server.host;
 
-function getPidFilePath(): string {
-  return join(getConfigDir(), "server.pid");
-}
-
-function getLogFilePath(): string {
-  return join(getConfigDir(), "server.log");
-}
-
-// ==================== 服务管理 ====================
-
-interface ServerStatus {
-  running: boolean;
-  pid?: number;
-  port?: number;
-  host?: string;
-  startTime?: number;
-  memoryUsage?: number;
-}
-
-function getServerStatus(): ServerStatus {
-  const pidFile = getPidFilePath();
-
-  if (!existsSync(pidFile)) {
-    return { running: false };
-  }
-
-  try {
-    const pidStr = readFileSync(pidFile, "utf-8").trim();
-    const pid = parseInt(pidStr, 10);
-
-    if (isNaN(pid)) {
-      return { running: false };
-    }
-
-    // 检查进程是否存在
-    try {
-      process.kill(pid, 0); // 发送信号 0 只检查进程存在性
-
-      // 读取进程信息（仅 macOS/Linux）
-      let startTime: number | undefined;
-      let memoryUsage: number | undefined;
-
-      try {
-        // macOS: ps -p PID -o lstart=,rss=
-        const { execSync } = require("child_process");
-        const psOutput = execSync(`ps -p ${pid} -o lstart=,rss=`, { encoding: "utf-8" });
-        const parts = psOutput.trim().split(/\s+/);
-        if (parts.length >= 6) {
-          // 解析启动时间（简化处理）
-          const rssKB = parseInt(parts[parts.length - 1], 10);
-          if (!isNaN(rssKB)) {
-            memoryUsage = rssKB * 1024; // 转换为字节
-          }
-        }
-      } catch {
-        // 忽略错误
-      }
-
-      return {
-        running: true,
-        pid,
-        port: config.server.port,
-        host: config.server.host,
-        startTime,
-        memoryUsage,
-      };
-    } catch {
-      // 进程不存在，清理 PID 文件
-      unlinkSync(pidFile);
-      return { running: false };
-    }
-  } catch {
-    return { running: false };
-  }
-}
+// ==================== 服务连接 ====================
 
 /**
  * 检测端口上是否运行着 md-viewer server（通过 /api/files 端点识别）
@@ -141,160 +66,6 @@ async function isPortInUseByOther(host: string, port: number): Promise<boolean> 
   }
 }
 
-/**
- * 判断当前是否以源码模式运行（bun run src/cli.ts）
- * 源码模式下 process.execPath 是 bun，编译模式下是可执行文件自身
- */
-function isSourceMode(): boolean {
-  const execPath = process.execPath;
-  return execPath.endsWith("/bun") || execPath.endsWith("/bun-debug");
-}
-
-function startServer(daemon: boolean = false): void {
-  if (!daemon) {
-    // 前台模式：直接启动 server（不返回）
-    console.log("🚀 启动 Server (前台模式)...");
-    console.log(`   按 Ctrl+C 停止`);
-    console.log("");
-
-    // 直接调用 server 启动（会阻塞）
-    startServerForeground();
-    return;
-  }
-
-  // 后台模式：检查是否已运行
-  const status = getServerStatus();
-  if (status.running) {
-    console.log(`⚠️  Server 已在运行中 (PID: ${status.pid})`);
-    console.log(`   http://${status.host}:${status.port}/`);
-    return;
-  }
-
-  console.log("🚀 启动 Server (后台模式)...");
-
-  // 准备日志文件
-  const logFile = getLogFilePath();
-  const logFd = openSync(logFile, "a");
-
-  let child: ReturnType<typeof spawn>;
-
-  if (isSourceMode()) {
-    // 源码模式：用 bun 运行 server.ts
-    // import.meta.url 形如 file:///path/to/src/cli.ts，取目录拼 server.ts
-    const serverPath = new URL("./server.ts", import.meta.url).pathname;
-    child = spawn(process.execPath, ["run", serverPath], {
-      detached: true,
-      stdio: ["ignore", logFd, logFd],
-      env: { ...process.env, NODE_ENV: "production" },
-    });
-  } else {
-    // 编译模式：调用自身的 --internal-server-mode
-    child = spawn(process.execPath, ["--internal-server-mode"], {
-      detached: true,
-      stdio: ["ignore", logFd, logFd],
-      env: { ...process.env, NODE_ENV: "production" },
-    });
-  }
-
-  child.unref();
-
-  // 写入 PID 文件
-  if (child.pid) {
-    const pidFile = getPidFilePath();
-    writeFileSync(pidFile, String(child.pid), "utf-8");
-  } else {
-    console.error("❌ 无法获取 Server PID");
-    process.exit(1);
-  }
-
-  // 等待一下确保启动成功
-  setTimeout(() => {
-    const newStatus = getServerStatus();
-    if (newStatus.running) {
-      console.log(`✅ Server 已启动 (PID: ${newStatus.pid})`);
-      console.log(`   http://${newStatus.host}:${newStatus.port}/`);
-      console.log(`   日志: ${logFile}`);
-    } else {
-      console.error("❌ Server 启动失败，查看日志:");
-      console.error(`   tail -f ${logFile}`);
-      process.exit(1);
-    }
-  }, 1000);
-}
-
-async function startServerForeground(): Promise<void> {
-  // 直接 import server 模块，会阻塞在这里
-  await import("./server.ts");
-}
-
-function stopServer(): void {
-  const status = getServerStatus();
-  if (!status.running) {
-    console.log("⚠️  Server 未运行");
-    return;
-  }
-
-  console.log(`🛑 停止 Server (PID: ${status.pid})...`);
-
-  try {
-    process.kill(status.pid!, "SIGTERM");
-
-    // 清理 PID 文件
-    const pidFile = getPidFilePath();
-    if (existsSync(pidFile)) {
-      unlinkSync(pidFile);
-    }
-
-    console.log("✅ Server 已停止");
-  } catch (e: any) {
-    console.error(`❌ 停止失败: ${e.message}`);
-    process.exit(1);
-  }
-}
-
-async function restartServer(daemon: boolean = false): Promise<void> {
-  console.log("🔄 重启 Server...");
-  stopServer();
-  await new Promise(resolve => setTimeout(resolve, 500));
-  await startServer(daemon);
-}
-
-function showServerStatus(): void {
-  const status = getServerStatus();
-
-  if (status.running) {
-    console.log("✅ Server 运行中");
-    console.log(`   PID: ${status.pid}`);
-    console.log(`   URL: http://${status.host}:${status.port}/`);
-    if (status.memoryUsage) {
-      console.log(`   内存: ${(status.memoryUsage / 1024 / 1024).toFixed(1)} MB`);
-    }
-  } else {
-    console.log("⚠️  Server 未运行");
-    console.log(`   使用 'mdv server start' 启动`);
-  }
-}
-
-function showLogs(tail?: number): void {
-  const logFile = getLogFilePath();
-
-  if (!existsSync(logFile)) {
-    console.log("⚠️  日志文件不存在");
-    console.log(`   位置: ${logFile}`);
-    return;
-  }
-
-  const content = readFileSync(logFile, "utf-8");
-  const lines = content.split("\n");
-
-  if (tail && tail > 0) {
-    const start = Math.max(0, lines.length - tail);
-    console.log(lines.slice(start).join("\n"));
-  } else {
-    console.log(content);
-  }
-}
-
 function getAppServerPort(): number {
   // 优先读 app 写入的实际端口文件
   const portFile = join(getConfigDir(), "server.port");
@@ -320,46 +91,8 @@ async function ensureServerRunning(): Promise<void> {
     process.exit(1);
   }
 
-  // Server 未运行，自动在后台启动
-  console.error(`⚠️  Server 未运行，正在启动...`);
-
-  const logFile = getLogFilePath();
-  const logFd = openSync(logFile, "a");
-
-  let child: ReturnType<typeof spawn>;
-
-  if (isSourceMode()) {
-    const serverPath = new URL("./server.ts", import.meta.url).pathname;
-    child = spawn(process.execPath, ["run", serverPath], {
-      detached: true,
-      stdio: ["ignore", logFd, logFd],
-      env: { ...process.env, NODE_ENV: "production" },
-    });
-  } else {
-    child = spawn(process.execPath, ["--internal-server-mode"], {
-      detached: true,
-      stdio: ["ignore", logFd, logFd],
-      env: { ...process.env, NODE_ENV: "production" },
-    });
-  }
-
-  child.unref();
-
-  if (child.pid) {
-    const pidFile = getPidFilePath();
-    writeFileSync(pidFile, String(child.pid), "utf-8");
-  }
-
-  // 等待 server 就绪，最多 5 秒
-  for (let i = 0; i < 10; i++) {
-    await new Promise(r => setTimeout(r, 500));
-    if (await isServerHttpReachable(host, port)) {
-      return;
-    }
-  }
-
-  console.error(`❌ Server 启动超时`);
-  console.error(`   查看日志: tail -f ${logFile}`);
+  console.error(`❌ md-viewer 服务未运行 (${host}:${port})`);
+  console.error(`   请通过 nanny/app-nanny 启动服务，或在项目目录运行: just dev`);
   process.exit(1);
 }
 
@@ -421,8 +154,8 @@ async function openFile(filePath: string, focus: boolean = true): Promise<void> 
     console.log(`✅ ${action}: ${result.filename}`);
   } catch (e: any) {
     if (e.cause?.code === "ECONNREFUSED") {
-      console.error(`❌ 无法连接到 MDViewer (${host}:${port})`);
-      console.error(`   请确保 MDViewer.app 已启动`);
+      console.error(`❌ 无法连接到 md-viewer 服务 (${host}:${port})`);
+      console.error(`   请确保服务已启动（bun run dev）`);
     } else {
       console.error(`❌ 错误: ${e.message}`);
     }
@@ -492,52 +225,6 @@ function setConfigValue(key: string, value: string): void {
   writeFileSync(configPath, JSON.stringify(currentConfig, null, 2) + "\n", "utf-8");
   console.log(`✅ 已设置 ${key} = ${JSON.stringify(parsedValue)}`);
   console.log(`   配置文件: ${configPath}`);
-}
-
-// ==================== 运维统计 ====================
-
-async function showStats(): Promise<void> {
-  console.log("📊 MD Viewer 运维统计");
-  console.log("=====================");
-  console.log("");
-
-  // 1. 服务器状态
-  const port = getAppServerPort();
-  const host = config.server.host;
-  const reachable = await isServerHttpReachable(host, port);
-  console.log("服务器状态:");
-  if (reachable) {
-    console.log(`  运行中`);
-    console.log(`  地址: http://${host}:${port}/`);
-  } else {
-    console.log(`  未运行`);
-  }
-  console.log("");
-
-  // 2. 打开的文件数量（需要从 server 获取）
-  if (reachable) {
-    try {
-      const response = await fetch(`http://${host}:${port}/api/files`);
-      if (response.ok) {
-        const files = await response.json();
-        console.log("打开的文件:");
-        console.log(`  当前数量: ${files.length}`);
-        console.log("");
-      }
-    } catch {
-      // 忽略错误
-    }
-  }
-
-  // 4. 日志文件大小
-  const logFile = getLogFilePath();
-  if (existsSync(logFile)) {
-    const stat = statSync(logFile);
-    const sizeMB = (stat.size / 1024 / 1024).toFixed(2);
-    console.log("日志文件:");
-    console.log(`  大小: ${sizeMB} MB`);
-    console.log(`  位置: ${logFile}`);
-  }
 }
 
 // ==================== 评论功能 ====================
@@ -875,16 +562,6 @@ function showCommentsStats(): void {
   }
 }
 
-// ==================== 数据清理 ====================
-
-function cleanupExpired(): void {
-  console.log("🧹 清理过期同步记录...");
-  console.log("");
-
-  const cleanedCount = cleanupAllExpiredRecords();
-  console.log(`✅ 已清理 ${cleanedCount} 条过期记录（超过 6 个月）`);
-}
-
 // ==================== 帮助信息 ====================
 
 // ==================== 标签页管理 ====================
@@ -905,8 +582,8 @@ async function showTabs(json: boolean = false): Promise<void> {
   }
 
   if (!data) {
-    console.error("❌ 无法连接到 MDViewer App");
-    console.error("   请确保 MDViewer.app 已启动");
+    console.error("❌ 无法连接到 md-viewer 服务");
+    console.error("   请确保服务已启动（bun run dev）");
     process.exit(1);
   }
 
@@ -963,13 +640,6 @@ MD Viewer CLI - 命令行工具
   mdv comments tidy [--days <N>] [--missing]  清理过期评论；--missing 同时清理已删除文件的评论
   mdv comments reopen [--file <FILE>] [--nth <N>]
                                        重新打开已解决评论（不加 --nth 则交互式选择）
-  mdv todos [list]                    列出当前工作区未完成的 Todo（默认）
-  mdv todos list --all                列出全库 Todo（跨工作区）
-  mdv todos list --include-done       同时包含已完成的 Todo
-  mdv todos list --json               JSON 格式输出
-  mdv todos tidy [--days <N>]         清理 N 天前已完成的 Todo（默认 30 天）
-  mdv todos tidy --missing            同时清理来源文件已删除的 Todo
-  mdv rag tidy                        删除已不存在文件的 RAG 索引
   mdv --help                           显示帮助
 
 选项:
@@ -1051,7 +721,7 @@ function parseArgs(args: string[]): {
 
   const command: string[] = [];
   let filePath: string | undefined;
-  const topLevelCommands = new Set(["tabs", "config", "comments", "todos", "rag"]);
+  const topLevelCommands = new Set(["tabs", "config", "comments"]);
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -1115,9 +785,7 @@ async function main() {
 
   const args = process.argv.slice(2);
 
-  // 检测内部 server 模式
   if (args[0] === "--internal-server-mode") {
-    // 启动 server
     await import("./server.ts");
     return;
   }
@@ -1248,71 +916,6 @@ async function main() {
     } else {
       console.error(`❌ 未知的 comments 子命令: ${subcmd}`);
       console.error(`   可用: list, get, reply, reply-batch, stats, tidy, reopen`);
-      process.exit(1);
-    }
-  } else if (cmd === "todos") {
-    const todosSubcmd = subcmd || "list";
-
-    if (todosSubcmd === "list") {
-      const { listTodos } = await import("./todo-storage.ts");
-      const workspaceRoot = options.all ? null : findGitRoot(process.cwd());
-      const doneFilter = options.includeDone ? {} : { done: false as const };
-      const todos = listTodos({ ...doneFilter, workspaceRoot });
-      if (options.json) {
-        console.log(JSON.stringify({ workspaceRoot, todos }, null, 2));
-      } else {
-        if (workspaceRoot) console.log(`# Todo（${workspaceRoot}）`);
-        if (todos.length === 0) {
-          console.log("暂无 Todo");
-        } else {
-          for (const t of todos) {
-            const status = t.done ? "[x]" : "[ ]";
-            const file = t.filePath.split("/").pop() ?? t.filePath;
-            const quote = t.quote.length > 60 ? t.quote.slice(0, 60) + "..." : t.quote;
-            const note = t.note ? `  备注: ${t.note}` : "";
-            const ago = formatRelativeTime(t.createdAt);
-            console.log(`${status}  ${file}  "${quote}"  (${ago})${note}`);
-          }
-        }
-      }
-    } else if (todosSubcmd === "tidy") {
-      const { tidyTodos } = await import("./todo-storage.ts");
-      const days = Number.isFinite(Number(options.days)) && Number(options.days) >= 0
-        ? Number(options.days) : 30;
-      const result = tidyTodos({ olderThanDays: days, missingFiles: options.missing === true });
-      if (options.json) {
-        console.log(JSON.stringify(result));
-      } else {
-        console.log(`✅ 已清理 ${result.deleted} 条 Todo`);
-      }
-    } else {
-      console.error(`❌ 未知的 todos 子命令: ${todosSubcmd}`);
-      console.error("   可用: list, tidy");
-      process.exit(1);
-    }
-  } else if (cmd === "rag") {
-    const ragSubcmd = subcmd || "tidy";
-    if (ragSubcmd === "tidy") {
-      const { getIndexedPaths, deleteFileChunks } = await import("./rag-storage.ts");
-      const { invalidateChunksForPath } = await import("./rag-vector-cache.ts");
-      const paths = getIndexedPaths();
-      let deleted = 0;
-      for (const p of paths) {
-        if (!existsSync(p)) {
-          deleteFileChunks(p);
-          invalidateChunksForPath(p);
-          deleted++;
-          if (!options.json) console.log(`  删除孤立索引: ${p}`);
-        }
-      }
-      if (options.json) {
-        console.log(JSON.stringify({ deleted, checked: paths.length }));
-      } else {
-        console.log(`✅ 检查 ${paths.length} 个已索引文件，删除 ${deleted} 条孤立索引`);
-      }
-    } else {
-      console.error(`❌ 未知的 rag 子命令: ${ragSubcmd}`);
-      console.error("   可用: tidy");
       process.exit(1);
     }
   } else {

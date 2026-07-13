@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, mock } from 'bun:test';
-import { storageGet, storageSet, storageGetNumber, getAllStorageKeys, storageRemove } from '../../src/client/utils/storage';
+import { storageGet, storageSet, storageGetNumber, getAllStorageKeys, storageRemove, pruneDeadFeatureStorageKeys, pruneStalePerFileStorage } from '../../src/client/utils/storage';
 
 class MemoryStorage implements Storage {
   private data = new Map<string, string>();
@@ -118,5 +118,73 @@ describe('storageRemove', () => {
 
   it('does not throw when key does not exist', () => {
     expect(() => storageRemove('nonexistent')).not.toThrow();
+  });
+});
+
+describe('pruneDeadFeatureStorageKeys', () => {
+  it('removes leftover keys from the deleted todo/chat/rag/translate/monitor features', () => {
+    storage.setItem('md-viewer:todo-filter', 'open');
+    storage.setItem('md-viewer:chat-session-id', 'abc');
+    storage.setItem('md-viewer:chat-sidebar-width', '300');
+    // 真实观测到的历史格式：按文件路径单独存一条 chat session（旧版 Chat 面板）
+    storage.setItem('md-viewer:chat-session:/Users/huanghao/workspace/foo.md', '{}');
+    storage.setItem('md-viewer:agent-url', 'http://localhost:3003');
+    storage.setItem('md-viewer:rag-search-history', '[]');
+    storage.setItem('md-viewer:translate-url', 'http://localhost:3002');
+    // 历史遗留格式（旧版翻译功能用过的 key 结构，前缀不是 "translate:" 而是 "translation:"）
+    storage.setItem('md-viewer:translation:/a.pdf:1:4238', '{}');
+    storage.setItem('md-viewer:memory-monitor-tab', 'memory');
+
+    pruneDeadFeatureStorageKeys();
+
+    expect(getAllStorageKeys()).toEqual([]);
+  });
+
+  it('removes legacy renamed keys left over from past refactors (not feature deletions)', () => {
+    storage.setItem('md-viewer:annotation-panel-open-by-file', '{"/a.md":true}');
+    storage.setItem('md-viewer:toc-open-by-file', '{"/a.md":false}');
+    storage.setItem('md-viewer:focus-expanded', '{}');
+    storage.setItem('md-viewer:listDiffPaths', '[]');
+    storage.setItem('md-viewer:syncState', '{}');
+
+    pruneDeadFeatureStorageKeys();
+
+    expect(getAllStorageKeys()).toEqual([]);
+  });
+
+  it('keeps keys belonging to features that are still alive', () => {
+    storage.setItem('md-viewer:config', '{}');
+    storage.setItem('md-viewer:pdf-zoom:/a.pdf', '1.5');
+    storage.setItem('md-viewer:annotation-density', 'simple');
+    storage.setItem('md-viewer:annotation-panel-open', '1'); // 全局版，容易和 -by-file 那条混淆，不该被清
+    storage.setItem('md-viewer:toc-open', '1');
+
+    pruneDeadFeatureStorageKeys();
+
+    expect(getAllStorageKeys().sort()).toEqual([
+      'md-viewer:annotation-density',
+      'md-viewer:annotation-panel-open',
+      'md-viewer:config',
+      'md-viewer:pdf-zoom:/a.pdf',
+      'md-viewer:toc-open',
+    ]);
+  });
+});
+
+describe('pruneStalePerFileStorage', () => {
+  it('removes pdf-zoom/pdf-scroll keys for files no longer in the session (历史遗留)', () => {
+    storage.setItem('md-viewer:pdf-zoom:/open.pdf', '1.5');
+    storage.setItem('md-viewer:pdf-scroll:/open.pdf', '100');
+    storage.setItem('md-viewer:pdf-zoom:/closed-long-ago.pdf', '2');
+    storage.setItem('md-viewer:pdf-scroll:/closed-long-ago.pdf', '50');
+    storage.setItem('md-viewer:config', '{}'); // 非 per-file key，不受影响
+
+    pruneStalePerFileStorage(['/open.pdf']);
+
+    expect(storage.getItem('md-viewer:pdf-zoom:/open.pdf')).toBe('1.5');
+    expect(storage.getItem('md-viewer:pdf-scroll:/open.pdf')).toBe('100');
+    expect(storage.getItem('md-viewer:pdf-zoom:/closed-long-ago.pdf')).toBeNull();
+    expect(storage.getItem('md-viewer:pdf-scroll:/closed-long-ago.pdf')).toBeNull();
+    expect(storage.getItem('md-viewer:config')).toBe('{}');
   });
 });

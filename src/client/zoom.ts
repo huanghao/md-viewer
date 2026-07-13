@@ -20,6 +20,10 @@ export function pdfZoomKey(filePath: string): string {
   return `md-viewer:pdf-zoom:${filePath}`;
 }
 
+export function pdfScrollKey(filePath: string): string {
+  return `md-viewer:pdf-scroll:${filePath}`;
+}
+
 /**
  * Parse user-typed zoom input. Accepts: "150", "150%", "1.5".
  * Returns scale as a ratio (e.g. 1.5 for 150%), or null if invalid.

@@ -182,23 +182,28 @@ export async function handleRefreshButtonClick(): Promise<void> {
 
 // ── Workspace polling ────────────────────────────────────────────────────────
 export let workspacePollRunning = false;
+let workspacePollTimer: number | null = null;
+let workspacePollCursor = 0;
 
 export function startWorkspacePolling(): void {
-  window.setInterval(async () => {
+  if (workspacePollTimer !== null) return;
+
+  workspacePollTimer = window.setInterval(async () => {
+    if (document.hidden) return;
     if (workspacePollRunning) return;
     if (state.config.sidebarTab === 'list') return;
-    if (state.config.sidebarTab === 'search') return;
 
     const toScan = state.config.sidebarTab === 'focus'
       ? state.config.workspaces
       : state.config.workspaces.filter((ws) => ws.isExpanded);
     if (toScan.length === 0) return;
 
+    const workspace = toScan[workspacePollCursor % toScan.length];
+    workspacePollCursor = (workspacePollCursor + 1) % toScan.length;
+
     workspacePollRunning = true;
     try {
-      for (const ws of toScan) {
-        await scanWorkspace(ws.id);
-      }
+      await scanWorkspace(workspace.id);
       renderSidebar();
     } finally {
       workspacePollRunning = false;

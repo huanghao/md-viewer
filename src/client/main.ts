@@ -33,9 +33,5 @@ export {
   copyFileName,
 } from './utils/clipboard';
 
-declare global {
-  function cleanupAllExpiredRecords(): number;
-}
-
 // ==================== 初始化 ====================
 import './init';

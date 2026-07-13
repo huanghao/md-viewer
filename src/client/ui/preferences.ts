@@ -4,7 +4,6 @@ import { renderSidebar } from './sidebar';
 import { showError, showSuccess } from './toast';
 import { MD_THEMES, HL_THEMES } from '../themes/index';
 import { getAllStorageKeys, storageRemove } from '../utils/storage';
-import { getTranslateUrl, setTranslateUrl } from '../translation';
 import {
   getRegisteredActions,
   getEffectiveKey,

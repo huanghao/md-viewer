@@ -73,11 +73,26 @@ interface FileListCache {
 
 const fileListCache = new Map<string, FileListCache>();
 const FILE_LIST_CACHE_TTL = 30_000; // 30 秒
+const FILE_LIST_CACHE_MAX_ENTRIES = 200;
+
+function pruneFileListCache(now = Date.now()): void {
+  for (const [dir, cached] of fileListCache) {
+    if (cached.expiresAt <= now) fileListCache.delete(dir);
+  }
+  while (fileListCache.size > FILE_LIST_CACHE_MAX_ENTRIES) {
+    const oldest = fileListCache.keys().next().value;
+    if (oldest === undefined) break;
+    fileListCache.delete(oldest);
+  }
+}
 
 export function getFileList(dir: string): string[] {
   const now = Date.now();
+  pruneFileListCache(now);
   const cached = fileListCache.get(dir);
   if (cached && cached.expiresAt > now) {
+    fileListCache.delete(dir);
+    fileListCache.set(dir, cached);
     return cached.files;
   }
   try {
@@ -95,6 +110,11 @@ export function getFileList(dir: string): string[] {
 
 export function invalidateFileListCache(dir: string): void {
   fileListCache.delete(dir);
+}
+
+export function getFileListCacheSizeForTesting(): number {
+  pruneFileListCache();
+  return fileListCache.size;
 }
 
 interface SearchCandidate {

@@ -1,36 +1,71 @@
-# MD Viewer - Markdown Viewer
+# MD Viewer
 
-一个简单的 Markdown 阅读工具，通过 HTTP 接口提供文件浏览功能。
+Local Markdown/PDF/HTML reading tool with file watching, workspace navigation, tabs, and SQLite-backed annotations.
 
-## Key Features
+## Current Features
 
-- 本地文件阅读：支持 Markdown/HTML 打开与预览，CLI 一键唤起浏览器页面。
-- 本地服务由 nanny/app-nanny 维护，`mdv <FILE>` 连接已运行的服务并打开文件。
-- 实时变更感知：文件更新后显示刷新状态，可一键同步到最新磁盘内容。
-- 工作区模式：支持多工作区、目录树浏览、路径补全与快速定位文件。
-- 标签页与会话恢复：保留已打开文件列表与当前上下文，减少重复打开成本。
-- 学城同步：支持选择/输入父文档位置，按版本连续同步（`-v2/-v3...`）。
-- 同步状态服务端持久化：同步记录、历史、最近位置、偏好设置统一保存到 SQLite。
-- 评论系统：支持划词评论、状态管理（未解决/已解决/定位失败）与 SQLite 持久化。
-- 排障接口：服务端提供 workspace index 健康状态接口，CLI 保留配置和评论管理命令。
+- Open local Markdown, HTML, text-like files, and PDF files through `mdv <FILE>` or the browser UI.
+- Maintain opened tabs and session state in the browser.
+- Detect external file changes and show refresh/diff state for opened files.
+- Browse configured workspaces with tree view, path autocomplete, quick open, and workspace file search.
+- Use a lightweight Go workspace scanner daemon for long-running indexing when started by app-nanny.
+- Add text annotations, replies, status changes, quick comments, and PDF annotations backed by local SQLite.
+- Render Markdown with TOC, search, diff, zoom, code highlighting, KaTeX, Mermaid, and PDF.js support.
 
-## 安装
+Removed features are not part of the current product: chat, todo, RAG/vector search, translation, agent monitor, and external sync flows.
+
+## Development
+
+Install dependencies:
 
 ```bash
-# 安装依赖
 bun install
-
-# 构建
-./scripts/build-all.sh 1.0.0
-
-# 手动安装（复制到 PATH）
-sudo cp dist/mdv /usr/local/bin/
 ```
 
-## 开发模式
+Run the development server without nanny:
 
 ```bash
 just dev
 ```
 
-详见 [BUILD.md](BUILD.md)。
+Build local artifacts:
+
+```bash
+bun run build
+```
+
+Run tests:
+
+```bash
+bun test tests/unit
+go test -race ./cmd/workspace-scanner
+```
+
+## Long-Running Local Service
+
+For daily local use, run the service through app-nanny using `app-nanny.toml`. It starts:
+
+- Bun server on port `3000`
+- frontend build watcher
+- Go workspace scanner daemon over `.cache/mdv-workspace-index.sock`
+
+Build the scanner once if needed:
+
+```bash
+bun run build:scanner
+```
+
+`mdv <FILE>` expects the local server to already be running.
+
+## Project Layout
+
+- `src/server.ts` — Hono server entrypoint
+- `src/routes/` — HTTP route registration
+- `src/handlers/` — request handlers
+- `src/client/` — browser app
+- `cmd/workspace-scanner/` — Go workspace scanner daemon
+- `docs/design/` — long-term design truth
+- `docs/reference/` — long-term operational/topic references
+- `docs/testing/` — testing notes
+
+See [docs/README.md](docs/README.md) and [AGENTS.md](AGENTS.md) for maintenance rules.

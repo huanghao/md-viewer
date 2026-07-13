@@ -1,82 +1,79 @@
 # AGENTS.md
 
-## Scope
+This file contains durable project rules for coding agents. Keep it short and current. Do not put one-off plans, historical notes, or tool playbooks here.
 
-This file defines durable, project-specific principles.
-Do not place tool-operational playbooks here unless they are temporary workarounds.
+## Project Shape
 
-## What Belongs Here
+- `src/server.ts` is only the Hono app entrypoint: config, route registration, startup.
+- HTTP routes live in `src/routes/`; request handlers live in `src/handlers/`.
+- Frontend code lives in `src/client/`; static HTML is `public/index.html`; built assets are `dist/client.js` and `dist/client.css`.
+- Workspace indexing is handled by the Go scanner in `cmd/workspace-scanner/`. The Bun server talks to it through `MDV_WORKSPACE_DAEMON_SOCKET` when app-nanny starts both processes.
+- The TypeScript workspace scanner is fallback code. Do not make it the primary long-running indexer again without an explicit design update.
+- Whole-workspace chokidar watching is intentionally off by default. Opened files may be watched individually; closed/LRU-evicted files must be unwatched.
+- Annotation data is server-side SQLite. `src/annotation-db.ts` owns DB setup; feature-specific storage modules should stay small and focused.
 
-- Project context the model cannot reliably infer
-- Decision boundaries and priorities
-- Stable constraints that should survive model capability changes
+## Removed Feature Boundary
 
-## 开发原则
+These features were intentionally removed to reduce runtime weight and maintenance cost:
 
-- 完成功能后考虑增加测试，特别是逻辑复杂的业务功能
-- 相似的代码、功能不要在多个地方重写。如果少量代码重复，但出现在多处，在代码附近加上注释，让agent能注意到关联代码，避免下次修改的时候遗漏
+- chat / AI panel
+- todo panel and todo CLI
+- RAG/vector search
+- translation server and paragraph translation
+- agent session monitor
+- external sync / sync-state flows
 
-## Design Principles
+Do not reintroduce any of them as incidental dependencies, UI leftovers, storage keys, docs, or tests. A new version requires a fresh design document and an explicit product decision.
 
-- 涉及体验变化（参数、交互、视觉）或复杂策略变化时，先做设计方案再实现。
-- 设计文档放在 `docs/design/`，并把待决策项放在文档最前。
-- 设计文档以产品与流程为主，代码仅用于帮助理解。
-- 功能用效果直接说话，不要增加冗余的页面：如果视觉效果上有明显变化，就不需要用另一种形式再来通知一遍，比如 toast、或者状态成功的落地页。
+## Development Commands
 
-## Interaction Constraints
+- Install deps: `bun install`
+- Dev server without nanny: `just dev`
+- Build all local artifacts: `bun run build`
+- Unit tests: `bun test tests/unit`
+- Go scanner race tests: `go test -race ./cmd/workspace-scanner`
 
-- 默认不使用模态框（system `alert/confirm/prompt` 或自定义 modal）承载常规输入/编辑流程。
-- 优先使用非模态交互：页面内嵌输入、侧栏表单、行内编辑、抽屉。
-- 仅在高风险且不可逆操作中允许确认交互。
+For long-running local use, prefer app-nanny with `app-nanny.toml`. Build the scanner first if `.cache/mdv-workspace-scanner` is missing:
 
-## No `window.*` Globals for Inter-Component Communication
+```bash
+bun run build:scanner
+```
 
-禁止用 `(window as any).xxx = fn` 或 `window.xxx = fn` 的方式在模块间传递函数或触发行为。这种模式绕过 TypeScript 类型系统，使重命名/查找引用完全失效，并让模块间依赖在 IDE 中不可见。
+## Change Discipline
 
-已知存量代码（`sidebar-workspace.ts`、`workspace-focus.ts` 等）使用了这种模式，这是技术债，不是可效仿的先例。
+- Prefer existing module boundaries over new abstractions.
+- Keep commits focused on one goal. Do not mix unrelated cleanup with behavioral changes.
+- Add or update tests for non-trivial logic, state transitions, storage behavior, watcher behavior, or daemon behavior.
+- When touching scanner/indexing behavior, run both `bun test tests/unit` and `go test -race ./cmd/workspace-scanner`.
+- When touching build/runtime entrypoints, run `bun run build`.
 
-**替代方案：**
-- HTML 模板内的 `onclick` 处理：用事件委托（`data-action` + `data-*` 属性 + 父级 `addEventListener`），在同一文件内处理
-- 跨模块触发行为：用 `CustomEvent` + `document.dispatchEvent`，接收方 `addEventListener`
-- 需要向子模块注入回调：通过函数参数或导出的 `init(callbacks)` 模式传入
+## Frontend Rules
 
-## Count/Badge Consistency
+- Do not introduce new `(window as any).xxx = fn`, `window.xxx = fn`, or inline `onclick` as inter-component communication.
+- Use event delegation (`data-action` + `data-*`) for HTML templates.
+- Use `CustomEvent` or explicit `initXxx(deps)` callback injection for cross-module coordination.
+- Third-party library globals (`marked`, `mermaid`, `pdfjsLib`, `renderMathInElement`) are allowed only as library integration points.
+- Avoid modal UI for ordinary input/editing. Prefer inline controls, sidebars, drawers, or existing panels. Confirmation UI is reserved for high-risk destructive actions.
 
-凡是涉及"计数"的地方（badge、tab 数字、摘要 API），必须使用同一个判断函数，不得内联重写条件：
+## Import Boundaries
 
-- 批注 open 计数统一用 `isOpen(status)`（来自 `annotation-status.ts`），禁止写 `status !== 'resolved'` 或 `status === 'anchored'` 等等价但分散的条件
-- 服务端聚合（`calculateOpenCount`）、客户端增量（`adjustAnnotationCount` 的调用处）、UI 过滤（`matchesFilter`）三处逻辑必须基于同一函数，改一处必须同步检查其他处
-- 新增状态枚举值时，必须同步更新 `annotation-status.ts` 中的所有判断函数，并补充 `annotation-count-badge.test.ts` 中的覆盖用例
+- `src/client/main.ts` should remain a tiny startup bridge.
+- `src/client/init.ts` owns app initialization and dependency wiring.
+- Avoid circular imports. If module A needs module B but B already imports A, use `initXxx(deps)` or a narrow callback registration module.
+- If a frontend change compiles but crashes with `undefined` module state at runtime, check for an import cycle before adding guards.
 
-## Module Import Rules — Avoid Circular Dependencies
+## Count And Badge Consistency
 
-前端客户端代码（`src/client/`）的模块依赖有一条硬规则：
+- Annotation open-count logic must use `isOpen(status)` from `src/annotation-status.ts`.
+- Do not inline equivalent status checks such as `status !== "resolved"`.
+- If annotation status values change, update server aggregation, client badge updates, UI filtering, and related tests together.
 
-**`init.ts` 不得 import `main.ts`，`main.ts` 不得 import `init.ts` 以外的启动模块。**
+## Documentation
 
-历史教训：`init.ts ↔ main.ts` 循环依赖曾导致 esbuild 打包后 `pdfViewerRegistry` 求值为 `undefined`，在页面加载时 crash（`Cannot read properties of undefined (reading 'entries')`）。已通过提取 `pdf-registry.ts`、`app-actions.ts` 彻底消除。
-
-### 判断何时用 `initXxx(deps)` 注入 vs 直接 import
-
-直接 import 是默认做法。只在以下情况改用 `initXxx(deps)` 注入：
-
-> **规则**：如果模块 A 需要模块 B 的函数，但模块 B（或其上层调用链）已经 import 了模块 A，就不能直接 import——改用 initXxx 传入回调。
-
-具体场景：
-- `content-renderer.ts` 需要 `evictPdfViewer`（在 `pdf-registry.ts`）、`updateToolbarButtons`（在 `app-actions.ts`）——后两者不 import content-renderer，可以直接传入，用 `initContentRenderer(deps)`
-- `file-switcher.ts` 需要 `onFileLoaded`（在 `app-actions.ts`）——app-actions 不 import file-switcher，用 `initFileSwitcher(deps)`
-- `annotation-rendering.ts` 需要 `showPopover`、`persistAnnotations`（在 `annotation.ts`）——annotation.ts 会 import annotation-rendering，直接 import 会成环，用 `registerRenderingCallbacks()`
-
-**检测方法**：新增 import 后运行 `npx tsc --noEmit`，若编译通过但页面行为异常（变量为 undefined），用 `grep -rn "from './xxx'" src/client/ --include="*.ts"` 检查是否形成环。
-
-## Collaboration Principles
-
-- 提交应聚焦单一目标，避免把无关改动混入同一提交。
-- 多方实现冲突时，优先保留双方意图并显式标注待人工决策点。
-
-## Documentation Consistency
-
-当 CLI 参数或配置行为发生变化时，同步更新 `showHelp()` 输出。
-
-文档治理规范：`docs/文档治理规范.md`
-
+- Documentation governance lives in `docs/文档治理规范.md`.
+- `docs/` root should only contain the docs index and governance file.
+- Long-term design truth lives in `docs/design/`.
+- Long-term operational/topic references live in `docs/reference/`.
+- Testing notes live in `docs/testing/`.
+- Do not create `docs/archive/`, `docs/research/`, or prototype asset folders for historical material. Git history is the archive.
+- CLI/config behavior changes must update `showHelp()` and any relevant docs.

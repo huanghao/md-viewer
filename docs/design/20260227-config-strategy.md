@@ -80,7 +80,7 @@
 
 1. 在 `DEFAULT_CONFIG` 中添加默认值
 2. 更新 `Config` 接口
-3. 更新 `man/md-viewer.config.5`
+3. 更新 `showHelp()` 中的配置说明（如影响 CLI 行为）
 4. 更新 `docs/design/20260227-config-strategy.md`（本文档）
 
 ### 废弃配置项
@@ -95,15 +95,11 @@
 {
   "server": {
     "port": 3000,
-    "host": "localhost"
+    "host": "127.0.0.1"
   },
   "client": {
     "defaultFocus": true,
     "theme": "light"
-  },
-  "editor": {
-    "fontSize": 14,
-    "lineHeight": 1.6
   },
   "files": {
     "autoRefresh": true,
@@ -111,8 +107,3 @@
   }
 }
 ```
-
-## 相关文档
-
-- [md-viewer(1)](../../man/md-viewer.1) - 命令行手册
-- [md-viewer.config(5)](../../man/md-viewer.config.5) - 配置文件手册

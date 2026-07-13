@@ -174,5 +174,5 @@ textLayerDiv.addEventListener("mouseup", (e) => {
 ## 不要碰的地方
 
 - `applyAnnotations()` 在 PDF 模式下已跳过（会导致 clearRenderedMarks 误删 text layer 里的 annotation-mark span）
-- `highlightQuote` 里不能调 `renderPage`（会导致卡死，见 `docs/pdf-render-performance.md`）
+- `highlightQuote` 里不能调 `renderPage`（会导致卡死，见 [PDF 渲染性能策略](./pdf-render-performance.md)）
 - `clearHighlights()` 只在 `renderHighlights()` 开头调一次

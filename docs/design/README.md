@@ -9,7 +9,7 @@
 - [配置策略](./20260227-config-strategy.md)
 - [状态管理](./20260228-state-management.md)
 - [文件状态模型 V2](./20260301-state-model-v2.md)
-- [文件状态机 V1](./20260301-file-state-machine-v1/20260301-file-state-machine-v1.md)
+- [文件状态机 V1](./20260301-file-state-machine-v1.md)
 - [路径补全](./20260228-file-path-autocomplete.md)
 - [非 Markdown 文件处理](./20260228-non-md-file-handling.md)
 - [Annotation 存储与锚点](./20260304-annotation-storage-and-anchoring.md)

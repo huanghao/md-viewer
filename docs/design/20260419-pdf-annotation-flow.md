@@ -94,7 +94,7 @@
 
 **改进方向（坐标映射方案）**：
 
-不依赖浏览器 DOM 选中，改用 mousedown/mouseup 的 PDF 坐标直接在 TextItem 列表里找命中的 item，用 X 坐标估算字符偏移截取精确子串。实测 23 条样本，22/23 准确，在标题/图表等布局复杂区域远优于浏览器拖拽。详见 `pdf-viewer-internals.md § 10`。
+不依赖浏览器 DOM 选中，改用 mousedown/mouseup 的 PDF 坐标直接在 TextItem 列表里找命中的 item，用 X 坐标估算字符偏移截取精确子串。实测 23 条样本，22/23 准确，在标题/图表等布局复杂区域远优于浏览器拖拽。详见 [PDF viewer internals](../reference/pdf-viewer-internals.md)。
 
 ---
 

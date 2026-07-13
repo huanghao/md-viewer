@@ -257,7 +257,7 @@ span 的 `transform: matrix(a,b,c,d,e,f)` 中：
 
 ### 8. 库加载与初始化
 
-**文件：`src/client/html.ts`**
+**文件：`public/index.html`**
 
 ```html
 <script type="module">
@@ -567,7 +567,7 @@ PDF.js 库自带（由库内部管理，项目不直接操作）：
 | `.textLayer .highlight.selected` | 内部 `<span>` | 当前选中的搜索结果 |
 | `.textLayer .endOfContent` | 末尾 `<div>` | 处理跨行选区边界 |
 
-项目自定义（定义在 `src/client/css.ts`）：
+项目自定义（定义在 `src/client/styles.css`）：
 
 | Class | 元素 | 作用 |
 |-------|------|------|
@@ -627,10 +627,9 @@ renderHighlights() → highlightByItemRange(startItemIdx)
 
 | 文件 | 职责 |
 |------|------|
-| `src/client/html.ts` | CDN 加载 pdfjs-dist，暴露到 window |
+| `public/index.html` | CDN 加载 pdfjs-dist，暴露到 window |
 | `src/client/pdf-viewer.ts` | 核心查看器：渲染、高亮、文本选择、滚动 |
 | `src/client/pdf-annotation.ts` | 注释桥接层：连接查看器与注释系统 |
-| `src/client/pdf-translation.ts` | 段落翻译：基于 PdfTextBlock，带 localStorage 缓存 |
-| `src/client/main.ts` | 查看器生命周期管理、事件路由 |
-| `src/handlers.ts` | `/api/pdf-asset` 接口：读取本地 PDF 文件 |
-| `src/client/css.ts` | PDF 相关样式 |
+| `src/client/content-renderer.ts` | 查看器生命周期管理、事件路由 |
+| `src/handlers/file-asset-handlers.ts` | `/api/pdf-asset` 接口：读取本地 PDF 文件 |
+| `src/client/styles.css` | PDF 相关样式 |

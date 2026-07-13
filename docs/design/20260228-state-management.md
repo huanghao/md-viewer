@@ -6,7 +6,7 @@
 
 当前状态管理已按职责拆分为两条主线：
 
-1. `Session State`：会话缓存态（正文、tabs、同步上下文）
+1. `Session State`：会话缓存态（正文、tabs、当前文件上下文）
 2. `Workspace State`：工作区真实态（树、蓝点、删除态）
 
 核心原则：
@@ -32,7 +32,7 @@ state.currentFile: string | null
 职责：
 - 渲染 tabs
 - 渲染当前正文
-- 维护同步功能所需上下文
+- 维护当前文件路径、标题、正文缓存等会话上下文
 - 保存到 `localStorage`（`md-viewer:openFiles`）
 
 说明：
@@ -62,7 +62,7 @@ Facade 位置：
 
 位置：
 - `src/file-watcher.ts`
-- `src/handlers.ts`
+- `src/handlers/file-read-handlers.ts`
 
 当前策略：
 - 打开文件会注册文件级监听
@@ -114,7 +114,7 @@ Facade 位置：
 
 已完成补充：
 1. `workspace-state-diff` 细粒度单测：`tests/unit/workspace-state-diff.test.ts`
-2. 同步状态拆分：`src/client/sync-state.ts`（与 `sessionFiles` 解耦）
+2. 文件关闭和 LRU 淘汰会释放服务端文件级 watcher。
 
 ---
 

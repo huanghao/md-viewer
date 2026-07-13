@@ -352,9 +352,9 @@
 ├─────────────────────────────────────┤
 │ 在 "md-viewer" 中搜索：              │
 │                                     │
-│ 📄 docs/design/20260228-sidebar-styling.md   │  ← 文件名匹配
-│ 📄 docs/design/file-input.md        │  ← 内容匹配
-│    ...包含 "sidebar" 的段落...      │
+│ 📄 docs/design/20260228-state-management.md  │  ← 文件名匹配
+│ 📄 docs/design/visual-design-standard.md     │  ← 内容匹配
+│    ...包含关键词的段落...                    │
 └─────────────────────────────────────┘
 ```
 

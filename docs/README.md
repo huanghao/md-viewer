@@ -17,13 +17,6 @@
 - [pdf-viewer-internals](./pdf-viewer-internals.md)
 - [handoff-pdf-annotation-2026-04-16](./handoff-pdf-annotation-2026-04-16.md)
 - [release-checklist](./release-checklist.md)
-- [RELEASE_v0.1.0](./RELEASE_v0.1.0.md)
-
-## 阶段性审计快照（不强制维护，可能已过期）
-
-- [architecture-risk-2026-05-03](./architecture-risk-2026-05-03.md)
-- [code-quality-audit-2026-04-20](./code-quality-audit-2026-04-20.md)
-- [codebase-stats-2026-04-20](./codebase-stats-2026-04-20.md)
 
 ## 调研记录
 

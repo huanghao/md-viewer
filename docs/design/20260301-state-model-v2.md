@@ -9,7 +9,6 @@
 - 工作区扫描状态（目录快照）
 - 文件系统变化状态（M/D）
 - 列表差异状态（蓝点）
-- 同步状态（学城）
 
 用户感知问题：
 1. “扫描到文件”与“蓝点”来源被混淆。
@@ -45,19 +44,11 @@
 - 工作区模式：`workspace 扫描结果` vs `workspaceKnownFiles` 的差异
 - 简单模式：路径首次加入 `state.sessionFiles`
 
-### 维度 D：同步状态（SyncState）
-- `unsynced`
-- `synced`
-
-来源：同步记录（`syncedDocId/syncedAt/...`）
-
----
-
 ## 状态作用域（必须区分）
 
 ### 1) OpenFileState（文件内容态）
 - 作用范围：`state.sessionFiles`
-- 包含维度：A/B/C/D
+- 包含维度：A/B/C
 - UI 投影：简单模式列表、工具栏
 
 ### 2) WorkspaceTreeState（工作区目录树）
@@ -78,10 +69,6 @@
 - listDiff => `●`
 - normal => 空
 
-### 同步状态显示
-- 不进入列表 badge
-- 只在工具栏/同步详情显示
-
 ### 当前文件高亮
 - 属于选择态，不是业务状态
 - 与 badge 并列，不参与优先级计算
@@ -95,13 +82,12 @@
 | `isMissing` | Availability | `missing` |
 | `lastModified > displayedModified` | Freshness | `dirty` |
 | `listDiffPaths` | ListDiff | `diff` |
-| `syncedDocId` 等 | SyncState | `synced` |
 | `state.currentFile` | 选择态 | 非业务状态 |
 | `state.fileTree` | WorkspaceTreeState | 快照，不是 open state |
 
 ---
 
-## 与 `state-sync-risk-analysis` 的对齐
+## 与工作区状态风险的对齐
 
 已对齐项：
 1. “工作区树不是实时状态”结论保持不变。
@@ -117,7 +103,7 @@
 
 ### Phase 1（不改 watcher，先收敛语义与实现）
 1. 固化 UI 规则：badge 只看 A/B/C。
-2. 文档明确“sync 状态不入列表 badge”。
+2. 文档明确外部发布类状态不进入列表 badge。
 
 ### Phase 2（已完成）
 1. 已新增：
@@ -139,24 +125,21 @@
 1. `D > M > listDiff` 优先级稳定。
 2. listDiff 刷新后保持。
 3. workspace 新文件提示与 open/read 不混淆。
-4. sync 成功不改变 badge 优先级。
-5. 删除文件后 D 状态可重试/可关闭。
+4. 删除文件后 D 状态可重试/可关闭。
 
 ---
 
 ## 决策点（供 review）
 
 1. 是否同意把“工作区新文件提示”与“open unread”彻底拆分？
-2. 是否同意列表 badge 永远只显示 A/B/C，不显示 sync？
-3. 是否接受 Phase 2 先于 workspace watcher 落地（低风险）？
+2. 是否接受 Phase 2 先于 workspace watcher 落地（低风险）？
 
 ---
 
 ## Review 结论（更新）
 
 1. 已确认：拆分“工作区新文件提示”与“open unread”。
-2. 已确认：列表 badge 永远只显示 A/B/C，不显示 sync。
-3. 已完成：Phase 2 与 workspace watcher 落地。
+2. 已完成：Phase 2 与 workspace watcher 落地。
 
 补充确认：
 - 只要文件被工作区“新扫描到”，就显示当前的小蓝点提示。

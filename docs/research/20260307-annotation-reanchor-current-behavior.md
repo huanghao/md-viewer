@@ -430,4 +430,3 @@
 ## 相关文档
 
 - [批注持久化与锚点稳定性设计](../design/20260304-annotation-storage-and-anchoring.md)
-- [评论界面与交互重设计](../design/20260305-comment-ui-redesign/20260305-comment-ui-redesign.md)

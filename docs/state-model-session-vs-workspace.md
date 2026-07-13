@@ -25,7 +25,7 @@
 职责：
 - 渲染 tabs
 - 渲染当前正文
-- 提供同步上下文（当前文件路径、标题、上次同步记录）
+- 提供当前文件路径、标题、正文缓存等会话上下文
 
 不负责：
 - 工作区全量文件存在性
@@ -113,6 +113,4 @@ flowchart TD
 本轮完成：
 1. 已补充 `workspace-state-diff` 细粒度单测：
 - `tests/unit/workspace-state-diff.test.ts`
-2. 已将同步状态从 `sessionFiles` 中拆分：
-- 新增 `src/client/sync-state.ts`
-- `FileInfo` 移除 `synced*` 字段，转由 `sync-state` 独立维护（含本地持久化）
+2. 已将工作区删除态和新增态从 `sessionFiles` 中拆分，避免关闭 tab 或恢复会话影响工作区真实状态。

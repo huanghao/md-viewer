@@ -71,7 +71,6 @@ interface PdfAnnotation {
 |------|------|
 | `src/client/pdf-viewer.ts` | PDF 渲染、mousedown/mouseup 事件、markSelectionSpans、highlightQuote |
 | `src/client/pdf-annotation.ts` | handleTextSelected（构建 pending annotation）、renderHighlights |
-| `src/client/pdf-translation.ts` | 段落翻译（当前已禁用，onParagraphClick 为空） |
 | `src/client/main.ts` | PDF viewer 初始化、annotation:created 监听、data-current-file 设置 |
 | `src/client/annotation.ts` | savePendingAnnotation、hideComposer、clearTempSelectionMark |
 
@@ -155,10 +154,6 @@ textLayerDiv.addEventListener("mouseup", (e) => {
 **现象**：点击 mark 后，popover 有时显示在错误位置（如标题附近而非正文）。
 **根因**：`getBoundingClientRect()` 获取的是 mark 的位置，但 mark 可能在错误的 span 上。
 **依赖**：先解决高亮位置问题。
-
-### [low] 翻译功能未启用
-**现象**：PDF 段落翻译已禁用。
-**文件**：`pdf-translation.ts`
 
 ## 已完成（2026-04-17）
 

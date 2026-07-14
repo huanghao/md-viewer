@@ -1,11 +1,51 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it, mock } from 'bun:test';
 import type { FileTreeNode } from '../../src/client/types';
+import { state } from '../../src/client/state';
 import {
   globToRegex,
   isIgnored,
   getActiveFiles,
+  renderFocusView,
 } from '../../src/client/ui/workspace-focus';
 import { formatRelativeTimeShort as formatRelativeTime } from '../../src/client/utils/format';
+
+class MemoryStorage {
+  private data = new Map<string, string>();
+  get length() {
+    return this.data.size;
+  }
+  clear() {
+    this.data.clear();
+  }
+  getItem(key: string) {
+    return this.data.has(key) ? this.data.get(key)! : null;
+  }
+  key(index: number) {
+    return Array.from(this.data.keys())[index] ?? null;
+  }
+  removeItem(key: string) {
+    this.data.delete(key);
+  }
+  setItem(key: string, value: string) {
+    this.data.set(key, String(value));
+  }
+}
+
+if (!(globalThis as any).localStorage) {
+  (globalThis as any).localStorage = new MemoryStorage();
+}
+
+afterEach(() => {
+  localStorage.clear();
+  state.config.workspaces = [];
+  state.config.focusWindowKey = '8h';
+  state.config.focusActiveTypes = ['md', 'pdf'];
+  state.config.focusStrategies = ['mtime'];
+  state.searchQuery = '';
+  state.fileTree.clear();
+  state.workspaceLoadingIds.clear();
+  state.workspaceFailedIds.clear();
+});
 
 // ==================== globToRegex ====================
 
@@ -173,6 +213,25 @@ describe('getActiveFiles', () => {
     expect(getActiveFiles(ws, tree, windowMs, new Set())).toEqual([]);
   });
 
+});
+
+describe('renderFocusView', () => {
+  it('shows a scanning state while workspace trees are being loaded', () => {
+    globalThis.fetch = mock(async () => Response.json({
+      name: 'repo',
+      path: '/repo',
+      type: 'directory',
+      children: [],
+    })) as any;
+    state.config.workspaces = [
+      { id: 'ws-loading', name: 'repo', path: '/repo', isExpanded: false },
+    ];
+
+    const html = renderFocusView();
+
+    expect(html).toContain('正在扫描最近文件');
+    expect(state.workspaceLoadingIds.has('ws-loading')).toBe(true);
+  });
 });
 
 // ==================== formatRelativeTime ====================

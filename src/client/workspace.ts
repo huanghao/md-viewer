@@ -193,7 +193,7 @@ export async function scanWorkspace(workspaceId: string): Promise<FileTreeNode |
 
   try {
     const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 15000);
+    const timeoutId = globalThis.setTimeout(() => controller.abort(), 15000);
 
     // 调用后端 API 扫描目录
     const response = await fetch('/api/scan-workspace', {
@@ -202,7 +202,7 @@ export async function scanWorkspace(workspaceId: string): Promise<FileTreeNode |
       body: JSON.stringify({ path: workspace.path }),
       signal: controller.signal,
     });
-    window.clearTimeout(timeoutId);
+    globalThis.clearTimeout(timeoutId);
 
     if (!response.ok) {
       console.error('扫描工作区失败:', await response.text());
@@ -327,10 +327,13 @@ function expandRecentFileDirs(root: FileTreeNode, maxCount: number): void {
 export async function hydrateExpandedWorkspaces(): Promise<string[]> {
   registerConfiguredWorkspaces();
 
-  const expanded = state.config.workspaces.filter((ws) => ws.isExpanded);
+  const hydrateAllForFocus = state.config.sidebarTab === 'focus';
+  const cacheCandidates = hydrateAllForFocus
+    ? state.config.workspaces
+    : state.config.workspaces.filter((ws) => ws.isExpanded);
 
   // 从缓存同步恢复，立即可渲染
-  for (const ws of expanded) {
+  for (const ws of cacheCandidates) {
     const cached = loadFileTreeCache(ws.id);
     if (cached) {
       const persistedExpandedState = getWorkspaceExpandedState(ws.id);
@@ -348,7 +351,7 @@ export async function hydrateExpandedWorkspaces(): Promise<string[]> {
   }
 
   // 后台异步刷新（不 await，不阻塞首屏）
-  for (const ws of expanded) {
+  for (const ws of cacheCandidates) {
     scanWorkspace(ws.id).catch(() => {});
   }
 

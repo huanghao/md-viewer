@@ -178,7 +178,8 @@ export function setSidebarTab(tab: 'focus' | 'full' | 'list'): void {
   state.config.sidebarTab = tab;
   saveConfig(state.config);
   if (tab === 'focus') {
-    import('./workspace-focus').then(({ refreshFrecencySignals, renderFocusView: _ }) => {
+    import('./workspace-focus').then(({ refreshFrecencySignals, refreshFocusWorkspaces }) => {
+      refreshFocusWorkspaces(true);
       void refreshFrecencySignals().then(() => renderSidebar());
     });
   } else if (tab === 'full' && state.currentFile) {

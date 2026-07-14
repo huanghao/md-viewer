@@ -39,6 +39,7 @@ describe("workspace tree expansion persistence", () => {
     localStorage.clear();
     globalThis.fetch = mock(async () => Response.json({ ok: true })) as any;
     state.config.workspaces = [];
+    state.config.sidebarTab = "full";
     state.fileTree.clear();
     state.currentWorkspace = null;
     restoreWorkspaceExpandedStateFromStorage();
@@ -94,5 +95,26 @@ describe("workspace tree expansion persistence", () => {
       .filter((call: any[]) => call[0] === "/api/register-workspace");
     expect(calls).toHaveLength(2);
     expect(calls.map((call: any[]) => JSON.parse(call[1].body).path)).toEqual(["/repo-a", "/repo-b"]);
+  });
+
+  test("hydrate restores cached collapsed workspaces when the sidebar starts in focus mode", async () => {
+    state.config.sidebarTab = "focus";
+    state.config.workspaces = [
+      { id: "ws-collapsed", name: "repo-a", path: "/repo-a", isExpanded: false },
+    ];
+    localStorage.setItem("md-viewer:fileTreeCache", JSON.stringify({
+      "ws-collapsed": {
+        name: "repo-a",
+        path: "/repo-a",
+        type: "directory",
+        children: [
+          { name: "README.md", path: "/repo-a/README.md", type: "file", lastModified: Date.now() },
+        ],
+      },
+    }));
+
+    await hydrateExpandedWorkspaces();
+
+    expect(state.fileTree.get("ws-collapsed")?.children?.[0]?.path).toBe("/repo-a/README.md");
   });
 });

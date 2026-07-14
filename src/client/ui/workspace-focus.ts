@@ -2,7 +2,10 @@ import type { Workspace, FileTreeNode } from '../types';
 import { saveConfig } from '../config';
 import {
   state,
+  markWorkspaceLoading,
   markWorkspaceFailed,
+  clearWorkspaceFailed,
+  isWorkspaceLoading,
   isWorkspaceFailed,
 } from '../state';
 import { escapeHtml, escapeAttr } from '../utils/escape';
@@ -53,6 +56,36 @@ export function isIgnored(filePath: string, workspacePath: string, patterns: str
 
 // 防止同一工作区在同一渲染周期内被重复触发扫描
 const pendingScanIds = new Set<string>();
+let lastFocusWorkspaceRefreshAt = 0;
+const FOCUS_WORKSPACE_REFRESH_COOLDOWN_MS = 30_000;
+
+function scheduleFocusWorkspaceScan(workspaceId: string): void {
+  if (pendingScanIds.has(workspaceId) || isWorkspaceLoading(workspaceId) || isWorkspaceFailed(workspaceId)) return;
+
+  pendingScanIds.add(workspaceId);
+  markWorkspaceLoading(workspaceId);
+  void scanWorkspace(workspaceId).then((scanned) => {
+    pendingScanIds.delete(workspaceId);
+    if (scanned) {
+      clearWorkspaceFailed(workspaceId);
+    } else {
+      markWorkspaceFailed(workspaceId);
+    }
+    import('./sidebar').then(({ renderSidebar }) => renderSidebar());
+  });
+}
+
+export function refreshFocusWorkspaces(force = false): void {
+  const now = Date.now();
+  if (!force && lastFocusWorkspaceRefreshAt && now - lastFocusWorkspaceRefreshAt < FOCUS_WORKSPACE_REFRESH_COOLDOWN_MS) {
+    return;
+  }
+  lastFocusWorkspaceRefreshAt = now;
+
+  for (const ws of state.config.workspaces) {
+    scheduleFocusWorkspaceScan(ws.id);
+  }
+}
 
 function getActiveTypes(): Set<string> {
   const types = sanitizeFocusActiveTypes(state.config.focusActiveTypes);
@@ -331,6 +364,7 @@ export function renderFocusView(): string {
   const query = state.searchQuery.trim().toLowerCase();
   const collapsed = getFocusCollapsed();
   const activeTypes = getActiveTypes();
+  refreshFocusWorkspaces(false);
 
   // 读模式需要 open/annotate 信号
   const lastOpenMap = useOpen
@@ -341,18 +375,7 @@ export function renderFocusView(): string {
 
   for (const ws of workspaces) {
     const tree = state.fileTree.get(ws.id);
-    if (!tree && !pendingScanIds.has(ws.id) && !isWorkspaceFailed(ws.id)) {
-      pendingScanIds.add(ws.id);
-      void scanWorkspace(ws.id).then((scanned) => {
-        pendingScanIds.delete(ws.id);
-        if (scanned) {
-          import('./sidebar').then(({ renderSidebar }) => renderSidebar());
-        } else {
-          markWorkspaceFailed(ws.id);
-          import('./sidebar').then(({ renderSidebar }) => renderSidebar());
-        }
-      });
-    }
+    if (!tree) scheduleFocusWorkspaceScan(ws.id);
     if (!tree) continue;
 
     for (const f of collectFiles(tree)) {
@@ -405,6 +428,11 @@ export function renderFocusView(): string {
         return !!fuzzyMatch(name, query) || !!fuzzyMatch(f.path, query);
       })
     : allCandidates;
+
+  const hasLoadingWorkspaces = workspaces.some((ws) => isWorkspaceLoading(ws.id) || pendingScanIds.has(ws.id));
+  if (filtered.length === 0 && hasLoadingWorkspaces) {
+    return `<div class="focus-view">${renderFilterBar()}<div class="focus-empty">正在扫描最近文件…</div></div>`;
+  }
 
   if (filtered.length === 0) {
     return `<div class="focus-view">${renderFilterBar()}<div class="focus-empty">暂无最近文件</div></div>`;

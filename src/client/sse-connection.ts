@@ -9,6 +9,7 @@ import { getDiffViewActive, refreshDiffIfActive } from './diff-view';
 import { saveSnapshot } from './api/snapshots';
 import { markWorkspaceModified, clearWorkspacePathMissing, markWorkspacePathMissing } from './workspace-state';
 import { updateStatusbarConnection } from './statusbar';
+import { handleAgentProgressEvent, handleAgentRunStatusEvent } from './agent-runner';
 
 export interface SSEDeps {
   onFileLoaded: (data: FileData, focus?: boolean) => Promise<void>;
@@ -220,6 +221,14 @@ export function connectSSE(isReconnect = false) {
     } catch (error) {
       console.error('响应状态请求失败:', error);
     }
+  });
+
+  // Agent 运行进度 / 运行状态
+  eventSource.addEventListener('agent-progress', (e: any) => {
+    handleAgentProgressEvent(JSON.parse(e.data));
+  });
+  eventSource.addEventListener('agent-run-status', (e: any) => {
+    handleAgentRunStatusEvent(JSON.parse(e.data));
   });
 
   eventSource.onerror = () => {

@@ -68,6 +68,44 @@ export function getDb(): Database {
       sort_order INTEGER NOT NULL DEFAULT 0
     );
   `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS agent_sessions (
+      doc_path   TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      running    INTEGER NOT NULL DEFAULT 0,
+      run_id     TEXT,
+      updated_at INTEGER NOT NULL
+    );
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS agent_runs (
+      id                     TEXT PRIMARY KEY,
+      doc_path               TEXT NOT NULL,
+      session_id             TEXT NOT NULL,
+      workspace_path         TEXT,
+      command                TEXT,
+      status                 TEXT NOT NULL,
+      started_at             INTEGER NOT NULL,
+      finished_at            INTEGER,
+      input_tokens           INTEGER,
+      output_tokens          INTEGER,
+      cache_creation_tokens  INTEGER,
+      cache_read_tokens      INTEGER,
+      cost_usd               REAL,
+      model                  TEXT,
+      error                  TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_runs_workspace ON agent_runs(workspace_path, started_at);
+    CREATE INDEX IF NOT EXISTS idx_agent_runs_doc_path ON agent_runs(doc_path, started_at);
+  `);
+  {
+    const cols = db.query(`PRAGMA table_info(agent_runs)`).all() as Array<{ name: string }>;
+    if (!cols.some((col) => col.name === "transcript_json")) {
+      db.exec(`ALTER TABLE agent_runs ADD COLUMN transcript_json TEXT`);
+    }
+  }
+
   seedQuickComments(db);
   migrateAnnotationColumns(db);
 

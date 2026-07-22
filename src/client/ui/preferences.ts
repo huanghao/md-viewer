@@ -16,8 +16,9 @@ import {
 } from '../keybindings';
 import { fetchQuickComments, saveQuickComments } from '../api/annotations';
 import { loadQuickComments } from '../annotation';
+import { fetchAgentUsage, fetchRecentAgentRuns, fetchWorkspaceAgentCommand, saveWorkspaceAgentCommand, type AgentRun, type AgentUsageSummary } from '../api/agent';
 
-type PrefTab = '外观' | '快捷键' | '评论';
+type PrefTab = '外观' | '快捷键' | '评论' | 'Agent';
 
 let overlay: HTMLElement | null = null;
 let currentTab: PrefTab = '外观';
@@ -27,6 +28,8 @@ let savedMathInline = true;
 let recordingActionId: string | null = null;
 let keydownHandler: ((e: KeyboardEvent) => void) | null = null;
 let editingComments: string[] = [];
+let selectedAgentWorkspace = '';
+let editingAgentCommand = '';
 
 export function showPreferences(): void {
   savedMarkdownTheme = state.config.markdownTheme || 'github';
@@ -97,6 +100,7 @@ function renderNav(): void {
     { id: '外观', icon: '🎨' },
     { id: '快捷键', icon: '⌨️' },
     { id: '评论', icon: '💬' },
+    { id: 'Agent', icon: '🤖' },
   ];
   nav.innerHTML = tabs
     .map(
@@ -123,6 +127,7 @@ function renderTab(): void {
   if (currentTab === '外观') content.innerHTML = renderAppearanceTab();
   else if (currentTab === '快捷键') content.innerHTML = renderKeybindingsTab();
   else if (currentTab === '评论') { renderCommentsTab(content); return; }
+  else if (currentTab === 'Agent') { renderAgentTab(content); return; }
   bindTabEvents();
 }
 
@@ -228,6 +233,20 @@ async function saveAndClose(): Promise<void> {
     const texts = editingComments.filter((t) => t.trim().length > 0);
     await saveQuickComments(texts);
     await loadQuickComments();
+    closePreferences();
+    return;
+  }
+
+  if (currentTab === 'Agent') {
+    if (selectedAgentWorkspace) {
+      const command = editingAgentCommand.trim().split(/\s+/).filter(Boolean);
+      try {
+        await saveWorkspaceAgentCommand(selectedAgentWorkspace, command.length > 0 ? command : null);
+        showSuccess('设置已保存');
+      } catch (err: any) {
+        showError('保存失败: ' + err.message);
+      }
+    }
     closePreferences();
     return;
   }
@@ -432,6 +451,113 @@ function renderQcList(container: Element): void {
       dragIdx = null;
     });
   });
+}
+
+// ── Agent tab ────────────────────────────────────────────────────────────
+
+async function renderAgentTab(container: Element): Promise<void> {
+  const workspaces = state.config.workspaces.map((ws) => ws.path).filter(Boolean);
+  if (!selectedAgentWorkspace || !workspaces.includes(selectedAgentWorkspace)) {
+    selectedAgentWorkspace = workspaces[0] || '';
+  }
+
+  container.innerHTML = `
+    <div class="settings-group">
+      <div class="settings-group-title">Agent 命令</div>
+      <div class="settings-section-desc">
+        点击"请 Agent 处理批注"按钮时，针对该 workspace 实际执行的命令（比如 <code>mc --code --dangerously-skip-permissions</code>）。留空则使用默认的 <code>claude --dangerously-skip-permissions</code>。
+      </div>
+      ${workspaces.length === 0
+        ? `<div class="settings-section-desc">还没有注册任何 workspace。</div>`
+        : `
+      <div class="settings-row">
+        <label class="settings-label">Workspace</label>
+        <select id="agentWorkspaceSelect" class="settings-select">
+          ${workspaces.map((p) => `<option value="${escapeHtml(p)}"${p === selectedAgentWorkspace ? ' selected' : ''}>${escapeHtml(p)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="settings-row">
+        <label class="settings-label">命令</label>
+        <input type="text" id="agentCommandInput" class="settings-select" style="flex:1" placeholder="claude --dangerously-skip-permissions" />
+      </div>
+      `}
+    </div>
+    <div class="settings-group">
+      <div class="settings-group-title">用量统计（近 30 天）</div>
+      <div class="settings-section-desc">按 workspace 汇总的运行次数、token 用量和花费，用于账单审计。</div>
+      <div id="agentUsageTable" class="settings-kv-grid"></div>
+    </div>
+    <div class="settings-group">
+      <div class="settings-group-title">最近运行明细</div>
+      <div class="settings-section-desc">
+        每次运行的 token 拆分（input / output / cache 创建 / cache 读取）和花费。cache 创建 token 通常是 <code>--resume</code> 续接旧会话时上下文变长导致的隐藏开销，明细里单独列出方便定位。
+      </div>
+      <div id="agentRunsTable" class="agent-runs-table"></div>
+    </div>
+  `;
+
+  if (workspaces.length > 0) {
+    const select = container.querySelector('#agentWorkspaceSelect') as HTMLSelectElement | null;
+    const input = container.querySelector('#agentCommandInput') as HTMLInputElement | null;
+    const loadCommand = async () => {
+      const command = await fetchWorkspaceAgentCommand(selectedAgentWorkspace).catch(() => null);
+      editingAgentCommand = command?.join(' ') ?? '';
+      if (input) input.value = editingAgentCommand;
+    };
+    select?.addEventListener('change', () => {
+      selectedAgentWorkspace = select.value;
+      void loadCommand();
+    });
+    input?.addEventListener('input', () => {
+      editingAgentCommand = input.value;
+    });
+    await loadCommand();
+  }
+
+  const usageEl = container.querySelector('#agentUsageTable');
+  if (usageEl) {
+    const summary = await fetchAgentUsage(30).catch(() => [] as AgentUsageSummary[]);
+    usageEl.innerHTML = summary.length === 0
+      ? `<div>暂无运行记录</div>`
+      : summary.map((s) => `
+        <div>${escapeHtml(s.workspacePath || '(未知 workspace)')}</div>
+        <div>${s.runCount} 次 · ${(s.totalInputTokens + s.totalOutputTokens).toLocaleString()} tokens · $${s.totalCostUsd.toFixed(3)}</div>
+      `).join('');
+  }
+
+  const runsEl = container.querySelector('#agentRunsTable');
+  if (runsEl) {
+    const runs = await fetchRecentAgentRuns(50).catch(() => [] as AgentRun[]);
+    runsEl.innerHTML = runs.length === 0 ? `<div class="settings-section-desc">暂无运行记录</div>` : `
+      <table class="agent-runs-table-inner">
+        <thead>
+          <tr>
+            <th>时间</th><th>文档</th><th>状态</th>
+            <th>input</th><th>output</th><th>cache 创建</th><th>cache 读取</th><th>花费</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${runs.map((r) => {
+            const name = r.docPath.split('/').pop() || r.docPath;
+            const time = new Date(r.startedAt).toLocaleString();
+            const statusCls = r.status === 'error' ? 'is-error' : r.status === 'running' ? 'is-running' : '';
+            return `
+              <tr class="${statusCls}" title="${escapeHtml(r.docPath)}">
+                <td>${time}</td>
+                <td>${escapeHtml(name)}</td>
+                <td>${r.status}</td>
+                <td>${r.usage.inputTokens?.toLocaleString() ?? '-'}</td>
+                <td>${r.usage.outputTokens?.toLocaleString() ?? '-'}</td>
+                <td>${r.usage.cacheCreationTokens?.toLocaleString() ?? '-'}</td>
+                <td>${r.usage.cacheReadTokens?.toLocaleString() ?? '-'}</td>
+                <td>${typeof r.usage.costUsd === 'number' ? '$' + r.usage.costUsd.toFixed(3) : '-'}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+  }
 }
 
 function bindTabEvents(): void {

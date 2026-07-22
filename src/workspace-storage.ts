@@ -33,6 +33,10 @@ function getDb(): Database {
       SELECT path, added_at FROM rag_workspaces;
     `);
   }
+  const columns = db.query(`PRAGMA table_info(workspace_paths)`).all() as Array<{ name: string }>;
+  if (!columns.some((col) => col.name === "agent_command")) {
+    db.exec(`ALTER TABLE workspace_paths ADD COLUMN agent_command TEXT`);
+  }
   return db;
 }
 
@@ -46,4 +50,29 @@ export function deleteWorkspacePath(path: string): void {
 
 export function getWorkspacePaths(): string[] {
   return (getDb().query("SELECT path FROM workspace_paths ORDER BY added_at").all() as { path: string }[]).map(r => r.path);
+}
+
+/** 找到包含 docPath 的已注册 workspace（取最长前缀匹配）。 */
+export function findWorkspaceForPath(docPath: string): string | null {
+  const candidates = getWorkspacePaths().filter((p) => docPath === p || docPath.startsWith(p.endsWith("/") ? p : p + "/"));
+  if (candidates.length === 0) return null;
+  return candidates.sort((a, b) => b.length - a.length)[0]!;
+}
+
+export function getWorkspaceAgentCommand(workspacePath: string): string[] | null {
+  const row = getDb().query("SELECT agent_command FROM workspace_paths WHERE path = ?").get(workspacePath) as { agent_command: string | null } | null;
+  if (!row?.agent_command) return null;
+  try {
+    const parsed = JSON.parse(row.agent_command);
+    return Array.isArray(parsed) && parsed.every((x) => typeof x === "string") ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setWorkspaceAgentCommand(workspacePath: string, command: string[] | null): void {
+  getDb().query("UPDATE workspace_paths SET agent_command = ? WHERE path = ?").run(
+    command && command.length > 0 ? JSON.stringify(command) : null,
+    workspacePath
+  );
 }

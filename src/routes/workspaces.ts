@@ -1,8 +1,10 @@
 import type { Hono } from "hono";
 import {
+  handleGetWorkspaceAgentCommand,
   handleGetWorkspaces,
   handleRegisterWorkspace,
   handleScanWorkspace,
+  handleSetWorkspaceAgentCommand,
   handleUnregisterWorkspace,
   handleWorkspaceIndexStats,
   handleWorkspaceSearch,
@@ -15,4 +17,6 @@ export function registerWorkspaceRoutes(app: Hono): void {
   app.get("/api/workspaces", handleGetWorkspaces);
   app.get("/api/workspace-search", handleWorkspaceSearch);
   app.get("/api/workspace-index/stats", handleWorkspaceIndexStats);
+  app.get("/api/workspace-agent-command", handleGetWorkspaceAgentCommand);
+  app.post("/api/workspace-agent-command", handleSetWorkspaceAgentCommand);
 }

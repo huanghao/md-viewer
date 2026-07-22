@@ -9,6 +9,7 @@ import { log } from "./utils.ts";
 import { broadcastEvent } from "./sse.ts";
 import { bootstrapWorkspaceIndexes } from "./handlers/workspace-handlers.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
+import { registerAgentRoutes } from "./routes/agent.ts";
 import { registerAnnotationRoutes } from "./routes/annotations.ts";
 import { registerFileRoutes } from "./routes/files.ts";
 import { registerFocusRoutes } from "./routes/focus.ts";
@@ -33,6 +34,7 @@ registerWorkspaceRoutes(app);
 registerAnnotationRoutes(app);
 registerSnapshotRoutes(app);
 registerFocusRoutes(app);
+registerAgentRoutes(app);
 
 // ==================== 启动服务 ====================
 

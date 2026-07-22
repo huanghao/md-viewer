@@ -7,7 +7,13 @@ import {
   searchWorkspaceFiles,
   unregisterWorkspaceIndex,
 } from "../workspace-index.ts";
-import { deleteWorkspacePath, getWorkspacePaths, upsertWorkspacePath } from "../workspace-storage.ts";
+import {
+  deleteWorkspacePath,
+  getWorkspaceAgentCommand,
+  getWorkspacePaths,
+  setWorkspaceAgentCommand,
+  upsertWorkspacePath,
+} from "../workspace-storage.ts";
 
 export { scanCache } from "../workspace-index.ts";
 
@@ -67,6 +73,19 @@ export function handleUnregisterWorkspace(c: Context) {
     });
     return c.json({ ok: true });
   });
+}
+
+export function handleGetWorkspaceAgentCommand(c: Context) {
+  const path = c.req.query("path");
+  if (!path) return c.json({ error: "缺少 path 参数" }, 400);
+  return c.json({ command: getWorkspaceAgentCommand(resolve(path)) });
+}
+
+export async function handleSetWorkspaceAgentCommand(c: Context) {
+  const body = await c.req.json<{ path?: string; command?: string[] | null }>().catch(() => ({}) as any);
+  if (!body?.path) return c.json({ error: "缺少 path 参数" }, 400);
+  setWorkspaceAgentCommand(resolve(body.path), body.command ?? null);
+  return c.json({ ok: true });
 }
 
 export async function handleWorkspaceSearch(c: Context) {

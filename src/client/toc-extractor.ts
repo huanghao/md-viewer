@@ -35,7 +35,7 @@ export function extractMdToc(content: string): TocItem[] {
   return buildTree(flat);
 }
 
-function buildTree(flat: TocItem[]): TocItem[] {
+export function buildTree(flat: TocItem[]): TocItem[] {
   const root: TocItem[] = [];
   const stack: TocItem[] = [];
   // Clone each item so repeated buildTree calls don't accumulate children

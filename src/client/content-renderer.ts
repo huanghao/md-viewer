@@ -21,6 +21,7 @@ import {
   getAnnotations,
 } from './annotation';
 import { updateToc } from './toc-manager';
+import { HTML_READER_HOST_ID } from './annotation-layout';
 import { createPdfViewer } from './pdf-viewer.js';
 import { createPdfAnnotationBridge } from './pdf-annotation.js';
 import { currentPdfViewer, setCurrentPdfViewer } from './pdf-state';
@@ -137,11 +138,15 @@ export function resolveMarkdownAssetSrc(src: string, currentFilePath: string): s
   return `/api/file-asset?path=${encodeURIComponent(absPath)}${suffix}`;
 }
 
-export function rewriteMarkdownAssetUrls(container: HTMLElement, currentFilePath: string): void {
-  const root = container.querySelector('.markdown-body');
-  if (!root) return;
+export function rewriteMarkdownAssetUrls(
+  container: HTMLElement,
+  currentFilePath: string,
+  root?: Element | null
+): void {
+  const target = root ?? container.querySelector('.markdown-body');
+  if (!target) return;
 
-  root.querySelectorAll('img[src], video[src], source[src]').forEach((el) => {
+  target.querySelectorAll('img[src], video[src], source[src]').forEach((el) => {
     const source = el.getAttribute('src');
     if (!source) return;
     const resolved = resolveMarkdownAssetSrc(source, currentFilePath);
@@ -487,6 +492,45 @@ export async function showNearbyMenu(e: Event) {
   }
 }
 
+// ── HTML file rendering (Shadow DOM) ──────────────────────────────────────────
+// HTML 文件不再进 iframe 隔离渲染，而是挂进一个 Shadow DOM 里：既保留样式/DOM
+// 查询的双向隔离，又让 #reader 是主文档里能拿到引用的真实节点，从而复用批注/
+// TOC/查找基础设施。script 标签走 innerHTML 不会执行，需要手动重建。
+function mountHtmlIntoShadowRoot(container: HTMLElement, file: { path: string; content: string }): void {
+  const doc = new DOMParser().parseFromString(file.content, 'text/html');
+  // 整个 <html>（含 <head> 里的 <style>）原样搬进 shadow root，而不是只取
+  // body.innerHTML —— 否则源文件里常见的 `body { ... }` 选择器会因为 shadow
+  // 内没有真实 <body> 标签而完全失效（agent 生成的 HTML 几乎都靠这个做整页样式）。
+  const htmlRoot = document.adoptNode(doc.documentElement);
+
+  container.innerHTML = `<div id="${HTML_READER_HOST_ID}"></div>`;
+  const host = container.querySelector<HTMLElement>(`#${HTML_READER_HOST_ID}`)!;
+  const shadow = host.attachShadow({ mode: 'open' });
+  shadow.appendChild(htmlRoot);
+
+  const bodyEl = htmlRoot.querySelector('body');
+  if (bodyEl) bodyEl.id = 'reader';
+
+  const markStylesLink = document.createElement('link');
+  markStylesLink.rel = 'stylesheet';
+  markStylesLink.href = '/annotation-marks.css';
+  shadow.appendChild(markStylesLink);
+
+  // 重新创建 <script>（inline 和 src 都要）：DOMParser/adoptNode 插入的 script
+  // 不会自动执行，必须替换成浏览器会真正解析执行的新节点。
+  for (const oldScript of Array.from(shadow.querySelectorAll('script'))) {
+    const newScript = document.createElement('script');
+    for (const attr of Array.from(oldScript.attributes)) {
+      newScript.setAttribute(attr.name, attr.value);
+    }
+    newScript.textContent = oldScript.textContent;
+    oldScript.replaceWith(newScript);
+  }
+
+  const readerEl = shadow.getElementById('reader');
+  if (readerEl) rewriteMarkdownAssetUrls(container, file.path, readerEl);
+}
+
 // ── Main content rendering ────────────────────────────────────────────────────
 export function renderContent() {
   const container = document.getElementById('content');
@@ -537,9 +581,16 @@ export function renderContent() {
   if (!file) return;
 
   if (isHtmlPath(file.path)) {
+    mountHtmlIntoShadowRoot(container, file);
+    invalidateAnnotationElementsCache();
     container.setAttribute('data-current-file', file.path);
-    container.innerHTML = `<iframe class="html-preview-frame" srcdoc="${file.content.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"></iframe>`;
+    container.scrollTop = file.savedScrollTop ?? 0;
+    applyAnnotations();
     renderBreadcrumb();
+    unmountScrollbar();
+    mountScrollbar();
+    unmountPdfPageIndicator(container);
+    updateToc(file.path);
     _updateToolbarButtons!();
     return;
   }

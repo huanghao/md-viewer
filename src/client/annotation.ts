@@ -21,6 +21,7 @@ import { currentPdfViewer } from './pdf-state';
 import { isResolvedAnn, getAnchorTrack, matchesFilter, getVisibleAnnotations as getVisibleAnnotationsUtil } from './annotation/query';
 import { handleEmacsKeys } from './utils/emacs-keys';
 import { recordSignal } from './utils/focus-signals';
+import { initAgentRunner, onAgentTabActivated } from './agent-runner';
 import {
   type Annotation,
   type AnnotationThreadItem,
@@ -196,15 +197,16 @@ function updateAnnotationCount(): void {
 
 // ==================== Tab ====================
 
-let _currentAnnotationTab: 'comments' = 'comments';
+let _currentAnnotationTab: 'comments' | 'agent' = 'comments';
 
 // 当前渲染的 filePath，供事件委托读取（renderAnnotationList 每次更新）
 let _listFilePath: string | null = null;
 
-export function switchAnnotationTab(tab: 'comments'): void {
+export function switchAnnotationTab(tab: 'comments' | 'agent'): void {
   _currentAnnotationTab = tab;
   const commentsList = document.getElementById('annotationList');
   const commentsActions = document.getElementById('annotationCommentsActions');
+  const agentTab = document.getElementById('annotationAgentTab');
   const tabs = document.querySelectorAll('.annotation-tab');
 
   tabs.forEach((btn) => {
@@ -213,8 +215,13 @@ export function switchAnnotationTab(tab: 'comments'): void {
 
   if (commentsList) commentsList.style.display = tab === 'comments' ? '' : 'none';
   if (commentsActions) commentsActions.classList.toggle('hidden', tab !== 'comments');
+  if (agentTab) agentTab.classList.toggle('hidden', tab !== 'agent');
   // Close filter menu when switching tabs
   document.getElementById('annotationFilterMenu')?.classList.add('hidden');
+
+  if (tab === 'agent') {
+    void onAgentTabActivated(_listFilePath);
+  }
 }
 
 export function dismissAnnotationPopupByEscape(): boolean {
@@ -767,6 +774,7 @@ function resolvePositionedAnnotationOverlaps(listEl: HTMLElement, contentScrollH
 
 export function renderAnnotationList(filePath: string | null): void {
   _listFilePath = filePath;
+  if (_currentAnnotationTab === 'agent') void onAgentTabActivated(filePath);
   const el = getElements();
   if (!el.annotationList) return;
   updateAnnotationCount();
@@ -846,12 +854,27 @@ export function renderAnnotationList(filePath: string | null): void {
 }
 
 // ==================== 事件处理 ====================
+// HTML 文件走 Shadow DOM 挂载：划词发生在 shadow 内部时，document.getSelection()
+// 拿到的 Range 会被浏览器重定向成外层无意义的节点（startContainer 变成外层 body、
+// offset 变成 1），必须改用 shadow root 自己的 getSelection() 才能拿到真实内部
+// 节点（已用真实 HTML 文件在 headless Chromium 实测验证）。
+function getSelectionForReader(reader: HTMLElement): Selection | null {
+  const root = reader.getRootNode();
+  if (root instanceof ShadowRoot) {
+    const shadowGetSelection = (root as unknown as { getSelection?: () => Selection | null }).getSelection;
+    if (typeof shadowGetSelection === 'function') {
+      return shadowGetSelection.call(root);
+    }
+  }
+  return window.getSelection();
+}
+
 export function handleSelectionForAnnotation(filePath: string | null): void {
   const el = getElements();
   const renderedFilePath = el.content?.getAttribute('data-current-file');
   if (!filePath || !renderedFilePath || filePath !== renderedFilePath || !el.reader) return;
 
-  const selection = window.getSelection();
+  const selection = getSelectionForReader(el.reader);
   if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
 
   const range = selection.getRangeAt(0);
@@ -1272,6 +1295,7 @@ export function initAnnotationElements(): void {
   getElements().closeToggle?.addEventListener('click', () => {
     closeAnnotationSidebar();
   });
+  initAgentRunner();
   getElements().floatingOpenBtn?.addEventListener('click', () => {
     openAnnotationSidebar();
   });

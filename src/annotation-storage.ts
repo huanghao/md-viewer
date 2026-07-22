@@ -31,7 +31,7 @@ export interface StoredAnnotation {
   confidence?: number;
   // PDF-specific fields
   page?: number;
-  fileType?: "md" | "pdf";
+  fileType?: "md" | "pdf" | "html";
   rectCoords?: PdfRectCoords;
 }
 
@@ -45,7 +45,7 @@ export interface AnnotationDocSummary {
   resolvedCount: number;
 }
 
-function normalizeDocPath(path: string): string {
+export function normalizeDocPath(path: string): string {
   const raw = (path || "").trim();
   if (!raw) return raw;
   if (/^https?:\/\//i.test(raw)) return raw;
@@ -130,7 +130,7 @@ function mapRowToAnnotation(row: any): StoredAnnotation {
     status: row.status || "anchored",
     confidence: typeof row.confidence === "number" ? row.confidence : undefined,
     page: row.page ?? undefined,
-    fileType: (row.file_type as "md" | "pdf") ?? "md",
+    fileType: (row.file_type as "md" | "pdf" | "html") ?? "md",
     rectCoords,
   };
 }
@@ -167,7 +167,8 @@ function normalizeAnnotation(input: any): StoredAnnotation | null {
   const page = Number.isFinite(Number(input.page)) && Number(input.page) >= 1
     ? Math.floor(Number(input.page))
     : undefined;
-  const fileType: "md" | "pdf" = input.fileType === "pdf" ? "pdf" : "md";
+  const fileType: "md" | "pdf" | "html" =
+    input.fileType === "pdf" ? "pdf" : input.fileType === "html" ? "html" : "md";
   const rectCoords = input.rectCoords
     && typeof input.rectCoords === "object"
     && Number.isFinite(Number(input.rectCoords.x1))

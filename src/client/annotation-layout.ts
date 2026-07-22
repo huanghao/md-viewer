@@ -13,11 +13,23 @@ import {
 import { storageGet, storageSet, storageGetNumber } from './utils/storage';
 
 // ==================== DOM 元素引用 ====================
+
+// HTML 文件走 Shadow DOM 挂载时，#reader 在 shadow root 内部，
+// document.getElementById 找不到，需要先定位宿主元素再穿透进去。
+export const HTML_READER_HOST_ID = 'html-reader-host';
+
+export function resolveReaderElement(): HTMLElement | null {
+  const direct = document.getElementById('reader');
+  if (direct) return direct;
+  const host = document.getElementById(HTML_READER_HOST_ID);
+  return (host?.shadowRoot?.getElementById('reader') as HTMLElement | null) ?? null;
+}
+
 function queryAnnotationElements() {
   return {
     sidebar: document.getElementById('annotationSidebar'),
     sidebarResizer: document.getElementById('annotationSidebarResizer'),
-    reader: document.getElementById('reader'),
+    reader: resolveReaderElement(),
     content: document.getElementById('content'),
     composer: document.getElementById('annotationComposer'),
     composerHeader: document.getElementById('annotationComposerHeader'),

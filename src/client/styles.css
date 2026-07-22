@@ -1302,15 +1302,6 @@
     .content::-webkit-scrollbar {
       width: 0;
     }
-    .html-preview-frame {
-      display: block;
-      width: calc(100% + 48px);
-      margin: -24px;
-      height: calc(100% + 48px);
-      min-height: calc(100vh - 48px);
-      border: none;
-      background: #fff;
-    }
     body.annotation-sidebar-collapsed .content {
       padding-right: 24px;
     }

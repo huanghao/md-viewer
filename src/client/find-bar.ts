@@ -1,3 +1,5 @@
+import { resolveReaderElement } from './annotation-layout';
+
 // ==================== 页面内查找 ====================
 export function setupFindBar() {
   // 创建 find bar DOM
@@ -46,7 +48,10 @@ export function setupFindBar() {
     clearHighlights();
     if (!query) return;
 
-    const content = document.getElementById('content');
+    // HTML 文件的内容在 shadow root 里；#content 本身是 shadow host 的外层容器，
+    // TreeWalker 从 #content 出发天然穿不进 shadow 边界，必须直接把 root 定位到
+    // 已解析出的 reader 元素（md 文件走这条路也完全兼容，行为不变）。
+    const content = resolveReaderElement() ?? document.getElementById('content');
     if (!content) return;
     highlightContainer = content;
 
@@ -107,9 +112,8 @@ export function setupFindBar() {
   }
 
   function scrollToMatch(index: number) {
-    const content = document.getElementById('content');
-    if (!content) return;
-    const marks = content.querySelectorAll('mark.find-highlight');
+    if (!highlightContainer) return;
+    const marks = highlightContainer.querySelectorAll('mark.find-highlight');
     marks.forEach((m, i) => {
       m.classList.toggle('find-highlight-current', i === index);
     });

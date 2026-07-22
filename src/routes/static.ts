@@ -32,6 +32,14 @@ export function registerStaticRoutes(app: Hono): void {
     return c.body(content);
   });
 
+  app.get("/annotation-marks.css", (c) => {
+    const content = serveStatic("annotation-marks.css");
+    if (!content) return c.notFound();
+    c.header("Content-Type", "text/css");
+    c.header("Cache-Control", "no-cache");
+    return c.body(content);
+  });
+
   app.get("/favicon.svg", (c) => {
     c.header("Content-Type", "image/svg+xml");
     c.header("Cache-Control", "public, max-age=31536000");

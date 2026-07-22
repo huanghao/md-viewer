@@ -11,7 +11,7 @@
     "build:client:watch": "bun run build.ts --watch",
     "build:scanner": "mkdir -p .cache && go build -o .cache/mdv-workspace-scanner ./cmd/workspace-scanner",
     "dev": "bun --watch run src/server.ts",
-    "build": "rm -rf dist/static && bun run build:scanner && bun run build:client && mkdir -p dist/static && cp public/index.html dist/client.js dist/client.css dist/static/ && bun build src/cli.ts --compile --outfile=dist/mdv",
+    "build": "rm -rf dist/static && bun run build:scanner && bun run build:client && mkdir -p dist/static && cp public/index.html dist/client.js dist/client.css dist/annotation-marks.css dist/static/ && bun build src/cli.ts --compile --outfile=dist/mdv",
     "cli": "bun run src/cli.ts",
     "test": "bun test tests/unit"
   },

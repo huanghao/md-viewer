@@ -34,7 +34,9 @@ export function applyTheme(): void {
 
 // ── Annotation sync ─────────────────────────────────────────────────────────
 export function syncAnnotationsForCurrentFile(force = false): void {
-  const nextPath = state.currentFile && !isHtmlPath(state.currentFile) ? state.currentFile : null;
+  // HTML 文件现在走 Shadow DOM 挂载，同样支持批注，不再排除
+  // （历史上 HTML 只能进 iframe、批注系统够不到，这里曾经硬排除过）。
+  const nextPath = state.currentFile ?? null;
   const currentAnnotationFilePath = getAnnotationCurrentFilePath();
   if (force || nextPath !== currentAnnotationFilePath) {
     setAnnotations(nextPath);

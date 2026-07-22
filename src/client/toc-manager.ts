@@ -2,9 +2,10 @@ import type { TocItem } from './toc-extractor.js';
 import type { PdfViewerInstance } from './pdf-viewer.js';
 
 import { state } from './state';
-import { extractMdToc, extractPdfOutline, loadSidecar, saveSidecar, scanPdfHeadings } from './toc-extractor.js';
+import { extractMdToc, extractPdfOutline, loadSidecar, saveSidecar, scanPdfHeadings, buildTree } from './toc-extractor.js';
 import { renderTocPanel, setActiveTocItem } from './ui/toc-panel.js';
 import { storageGet, storageSet, storageGetNumber } from './utils/storage';
+import { resolveReaderElement } from './annotation-layout';
 
 // Injected callback from main.ts (to avoid circular import)
 let _getPdfViewerForFile: (filePath: string) => PdfViewerInstance | null = () => null;
@@ -139,26 +140,41 @@ export async function updateToc(filePath: string): Promise<void> {
   const isPdf = filePath.endsWith('.pdf');
   const lower = filePath.toLowerCase();
   const isMd = lower.endsWith('.md') || lower.endsWith('.markdown');
+  const isHtml = lower.endsWith('.html') || lower.endsWith('.htm');
 
-  if (!isPdf && !isMd) {
+  if (!isPdf && !isMd && !isHtml) {
     renderTocPanel(panel, [], () => {});
     return;
   }
 
-  if (isMd) {
-    const file = state.sessionFiles.get(filePath);
-    const content = file?.content ?? '';
-    if (!content) {
-      // File not yet loaded — stay in loading state, updateToc will be called again via onFileLoaded
-      renderTocPanel(panel, [], () => {}, true);
-      return;
+  if (isMd || isHtml) {
+    let toc: TocItem[];
+    if (isMd) {
+      const file = state.sessionFiles.get(filePath);
+      const content = file?.content ?? '';
+      if (!content) {
+        // File not yet loaded — stay in loading state, updateToc will be called again via onFileLoaded
+        renderTocPanel(panel, [], () => {}, true);
+        return;
+      }
+      toc = extractMdToc(content);
+    } else {
+      // HTML 文件没有 markdown 源文本可正则抓取，直接扫描已渲染 DOM 的 heading
+      // （shadow root 内的 #reader 是真实元素引用，querySelectorAll 天然只在
+      // 该元素子树内查找，不受 shadow 边界影响）。
+      const readerEl = resolveReaderElement();
+      const headingEls = Array.from(readerEl?.querySelectorAll<HTMLElement>('h1, h2, h3') ?? []);
+      const flat: TocItem[] = headingEls
+        .map(h => ({ title: h.textContent?.trim() ?? '', level: Number(h.tagName[1]), children: [] as TocItem[] }))
+        .filter(item => item.title);
+      toc = buildTree(flat);
     }
-    const toc = extractMdToc(content);
 
     // toolbar (48px) + tabs (~36px) = offset so heading isn't hidden under fixed headers
     const HEADER_OFFSET = 90;
-    const jumpToMdHeading = (title: string) => {
-      const headings = Array.from(document.querySelectorAll<HTMLElement>('#reader h1, #reader h2, #reader h3'));
+    const jumpToHeading = (title: string) => {
+      const readerEl = resolveReaderElement();
+      const headings = Array.from(readerEl?.querySelectorAll<HTMLElement>('h1, h2, h3') ?? []);
       const target = headings.find(h => h.textContent?.trim() === title);
       if (target) {
         const contentEl = document.getElementById('content');
@@ -170,14 +186,15 @@ export async function updateToc(filePath: string): Promise<void> {
       }
     };
 
-    renderTocPanel(panel, toc, item => jumpToMdHeading(item.title));
+    renderTocPanel(panel, toc, item => jumpToHeading(item.title));
     applyTocVisibility(filePath);
 
     // Highlight active TOC item on scroll
     const contentEl = document.getElementById('content');
     if (contentEl && panel) {
       const onScroll = () => {
-        const headings = Array.from(document.querySelectorAll<HTMLElement>('#reader h1, #reader h2, #reader h3'));
+        const readerEl = resolveReaderElement();
+        const headings = Array.from(readerEl?.querySelectorAll<HTMLElement>('h1, h2, h3') ?? []);
         if (!headings.length) return;
         const scrollTop = contentEl.scrollTop;
         let current = headings[0];

@@ -34,15 +34,24 @@ export function getAgentSession(docPath: string): AgentSession | null {
   return row ? rowToSession(row) : null;
 }
 
+/** 把文档指向某个 session id：已有记录则更新，没有则插入（running/run_id 重置为空闲）。 */
+function upsertSessionId(path: string, existing: AgentSession | null, sessionId: string): void {
+  if (existing) {
+    getDb().query("UPDATE agent_sessions SET session_id = ?, updated_at = ? WHERE doc_path = ?").run(sessionId, Date.now(), path);
+  } else {
+    getDb().query(
+      "INSERT INTO agent_sessions (doc_path, session_id, running, run_id, updated_at) VALUES (?, ?, 0, NULL, ?)"
+    ).run(path, sessionId, Date.now());
+  }
+}
+
 /** 获取（或按需创建）文档对应的 session id；sessionIdOverride 用于手动关联到已有会话。 */
 export function ensureAgentSessionId(docPath: string, sessionIdOverride?: string): string {
   const path = normalizeDocPath(docPath);
   const existing = getAgentSession(path);
   if (existing) return existing.sessionId;
   const sessionId = sessionIdOverride || randomUUID();
-  getDb().query(
-    "INSERT INTO agent_sessions (doc_path, session_id, running, run_id, updated_at) VALUES (?, ?, 0, NULL, ?)"
-  ).run(path, sessionId, Date.now());
+  upsertSessionId(path, existing, sessionId);
   return sessionId;
 }
 
@@ -69,13 +78,7 @@ export function setAgentSessionId(docPath: string, sessionId: string): boolean {
   const path = normalizeDocPath(docPath);
   const existing = getAgentSession(path);
   if (existing?.running) return false;
-  if (existing) {
-    getDb().query("UPDATE agent_sessions SET session_id = ?, updated_at = ? WHERE doc_path = ?").run(sessionId, Date.now(), path);
-  } else {
-    getDb().query(
-      "INSERT INTO agent_sessions (doc_path, session_id, running, run_id, updated_at) VALUES (?, ?, 0, NULL, ?)"
-    ).run(path, sessionId, Date.now());
-  }
+  upsertSessionId(path, existing, sessionId);
   return true;
 }
 
@@ -85,13 +88,7 @@ export function resetAgentSessionId(docPath: string): string | null {
   const existing = getAgentSession(path);
   if (existing?.running) return null;
   const sessionId = randomUUID();
-  if (existing) {
-    getDb().query("UPDATE agent_sessions SET session_id = ?, updated_at = ? WHERE doc_path = ?").run(sessionId, Date.now(), path);
-  } else {
-    getDb().query(
-      "INSERT INTO agent_sessions (doc_path, session_id, running, run_id, updated_at) VALUES (?, ?, 0, NULL, ?)"
-    ).run(path, sessionId, Date.now());
-  }
+  upsertSessionId(path, existing, sessionId);
   return sessionId;
 }
 

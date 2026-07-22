@@ -2,7 +2,7 @@ import { dirname, resolve } from "path";
 import { randomUUID } from "crypto";
 import type { Context } from "hono";
 import { broadcastEvent } from "../sse.ts";
-import { normalizeDocPath, listAnnotations } from "../annotation-storage.ts";
+import { listAnnotations } from "../annotation-storage.ts";
 import { isOpen } from "../annotation-status.ts";
 import { findWorkspaceForPath, getWorkspaceAgentCommand } from "../workspace-storage.ts";
 import {

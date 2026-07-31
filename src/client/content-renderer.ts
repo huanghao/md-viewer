@@ -176,6 +176,166 @@ export function renderMath(container: HTMLElement): void {
 }
 
 // ── Mermaid rendering ─────────────────────────────────────────────────────────
+const MERMAID_ZOOM_MIN = 0.25;
+const MERMAID_ZOOM_MAX = 4;
+const MERMAID_ZOOM_STEP = 1.25;
+
+function getMermaidSvgSize(svgEl: SVGSVGElement): { width: number; height: number } {
+  const vb = svgEl.viewBox?.baseVal;
+  if (vb && vb.width > 0 && vb.height > 0) return { width: vb.width, height: vb.height };
+  const rect = svgEl.getBoundingClientRect();
+  return { width: rect.width || 800, height: rect.height || 600 };
+}
+
+function createMermaidActionButton(label: string, title: string, onClick: () => void): HTMLButtonElement {
+  const btn = document.createElement('button');
+  btn.className = 'mermaid-zoom-btn';
+  btn.textContent = label;
+  btn.title = title;
+  btn.addEventListener('click', onClick);
+  return btn;
+}
+
+// 内联缩放：svg 保持自然尺寸，外层 wrapper 用 transform scale + 手动撑开布局尺寸，
+// 让宿主容器的原生滚动条充当平移手段。返回 fit() 供插入 DOM 后调用。
+function attachMermaidZoom(actions: HTMLElement, host: HTMLElement, svgEl: SVGSVGElement): { fit: () => void } {
+  const { width, height } = getMermaidSvgSize(svgEl);
+  svgEl.style.maxWidth = 'none';
+  svgEl.style.width = `${width}px`;
+  svgEl.style.height = `${height}px`;
+  svgEl.style.margin = '0';
+  svgEl.style.transformOrigin = '0 0';
+
+  const zoomWrap = document.createElement('div');
+  zoomWrap.className = 'mermaid-zoom';
+  host.insertBefore(zoomWrap, svgEl);
+  zoomWrap.appendChild(svgEl);
+
+  let scale = 1;
+  const fitScale = (): number => Math.min(1, (host.clientWidth - 16) / width);
+  const apply = (next: number): void => {
+    scale = Math.min(MERMAID_ZOOM_MAX, Math.max(MERMAID_ZOOM_MIN, next));
+    zoomWrap.style.width = `${Math.round(width * scale)}px`;
+    zoomWrap.style.height = `${Math.round(height * scale)}px`;
+    svgEl.style.transform = `scale(${scale})`;
+  };
+
+  actions.appendChild(createMermaidActionButton('－', '缩小', () => apply(scale / MERMAID_ZOOM_STEP)));
+  actions.appendChild(createMermaidActionButton('＋', '放大', () => apply(scale * MERMAID_ZOOM_STEP)));
+  actions.appendChild(createMermaidActionButton('适应宽度', '缩放以适应内容宽度', () => apply(fitScale())));
+  actions.appendChild(createMermaidActionButton('全屏', '全屏查看（滚轮缩放、拖拽平移）', () => openMermaidLightbox(svgEl)));
+
+  apply(fitScale());
+  return { fit: () => apply(fitScale()) };
+}
+
+// 全屏查看：克隆 svg 到遮罩层，滚轮以光标为中心缩放，拖拽平移，Esc/按钮关闭
+function openMermaidLightbox(sourceSvg: SVGSVGElement): void {
+  const { width, height } = getMermaidSvgSize(sourceSvg);
+
+  const overlay = document.createElement('div');
+  overlay.className = 'mermaid-lightbox';
+  const toolbar = document.createElement('div');
+  toolbar.className = 'mermaid-lightbox-toolbar';
+  const stage = document.createElement('div');
+  stage.className = 'mermaid-lightbox-stage';
+
+  const svgEl = sourceSvg.cloneNode(true) as SVGSVGElement;
+  svgEl.style.transform = '';
+  stage.appendChild(svgEl);
+
+  let scale = 1;
+  let tx = 0;
+  let ty = 0;
+  const clamp = (s: number): number => Math.min(8, Math.max(0.05, s));
+  const applyTransform = (): void => {
+    svgEl.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+    label.textContent = `${Math.round(scale * 100)}%`;
+  };
+  const stageCenter = (): { x: number; y: number } => {
+    const rect = stage.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  };
+  const zoomAt = (clientX: number, clientY: number, factor: number): void => {
+    const rect = stage.getBoundingClientRect();
+    const px = clientX - rect.left;
+    const py = clientY - rect.top;
+    const next = clamp(scale * factor);
+    const k = next / scale;
+    tx = px - (px - tx) * k;
+    ty = py - (py - ty) * k;
+    scale = next;
+    applyTransform();
+  };
+  const fitToStage = (): void => {
+    const sw = stage.clientWidth;
+    const sh = stage.clientHeight;
+    if (sw === 0 || sh === 0) return;
+    scale = clamp(Math.min(sw / width, sh / height) * 0.95);
+    tx = (sw - width * scale) / 2;
+    ty = (sh - height * scale) / 2;
+    applyTransform();
+  };
+
+  const label = document.createElement('span');
+  label.className = 'mermaid-lightbox-zoom-label';
+  const close = (): void => {
+    document.removeEventListener('keydown', onKeyDown);
+    overlay.remove();
+  };
+  const onKeyDown = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape') close();
+  };
+
+  toolbar.appendChild(createMermaidActionButton('－', '缩小', () => {
+    const c = stageCenter();
+    zoomAt(c.x, c.y, 1 / MERMAID_ZOOM_STEP);
+  }));
+  toolbar.appendChild(label);
+  toolbar.appendChild(createMermaidActionButton('＋', '放大', () => {
+    const c = stageCenter();
+    zoomAt(c.x, c.y, MERMAID_ZOOM_STEP);
+  }));
+  toolbar.appendChild(createMermaidActionButton('重置', '适应窗口', fitToStage));
+  toolbar.appendChild(createMermaidActionButton('关闭', '关闭（Esc）', close));
+
+  stage.addEventListener('wheel', (e: WheelEvent) => {
+    e.preventDefault();
+    zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.2 : 1 / 1.2);
+  }, { passive: false });
+
+  let dragging = false;
+  let lastX = 0;
+  let lastY = 0;
+  stage.addEventListener('pointerdown', (e: PointerEvent) => {
+    dragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    stage.classList.add('panning');
+    stage.setPointerCapture(e.pointerId);
+  });
+  stage.addEventListener('pointermove', (e: PointerEvent) => {
+    if (!dragging) return;
+    tx += e.clientX - lastX;
+    ty += e.clientY - lastY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    applyTransform();
+  });
+  const endPan = (): void => {
+    dragging = false;
+    stage.classList.remove('panning');
+  };
+  stage.addEventListener('pointerup', endPan);
+  stage.addEventListener('pointercancel', endPan);
+
+  overlay.appendChild(toolbar);
+  overlay.appendChild(stage);
+  document.body.appendChild(overlay);
+  document.addEventListener('keydown', onKeyDown);
+  fitToStage();
+}
+
 export async function renderMermaidDiagrams(container: HTMLElement): Promise<void> {
   const mermaid = (window as any).mermaid;
   if (!mermaid) return;
@@ -273,17 +433,26 @@ export async function renderMermaidDiagrams(container: HTMLElement): Promise<voi
       block.className = 'mermaid-block';
       const actions = document.createElement('div');
       actions.className = 'mermaid-actions';
-      const { panel, toggleButton } = createMermaidSourcePanel(source, false);
-      actions.appendChild(toggleButton);
 
       const host = document.createElement('div');
       host.className = 'mermaid';
       host.setAttribute('data-mdv-mermaid', '1');
       host.innerHTML = svg;
+
+      let zoom: { fit: () => void } | null = null;
+      const svgEl = host.querySelector('svg');
+      if (svgEl) {
+        zoom = attachMermaidZoom(actions, host, svgEl as SVGSVGElement);
+      }
+      const { panel, toggleButton } = createMermaidSourcePanel(source, false);
+      actions.appendChild(toggleButton);
+
       block.appendChild(actions);
       block.appendChild(host);
       block.appendChild(panel);
       preEl.replaceWith(block);
+      // 插入 DOM 后容器宽度才可用，重新按宽度适配一次
+      zoom?.fit();
 
       if (typeof bindFunctions === 'function') {
         bindFunctions(host);
@@ -492,6 +661,19 @@ export async function showNearbyMenu(e: Event) {
   }
 }
 
+// `:root` 只匹配文档级别的根元素，在 shadow root 内部永远匹配不到任何东西——
+// 但很多单文件 HTML 常用 `:root { --bg: ...; }` 声明整套配色变量（含
+// `:root[data-theme="dark"]`/`:root:not(...)` 这类深色模式开关写法）。
+// 挂进 shadow 后这些变量全部不生效，颜色会整体消失。把 `:root` 系列选择器
+// 转成 shadow DOM 里等价的 `:host(...)`，让这些变量重新在 shadow host 上生效
+// （自定义属性会从 host 正常继承进 shadow 内部）。
+function rewriteRootSelectorForShadow(css: string): string {
+  return css.replace(
+    /:root((?:\[[^\]]*\]|:[\w-]+(?:\([^)]*\))?|\.[\w-]+)*)/g,
+    (_match, rest: string) => (rest ? `:host(${rest})` : ':host')
+  );
+}
+
 // ── HTML file rendering (Shadow DOM) ──────────────────────────────────────────
 // HTML 文件不再进 iframe 隔离渲染，而是挂进一个 Shadow DOM 里：既保留样式/DOM
 // 查询的双向隔离，又让 #reader 是主文档里能拿到引用的真实节点，从而复用批注/
@@ -502,6 +684,9 @@ function mountHtmlIntoShadowRoot(container: HTMLElement, file: { path: string; c
   // body.innerHTML —— 否则源文件里常见的 `body { ... }` 选择器会因为 shadow
   // 内没有真实 <body> 标签而完全失效（agent 生成的 HTML 几乎都靠这个做整页样式）。
   const htmlRoot = document.adoptNode(doc.documentElement);
+  for (const styleEl of Array.from(htmlRoot.querySelectorAll('style'))) {
+    styleEl.textContent = rewriteRootSelectorForShadow(styleEl.textContent ?? '');
+  }
 
   container.innerHTML = `<div id="${HTML_READER_HOST_ID}"></div>`;
   const host = container.querySelector<HTMLElement>(`#${HTML_READER_HOST_ID}`)!;

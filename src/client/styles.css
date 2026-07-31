@@ -1331,9 +1331,12 @@
     .markdown-body .mermaid-actions {
       display: flex;
       justify-content: flex-end;
+      align-items: center;
+      gap: 6px;
       margin-bottom: 8px;
     }
-    .markdown-body .mermaid-source-toggle {
+    .markdown-body .mermaid-source-toggle,
+    .mermaid-zoom-btn {
       border: 1px solid var(--color-border-subtle);
       background: #fff;
       color: var(--color-text-secondary);
@@ -1343,9 +1346,62 @@
       padding: 5px 9px;
       cursor: pointer;
     }
-    .markdown-body .mermaid-source-toggle:hover {
+    .markdown-body .mermaid-source-toggle:hover,
+    .mermaid-zoom-btn:hover {
       border-color: var(--color-text-muted);
       color: #374151;
+    }
+    .markdown-body .mermaid-zoom {
+      position: relative;
+      margin: 0 auto;
+    }
+    .mermaid-lightbox {
+      position: fixed;
+      inset: 0;
+      z-index: var(--z-overlay);
+      display: flex;
+      flex-direction: column;
+      background: rgba(17, 24, 39, 0.75);
+    }
+    .mermaid-lightbox-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 10px 16px;
+      flex-shrink: 0;
+    }
+    .mermaid-lightbox-toolbar .mermaid-zoom-btn {
+      border-color: rgba(255, 255, 255, 0.3);
+      background: rgba(255, 255, 255, 0.08);
+      color: #f9fafb;
+    }
+    .mermaid-lightbox-toolbar .mermaid-zoom-btn:hover {
+      border-color: rgba(255, 255, 255, 0.6);
+      color: #ffffff;
+    }
+    .mermaid-lightbox-zoom-label {
+      min-width: 48px;
+      text-align: center;
+      color: #e5e7eb;
+      font-size: var(--text-sm);
+    }
+    .mermaid-lightbox-stage {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      cursor: grab;
+    }
+    .mermaid-lightbox-stage.panning {
+      cursor: grabbing;
+    }
+    .mermaid-lightbox-stage svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform-origin: 0 0;
+      background: #ffffff;
+      border-radius: var(--radius-lg);
     }
     .markdown-body .mermaid {
       margin: 0;
@@ -4058,3 +4114,34 @@
     .qc-item-del:hover { background: var(--color-error-bg, #ffebe9); color: var(--color-error, #cf222e); }
     .qc-preset-chip { padding: 3px 10px; border: 1px solid var(--color-border-subtle, #e8ecf0); border-radius: 20px; background: var(--color-bg-subtle, #f6f8fa); color: var(--color-accent, #0969da); font-size: 12px; cursor: pointer; }
     .qc-preset-chip:hover { background: var(--color-border-subtle, #e8ecf0); }
+
+    /* ==================== 打印：只留内容区，隐藏工具栏/侧边栏 ==================== */
+    @media print {
+      .sidebar,
+      .sidebar-resizer,
+      .sidebar-floating-open-btn,
+      .toolbar,
+      .tabs,
+      #docScrollbar,
+      #pdfPageIndicator,
+      .annotation-sidebar,
+      .annotation-sidebar-resizer,
+      .annotation-floating-open-btn,
+      .statusbar,
+      #findBar {
+        display: none !important;
+      }
+      .app,
+      .app-body,
+      .main {
+        display: block !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+      }
+      .content {
+        overflow: visible !important;
+        padding: 0 !important;
+        height: auto !important;
+      }
+    }

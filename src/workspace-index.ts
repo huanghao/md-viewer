@@ -6,17 +6,23 @@ import { scanWorkspaceTree, type FileTreeNode } from "./workspace-scanner.ts";
 import { watchWorkspace } from "./file-watcher.ts";
 import { fuzzyScore } from "./client/utils/fuzzy-search.ts";
 import { markExploded } from "./scan-guard.ts";
+import { insertScanMetric } from "./scan-metrics-storage.ts";
 
 export const scanCache = new Map<string, { tree: FileTreeNode; ts: number }>();
 const scanInFlight = new Map<string, Promise<FileTreeNode>>();
 const SCAN_CACHE_FRESH_MS = 10_000;
 const SCAN_CACHE_MAX_ENTRIES = 30;
 const BACKGROUND_REFRESH_DELAY_MS = 100;
+// daemon 自己的内存索引由 fsnotify 维护、通常很新鲜，日常刷新没必要每次都强制
+// 全量重扫（force:true）。但工作区目录数超过 daemon 的 watch 上限时它会放弃
+// watch，索引可能静默过期——保留一个周期性强制刷新兜底，避免那种情况下永远拿到旧数据。
+const FORCE_REFRESH_INTERVAL_MS = 60_000;
+const lastForcedAt = new Map<string, number>();
 const GO_SCANNER_TIMEOUT_MS = 10_000;
 const GO_DAEMON_REQUEST_TIMEOUT_MS = 10_000;
 const GO_SCANNER_PATH = resolve(".cache/mdv-workspace-scanner");
 
-const backgroundQueue: string[] = [];
+const backgroundQueue: Array<{ path: string; force: boolean }> = [];
 const backgroundQueued = new Set<string>();
 let backgroundRunning = false;
 
@@ -48,7 +54,7 @@ function shouldRefresh(path: string): boolean {
   return !cached || Date.now() - cached.ts >= SCAN_CACHE_FRESH_MS;
 }
 
-async function runScan(resolvedPath: string): Promise<FileTreeNode> {
+async function runScan(resolvedPath: string, force = false, source = "direct"): Promise<FileTreeNode> {
   const inFlight = scanInFlight.get(resolvedPath);
   if (inFlight) return inFlight;
 
@@ -58,24 +64,45 @@ async function runScan(resolvedPath: string): Promise<FileTreeNode> {
     watchWorkspace(resolvedPath);
   }
 
-  const scanPromise = scanWorkspaceTreeWithAdapter(resolvedPath)
+  const startedAt = Date.now();
+  if (force) lastForcedAt.set(resolvedPath, startedAt);
+
+  const scanPromise = scanWorkspaceTreeWithAdapter(resolvedPath, force)
     .then((tree) => {
       setScanCache(resolvedPath, tree);
       scanInFlight.delete(resolvedPath);
+      insertScanMetric({
+        workspaceId: resolvedPath,
+        source,
+        force,
+        startedAt,
+        durationMs: Date.now() - startedAt,
+        success: true,
+        fileCount: tree.fileCount,
+      });
       return tree;
     })
     .catch((err) => {
       scanInFlight.delete(resolvedPath);
+      insertScanMetric({
+        workspaceId: resolvedPath,
+        source,
+        force,
+        startedAt,
+        durationMs: Date.now() - startedAt,
+        success: false,
+        error: err?.message || String(err),
+      });
       throw err;
     });
   scanInFlight.set(resolvedPath, scanPromise);
   return scanPromise;
 }
 
-async function scanWorkspaceTreeWithAdapter(resolvedPath: string): Promise<FileTreeNode> {
+async function scanWorkspaceTreeWithAdapter(resolvedPath: string, force: boolean): Promise<FileTreeNode> {
   if (shouldUseGoDaemon()) {
     try {
-      const tree = await daemonRequest<FileTreeNode>("/scan", { path: resolvedPath, force: true });
+      const tree = await daemonRequest<FileTreeNode>("/scan", { path: resolvedPath, force });
       applyScanWarnings(tree);
       return tree;
     } catch (err: any) {
@@ -164,7 +191,11 @@ function requestDaemonOverUnixSocket<T>(
       });
     });
     req.on("timeout", () => {
-      req.destroy(new Error(`Go daemon request timed out after ${GO_DAEMON_REQUEST_TIMEOUT_MS}ms`));
+      const err = new Error(`Go daemon request timed out after ${GO_DAEMON_REQUEST_TIMEOUT_MS}ms`);
+      req.destroy(err);
+      // 不能只依赖 destroy() 后冒泡的 'error' 事件——一旦它不触发，这个 promise
+      // 就永远不会 settle，会让 scanInFlight 里的条目卡死，导致后续刷新永久被跳过。
+      reject(err);
     });
     req.on("error", reject);
     req.end(payload);
@@ -215,12 +246,12 @@ function pumpBackgroundQueue(): void {
   if (backgroundRunning) return;
   const next = backgroundQueue.shift();
   if (!next) return;
-  backgroundQueued.delete(next);
+  backgroundQueued.delete(next.path);
   backgroundRunning = true;
   setTimeout(() => {
-    runScan(next)
+    runScan(next.path, next.force, "warm")
       .catch((err) => {
-        console.warn(`[workspace-index] 后台刷新失败: ${next}: ${err?.message || err}`);
+        console.warn(`[workspace-index] 后台刷新失败: ${next.path}: ${err?.message || err}`);
       })
       .finally(() => {
         backgroundRunning = false;
@@ -234,8 +265,10 @@ export function warmWorkspace(path: string): void {
   if (!existsSync(resolvedPath)) return;
   if (!shouldRefresh(resolvedPath)) return;
   if (scanInFlight.has(resolvedPath) || backgroundQueued.has(resolvedPath)) return;
+  const lastForced = lastForcedAt.get(resolvedPath) ?? 0;
+  const force = Date.now() - lastForced >= FORCE_REFRESH_INTERVAL_MS;
   backgroundQueued.add(resolvedPath);
-  backgroundQueue.push(resolvedPath);
+  backgroundQueue.push({ path: resolvedPath, force });
   pumpBackgroundQueue();
 }
 

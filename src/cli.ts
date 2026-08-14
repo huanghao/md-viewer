@@ -9,6 +9,8 @@ import { existsSync, readFileSync, writeFileSync } from "fs";
 import { loadConfig, getConfigDir, getConfigPath, initConfig } from "./config.ts";
 import { appendAnnotationReply, getAnnotationsByDocument, listAnnotatedDocuments, listRecentlyResolvedAnnotations, tidyAnnotations, tidyMissingFiles, updateAnnotationStatus, type ResolvedAnnotationEntry } from "./annotation-storage.ts";
 import { findGitRoot, filterCommentDocsByWorkspace } from "./comments-filter.ts";
+import { queryScanMetrics } from "./scan-metrics-storage.ts";
+import { getWorkspaceIndexHealth } from "./workspace-index.ts";
 
 function formatRelativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -562,6 +564,81 @@ function showCommentsStats(): void {
   }
 }
 
+function percentile(sorted: number[], p: number): number {
+  if (sorted.length === 0) return 0;
+  const idx = Math.min(sorted.length - 1, Math.floor(p * sorted.length));
+  return sorted[idx];
+}
+
+async function showScanStats(days: number): Promise<void> {
+  const records = queryScanMetrics(days);
+
+  console.log("📊 工作区扫描统计");
+  console.log("================");
+  console.log("");
+  console.log(`统计窗口: 最近 ${days} 天`);
+  console.log(`扫描次数: ${records.length}`);
+
+  if (records.length > 0) {
+    const succeeded = records.filter((r) => r.success);
+    const successRate = ((succeeded.length / records.length) * 100).toFixed(1);
+    const durations = records.map((r) => r.durationMs).sort((a, b) => a - b);
+    const avg = durations.reduce((sum, d) => sum + d, 0) / durations.length;
+    const p95 = percentile(durations, 0.95);
+
+    console.log(`成功率: ${successRate}% (${succeeded.length}/${records.length})`);
+    console.log(`平均耗时: ${avg.toFixed(0)}ms, P95: ${p95}ms`);
+    console.log("");
+
+    const forced = records.filter((r) => r.force);
+    const cached = records.filter((r) => !r.force);
+    const avgOf = (list: typeof records) =>
+      list.length > 0 ? (list.reduce((sum, r) => sum + r.durationMs, 0) / list.length).toFixed(0) : "-";
+    console.log("按 force 分类:");
+    console.log(`  - force=true  (全量重扫): ${forced.length} 次, 平均 ${avgOf(forced)}ms`);
+    console.log(`  - force=false (内存命中): ${cached.length} 次, 平均 ${avgOf(cached)}ms`);
+    console.log("");
+
+    const bySource = new Map<string, number>();
+    for (const r of records) bySource.set(r.source, (bySource.get(r.source) ?? 0) + 1);
+    console.log("按触发来源分类:");
+    for (const [source, count] of bySource.entries()) {
+      console.log(`  - ${source}: ${count} 次`);
+    }
+    console.log("");
+
+    const byWorkspace = new Map<string, { count: number; totalMs: number }>();
+    for (const r of records) {
+      const entry = byWorkspace.get(r.workspaceId) ?? { count: 0, totalMs: 0 };
+      entry.count += 1;
+      entry.totalMs += r.durationMs;
+      byWorkspace.set(r.workspaceId, entry);
+    }
+    const topWorkspaces = Array.from(byWorkspace.entries())
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 10);
+    console.log("按工作区分类 (次数最多的前 10 个):");
+    for (const [workspaceId, entry] of topWorkspaces) {
+      console.log(`  - ${workspaceId}: ${entry.count} 次, 平均 ${(entry.totalMs / entry.count).toFixed(0)}ms`);
+    }
+  }
+
+  console.log("");
+  console.log("🔧 daemon 实时状态");
+  console.log("==================");
+  const health = await getWorkspaceIndexHealth();
+  if (!health.configured) {
+    console.log("（未配置 workspace daemon）");
+  } else if (!health.ok || !health.stats) {
+    console.log(`（无法获取: ${health.error || "未知错误"}）`);
+  } else {
+    const s = health.stats;
+    console.log(`扫描次数: ${s.scanCount}, 刷新次数: ${s.refreshCount}, 扫描错误: ${s.scanErrorCount}`);
+    console.log(`watch 错误: ${s.watchErrorCount}, watch 超限次数: ${s.watchLimitCount}`);
+    if (s.lastError) console.log(`最近错误: ${s.lastError}`);
+  }
+}
+
 // ==================== 帮助信息 ====================
 
 // ==================== 标签页管理 ====================
@@ -640,6 +717,7 @@ MD Viewer CLI - 命令行工具
   mdv comments tidy [--days <N>] [--missing]  清理过期评论；--missing 同时清理已删除文件的评论
   mdv comments reopen [--file <FILE>] [--nth <N>]
                                        重新打开已解决评论（不加 --nth 则交互式选择）
+  mdv scan-stats [--days <N>]          工作区扫描耗时/成功率/force 占比统计（默认最近 7 天）
   mdv --help                           显示帮助
 
 选项:
@@ -652,7 +730,7 @@ MD Viewer CLI - 命令行工具
   --author <NAME>                      回复作者（必填，如 codex/claude/huanghao）
   --text <TEXT>                        回复内容（用于 reply）
   --input <PATH|->                     批量回复输入（JSON 文件路径或 stdin）
-  --days <N>                           清理天数阈值（用于 tidy，默认 7）
+  --days <N>                           清理天数阈值（用于 tidy），或统计窗口天数（用于 scan-stats，默认 7）
   --missing                            同时清理已删除文件的评论（用于 tidy）
   --nth <N>                            倒数第 N 个已解决评论（用于 reopen）
 
@@ -677,6 +755,8 @@ MD Viewer CLI - 命令行工具
   mdv comments reopen                  交互式选择重新打开已解决评论
   mdv comments reopen --nth 2          重新打开倒数第 2 条已解决评论
   mdv comments reopen --file README.md --nth 1  指定文件的倒数第 1 条
+  mdv scan-stats                        查看最近 7 天工作区扫描耗时/成功率
+  mdv scan-stats --days 30              查看最近 30 天工作区扫描统计
 
 配置文件:
   ${getConfigPath()}
@@ -721,7 +801,7 @@ function parseArgs(args: string[]): {
 
   const command: string[] = [];
   let filePath: string | undefined;
-  const topLevelCommands = new Set(["tabs", "config", "comments"]);
+  const topLevelCommands = new Set(["tabs", "config", "comments", "scan-stats"]);
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -918,6 +998,11 @@ async function main() {
       console.error(`   可用: list, get, reply, reply-batch, stats, tidy, reopen`);
       process.exit(1);
     }
+  } else if (cmd === "scan-stats") {
+    const days = Number.isFinite(Number(options.days)) && Number(options.days) > 0
+      ? Math.floor(Number(options.days))
+      : 7;
+    await showScanStats(days);
   } else {
     console.error(`❌ 未知命令: ${cmd}`);
     console.error("");

@@ -8,6 +8,7 @@ import { Hono } from "hono";
 import { log } from "./utils.ts";
 import { broadcastEvent } from "./sse.ts";
 import { bootstrapWorkspaceIndexes } from "./handlers/workspace-handlers.ts";
+import { pruneScanMetrics } from "./scan-metrics-storage.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
 import { registerAgentRoutes } from "./routes/agent.ts";
 import { registerAnnotationRoutes } from "./routes/annotations.ts";
@@ -53,6 +54,7 @@ if (import.meta.main) {
   log(`📖 使用方法: 在浏览器中打开，然后添加 Markdown/HTML 文件路径`);
 
   void bootstrapWorkspaceIndexes();
+  pruneScanMetrics(30);
 
   process.on("SIGINT", () => process.exit(0));
   process.on("SIGTERM", () => process.exit(0));

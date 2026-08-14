@@ -185,7 +185,6 @@ export async function handleRefreshButtonClick(): Promise<void> {
 // ── Workspace polling ────────────────────────────────────────────────────────
 export let workspacePollRunning = false;
 let workspacePollTimer: number | null = null;
-let workspacePollCursor = 0;
 
 export function startWorkspacePolling(): void {
   if (workspacePollTimer !== null) return;
@@ -200,12 +199,11 @@ export function startWorkspacePolling(): void {
       : state.config.workspaces.filter((ws) => ws.isExpanded);
     if (toScan.length === 0) return;
 
-    const workspace = toScan[workspacePollCursor % toScan.length];
-    workspacePollCursor = (workspacePollCursor + 1) % toScan.length;
-
+    // 并发扫描全部工作区，而不是每个 tick 轮转扫一个——daemon 侧现在默认走
+    // force:false（内存命中，开销很低），"扫得更全"不再意味着"扫得更贵"。
     workspacePollRunning = true;
     try {
-      await scanWorkspace(workspace.id);
+      await Promise.allSettled(toScan.map((workspace) => scanWorkspace(workspace.id)));
       renderSidebar();
     } finally {
       workspacePollRunning = false;

@@ -99,6 +99,22 @@ export function getDb(): Database {
     CREATE INDEX IF NOT EXISTS idx_agent_runs_workspace ON agent_runs(workspace_path, started_at);
     CREATE INDEX IF NOT EXISTS idx_agent_runs_doc_path ON agent_runs(doc_path, started_at);
   `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS scan_metrics (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      workspace_id TEXT NOT NULL,
+      source       TEXT NOT NULL,
+      force        INTEGER NOT NULL DEFAULT 0,
+      started_at   INTEGER NOT NULL,
+      duration_ms  INTEGER NOT NULL,
+      success      INTEGER NOT NULL,
+      file_count   INTEGER,
+      error        TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_scan_metrics_started_at ON scan_metrics(started_at);
+    CREATE INDEX IF NOT EXISTS idx_scan_metrics_workspace ON scan_metrics(workspace_id, started_at);
+  `);
   {
     const cols = db.query(`PRAGMA table_info(agent_runs)`).all() as Array<{ name: string }>;
     if (!cols.some((col) => col.name === "transcript_json")) {

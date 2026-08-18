@@ -25,6 +25,8 @@ These features were intentionally removed to reduce runtime weight and maintenan
 
 Do not reintroduce any of them as incidental dependencies, UI leftovers, storage keys, docs, or tests. A new version requires a fresh design document and an explicit product decision.
 
+Exception: the annotation Agent tab is a scoped batch runner for asking a local coding agent to process comments on the current document. Keep it bounded to document/comment work; do not turn it back into a general chat panel or session monitor.
+
 ## Development Commands
 
 - Install deps: `bun install`

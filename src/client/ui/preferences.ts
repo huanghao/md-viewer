@@ -16,7 +16,7 @@ import {
 } from '../keybindings';
 import { fetchQuickComments, saveQuickComments } from '../api/annotations';
 import { loadQuickComments } from '../annotation';
-import { fetchAgentUsage, fetchRecentAgentRuns, fetchWorkspaceAgentCommand, saveWorkspaceAgentCommand, type AgentRun, type AgentUsageSummary } from '../api/agent';
+import { fetchAgentBackends, fetchAgentUsage, fetchRecentAgentRuns, fetchWorkspaceAgentCommand, saveWorkspaceAgentCommand, type AgentRun, type AgentUsageSummary } from '../api/agent';
 
 type PrefTab = '外观' | '快捷键' | '评论' | 'Agent';
 
@@ -463,9 +463,16 @@ async function renderAgentTab(container: Element): Promise<void> {
 
   container.innerHTML = `
     <div class="settings-group">
-      <div class="settings-group-title">Agent 命令</div>
+      <div class="settings-group-title">Agent Backend</div>
       <div class="settings-section-desc">
-        点击"请 Agent 处理批注"按钮时，针对该 workspace 实际执行的命令（比如 <code>mc --code --dangerously-skip-permissions</code>）。留空则使用默认的 <code>claude --dangerously-skip-permissions</code>。
+        默认从 <code>~/.config/agent-backends.yaml</code> 读取 backend，并通过 shim 隔离 <code>ANTHROPIC_*</code> 等环境变量。下面的 workspace 命令是兼容旧配置的完整覆盖；留空则使用默认 backend。
+      </div>
+      <div id="agentBackendTable" class="settings-kv-grid"></div>
+    </div>
+    <div class="settings-group">
+      <div class="settings-group-title">Workspace 命令覆盖</div>
+      <div class="settings-section-desc">
+        只有某个 workspace 需要特殊命令时才填写，比如 <code>mc --code --dangerously-skip-permissions</code>。留空则使用上面的默认 backend。
       </div>
       ${workspaces.length === 0
         ? `<div class="settings-section-desc">还没有注册任何 workspace。</div>`
@@ -495,6 +502,21 @@ async function renderAgentTab(container: Element): Promise<void> {
       <div id="agentRunsTable" class="agent-runs-table"></div>
     </div>
   `;
+
+  const backendEl = container.querySelector('#agentBackendTable');
+  if (backendEl) {
+    const backends = await fetchAgentBackends().catch(() => []);
+    backendEl.innerHTML = backends.length === 0
+      ? `<div class="settings-section-desc">没有发现可用 backend，将回退到 <code>claude</code>。</div>`
+      : backends.map((backend) => {
+        const desc = backend.description ? ` · ${escapeHtml(backend.description)}` : '';
+        const ctx = backend.contextWindow ? ` · ${backend.contextWindow.toLocaleString()} ctx` : '';
+        const status = backend.unavailableReason
+          ? `<span class="settings-danger">不可用：${escapeHtml(backend.unavailableReason)}</span>`
+          : `<span>可用</span>`;
+        return `<div>${backend.default ? '默认' : 'Backend'}</div><div><strong>${escapeHtml(backend.name)}</strong>${desc}${ctx}<br>${status}</div>`;
+      }).join('');
+  }
 
   if (workspaces.length > 0) {
     const select = container.querySelector('#agentWorkspaceSelect') as HTMLSelectElement | null;

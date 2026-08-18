@@ -2496,6 +2496,9 @@
     .settings-kv-grid > div:nth-child(2n + 1) {
       color: var(--color-text-secondary);
     }
+    .settings-danger {
+      color: var(--color-danger, #d33);
+    }
     .settings-key-list {
       display: flex;
       flex-wrap: wrap;

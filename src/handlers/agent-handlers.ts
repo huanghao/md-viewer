@@ -2,6 +2,7 @@ import { dirname, resolve } from "path";
 import { randomUUID } from "crypto";
 import type { Context } from "hono";
 import { broadcastEvent } from "../sse.ts";
+import { listAgentBackendStatuses, resolveAgentCommand } from "../agent-backends.ts";
 import { listAnnotations } from "../annotation-storage.ts";
 import { isOpen } from "../annotation-status.ts";
 import { findWorkspaceForPath, getWorkspaceAgentCommand } from "../workspace-storage.ts";
@@ -24,8 +25,6 @@ import {
   type AgentTranscriptMsg,
 } from "../agent-storage.ts";
 import { log } from "../utils.ts";
-
-const DEFAULT_AGENT_COMMAND = ["claude", "--dangerously-skip-permissions"];
 
 export async function handleStartAgentRun(c: Context) {
   const body = await c.req.json<{ path?: string; sessionIdOverride?: string; model?: string; prompt?: string }>().catch(() => ({}) as any);
@@ -52,7 +51,15 @@ export async function handleStartAgentRun(c: Context) {
 
   const workspacePath = findWorkspaceForPath(docPath);
   const cwd = workspacePath || dirname(docPath);
-  const agentCommand = (workspacePath && getWorkspaceAgentCommand(workspacePath)) || DEFAULT_AGENT_COMMAND;
+  let agentCommand: string[];
+  let backendName: string | null;
+  try {
+    const resolved = resolveAgentCommand(workspacePath ? getWorkspaceAgentCommand(workspacePath) : null);
+    agentCommand = resolved.command;
+    backendName = resolved.backendName;
+  } catch (error: any) {
+    return c.json({ error: error?.message || "Agent backend 不可用" }, 503);
+  }
 
   // displayPrompt：透传给前端/落库展示的原始内容；sentPrompt：实际发给 CLI 的内容——
   // 自定义消息里通常不会带文件路径（比如"这个文件写的是什么"），必须每轮都显式带上文档路径，
@@ -87,7 +94,11 @@ export async function handleStartAgentRun(c: Context) {
 
   void streamAgentRun(proc, { runId, docPath, sessionId, initialPrompt: displayPrompt });
 
-  return c.json({ success: true, runId, sessionId, resumed: isResume, command: agentCommand });
+  return c.json({ success: true, runId, sessionId, resumed: isResume, command: agentCommand, backend: backendName });
+}
+
+export function handleListAgentBackends(c: Context) {
+  return c.json({ backends: listAgentBackendStatuses() });
 }
 
 function extractToolResultText(content: any): string {

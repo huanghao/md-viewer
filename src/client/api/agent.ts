@@ -52,6 +52,14 @@ export interface AgentUsageSummary {
   totalOutputTokens: number;
 }
 
+export interface AgentBackendStatus {
+  name: string;
+  description: string;
+  default: boolean;
+  contextWindow: number | null;
+  unavailableReason: string | null;
+}
+
 export async function startAgentRun(
   path: string,
   opts?: { model?: string; prompt?: string }
@@ -133,4 +141,10 @@ export async function saveWorkspaceAgentCommand(path: string, command: string[] 
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path, command }),
   });
+}
+
+export async function fetchAgentBackends(): Promise<AgentBackendStatus[]> {
+  const response = await fetch('/api/agent/backends');
+  const data = await readJsonOrThrow(response);
+  return Array.isArray(data?.backends) ? data.backends : [];
 }

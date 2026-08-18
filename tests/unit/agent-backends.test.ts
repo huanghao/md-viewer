@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { mkdtempSync, rmSync } from "fs";
+import { mkdirSync, mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import {
@@ -7,6 +7,7 @@ import {
   parseAgentBackendsYaml,
   renderAgentShim,
   resolveAgentCommand,
+  listAgentBackendStatuses,
   type AgentBackend,
 } from "../../src/agent-backends";
 
@@ -107,5 +108,25 @@ backends:
     expect(requestedResolved.source).toBe("backend");
     expect(requestedResolved.backendName).toBe("mc");
     expect(requestedResolved.command[0]).toContain("mc.sh");
+  });
+
+  it("exposes backend default model from env", () => {
+    tmpHome = mkdtempSync(join(tmpdir(), "mdv-agent-home-"));
+    process.env.HOME = tmpHome;
+    const configPath = join(tmpHome, ".config", "agent-backends.yaml");
+    mkdirSync(join(tmpHome, ".config"), { recursive: true });
+    Bun.write(configPath, `
+default: kc
+backends:
+  - name: kc
+    command: "claude"
+    env:
+      ANTHROPIC_MODEL: "\${KC_MODEL}"
+`);
+    process.env.KC_MODEL = "k3-256k";
+
+    const status = listAgentBackendStatuses();
+    expect(status[0].name).toBe("kc");
+    expect(status[0].defaultModel).toBe("k3-256k");
   });
 });

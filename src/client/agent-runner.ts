@@ -17,6 +17,7 @@ import { showError, showSuccess } from './ui/toast';
 import { escapeHtml } from './utils/escape';
 
 const AGENT_BACKEND_KEY = 'md-viewer:agent-backend';
+const AGENT_MODEL_OVERRIDE_KEY = 'md-viewer:agent-model-override';
 
 let currentDocPath: string | null = null;
 let currentSessionId: string | null = null;
@@ -24,6 +25,7 @@ let activeRunId: string | null = null;
 let liveMessages: AgentTranscriptMsg[] = [];
 let pastRuns: AgentRun[] = [];
 let agentBackends: AgentBackendStatus[] = [];
+let modelInputTouched = false;
 let loadToken = 0;
 
 function guessWorkspaceForPath(path: string): string | null {
@@ -126,13 +128,33 @@ function renderBackendSelect(): void {
   const select = getElements().agentBackendSelect;
   if (!select) return;
   const saved = localStorage.getItem(AGENT_BACKEND_KEY) || '';
-  const options = [`<option value="">默认 backend</option>`];
+  const usableBackends = agentBackends.filter((backend) => !backend.unavailableReason);
+  const selected = saved && usableBackends.some((backend) => backend.name === saved)
+    ? saved
+    : usableBackends.find((backend) => backend.default)?.name || usableBackends[0]?.name || '';
+  const options: string[] = [];
+  if (agentBackends.length === 0) {
+    options.push(`<option value="">claude（默认）</option>`);
+  }
   for (const backend of agentBackends) {
-    const suffix = backend.default ? ' · 默认' : backend.unavailableReason ? ' · 不可用' : '';
+    const suffix = backend.default ? '（默认）' : backend.unavailableReason ? '（不可用）' : '';
     options.push(`<option value="${escapeHtml(backend.name)}"${backend.unavailableReason ? ' disabled' : ''}>${escapeHtml(backend.name)}${suffix}</option>`);
   }
   select.innerHTML = options.join('');
-  select.value = saved && agentBackends.some((backend) => backend.name === saved && !backend.unavailableReason) ? saved : '';
+  select.value = selected;
+  syncModelInputForBackend(selected);
+}
+
+function syncModelInputForBackend(backendName: string): void {
+  const input = getElements().agentModelInput;
+  if (!input) return;
+  const backend = agentBackends.find((item) => item.name === backendName);
+  const defaultModel = backend?.defaultModel || '';
+  const override = localStorage.getItem(`${AGENT_MODEL_OVERRIDE_KEY}:${backendName}`) || '';
+  if (!modelInputTouched) {
+    input.value = override || defaultModel;
+  }
+  input.placeholder = defaultModel || '默认模型';
 }
 
 function renderContextHint(): void {
@@ -224,8 +246,21 @@ export function initAgentRunner(): void {
 
   getElements().agentBackendSelect?.addEventListener('change', () => {
     const value = getElements().agentBackendSelect?.value || '';
-    if (value) localStorage.setItem(AGENT_BACKEND_KEY, value);
-    else localStorage.removeItem(AGENT_BACKEND_KEY);
+    const defaultBackend = agentBackends.find((backend) => backend.default && !backend.unavailableReason)?.name || '';
+    if (!value || value === defaultBackend) localStorage.removeItem(AGENT_BACKEND_KEY);
+    else localStorage.setItem(AGENT_BACKEND_KEY, value);
+    modelInputTouched = false;
+    syncModelInputForBackend(value);
+  });
+
+  getElements().agentModelInput?.addEventListener('input', () => {
+    modelInputTouched = true;
+    const backend = getElements().agentBackendSelect?.value || '';
+    const model = getElements().agentModelInput?.value.trim() || '';
+    const defaultModel = agentBackends.find((item) => item.name === backend)?.defaultModel || '';
+    if (!backend) return;
+    if (!model || model === defaultModel) localStorage.removeItem(`${AGENT_MODEL_OVERRIDE_KEY}:${backend}`);
+    else localStorage.setItem(`${AGENT_MODEL_OVERRIDE_KEY}:${backend}`, model);
   });
 
   void fetchAgentBackends().then((backends) => {
@@ -270,7 +305,9 @@ async function triggerAgentRun(): Promise<void> {
   const input = getElements().agentChatInput;
   const prompt = input?.value.trim() || undefined;
   const backend = getElements().agentBackendSelect?.value || undefined;
-  const model = getElements().agentModelInput?.value.trim() || undefined;
+  const rawModel = getElements().agentModelInput?.value.trim() || '';
+  const defaultModel = agentBackends.find((item) => item.name === backend)?.defaultModel || '';
+  const model = rawModel && rawModel !== defaultModel ? rawModel : undefined;
   const displayText = prompt || '处理这个文档的批注';
 
   if (input) input.value = '';

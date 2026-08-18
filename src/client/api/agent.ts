@@ -56,6 +56,7 @@ export interface AgentBackendStatus {
   name: string;
   description: string;
   default: boolean;
+  defaultModel: string | null;
   contextWindow: number | null;
   unavailableReason: string | null;
 }

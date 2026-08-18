@@ -16,6 +16,7 @@ export interface AgentBackendStatus {
   name: string;
   description: string;
   default: boolean;
+  defaultModel: string | null;
   contextWindow: number | null;
   unavailableReason: string | null;
 }
@@ -249,6 +250,7 @@ export function listAgentBackendStatuses(): AgentBackendStatus[] {
     name: backend.name,
     description: backend.description,
     default: backend.default,
+    defaultModel: backend.env.ANTHROPIC_MODEL ? expandVars(backend.env.ANTHROPIC_MODEL) : null,
     contextWindow: backend.contextWindow,
     unavailableReason: checkAgentBackendAvailable(backend),
   }));

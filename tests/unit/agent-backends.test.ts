@@ -1,14 +1,23 @@
 import { afterEach, describe, expect, it } from "bun:test";
+import { mkdtempSync, rmSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 import {
   checkAgentBackendAvailable,
   parseAgentBackendsYaml,
   renderAgentShim,
+  resolveAgentCommand,
   type AgentBackend,
 } from "../../src/agent-backends";
 
 const OLD_ENV = { ...process.env };
+let tmpHome: string | null = null;
 
 afterEach(() => {
+  if (tmpHome) {
+    rmSync(tmpHome, { recursive: true, force: true });
+    tmpHome = null;
+  }
   process.env = { ...OLD_ENV };
 });
 
@@ -84,5 +93,19 @@ backends:
     expect(shim).not.toContain("unset ANTHROPIC_API_KEY");
     expect(shim).toContain("export ANTHROPIC_API_KEY='secret-value'");
     expect(shim).toContain('exec mc --code "$@"');
+  });
+
+  it("uses workspace command only when no backend is explicitly requested", () => {
+    tmpHome = mkdtempSync(join(tmpdir(), "mdv-agent-home-"));
+    process.env.HOME = tmpHome;
+    const backends = [backend({ name: "mc", command: "mc --code", default: true })];
+
+    const workspaceResolved = resolveAgentCommand(["custom-agent"], null, backends);
+    expect(workspaceResolved).toMatchObject({ command: ["custom-agent"], source: "workspace-command" });
+
+    const requestedResolved = resolveAgentCommand(["custom-agent"], "mc", backends);
+    expect(requestedResolved.source).toBe("backend");
+    expect(requestedResolved.backendName).toBe("mc");
+    expect(requestedResolved.command[0]).toContain("mc.sh");
   });
 });

@@ -222,12 +222,20 @@ function codeAgentArgsFor(backend: AgentBackend): string[] {
   return backend.command.includes("--dangerously-skip-permissions") ? [] : DEFAULT_CODE_AGENT_ARGS;
 }
 
-export function resolveAgentCommand(workspaceCommand?: string[] | null): AgentCommandResolution {
-  if (workspaceCommand && workspaceCommand.length > 0) {
+export function resolveAgentCommand(
+  workspaceCommand?: string[] | null,
+  requestedBackendName?: string | null,
+  backends = discoverAgentBackends()
+): AgentCommandResolution {
+  if (!requestedBackendName && workspaceCommand && workspaceCommand.length > 0) {
     return { command: workspaceCommand, source: "workspace-command", backendName: null };
   }
-  const backends = discoverAgentBackends();
-  const backend = backends.find((item) => item.default) || backends[0];
+  const backend = requestedBackendName
+    ? backends.find((item) => item.name === requestedBackendName)
+    : backends.find((item) => item.default) || backends[0];
+  if (requestedBackendName && !backend) {
+    throw new Error(`backend ${requestedBackendName} 不存在`);
+  }
   if (!backend) {
     return { command: ["claude", ...DEFAULT_CODE_AGENT_ARGS], source: "backend", backendName: "claude" };
   }

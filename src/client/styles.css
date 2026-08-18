@@ -2699,8 +2699,17 @@
       color: var(--color-text-primary);
       padding: 4px 6px;
     }
-    .agent-chat-stats {
+    .agent-backend-select {
+      flex: 0 0 92px;
+    }
+    .agent-chat-context {
       padding: 0 10px 6px;
+      font-size: 11px;
+      color: var(--color-text-muted, #999);
+      border-bottom: 1px solid var(--color-border-subtle);
+    }
+    .agent-chat-stats {
+      padding: 6px 10px;
       font-size: 11px;
       color: var(--color-text-muted, #999);
     }

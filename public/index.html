@@ -153,6 +153,7 @@
       </div>
       <div class="annotation-agent-tab hidden" id="annotationAgentTab">
         <div class="agent-chat-header">
+          <select class="agent-chat-select agent-backend-select" id="agentBackendSelect" title="Backend"></select>
           <select class="agent-chat-select" id="agentSessionSelect" title="会话"></select>
           <input class="agent-chat-select agent-chat-model-input" id="agentModelInput" list="agentModelSuggestions" placeholder="默认模型" title="模型（留空用默认，claude CLI 不提供可查询的模型列表，这里是已知别名的建议，也可以直接填完整 model id）" />
           <datalist id="agentModelSuggestions">
@@ -162,6 +163,7 @@
             <option value="fable">
           </datalist>
         </div>
+        <div class="agent-chat-context" id="agentChatContext">上下文：当前文档路径 + mdv 批注；连续性来自 CLI session resume。</div>
         <div class="agent-chat-stats" id="agentChatStats"></div>
         <div class="agent-chat-messages" id="agentChatMessages">
           <div class="agent-chat-empty">还没有对话，在下面输入内容开始，或者留空直接发送 = 处理这个文档的批注。</div>

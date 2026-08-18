@@ -62,12 +62,12 @@ export interface AgentBackendStatus {
 
 export async function startAgentRun(
   path: string,
-  opts?: { model?: string; prompt?: string }
-): Promise<{ runId: string; sessionId: string; resumed: boolean; command: string[] }> {
+  opts?: { backend?: string; model?: string; prompt?: string }
+): Promise<{ runId: string; sessionId: string; resumed: boolean; command: string[]; backend?: string | null }> {
   const response = await fetch('/api/agent/run', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path, model: opts?.model, prompt: opts?.prompt }),
+    body: JSON.stringify({ path, backend: opts?.backend, model: opts?.model, prompt: opts?.prompt }),
   });
   return readJsonOrThrow(response);
 }

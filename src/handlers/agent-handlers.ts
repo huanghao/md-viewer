@@ -27,7 +27,7 @@ import {
 import { log } from "../utils.ts";
 
 export async function handleStartAgentRun(c: Context) {
-  const body = await c.req.json<{ path?: string; sessionIdOverride?: string; model?: string; prompt?: string }>().catch(() => ({}) as any);
+  const body = await c.req.json<{ path?: string; sessionIdOverride?: string; backend?: string; model?: string; prompt?: string }>().catch(() => ({}) as any);
   const rawPath = body?.path;
   if (!rawPath) return c.json({ error: "缺少 path 参数" }, 400);
 
@@ -54,7 +54,7 @@ export async function handleStartAgentRun(c: Context) {
   let agentCommand: string[];
   let backendName: string | null;
   try {
-    const resolved = resolveAgentCommand(workspacePath ? getWorkspaceAgentCommand(workspacePath) : null);
+    const resolved = resolveAgentCommand(workspacePath ? getWorkspaceAgentCommand(workspacePath) : null, body?.backend?.trim() || null);
     agentCommand = resolved.command;
     backendName = resolved.backendName;
   } catch (error: any) {

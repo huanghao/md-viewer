@@ -1,12 +1,14 @@
 import { state } from './state';
 import { getElements } from './annotation-layout';
 import {
+  fetchAgentBackends,
   fetchAgentSession,
   fetchRunsBySession,
   fetchWorkspaceAgentSessions,
   linkAgentSession,
   newAgentSession,
   startAgentRun,
+  type AgentBackendStatus,
   type AgentRun,
   type AgentSession,
   type AgentTranscriptMsg,
@@ -14,11 +16,14 @@ import {
 import { showError, showSuccess } from './ui/toast';
 import { escapeHtml } from './utils/escape';
 
+const AGENT_BACKEND_KEY = 'md-viewer:agent-backend';
+
 let currentDocPath: string | null = null;
 let currentSessionId: string | null = null;
 let activeRunId: string | null = null;
 let liveMessages: AgentTranscriptMsg[] = [];
 let pastRuns: AgentRun[] = [];
+let agentBackends: AgentBackendStatus[] = [];
 let loadToken = 0;
 
 function guessWorkspaceForPath(path: string): string | null {
@@ -105,16 +110,35 @@ function renderStats(): void {
 function renderSessionSelect(sessions: AgentSession[]): void {
   const select = getElements().agentSessionSelect;
   if (!select) return;
-  const selfLabel = currentSessionId ? `当前会话 (${currentSessionId.slice(0, 8)})` : '🆕 新建会话';
+  const selfLabel = currentSessionId ? `当前文档会话 (${currentSessionId.slice(0, 8)})` : '新建当前文档会话';
   const options = [`<option value="__self__">${escapeHtml(selfLabel)}</option>`];
-  if (currentSessionId) options.push(`<option value="__new__">🆕 新建会话（放弃当前上下文）</option>`);
+  if (currentSessionId) options.push(`<option value="__new__">新建会话（放弃当前上下文）</option>`);
   for (const s of sessions) {
     if (s.sessionId === currentSessionId) continue;
     const name = s.docPath.split('/').pop() || s.docPath;
-    options.push(`<option value="${escapeHtml(s.sessionId)}">🔗 ${escapeHtml(name)} (${s.sessionId.slice(0, 8)})</option>`);
+    options.push(`<option value="${escapeHtml(s.sessionId)}">关联历史：${escapeHtml(name)} (${s.sessionId.slice(0, 8)})</option>`);
   }
   select.innerHTML = options.join('');
   select.value = '__self__';
+}
+
+function renderBackendSelect(): void {
+  const select = getElements().agentBackendSelect;
+  if (!select) return;
+  const saved = localStorage.getItem(AGENT_BACKEND_KEY) || '';
+  const options = [`<option value="">默认 backend</option>`];
+  for (const backend of agentBackends) {
+    const suffix = backend.default ? ' · 默认' : backend.unavailableReason ? ' · 不可用' : '';
+    options.push(`<option value="${escapeHtml(backend.name)}"${backend.unavailableReason ? ' disabled' : ''}>${escapeHtml(backend.name)}${suffix}</option>`);
+  }
+  select.innerHTML = options.join('');
+  select.value = saved && agentBackends.some((backend) => backend.name === saved && !backend.unavailableReason) ? saved : '';
+}
+
+function renderContextHint(): void {
+  const el = getElements().agentChatContext;
+  if (!el) return;
+  el.textContent = '上下文：当前文档路径 + mdv 批注；连续性来自 CLI session resume。';
 }
 
 function setRunning(running: boolean): void {
@@ -131,6 +155,11 @@ function setRunning(running: boolean): void {
 
 export async function onAgentTabActivated(path: string | null): Promise<void> {
   currentDocPath = path;
+  renderContextHint();
+  if (agentBackends.length === 0) {
+    agentBackends = await fetchAgentBackends().catch(() => []);
+    renderBackendSelect();
+  }
   if (!path) {
     liveMessages = [];
     pastRuns = [];
@@ -176,6 +205,7 @@ async function reloadConversation(path: string): Promise<void> {
 // ==================== 交互 ====================
 
 export function initAgentRunner(): void {
+  renderContextHint();
   getElements().agentChatSendBtn?.addEventListener('click', () => {
     void triggerAgentRun();
   });
@@ -190,6 +220,20 @@ export function initAgentRunner(): void {
 
   getElements().agentSessionSelect?.addEventListener('change', () => {
     void handleSessionSelectChange();
+  });
+
+  getElements().agentBackendSelect?.addEventListener('change', () => {
+    const value = getElements().agentBackendSelect?.value || '';
+    if (value) localStorage.setItem(AGENT_BACKEND_KEY, value);
+    else localStorage.removeItem(AGENT_BACKEND_KEY);
+  });
+
+  void fetchAgentBackends().then((backends) => {
+    agentBackends = backends;
+    renderBackendSelect();
+  }).catch(() => {
+    agentBackends = [];
+    renderBackendSelect();
   });
 }
 
@@ -225,6 +269,7 @@ async function triggerAgentRun(): Promise<void> {
 
   const input = getElements().agentChatInput;
   const prompt = input?.value.trim() || undefined;
+  const backend = getElements().agentBackendSelect?.value || undefined;
   const model = getElements().agentModelInput?.value.trim() || undefined;
   const displayText = prompt || '处理这个文档的批注';
 
@@ -235,7 +280,7 @@ async function triggerAgentRun(): Promise<void> {
   renderMessages();
 
   try {
-    const { runId, sessionId } = await startAgentRun(path, { model, prompt });
+    const { runId, sessionId } = await startAgentRun(path, { backend, model, prompt });
     activeRunId = runId;
     currentSessionId = sessionId;
   } catch (err: any) {

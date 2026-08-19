@@ -71,6 +71,10 @@ function renderMsgHtml(m: AgentTranscriptMsg): string {
   return `<div class="agent-msg agent-msg-text">${modelBadge}${escapeHtml(m.text)}${time}</div>`;
 }
 
+function shouldRenderMsg(m: AgentTranscriptMsg): boolean {
+  return !(m.kind === 'result' && m.text.startsWith('✓ 完成'));
+}
+
 function renderRunDivider(run: AgentRun): string {
   const time = new Date(run.startedAt).toLocaleString();
   const duration = run.finishedAt ? fmtDuration(run.finishedAt - run.startedAt) : '运行中';
@@ -84,8 +88,8 @@ function renderMessages(): void {
   if (!el) return;
   const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
 
-  const historyHtml = pastRuns.map((r) => renderRunDivider(r) + (r.transcript ?? []).map(renderMsgHtml).join('')).join('');
-  const liveHtml = liveMessages.map(renderMsgHtml).join('');
+  const historyHtml = pastRuns.map((r) => renderRunDivider(r) + (r.transcript ?? []).filter(shouldRenderMsg).map(renderMsgHtml).join('')).join('');
+  const liveHtml = liveMessages.filter(shouldRenderMsg).map(renderMsgHtml).join('');
 
   if (!historyHtml && !liveHtml) {
     el.innerHTML = `<div class="agent-chat-empty">还没有对话，在下面输入内容开始，或者留空直接发送 = 处理这个文档的批注。</div>`;
@@ -361,11 +365,8 @@ export function handleAgentRunStatusEvent(data: { runId: string; docPath: string
   activeRunId = null;
   setRunning(false);
 
-  const usage = data.usage;
-  const tokens = usage ? (usage.inputTokens || 0) + (usage.outputTokens || 0) : 0;
-  const cost = typeof usage?.costUsd === 'number' ? `$${usage.costUsd.toFixed(3)}` : '';
   if (data.status === 'success') {
-    liveMessages.push({ kind: 'result', text: `✓ 完成${tokens ? ' · ' + tokens + ' tokens' : ''}${cost ? ' · ' + cost : ''}`, timestamp: Date.now() });
+    // 成功态由 run divider / stats 展示；不再额外插入一条“完成”消息，占用一行。
   } else {
     liveMessages.push({ kind: 'error', text: '✗ Agent 运行出错', timestamp: Date.now() });
   }

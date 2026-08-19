@@ -265,8 +265,12 @@ async function streamPiAgentRun(
   }
 }
 
-/** 处理一行 stream-json 事件，累积到 transcript；返回 true 表示这行已经把这次运行标记为结束（result 事件）。 */
-function handleAgentEventLine(line: string, runId: string, docPath: string, sessionId: string, transcript: AgentTranscriptMsg[]): boolean {
+/** 处理一行 stream-json 事件，累积到 transcript；返回 true 表示这行已经把这次运行标记为结束（result 事件）。
+ * export 是为了让 tests/unit/agent-handlers-claude-event.test.ts 能直接调用——内部会真的
+ * 写 agent_runs/agent_sessions（走跟 streamAgentRun 一样的 finishAgentRun/markAgentIdle），
+ * 测试跟 agent-storage-session-lock.test.ts 一样靠 XDG_CONFIG_HOME 换临时库隔离，
+ * 不需要 mock，SSE 广播在没有连接的 client 时本来就是空操作。 */
+export function handleAgentEventLine(line: string, runId: string, docPath: string, sessionId: string, transcript: AgentTranscriptMsg[]): boolean {
   let event: any;
   try {
     event = JSON.parse(line);

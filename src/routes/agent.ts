@@ -7,6 +7,8 @@ import {
   handleLinkAgentSession,
   handleListAgentBackends,
   handleListRecentAgentRuns,
+  handleListPiModels,
+  handleListPiProviders,
   handleListWorkspaceAgentSessions,
   handleNewAgentSession,
   handleStartAgentRun,
@@ -15,6 +17,8 @@ import {
 export function registerAgentRoutes(app: Hono): void {
   app.post("/api/agent/run", handleStartAgentRun);
   app.get("/api/agent/backends", handleListAgentBackends);
+  app.get("/api/agent/pi-models", handleListPiModels);
+  app.get("/api/agent/pi-providers", handleListPiProviders);
   app.get("/api/agent/runs", handleGetAgentRuns);
   app.get("/api/agent/runs/recent", handleListRecentAgentRuns);
   app.get("/api/agent/runs/by-session", handleGetRunsBySession);

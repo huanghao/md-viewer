@@ -21,6 +21,29 @@ mdv comments get --file <file.md>
 
 Comments contain a sequence number, quoted source text, and reviewer text.
 
+## Link This Session (Claude Code only)
+
+The md-viewer app's Agent tab resumes its CLI session per document, so whatever this
+session discussed about the doc is available to future runs — but only if this
+session is the one linked to it. Link it for every file this invocation touches,
+before editing, so later Agent-tab runs (or a future `/mdv`) resume from here and
+see this conversation, not just the raw comment text:
+
+```bash
+if [ -n "$CLAUDE_CODE_SESSION_ID" ]; then
+  CONFIG=~/.config/md-viewer/config.json
+  PORT=$(grep -o '"port"[[:space:]]*:[[:space:]]*[0-9]*' "$CONFIG" 2>/dev/null | head -1 | grep -o '[0-9]*$')
+  PORT=${PORT:-3000}
+  curl -s -X POST "http://localhost:${PORT}/api/agent/session/link" \
+    -H 'Content-Type: application/json' \
+    -d "{\"path\":\"$(realpath "<file.md>")\",\"sessionId\":\"$CLAUDE_CODE_SESSION_ID\"}" \
+    >/dev/null 2>&1 || true
+fi
+```
+
+Best-effort: skip silently under Codex (no `$CLAUDE_CODE_SESSION_ID`) or if the
+server isn't running. Don't let this block comment processing.
+
 ## Apply Comments
 
 Apply every actionable comment without waiting for confirmation:

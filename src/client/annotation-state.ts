@@ -37,7 +37,9 @@ export type AnnotationDensity = 'default' | 'simple';
 export const ANNOTATION_WIDTH_KEY = 'md-viewer:annotation-sidebar-width';
 export const ANNOTATION_WIDTH_DEFAULT = 320;
 export const ANNOTATION_WIDTH_MIN = 260;
-export const ANNOTATION_WIDTH_MAX = 540;
+// Agent 对话需要比批注列表更宽的空间（代码块/长回复），540 太窄；900 大约是常见笔记本
+// 屏幕的一半，留够主内容区域的同时给 Agent 面板足够呼吸空间
+export const ANNOTATION_WIDTH_MAX = 900;
 
 export interface AnnotationState {
   annotations: Annotation[];

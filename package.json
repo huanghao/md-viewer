@@ -16,6 +16,7 @@
     "test": "bun test tests/unit"
   },
   "dependencies": {
+    "@earendil-works/pi-ai": "^0.84.2",
     "chokidar": "^5.0.0",
     "hono": "^3.12.8"
   },

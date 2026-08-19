@@ -6,6 +6,7 @@ import { escapeHtml } from './utils/escape';
 import {
   deleteAnnotationRemote,
   updateAnnotationStatusRemote,
+  resolveAllAnnotationsRemote,
   fetchQuickComments,
 } from './api/annotations';
 import { showError, showToast } from './ui/toast';
@@ -14,7 +15,7 @@ import { isOpen, isResolved, isUnanchored, type AnnotationStatus } from '../anno
 import { adjustAnnotationCount, adjustUnanchoredCount } from './state';
 import { loadConfig } from './config';
 import { formatRelativeTimeShort } from './utils/format';
-import { storageSet } from './utils/storage';
+import { storageGet, storageSet } from './utils/storage';
 import { createResizer } from './utils/resizer';
 import { getTextNodes, globalOffsetForPosition, globalOffsetForPositionEnd, positionForGlobalOffset, clamp, placeFloating, getReaderText } from './annotation/position';
 import { currentPdfViewer } from './pdf-state';
@@ -22,6 +23,7 @@ import { isResolvedAnn, getAnchorTrack, matchesFilter, getVisibleAnnotations as 
 import { handleEmacsKeys } from './utils/emacs-keys';
 import { recordSignal } from './utils/focus-signals';
 import { initAgentRunner, onAgentTabActivated } from './agent-runner';
+import { addTrayItem } from './agent-tray';
 import {
   type Annotation,
   type AnnotationThreadItem,
@@ -187,6 +189,11 @@ function updateControlState(): void {
     };
     el.filterToggle.title = map[state.filter];
   }
+  if (el.resolveAllBtn) {
+    const pendingCount = state.annotations.filter((a) => !isResolved(a.status as AnnotationStatus)).length;
+    (el.resolveAllBtn as HTMLButtonElement).disabled = pendingCount === 0;
+    el.resolveAllBtn.title = pendingCount > 0 ? `全部解决（${pendingCount} 条，含失锚）` : '没有未解决的评论';
+  }
 }
 
 function updateAnnotationCount(): void {
@@ -197,13 +204,16 @@ function updateAnnotationCount(): void {
 
 // ==================== Tab ====================
 
-let _currentAnnotationTab: 'comments' | 'agent' = 'comments';
+const ANNOTATION_TAB_KEY = 'md-viewer:annotation-tab';
+let _currentAnnotationTab: 'comments' | 'agent' =
+  storageGet<string>(ANNOTATION_TAB_KEY, 'comments') === 'agent' ? 'agent' : 'comments';
 
 // 当前渲染的 filePath，供事件委托读取（renderAnnotationList 每次更新）
 let _listFilePath: string | null = null;
 
 export function switchAnnotationTab(tab: 'comments' | 'agent'): void {
   _currentAnnotationTab = tab;
+  storageSet(ANNOTATION_TAB_KEY, tab);
   const commentsList = document.getElementById('annotationList');
   const commentsActions = document.getElementById('annotationCommentsActions');
   const agentTab = document.getElementById('annotationAgentTab');
@@ -251,17 +261,43 @@ export function showQuickAdd(x: number, y: number, pendingData: Omit<Annotation,
   renderQuickPromptBtns();
   const el = getElements();
   if (!el.quickAddWrap) return;
+  el.quickAddComment?.classList.remove('hidden');
   document.getElementById('quickAddTray')?.classList.toggle('hidden', _currentAnnotationTab !== 'agent');
   // 新划词时关闭旧的 composer（明确的焦点转移）
   if (el.composer && !el.composer.classList.contains('hidden')) {
     hideComposer();
   }
+  hideTrayComposer(); // 新划词时丢弃上一次未提交的托盘草稿
   state.pendingAnnotation = { ...pendingData, note: '', createdAt: Date.now() };
   state.pendingAnnotationFilePath = el.content?.getAttribute('data-current-file') || state.currentFilePath;
   el.quickAddWrap.classList.remove('hidden');
   placeFloating(el.quickAddWrap, x, y, {
     fallbackWidth: 168,
     fallbackHeight: 96,
+    flipY: true,
+  });
+  setLastQuickAddPosition(
+    Number.parseFloat(el.quickAddWrap.style.left || '0'),
+    Number.parseFloat(el.quickAddWrap.style.top || '0'),
+  );
+}
+
+function showAgentTrayQuickAdd(x: number, y: number, pendingData: Omit<Annotation, 'note' | 'createdAt'>, filePath: string): void {
+  const el = getElements();
+  if (!el.quickAddWrap) return;
+  el.quickAddComment?.classList.add('hidden');
+  document.getElementById('quickPromptsSection')?.classList.add('hidden');
+  document.getElementById('quickAddTray')?.classList.remove('hidden');
+  if (el.composer && !el.composer.classList.contains('hidden')) {
+    hideComposer();
+  }
+  hideTrayComposer();
+  state.pendingAnnotation = { ...pendingData, note: '', createdAt: Date.now() };
+  state.pendingAnnotationFilePath = filePath;
+  el.quickAddWrap.classList.remove('hidden');
+  placeFloating(el.quickAddWrap, x, y, {
+    fallbackWidth: 168,
+    fallbackHeight: 48,
     flipY: true,
   });
   setLastQuickAddPosition(
@@ -281,6 +317,52 @@ function hideQuickAdd(clearPending = false): void {
     pdfViewer?.clearTempRect();
     state.pendingAnnotationFilePath = null;
   }
+}
+
+// ==================== 划词 → Agent 托盘 ====================
+// 跟"写评论"完全独立：不创建 Annotation，不走锚定/回复/持久化，只是记一条
+// {quote, note}，攒在 localStorage 里，下一轮发给 Agent 时拼进 prompt、随即清空。
+// 用于"划到不懂的地方，写一句疑问，留给 Agent 下一轮看"，跟正式审阅评论是两回事。
+// UI 上是独立的浮窗（跟"评论创建浮窗"同一套壳），不塞进划词菜单里——菜单只负责
+// "选一个动作"，写内容另开一个窗，两者不混在一起。
+
+export function openTrayComposerFromPending(x?: number, y?: number): void {
+  const el = getElements();
+  if (!state.pendingAnnotation || !el.agentTrayComposer || !el.agentTrayComposerNote) return;
+  applyTempSelectionMark();
+  const pdfViewer = currentPdfViewer ?? undefined;
+  const pendingAnn = state.pendingAnnotation as Annotation & {
+    page?: number;
+    rectCoords?: { x1: number; y1: number; x2: number; y2: number };
+  };
+  if (pdfViewer && pendingAnn?.page !== undefined && pendingAnn?.rectCoords) {
+    const { x1, y1, x2, y2 } = pendingAnn.rectCoords;
+    pdfViewer.drawTempRect(pendingAnn.page, x1, y1, x2, y2, 'yellow');
+  }
+  el.agentTrayComposerNote.value = '';
+  const left = typeof x === 'number' ? x : (el.quickAddWrap ? Number.parseFloat(el.quickAddWrap.style.left || '0') : 0);
+  const top = typeof y === 'number' ? y : (el.quickAddWrap ? Number.parseFloat(el.quickAddWrap.style.top || '0') : 0);
+  placeFloating(el.agentTrayComposer, left, top + 34);
+  el.agentTrayComposer.classList.remove('hidden');
+  hideQuickAdd(false);
+  el.agentTrayComposerNote.focus();
+}
+
+function hideTrayComposer(): void {
+  const el = getElements();
+  if (!el.agentTrayComposer) return;
+  el.agentTrayComposer.classList.add('hidden');
+  if (el.agentTrayComposerNote) el.agentTrayComposerNote.value = '';
+}
+
+function submitTrayComposer(): void {
+  const el = getElements();
+  const pending = state.pendingAnnotation;
+  const filePath = state.pendingAnnotationFilePath;
+  const note = el.agentTrayComposerNote?.value.trim() || '';
+  if (pending && filePath) addTrayItem(filePath, pending.quote, note);
+  hideTrayComposer();
+  hideQuickAdd(true);
 }
 
 export function openComposerFromPending(x?: number, y?: number): void {
@@ -730,6 +812,53 @@ function toggleResolved(id: string, filePath: string): void {
   }
 }
 
+// 一次性解决当前文档下所有未解决评论（含失锚），供侧边栏"全部解决"按钮用。
+// 失锚也一起解决：mdv 改完文档后原文常挪位/被重写，评论多半会变成失锚——
+// 这不是"锚点丢了要人工确认"的异常情况，而是"已经处理过了"的正常结果，
+// 不含失锚的话这个按钮在 mdv 处理完之后基本就是摆设。
+function resolveAllOpen(filePath: string): void {
+  const targets = state.annotations.filter((a) => !isResolved(a.status as AnnotationStatus));
+  if (targets.length === 0) return;
+  const previous = targets.map((a) => ({ id: a.id, status: a.status as AnnotationStatus }));
+  const openCount = previous.filter((p) => isOpen(p.status)).length;
+  const unanchoredCount = previous.filter((p) => isUnanchored(p.status)).length;
+  const isPdf = document.getElementById('content')?.hasAttribute('data-pdf');
+
+  // 乐观更新客户端状态
+  targets.forEach((a) => { a.status = 'resolved'; });
+  hidePopover(true);
+  if (openCount) adjustAnnotationCount(filePath, -openCount);
+  if (unanchoredCount) adjustUnanchoredCount(filePath, -unanchoredCount);
+  afterAnnotationWritePdf(filePath, isPdf);
+  import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
+
+  const revert = () => {
+    targets.forEach((a) => {
+      const prev = previous.find((p) => p.id === a.id);
+      if (prev) a.status = prev.status;
+    });
+    if (openCount) adjustAnnotationCount(filePath, +openCount);
+    if (unanchoredCount) adjustUnanchoredCount(filePath, +unanchoredCount);
+    afterAnnotationWritePdf(filePath, isPdf);
+    import('./ui/sidebar').then(({ renderSidebar }) => renderSidebar());
+  };
+
+  const doUpdate = () => {
+    void resolveAllAnnotationsRemote(filePath).catch((error) => {
+      revert();
+      showError(`批量解决评论失败: ${error?.message || '未知错误'}`);
+    });
+  };
+
+  if (loadConfig().optimisticUndo !== false) {
+    enqueueOp(doUpdate, revert, `已解决 ${targets.length} 条评论`, (msg, cancel) => {
+      showToast({ message: msg, type: 'info', duration: 5000, action: { label: '撤销', onClick: cancel } });
+    });
+  } else {
+    doUpdate();
+  }
+}
+
 // 写操作完成后的统一收尾：同步正文高亮 + 侧边栏列表
 function afterAnnotationWrite(filePath: string, isPdf: boolean | undefined): void {
   if (!isPdf) applyAnnotations();
@@ -1105,6 +1234,35 @@ export function initAnnotationElements(): void {
     openComposerFromPending();
   });
 
+  getElements().quickAddTray?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (!state.pendingAnnotation) { hideQuickAdd(true); return; }
+    openTrayComposerFromPending();
+  });
+
+  getElements().agentTrayComposerSaveBtn?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    submitTrayComposer();
+  });
+
+  getElements().agentTrayComposerCancelBtn?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    hideTrayComposer();
+    hideQuickAdd(true);
+  });
+
+  getElements().agentTrayComposerNote?.addEventListener('keydown', (event) => {
+    event.stopPropagation();
+    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+      event.preventDefault();
+      submitTrayComposer();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      hideTrayComposer();
+      hideQuickAdd(true);
+    }
+  });
+
   document.getElementById('popoverCloseBtn')?.addEventListener('click', () => {
     state.pinnedAnnotationId = null;
     hidePopover(true);
@@ -1296,7 +1454,39 @@ export function initAnnotationElements(): void {
   getElements().closeToggle?.addEventListener('click', () => {
     closeAnnotationSidebar();
   });
+
+  getElements().resolveAllBtn?.addEventListener('click', () => {
+    const filePath = getActiveAnnotationFilePath();
+    if (filePath) resolveAllOpen(filePath);
+  });
   initAgentRunner();
+
+  document.getElementById('agentChatMessages')?.addEventListener('mouseup', () => {
+    setTimeout(() => {
+      const messagesEl = document.getElementById('agentChatMessages');
+      const selection = window.getSelection();
+      if (!messagesEl || !selection || selection.isCollapsed || selection.rangeCount === 0) return;
+      const range = selection.getRangeAt(0);
+      if (!messagesEl.contains(range.commonAncestorContainer)) return;
+      const quote = selection.toString().trim();
+      if (!quote) return;
+
+      const filePath = getActiveAnnotationFilePath();
+      if (!filePath) return;
+
+      const rects = range.getClientRects();
+      const lastRect = rects.length > 0 ? rects[rects.length - 1] : range.getBoundingClientRect();
+      showAgentTrayQuickAdd(lastRect.right + 6, lastRect.top - 8, {
+        id: `ann-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+        start: -1,
+        length: 0,
+        quote,
+        status: 'anchored',
+        confidence: 0,
+      }, filePath);
+    }, 0);
+  });
+
   getElements().floatingOpenBtn?.addEventListener('click', () => {
     openAnnotationSidebar();
   });
@@ -1356,6 +1546,16 @@ export function initAnnotationElements(): void {
       collapseComposer();
     }
 
+    // 点击 Agent 托盘浮窗外部 → 关闭并丢弃未提交的草稿
+    if (
+      els.agentTrayComposer &&
+      !els.agentTrayComposer.classList.contains('hidden') &&
+      !els.agentTrayComposer.contains(target)
+    ) {
+      hideTrayComposer();
+      hideQuickAdd(true);
+    }
+
     if (
       els.popover &&
       !els.popover.contains(target) &&
@@ -1378,10 +1578,16 @@ export function initAnnotationElements(): void {
       els.quickAddWrap &&
       !els.quickAddWrap.classList.contains('hidden') &&
       !els.quickAddWrap.contains(target) &&
-      !(target as HTMLElement).closest('#annotationComposer')
+      !(target as HTMLElement).closest('#annotationComposer') &&
+      !(target as HTMLElement).closest('#agentTrayComposer')
     ) {
       hideQuickAdd(true);
     }
+  });
+
+  document.addEventListener('contextmenu', () => {
+    hideQuickAdd(false);
+    hideTrayComposer();
   });
 
   // 通用拖拽逻辑，供 composer 和 popover 复用
@@ -1416,9 +1622,13 @@ export function initAnnotationElements(): void {
 
   const el = getElements();
   if (el.composerHeader && el.composer) makeDraggable(el.composerHeader, el.composer);
+  if (el.agentTrayComposerHeader && el.agentTrayComposer) makeDraggable(el.agentTrayComposerHeader, el.agentTrayComposer);
   if (el.popoverHeader && el.popover) makeDraggable(el.popoverHeader, el.popover);
 
   loadQuickComments();
+
+  // 刷新页面后恢复上次停留的 tab（评论/Agent），跟密度/筛选那些偏好一个存法
+  switchAnnotationTab(_currentAnnotationTab);
 }
 
 export function setPendingAnnotation(annotation: Annotation, filePath: string, clientX?: number, clientY?: number): void {

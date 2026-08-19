@@ -9,6 +9,7 @@ import { log } from "./utils.ts";
 import { broadcastEvent } from "./sse.ts";
 import { bootstrapWorkspaceIndexes } from "./handlers/workspace-handlers.ts";
 import { pruneScanMetrics } from "./scan-metrics-storage.ts";
+import { pruneOrphanedAgentSessions, resetStuckRunningAgentSessions } from "./agent-storage.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
 import { registerAgentRoutes } from "./routes/agent.ts";
 import { registerAnnotationRoutes } from "./routes/annotations.ts";
@@ -55,6 +56,10 @@ if (import.meta.main) {
 
   void bootstrapWorkspaceIndexes();
   pruneScanMetrics(30);
+  const prunedSessions = pruneOrphanedAgentSessions();
+  if (prunedSessions > 0) log(`🧹 清理了 ${prunedSessions} 条指向已删除文档的 Agent session 关联`);
+  const stuckRuns = resetStuckRunningAgentSessions();
+  if (stuckRuns > 0) log(`🧹 清理了 ${stuckRuns} 条上次进程重启时卡在"运行中"的 Agent 记录`);
 
   process.on("SIGINT", () => process.exit(0));
   process.on("SIGTERM", () => process.exit(0));

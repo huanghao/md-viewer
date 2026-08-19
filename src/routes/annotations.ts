@@ -7,6 +7,7 @@ import {
   handleGetQuickComments,
   handleMigrateAnnotations,
   handleReplyAnnotation,
+  handleResolveAllAnnotations,
   handleUpdateAnnotationStatus,
   handleUpsertAnnotation,
   handleUpsertQuickComments,
@@ -19,6 +20,7 @@ export function registerAnnotationRoutes(app: Hono): void {
   app.post("/api/annotations/reply", handleReplyAnnotation);
   app.post("/api/annotations/delete", handleDeleteAnnotation);
   app.post("/api/annotations/status", handleUpdateAnnotationStatus);
+  app.post("/api/annotations/resolve-all", handleResolveAllAnnotations);
   app.post("/api/annotations/migrate", handleMigrateAnnotations);
   app.post("/api/annotations/clear", handleClearAllAnnotations);
   app.get("/api/quick-comments", handleGetQuickComments);

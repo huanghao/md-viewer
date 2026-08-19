@@ -25,9 +25,11 @@ import {
   type AgentTranscriptMsg,
 } from "../agent-storage.ts";
 import { log } from "../utils.ts";
+import { buildPiArgv, handlePiEventLine } from "../pi-agent.ts";
+import { listPiModels, listPiProviders } from "../pi-models.ts";
 
 export async function handleStartAgentRun(c: Context) {
-  const body = await c.req.json<{ path?: string; sessionIdOverride?: string; backend?: string; model?: string; prompt?: string }>().catch(() => ({}) as any);
+  const body = await c.req.json<{ path?: string; sessionIdOverride?: string; backend?: string; provider?: string; model?: string; prompt?: string; thinking?: string }>().catch(() => ({}) as any);
   const rawPath = body?.path;
   if (!rawPath) return c.json({ error: "缺少 path 参数" }, 400);
 
@@ -51,6 +53,38 @@ export async function handleStartAgentRun(c: Context) {
 
   const workspacePath = findWorkspaceForPath(docPath);
   const cwd = workspacePath || dirname(docPath);
+
+  // pi（earendil-works/pi）是并排试用的另一条 Agent 运行时路径，不走 agent-backends.yaml
+  // 那套 claude 系 CLI 的 argv/解析逻辑（形状完全不同，见 pi-agent.ts 头部注释），
+  // 复用同一套 session/run 存储 + SSE 广播，只是 spawn 和解析这两步单独实现。
+  if (body?.backend === "pi") {
+    const displayPrompt = customPrompt || "处理这个文档的批注";
+    const sentPrompt = customPrompt
+      ? `[当前文档: ${docPath}]\n${customPrompt}`
+      : `/mdv 处理这个文件的批注：${docPath}`;
+    const argv = buildPiArgv({ prompt: sentPrompt, sessionId, provider: body?.provider || "kimi-coding", model: body?.model, thinking: body?.thinking });
+
+    const runId = randomUUID();
+    if (!tryMarkAgentRunning(docPath, runId)) {
+      return c.json({ error: "该文档已有 Agent 运行中" }, 409);
+    }
+    insertAgentRun({ id: runId, docPath, sessionId, workspacePath, command: argv });
+
+    let proc: Bun.Subprocess<"ignore", "pipe", "pipe">;
+    try {
+      // -p 非交互模式不需要 stdin，显式 ignore 避免子进程挂在悬空的 pipe 上等输入
+      proc = Bun.spawn(argv, { cwd, stdin: "ignore", stdout: "pipe", stderr: "pipe" });
+    } catch (error: any) {
+      finishAgentRun(runId, { status: "error", error: error?.message || "启动 pi 进程失败" });
+      markAgentIdle(docPath);
+      return c.json({ error: error?.message || "启动 pi 进程失败" }, 500);
+    }
+
+    void streamPiAgentRun(proc, { runId, docPath, sessionId, initialPrompt: displayPrompt });
+
+    return c.json({ success: true, runId, sessionId, resumed: isResume, command: argv, backend: "pi" });
+  }
+
   let agentCommand: string[];
   let backendName: string | null;
   try {
@@ -98,7 +132,30 @@ export async function handleStartAgentRun(c: Context) {
 }
 
 export function handleListAgentBackends(c: Context) {
-  return c.json({ backends: listAgentBackendStatuses() });
+  // pi 是并排试用的实验性 backend，不进 ~/.config/agent-backends.yaml（那份文件是给
+  // agent_client.py 之类通用调用方共享的，pi 的 argv/输出形状跟那套完全不一样，混进去
+  // 反而会让别的调用方读到一条它处理不了的声明）——直接在这里拼一条合成的状态项。
+  const backends = listAgentBackendStatuses();
+  backends.push({
+    name: "pi",
+    description: "pi（earendil-works/pi）实验性接入，可跟其它 backend 对比",
+    default: false,
+    // pi 现在挂了多个 provider（kimi-coding/openai-codex/…），每个的默认模型都不一样，
+    // 不能再给这个合成 backend 项写死一个——真正的默认模型由客户端按 provider 取模型列表的第一项决定
+    defaultModel: null,
+    contextWindow: null,
+    unavailableReason: Bun.which("pi") ? null : "本机未安装 pi CLI",
+  });
+  return c.json({ backends });
+}
+
+export function handleListPiModels(c: Context) {
+  const provider = c.req.query("provider") || "kimi-coding";
+  return c.json({ models: listPiModels(provider) });
+}
+
+export function handleListPiProviders(c: Context) {
+  return c.json({ providers: listPiProviders() });
 }
 
 function extractToolResultText(content: any): string {
@@ -111,6 +168,14 @@ function extractToolResultText(content: any): string {
 
 function truncate(text: string, max = 400): string {
   return text.length > max ? text.slice(0, max) + "…" : text;
+}
+
+// human-readable token 数，跟客户端 agent-runner.ts 的 fmtTokens 保持一致：不展示价格
+// （单价不确定，展示金额容易误导），这段文本会直接存进 transcript_json，历史记录里也不该带 $
+function fmtTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M tokens`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}k tokens`;
+  return `${n} tokens`;
 }
 
 async function streamAgentRun(
@@ -151,6 +216,55 @@ async function streamAgentRun(
   }
 }
 
+async function streamPiAgentRun(
+  proc: Bun.Subprocess<"ignore", "pipe", "pipe">,
+  ctx: { runId: string; docPath: string; sessionId: string; initialPrompt: string }
+) {
+  const { runId, docPath, initialPrompt } = ctx;
+  let finalized = false;
+  const transcript: AgentTranscriptMsg[] = [{ kind: "user", text: initialPrompt, timestamp: Date.now() }];
+
+  const onFinish = (result: { status: "success" | "error"; usage: AgentRunUsage; error?: string }) => {
+    finalized = true;
+    finishAgentRun(runId, { ...result, transcript });
+    markAgentIdle(docPath);
+    broadcastEvent({ type: "agent-run-status", runId, docPath, status: result.status, usage: result.usage });
+  };
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    for await (const chunk of proc.stdout as any as AsyncIterable<Uint8Array>) {
+      buffer += decoder.decode(chunk, { stream: true });
+      let idx: number;
+      while ((idx = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, idx).trim();
+        buffer = buffer.slice(idx + 1);
+        if (!line) continue;
+        // onProgress 把 pi 的事件归一化成 claude 那套 assistant/user 形状再广播，
+        // 前端 handleAgentProgressEvent 不用认识 pi 的格式就能实时展示，不用改客户端代码
+        handlePiEventLine(line, transcript, onFinish, (evt) => {
+          broadcastEvent({ type: "agent-progress", runId, docPath, event: evt });
+        });
+      }
+    }
+  } catch (error: any) {
+    log(`⚠️ pi run ${runId} stdout 读取失败: ${error?.message || error}`);
+  }
+
+  const exitCode = await proc.exited;
+
+  if (!finalized) {
+    const stderrText = await new Response(proc.stderr).text().catch(() => "");
+    const status = exitCode === 0 ? "success" : "error";
+    const error = exitCode === 0 ? undefined : (stderrText || `退出码 ${exitCode}`);
+    if (error) transcript.push({ kind: "error", text: error, timestamp: Date.now() });
+    finishAgentRun(runId, { status, error, transcript });
+    markAgentIdle(docPath);
+    broadcastEvent({ type: "agent-run-status", runId, docPath, status });
+  }
+}
+
 /** 处理一行 stream-json 事件，累积到 transcript；返回 true 表示这行已经把这次运行标记为结束（result 事件）。 */
 function handleAgentEventLine(line: string, runId: string, docPath: string, sessionId: string, transcript: AgentTranscriptMsg[]): boolean {
   let event: any;
@@ -166,7 +280,9 @@ function handleAgentEventLine(line: string, runId: string, docPath: string, sess
   if (event?.type === "assistant") {
     const model = event.message?.model;
     for (const block of event.message?.content ?? []) {
-      if (block.type === "text" && block.text) {
+      if (block.type === "thinking" && block.thinking) {
+        transcript.push({ kind: "thinking", text: block.thinking, timestamp: now, model });
+      } else if (block.type === "text" && block.text) {
         transcript.push({ kind: "text", text: block.text, timestamp: now, model });
       } else if (block.type === "tool_use") {
         const inputSummary = block.input ? truncate(JSON.stringify(block.input), 150) : "";
@@ -193,8 +309,9 @@ function handleAgentEventLine(line: string, runId: string, docPath: string, sess
     model: Object.keys(event.modelUsage || {})[0],
   };
   const status = event.is_error ? "error" : "success";
+  const tokens = (usage.inputTokens || 0) + (usage.outputTokens || 0);
   if (event.is_error) transcript.push({ kind: "error", text: String(event.result ?? ""), timestamp: now });
-  else transcript.push({ kind: "result", text: `✓ 完成 · $${(event.total_cost_usd ?? 0).toFixed(3)}`, timestamp: now });
+  else transcript.push({ kind: "result", text: `✓ 完成${tokens ? " · " + fmtTokens(tokens) : ""}`, timestamp: now });
   finishAgentRun(runId, { status, usage, error: event.is_error ? String(event.result ?? "") : undefined, transcript });
   markAgentIdle(docPath);
   broadcastEvent({ type: "agent-run-status", runId, docPath, status, usage });

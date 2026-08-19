@@ -16,7 +16,7 @@ export interface AgentRunUsage {
 }
 
 export interface AgentTranscriptMsg {
-  kind: 'user' | 'text' | 'tool' | 'tool-result' | 'error' | 'result';
+  kind: 'user' | 'text' | 'tool' | 'tool-result' | 'error' | 'result' | 'thinking';
   text: string;
   timestamp: number;
   model?: string;
@@ -44,6 +44,13 @@ export interface AgentSession {
   updatedAt: number;
 }
 
+export interface AgentSessionSummary {
+  sessionId: string;
+  docPaths: string[];
+  updatedAt: number;
+  firstPrompt: string | null;
+}
+
 export interface AgentUsageSummary {
   workspacePath: string | null;
   runCount: number;
@@ -63,12 +70,12 @@ export interface AgentBackendStatus {
 
 export async function startAgentRun(
   path: string,
-  opts?: { backend?: string; model?: string; prompt?: string }
+  opts?: { backend?: string; provider?: string; model?: string; prompt?: string; thinking?: string }
 ): Promise<{ runId: string; sessionId: string; resumed: boolean; command: string[]; backend?: string | null }> {
   const response = await fetch('/api/agent/run', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path, backend: opts?.backend, model: opts?.model, prompt: opts?.prompt }),
+    body: JSON.stringify({ path, backend: opts?.backend, provider: opts?.provider, model: opts?.model, prompt: opts?.prompt, thinking: opts?.thinking }),
   });
   return readJsonOrThrow(response);
 }
@@ -95,7 +102,7 @@ export async function fetchAgentSession(path: string): Promise<AgentSession | nu
   return data?.session ?? null;
 }
 
-export async function fetchWorkspaceAgentSessions(workspace: string): Promise<AgentSession[]> {
+export async function fetchWorkspaceAgentSessions(workspace: string): Promise<AgentSessionSummary[]> {
   const response = await fetch(`/api/agent/sessions?workspace=${encodeURIComponent(workspace)}`);
   const data = await readJsonOrThrow(response);
   return Array.isArray(data?.sessions) ? data.sessions : [];
@@ -148,4 +155,25 @@ export async function fetchAgentBackends(): Promise<AgentBackendStatus[]> {
   const response = await fetch('/api/agent/backends');
   const data = await readJsonOrThrow(response);
   return Array.isArray(data?.backends) ? data.backends : [];
+}
+
+export interface PiModel {
+  id: string;
+  name: string;
+  contextWindow: number;
+  maxTokens: number;
+  reasoning: boolean;
+  thinkingLevels: string[];
+}
+
+export async function fetchPiModels(provider: string): Promise<PiModel[]> {
+  const response = await fetch(`/api/agent/pi-models?provider=${encodeURIComponent(provider)}`);
+  const data = await readJsonOrThrow(response);
+  return Array.isArray(data?.models) ? data.models : [];
+}
+
+export async function fetchPiProviders(): Promise<string[]> {
+  const response = await fetch('/api/agent/pi-providers');
+  const data = await readJsonOrThrow(response);
+  return Array.isArray(data?.providers) ? data.providers : [];
 }

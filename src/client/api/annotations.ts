@@ -74,6 +74,19 @@ export async function updateAnnotationStatusRemote(
   return data.annotation as Annotation;
 }
 
+export async function resolveAllAnnotationsRemote(path: string): Promise<Annotation[]> {
+  const response = await fetch('/api/annotations/resolve-all', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path }),
+  });
+  const data = await readJsonOrThrow(response);
+  if (data?.success !== true) {
+    throw new Error(data?.error || '批量解决评论失败');
+  }
+  return (data.updated ?? []) as Annotation[];
+}
+
 export interface AnnotationSummary {
   count: number;
   unanchoredCount: number;

@@ -96,7 +96,7 @@ export function pruneDeadFeatureStorageKeys(): void {
 // pdf-zoom/pdf-scroll 是按文件路径单独存一条 key 的，在 removeFile()/cleanupOldFiles()
 // 补上清理钩子之前，关闭过的 PDF 会一直留着这两条 key。这里做一次性回收：会话恢复后，
 // 把不在当前 sessionPaths 里的 pdf-zoom/pdf-scroll key 全部清掉，处理历史遗留的部分。
-const PER_FILE_STORAGE_PREFIXES = ['md-viewer:pdf-zoom:', 'md-viewer:pdf-scroll:'];
+const PER_FILE_STORAGE_PREFIXES = ['md-viewer:pdf-zoom:', 'md-viewer:pdf-scroll:', 'md-viewer:agent-tray:'];
 
 export function pruneStalePerFileStorage(sessionPaths: Iterable<string>): void {
   const keep = new Set(sessionPaths);

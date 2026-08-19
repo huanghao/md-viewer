@@ -9,6 +9,7 @@ import {
   listAnnotations,
   listQuickComments,
   replaceQuickComments,
+  resolveAllOpenAnnotations,
   updateAnnotationStatus,
   upsertAnnotation,
 } from "../annotation-storage.ts";
@@ -117,6 +118,19 @@ export async function handleUpdateAnnotationStatus(c: Context) {
     return c.json({ success: true, annotation: result.updated });
   } catch (error: any) {
     return c.json({ error: error?.message || "更新评论状态失败" }, 500);
+  }
+}
+
+export async function handleResolveAllAnnotations(c: Context) {
+  try {
+    const body = await c.req.json();
+    const path = String(body?.path || "");
+    if (!path) return c.json({ error: "缺少 path 参数" }, 400);
+
+    const result = resolveAllOpenAnnotations(path);
+    return c.json({ success: true, updated: result.updated });
+  } catch (error: any) {
+    return c.json({ error: error?.message || "批量解决评论失败" }, 500);
   }
 }
 

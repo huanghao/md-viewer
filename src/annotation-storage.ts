@@ -546,6 +546,24 @@ export function updateAnnotationStatus(
   return { ok: true, updated: updatedRow ? mapRowToAnnotation(updatedRow) : undefined };
 }
 
+/** 一次性把某文档下所有未解决（anchored/unanchored）评论标记为已解决，供侧边栏"全部解决"用 */
+export function resolveAllOpenAnnotations(docPath: string): { ok: boolean; updated: StoredAnnotation[] } {
+  const path = normalizeDocPath(docPath);
+  if (!path) return { ok: false, updated: [] };
+  const openRows = getDb()
+    .query(`SELECT id FROM annotations WHERE doc_path = ? AND status != 'resolved'`)
+    .all(path) as Array<{ id: string }>;
+  if (openRows.length === 0) return { ok: true, updated: [] };
+  getDb()
+    .query(`UPDATE annotations SET status = 'resolved', updated_at = ? WHERE doc_path = ? AND status != 'resolved'`)
+    .run(Date.now(), path);
+  const updated = openRows
+    .map((row) => getAnnotationRowById(String(row.id)))
+    .filter((row): row is NonNullable<typeof row> => !!row)
+    .map(mapRowToAnnotation);
+  return { ok: true, updated };
+}
+
 export interface ResolvedAnnotationEntry extends StoredAnnotation {
   docPath: string;
   updatedAt: number;

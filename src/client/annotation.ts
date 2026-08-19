@@ -251,6 +251,7 @@ export function showQuickAdd(x: number, y: number, pendingData: Omit<Annotation,
   renderQuickPromptBtns();
   const el = getElements();
   if (!el.quickAddWrap) return;
+  document.getElementById('quickAddTray')?.classList.toggle('hidden', _currentAnnotationTab !== 'agent');
   // 新划词时关闭旧的 composer（明确的焦点转移）
   if (el.composer && !el.composer.classList.contains('hidden')) {
     hideComposer();

@@ -6,6 +6,9 @@ import './vendor-github-markdown.css';
 import './vendor-highlight-github.css';
 import './styles.css';
 
+// 本地 otel 接入，需在其它模块发起 fetch 之前注册好 instrumentation
+import './otel';
+
 export { applyTheme, renderAll, scrollContentToTop } from './app-actions';
 export { pdfViewerRegistry, currentPdfBridgeRef, PDF_IDLE_TIMEOUT_MS, PDF_MODE_KEY } from './pdf-registry';
 export {

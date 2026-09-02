@@ -17,10 +17,19 @@
   },
   "dependencies": {
     "@earendil-works/pi-ai": "^0.84.2",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.222.0",
+    "@opentelemetry/resources": "^2.11.0",
+    "@opentelemetry/sdk-trace-base": "^2.11.0",
+    "@opentelemetry/sdk-trace-node": "^2.11.0",
+    "@opentelemetry/semantic-conventions": "^1.43.0",
     "chokidar": "^5.0.0",
     "hono": "^3.12.8"
   },
   "devDependencies": {
+    "@opentelemetry/instrumentation": "^0.222.0",
+    "@opentelemetry/instrumentation-fetch": "^0.222.0",
+    "@opentelemetry/sdk-trace-web": "^2.11.0",
     "@types/bun": "latest",
     "esbuild": "^0.27.3",
     "happy-dom": "14",

@@ -4,6 +4,8 @@
  * 简单的 HTTP 服务，提供 Markdown 文件浏览功能
  */
 
+import "./otel.ts"; // 必须最先加载，注册 tracer provider 后其它模块的埋点才拿得到 tracer
+
 import { Hono } from "hono";
 import { log } from "./utils.ts";
 import { broadcastEvent } from "./sse.ts";
@@ -11,10 +13,12 @@ import { bootstrapWorkspaceIndexes } from "./handlers/workspace-handlers.ts";
 import { pruneScanMetrics } from "./scan-metrics-storage.ts";
 import { pruneOrphanedAgentSessions, resetStuckRunningAgentSessions } from "./agent-storage.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
+import { otelMiddleware } from "./otel-middleware.ts";
 import { registerAgentRoutes } from "./routes/agent.ts";
 import { registerAnnotationRoutes } from "./routes/annotations.ts";
 import { registerFileRoutes } from "./routes/files.ts";
 import { registerFocusRoutes } from "./routes/focus.ts";
+import { registerOtelRoutes } from "./routes/otel.ts";
 import { registerSessionRoutes } from "./routes/session.ts";
 import { registerSnapshotRoutes } from "./routes/snapshots.ts";
 import { registerStaticRoutes } from "./routes/static.ts";
@@ -29,7 +33,10 @@ const config = loadConfig();
 
 const app = new Hono();
 
+app.use("*", otelMiddleware);
+
 registerStaticRoutes(app);
+registerOtelRoutes(app);
 registerFileRoutes(app);
 registerSessionRoutes(app);
 registerWorkspaceRoutes(app);

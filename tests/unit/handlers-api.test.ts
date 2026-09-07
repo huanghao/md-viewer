@@ -61,8 +61,8 @@ let oldConfigHome: string | undefined;
 beforeEach(() => {
   tempRoot = mkdtempSync(join(tmpdir(), 'mdv-handlers-'));
   tempConfigHome = mkdtempSync(join(tmpdir(), 'mdv-handlers-config-'));
-  oldConfigHome = process.env.XDG_CONFIG_HOME;
-  process.env.XDG_CONFIG_HOME = tempConfigHome;
+  oldConfigHome = process.env.MDV_DATA_DIR;
+  process.env.MDV_DATA_DIR = tempConfigHome;
   resetDbForTesting();
   resetWorkspaceStorageForTesting();
   scanCache.clear();
@@ -74,9 +74,9 @@ afterEach(async () => {
   resetWorkspaceStorageForTesting();
   scanCache.clear();
   if (oldConfigHome === undefined) {
-    delete process.env.XDG_CONFIG_HOME;
+    delete process.env.MDV_DATA_DIR;
   } else {
-    process.env.XDG_CONFIG_HOME = oldConfigHome;
+    process.env.MDV_DATA_DIR = oldConfigHome;
   }
   rmSync(tempRoot, { recursive: true, force: true });
   rmSync(tempConfigHome, { recursive: true, force: true });

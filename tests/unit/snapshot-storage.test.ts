@@ -13,16 +13,16 @@ let tempDataHome = '';
 let oldDataHome: string | undefined;
 
 beforeAll(() => {
-  oldDataHome = process.env.XDG_DATA_HOME;
+  oldDataHome = process.env.MDV_DATA_DIR;
   tempDataHome = mkdtempSync(join(tmpdir(), 'mdv-snap-test-'));
-  process.env.XDG_DATA_HOME = tempDataHome;
+  process.env.MDV_DATA_DIR = tempDataHome;
 });
 
 afterAll(() => {
   if (oldDataHome === undefined) {
-    delete process.env.XDG_DATA_HOME;
+    delete process.env.MDV_DATA_DIR;
   } else {
-    process.env.XDG_DATA_HOME = oldDataHome;
+    process.env.MDV_DATA_DIR = oldDataHome;
   }
   rmSync(tempDataHome, { recursive: true, force: true });
 });

@@ -47,9 +47,13 @@ export function getConfigDir(): string {
   return join(configHome, "md-viewer");
 }
 
+/**
+ * 持久化数据目录（annotation 数据库、快照等丢了会心疼的数据）。
+ * 按本机 nanny 约定统一放 ~/workspace/my-store/md-viewer-data/，不放仓库或 XDG 缓存目录。
+ * MDV_DATA_DIR 仅用于测试注入覆盖。
+ */
 export function getDataDir(): string {
-  const dataHome = process.env.XDG_DATA_HOME || join(homedir(), ".local", "share");
-  return join(dataHome, "md-viewer");
+  return process.env.MDV_DATA_DIR || join(homedir(), "workspace", "my-store", "md-viewer-data");
 }
 
 export function getConfigPath(): string {

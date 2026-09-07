@@ -25,9 +25,9 @@ let wsB = '';   // /tmp/.../ws-b  (has .git)
 let tempRoot = '';
 
 beforeAll(() => {
-  oldConfigHome = process.env.XDG_CONFIG_HOME;
+  oldConfigHome = process.env.MDV_DATA_DIR;
   tempConfigHome = mkdtempSync(join(tmpdir(), 'mdv-filter-db-'));
-  process.env.XDG_CONFIG_HOME = tempConfigHome;
+  process.env.MDV_DATA_DIR = tempConfigHome;
   resetDbForTesting();
 
   // Create fake workspaces with .git markers
@@ -51,8 +51,8 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  if (oldConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;
-  else process.env.XDG_CONFIG_HOME = oldConfigHome;
+  if (oldConfigHome === undefined) delete process.env.MDV_DATA_DIR;
+  else process.env.MDV_DATA_DIR = oldConfigHome;
   resetDbForTesting();
   rmSync(tempConfigHome, { recursive: true, force: true });
   rmSync(tempRoot, { recursive: true, force: true });

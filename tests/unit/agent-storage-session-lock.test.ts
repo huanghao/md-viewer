@@ -15,15 +15,15 @@ import {
 import { resetDbForTesting } from "../../src/annotation-db";
 
 // 跟 tests/unit/annotation-storage.test.ts 用同一套隔离手法：agent_sessions/agent_runs
-// 跟 annotations 共用一个 sqlite 文件（annotation-db.ts 的 getDb()），走 XDG_CONFIG_HOME
+// 跟 annotations 共用一个 sqlite 文件（annotation-db.ts 的 getDb()），走 MDV_DATA_DIR
 // 换目录 + resetDbForTesting() 隔离，不是给 pi-models.ts 那种要显式传路径的场景。
 let tempConfigHome = "";
 let oldConfigHome: string | undefined;
 
 beforeAll(() => {
-  oldConfigHome = process.env.XDG_CONFIG_HOME;
+  oldConfigHome = process.env.MDV_DATA_DIR;
   tempConfigHome = mkdtempSync(join(tmpdir(), "mdv-agent-storage-"));
-  process.env.XDG_CONFIG_HOME = tempConfigHome;
+  process.env.MDV_DATA_DIR = tempConfigHome;
   resetDbForTesting();
 });
 
@@ -32,8 +32,8 @@ afterEach(() => {
 });
 
 afterAll(() => {
-  if (oldConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;
-  else process.env.XDG_CONFIG_HOME = oldConfigHome;
+  if (oldConfigHome === undefined) delete process.env.MDV_DATA_DIR;
+  else process.env.MDV_DATA_DIR = oldConfigHome;
   if (tempConfigHome) rmSync(tempConfigHome, { recursive: true, force: true });
 });
 

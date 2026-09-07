@@ -7,7 +7,7 @@ import { ensureAgentSessionId, getAgentRuns, getAgentSession, insertAgentRun, tr
 import { resetDbForTesting } from "../../src/annotation-db";
 import type { AgentTranscriptMsg } from "../../src/agent-storage";
 
-// 跟 tests/unit/agent-storage-session-lock.test.ts 同一套隔离：XDG_CONFIG_HOME 换临时目录 +
+// 跟 tests/unit/agent-storage-session-lock.test.ts 同一套隔离：MDV_DATA_DIR 换临时目录 +
 // resetDbForTesting()。handleAgentEventLine 内部会真的调 finishAgentRun/markAgentIdle 写库，
 // 所以每个用例先走一遍 ensureAgentSessionId + tryMarkAgentRunning + insertAgentRun，
 // 模拟 streamAgentRun 真实调用前的状态，而不是孤立地只测事件解析。
@@ -15,9 +15,9 @@ let tempConfigHome = "";
 let oldConfigHome: string | undefined;
 
 beforeAll(() => {
-  oldConfigHome = process.env.XDG_CONFIG_HOME;
+  oldConfigHome = process.env.MDV_DATA_DIR;
   tempConfigHome = mkdtempSync(join(tmpdir(), "mdv-agent-event-"));
-  process.env.XDG_CONFIG_HOME = tempConfigHome;
+  process.env.MDV_DATA_DIR = tempConfigHome;
   resetDbForTesting();
 });
 
@@ -26,8 +26,8 @@ afterEach(() => {
 });
 
 afterAll(() => {
-  if (oldConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;
-  else process.env.XDG_CONFIG_HOME = oldConfigHome;
+  if (oldConfigHome === undefined) delete process.env.MDV_DATA_DIR;
+  else process.env.MDV_DATA_DIR = oldConfigHome;
   if (tempConfigHome) rmSync(tempConfigHome, { recursive: true, force: true });
 });
 

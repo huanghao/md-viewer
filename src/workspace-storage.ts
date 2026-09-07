@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync } from "fs";
 import { join } from "path";
-import { getConfigDir } from "./config.ts";
+import { getDataDir } from "./config.ts";
 
 let db: Database | null = null;
 
@@ -14,7 +14,7 @@ export function resetWorkspaceStorageForTesting(): void {
 
 function getDb(): Database {
   if (db) return db;
-  const dir = getConfigDir();
+  const dir = getDataDir();
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   db = new Database(join(dir, "annotations.db"));
   db.exec("PRAGMA journal_mode=WAL;");

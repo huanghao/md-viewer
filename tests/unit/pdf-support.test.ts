@@ -35,15 +35,15 @@ let tempDir: string;
 let oldConfigHome: string | undefined;
 
 beforeAll(() => {
-  oldConfigHome = process.env.XDG_CONFIG_HOME;
+  oldConfigHome = process.env.MDV_DATA_DIR;
   tempDir = mkdtempSync(join(tmpdir(), 'mdv-pdf-test-'));
-  process.env.XDG_CONFIG_HOME = tempDir;
+  process.env.MDV_DATA_DIR = tempDir;
   resetDbForTesting();
 });
 
 afterAll(() => {
   resetDbForTesting();
-  if (oldConfigHome === undefined) { delete process.env.XDG_CONFIG_HOME; } else { process.env.XDG_CONFIG_HOME = oldConfigHome; }
+  if (oldConfigHome === undefined) { delete process.env.MDV_DATA_DIR; } else { process.env.MDV_DATA_DIR = oldConfigHome; }
   rmSync(tempDir, { recursive: true, force: true });
 });
 

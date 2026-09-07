@@ -15,26 +15,26 @@ import {
 } from '../../src/annotation-storage';
 
 let tempRoot = '';
-let tempConfigHome = '';
-let oldConfigHome: string | undefined;
+let tempDataHome = '';
+let oldDataDir: string | undefined;
 
 beforeEach(() => {
   tempRoot = mkdtempSync(join(tmpdir(), 'mdv-ann-maint-'));
-  tempConfigHome = mkdtempSync(join(tmpdir(), 'mdv-ann-maint-config-'));
-  oldConfigHome = process.env.XDG_CONFIG_HOME;
-  process.env.XDG_CONFIG_HOME = tempConfigHome;
+  tempDataHome = mkdtempSync(join(tmpdir(), 'mdv-ann-maint-data-'));
+  oldDataDir = process.env.MDV_DATA_DIR;
+  process.env.MDV_DATA_DIR = tempDataHome;
   resetDbForTesting();
 });
 
 afterEach(() => {
   resetDbForTesting();
-  if (oldConfigHome === undefined) {
-    delete process.env.XDG_CONFIG_HOME;
+  if (oldDataDir === undefined) {
+    delete process.env.MDV_DATA_DIR;
   } else {
-    process.env.XDG_CONFIG_HOME = oldConfigHome;
+    process.env.MDV_DATA_DIR = oldDataDir;
   }
   rmSync(tempRoot, { recursive: true, force: true });
-  rmSync(tempConfigHome, { recursive: true, force: true });
+  rmSync(tempDataHome, { recursive: true, force: true });
 });
 
 function annotation(id: string, status: 'anchored' | 'unanchored' | 'resolved' = 'anchored') {
@@ -106,9 +106,8 @@ describe('annotation-storage maintenance', () => {
   });
 
   it('getDb migrates older annotation tables by adding missing columns', () => {
-    const configDir = join(tempConfigHome, 'md-viewer');
-    mkdirSync(configDir, { recursive: true });
-    const dbPath = join(configDir, 'annotations.db');
+    mkdirSync(tempDataHome, { recursive: true });
+    const dbPath = join(tempDataHome, 'annotations.db');
     const oldDb = new Database(dbPath);
     oldDb.exec(`
       CREATE TABLE annotations (

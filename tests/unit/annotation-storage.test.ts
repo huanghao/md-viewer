@@ -17,9 +17,9 @@ let tempConfigHome = '';
 let oldConfigHome: string | undefined;
 
 beforeAll(() => {
-  oldConfigHome = process.env.XDG_CONFIG_HOME;
+  oldConfigHome = process.env.MDV_DATA_DIR;
   tempConfigHome = mkdtempSync(join(tmpdir(), 'mdv-ann-db-'));
-  process.env.XDG_CONFIG_HOME = tempConfigHome;
+  process.env.MDV_DATA_DIR = tempConfigHome;
   resetDbForTesting();
 
   replaceAnnotations('/tmp/a.md', [
@@ -35,9 +35,9 @@ beforeAll(() => {
 afterAll(() => {
   resetDbForTesting();
   if (oldConfigHome === undefined) {
-    delete process.env.XDG_CONFIG_HOME;
+    delete process.env.MDV_DATA_DIR;
   } else {
-    process.env.XDG_CONFIG_HOME = oldConfigHome;
+    process.env.MDV_DATA_DIR = oldConfigHome;
   }
   if (tempConfigHome) {
     rmSync(tempConfigHome, { recursive: true, force: true });

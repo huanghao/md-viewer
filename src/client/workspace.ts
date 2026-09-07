@@ -138,6 +138,7 @@ export function removeWorkspace(id: string): void {
 
   // 清除文件树缓存
   state.fileTree.delete(id);
+  deleteFileTreeCache(id);
   removeWorkspaceTracking(id);
   removeWorkspaceExpandedState(id);
 
@@ -246,6 +247,15 @@ function saveFileTreeCache(workspaceId: string, tree: FileTreeNode): void {
   try {
     const all = storageGet<Record<string, FileTreeNode>>(FILE_TREE_CACHE_KEY, {});
     all[workspaceId] = tree;
+    storageSet(FILE_TREE_CACHE_KEY, all);
+  } catch { /* 超配额时静默忽略 */ }
+}
+
+function deleteFileTreeCache(workspaceId: string): void {
+  try {
+    const all = storageGet<Record<string, FileTreeNode>>(FILE_TREE_CACHE_KEY, {});
+    if (!(workspaceId in all)) return;
+    delete all[workspaceId];
     storageSet(FILE_TREE_CACHE_KEY, all);
   } catch { /* 超配额时静默忽略 */ }
 }

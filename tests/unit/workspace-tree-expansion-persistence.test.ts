@@ -83,6 +83,25 @@ describe("workspace tree expansion persistence", () => {
     expect(getWorkspaceExpandedState(wsId)).toBeUndefined();
   });
 
+  test("remove workspace also clears its cached file tree entry", () => {
+    const wsId = "ws-tree-cache-remove";
+    localStorage.setItem("md-viewer:fileTreeCache", JSON.stringify({
+      [wsId]: { name: "repo", path: "/repo", type: "directory", children: [] },
+      "ws-other": { name: "other", path: "/other", type: "directory", children: [] },
+    }));
+
+    state.config.workspaces = [
+      { id: wsId, name: "repo", path: "/repo", isExpanded: true },
+    ];
+    state.currentWorkspace = wsId;
+
+    removeWorkspace(wsId);
+
+    const cache = JSON.parse(localStorage.getItem("md-viewer:fileTreeCache") ?? "{}");
+    expect(cache[wsId]).toBeUndefined();
+    expect(cache["ws-other"]).toBeDefined();
+  });
+
   test("hydrate registers all configured workspaces with the server", async () => {
     state.config.workspaces = [
       { id: "ws-collapsed", name: "repo-a", path: "/repo-a", isExpanded: false },

@@ -16,6 +16,8 @@ const SHORTCUTS = [
   { key: `${mod}+`, desc: '放大' },
   { key: `${mod}−`, desc: '缩小' },
   { key: `${mod}0`, desc: '重置缩放' },
+  { group: '批注' },
+  { key: `${mod}E`, desc: '选中文本后写评论' },
   { group: 'Diff 模式' },
   { key: 'j', desc: '下一个变更块' },
   { key: 'k', desc: '上一个变更块' },

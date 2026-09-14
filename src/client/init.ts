@@ -387,6 +387,16 @@ import {
   });
 
   registerAction({
+    id: 'open-annotation-composer',
+    label: '选中文本后写评论',
+    category: 'view',
+    defaultKey: `${modKey}+e`,
+    context: '选中文本后',
+    handler: () => openComposerFromPending(),
+    shouldActivate: () => !!state.pendingAnnotation && !isInputFocused(),
+  });
+
+  registerAction({
     id: 'close-file',
     label: '关闭当前文件',
     category: 'file',

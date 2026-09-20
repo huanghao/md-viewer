@@ -7,24 +7,11 @@ description: Use when the user asks to read, handle, review, or apply mdv commen
 
 Use `mdv` to read and resolve annotations attached to local Markdown files. Handle comments directly instead of only summarizing them to the user.
 
-## Select The File
-
-- Use the path supplied by the user when present.
-- Otherwise use the most recently created or edited local Markdown file in the conversation.
-- If the target is still unclear, run `mdv comments list`, which shows files with open comments.
-- When several files are relevant, handle the most relevant one or two and report which files changed.
-
-```bash
-mdv comments list
-mdv comments get --file <file.md>
-```
-
-Comments contain a sequence number, quoted source text, and reviewer text.
-
 ## Link This Session (Claude Code only)
 
-The md-viewer app's Agent tab resumes its CLI session per document, so whatever this
-session discussed about the doc is available to future runs — but only if this
+This is the point of using mdv from inside a session rather than just reading comment
+text: the md-viewer app's Agent tab resumes its CLI session per document, so whatever
+this session discussed about the doc is available to future runs — but only if this
 session is the one linked to it. Link it for every file this invocation touches,
 before editing, so later Agent-tab runs (or a future `/mdv`) resume from here and
 see this conversation, not just the raw comment text:
@@ -44,17 +31,30 @@ fi
 Best-effort: skip silently under Codex (no `$CLAUDE_CODE_SESSION_ID`) or if the
 server isn't running. Don't let this block comment processing.
 
+## Select The File
+
+- Use the path supplied by the user when present.
+- Otherwise use the most recently created or edited local Markdown file in the conversation.
+- If the target is still unclear, run `mdv comments list`, which shows files with open comments.
+- When several files are relevant, handle the most relevant one or two and report which files changed.
+
+```bash
+mdv comments list
+mdv comments get --file <file.md>
+```
+
+Comments contain a sequence number, quoted source text, and reviewer text.
+
 ## Apply Comments
 
-Apply every actionable comment without waiting for confirmation:
+Apply every actionable comment without waiting for confirmation: edit the document directly, don't just summarize the comment back to the user.
 
-- Rewrite unclear wording so a first-time reader understands it from the start.
-- Add missing content in the section where it naturally belongs.
-- Integrate explanations into normal prose instead of preserving a question-and-answer trace.
 - Verify current or external claims before editing.
 - Fix broken Markdown or LaTeX when a comment identifies a rendering problem.
+- Integrate the fix into normal prose where it belongs, not as a Q&A trace appended to the passage — comment-driven edits default to answering each comment in place, which turns the document into a transcript. Rewrite the unclear passage itself; write for a new reader, not only the commenter.
+- After editing, reread from the previous heading through the changed text and confirm the section still reads as one coherent passage.
 
-Write for a new reader, not only for the commenter. Prefer rewriting the unclear passage over appending a detached explanation. After editing, reread from the previous heading through the changed text and confirm the section remains coherent.
+These are defaults against that one failure mode, not a full style guide — where the document's own project conventions (e.g. its CLAUDE.md) say more, follow those instead.
 
 ## Reply To Comments
 

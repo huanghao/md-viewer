@@ -1,10 +1,15 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import {
   ensureAgentSessionId,
   getAgentSession,
+  getEffectiveAgentSession,
+  getWorkspaceSessionId,
+  listAgentSessionsForWorkspace,
+  resetWorkspaceAgentSession,
+  setWorkspaceAgentSession,
   insertAgentRun,
   markAgentIdle,
   resetAgentSessionId,
@@ -125,5 +130,57 @@ describe("resetStuckRunningAgentSessions", () => {
     expect(resetStuckRunningAgentSessions()).toBe(0);
     // 文档本身的运行中标记不受影响（这个函数只认 agent_runs.status，不是 agent_sessions.running）
     expect(getAgentSession("/tmp/h.md")?.running).toBe(true);
+  });
+});
+
+describe("workspace 级默认 session", () => {
+  // 测试共用同一个 sqlite 文件（resetDbForTesting 只重开连接不清数据），每个用例用独立 workspace 防串扰
+  let n = 0;
+  let ws = "";
+  beforeEach(() => { ws = `/tmp/ws-case-${++n}`; });
+
+  it("同一 workspace 下的文档共享同一个 session", () => {
+    const a = ensureAgentSessionId(`${ws}/a.md`, undefined, ws);
+    const b = ensureAgentSessionId(`${ws}/b.md`, undefined, ws);
+    expect(a).toBe(b);
+    expect(getWorkspaceSessionId(ws)).toBe(a);
+  });
+
+  it("没有 workspace 默认时，沿用该 workspace 下最近用过的文档 session", () => {
+    ensureAgentSessionId(`${ws}/old.md`, "legacy-1");
+    ensureAgentSessionId(`${ws}/new.md`, "legacy-2");
+    expect(ensureAgentSessionId(`${ws}/c.md`, undefined, ws)).toBe("legacy-2");
+  });
+
+  it("新建会话后整个 workspace 切到新 session，也可以手动切回旧的", () => {
+    const old = ensureAgentSessionId(`${ws}/a.md`, undefined, ws);
+    const fresh = resetWorkspaceAgentSession(ws)!;
+    expect(fresh).not.toBe(old);
+    expect(ensureAgentSessionId(`${ws}/b.md`, undefined, ws)).toBe(fresh);
+    expect(getEffectiveAgentSession(`${ws}/a.md`, ws)?.sessionId).toBe(fresh);
+    expect(setWorkspaceAgentSession(ws, old)).toBe(true);
+    expect(ensureAgentSessionId(`${ws}/a.md`, undefined, ws)).toBe(old);
+  });
+
+  it("不同 workspace 互不影响", () => {
+    const a = ensureAgentSessionId(`${ws}/a.md`, undefined, ws);
+    const other = ensureAgentSessionId(`${ws}-b/a.md`, undefined, `${ws}-b`);
+    expect(other).not.toBe(a);
+  });
+
+  it("同 session 下一个文档在跑时，另一个文档不能并发运行，也不能切换会话", () => {
+    ensureAgentSessionId(`${ws}/a.md`, undefined, ws);
+    ensureAgentSessionId(`${ws}/b.md`, undefined, ws);
+    expect(tryMarkAgentRunning(`${ws}/a.md`, "run-1")).toBe(true);
+    expect(tryMarkAgentRunning(`${ws}/b.md`, "run-2")).toBe(false);
+    expect(getEffectiveAgentSession(`${ws}/b.md`, ws)?.running).toBe(true);
+    expect(resetWorkspaceAgentSession(ws)).toBeNull();
+    markAgentIdle(`${ws}/a.md`);
+    expect(tryMarkAgentRunning(`${ws}/b.md`, "run-3")).toBe(true);
+  });
+
+  it("刚新建、还没跑过的当前 session 也会出现在列表里", () => {
+    const fresh = resetWorkspaceAgentSession(ws)!;
+    expect(listAgentSessionsForWorkspace(ws).map((s) => s.sessionId)).toContain(fresh);
   });
 });

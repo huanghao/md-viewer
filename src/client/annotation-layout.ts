@@ -69,6 +69,8 @@ function queryAnnotationElements() {
     agentChatMessages: document.getElementById('agentChatMessages'),
     agentChatInput: document.getElementById('agentChatInput') as HTMLTextAreaElement | null,
     agentChatSendBtn: document.getElementById('agentChatSendBtn') as HTMLButtonElement | null,
+    agentChatChips: document.getElementById('agentChatChips') as HTMLElement | null,
+    agentMdvBtn: document.getElementById('agentMdvBtn') as HTMLButtonElement | null,
     agentChatStatus: document.getElementById('agentChatStatus'),
     closeToggle: document.getElementById('annotationSidebarClose'),
     floatingOpenBtn: document.getElementById('annotationFloatingOpenBtn'),

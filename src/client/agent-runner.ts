@@ -42,6 +42,56 @@ function guessWorkspaceForPath(path: string): string | null {
   return candidates.sort((a, b) => b.length - a.length)[0];
 }
 
+// 输入框上方的 /mdv 命令 chip：点 /mdv 按钮后出现 [/mdv] [文档相对路径]，发送时拼成
+// `/mdv <path> <更多文本>`（mdv skill 本来就认这个形状）。路径 chip 可以单独删掉，
+// 然后在文本里自己写别的文件名或绝对路径；命令 chip 删掉则退回普通消息。
+let mdvChipOn = false;
+let mdvPathChipOn = false;
+
+// 相对 workspace 根（agent 的 cwd 就是它）；不在任何 workspace 里时 cwd 是文档所在目录，只剩文件名
+function docRelPath(path: string): string {
+  const ws = guessWorkspaceForPath(path);
+  if (ws) return path.slice(ws.endsWith('/') ? ws.length : ws.length + 1);
+  return path.split('/').pop() || path;
+}
+
+function quoteIfNeeded(text: string): string {
+  return /\s/.test(text) ? `"${text}"` : text;
+}
+
+function renderChatChips(): void {
+  const el = getElements().agentChatChips;
+  const btn = getElements().agentMdvBtn;
+  btn?.classList.toggle('is-active', mdvChipOn);
+  if (!el) return;
+  const file = state.currentFile;
+  if (!mdvChipOn) {
+    el.classList.add('hidden');
+    el.innerHTML = '';
+    return;
+  }
+  const chip = (kind: string, label: string, extra = '') =>
+    `<span class="agent-chat-chip${extra}"><span class="agent-chat-chip-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>` +
+    `<button class="agent-chat-chip-remove" type="button" data-chip="${kind}" aria-label="移除">×</button></span>`;
+  el.innerHTML = chip('mdv', '/mdv', ' is-command') + (mdvPathChipOn && file ? chip('path', docRelPath(file)) : '');
+  el.classList.remove('hidden');
+}
+
+function removeLastChatChip(): boolean {
+  if (mdvPathChipOn) mdvPathChipOn = false;
+  else if (mdvChipOn) mdvChipOn = false;
+  else return false;
+  renderChatChips();
+  return true;
+}
+
+function activateMdvChip(): void {
+  mdvChipOn = true;
+  mdvPathChipOn = true;
+  renderChatChips();
+  getElements().agentChatInput?.focus();
+}
+
 function fmtTime(ts: number): string {
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
@@ -114,7 +164,7 @@ function renderMessages(): void {
   const liveHtml = liveMessages.filter(shouldRenderMsg).map(renderMsgHtml).join('');
 
   if (!historyHtml && !liveHtml) {
-    el.innerHTML = `<div class="agent-chat-empty">还没有对话，在下面输入内容开始，或者留空直接发送 = 处理这个文档的批注。</div>`;
+    el.innerHTML = `<div class="agent-chat-empty">还没有对话，在下面输入内容开始，或点 /mdv 处理这个文档的批注。</div>`;
   } else {
     el.innerHTML = historyHtml + liveHtml;
     renderMath(el);
@@ -391,6 +441,7 @@ export async function onAgentTabActivated(path: string | null): Promise<void> {
 
 async function reloadConversation(path: string): Promise<void> {
   const token = ++loadToken;
+  renderChatChips();
   const el = getElements().agentChatMessages;
   if (el) el.innerHTML = `<div class="agent-chat-empty">加载中…</div>`;
 
@@ -488,11 +539,26 @@ export function initAgentRunner(): void {
     void triggerAgentRun();
   });
 
+  getElements().agentMdvBtn?.addEventListener('click', activateMdvChip);
+  getElements().agentChatChips?.addEventListener('click', (event) => {
+    const btn = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-chip]');
+    if (!btn) return;
+    if (btn.dataset.chip === 'path') mdvPathChipOn = false;
+    else mdvChipOn = mdvPathChipOn = false;
+    renderChatChips();
+    getElements().agentChatInput?.focus();
+  });
+
   getElements().agentChatInput?.addEventListener('input', (e) => {
     autoResizeChatInput(e.currentTarget as HTMLTextAreaElement);
   });
 
   getElements().agentChatInput?.addEventListener('keydown', (e: KeyboardEvent) => {
+    // 输入框为空时 Backspace 像 omnibox 一样先删掉最后一个 chip
+    if (e.key === 'Backspace' && !(e.currentTarget as HTMLTextAreaElement).value && removeLastChatChip()) {
+      e.preventDefault();
+      return;
+    }
     // Enter 换行（textarea 默认行为），⌘/Ctrl+Enter 才发送
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
@@ -574,7 +640,7 @@ async function createNewAgentSession(): Promise<void> {
   try {
     await newAgentSession(path);
     closeAgentMenus();
-    showSuccess('已新建会话');
+    showSuccess('已新建会话，本工程的文档之后都会用它');
     await reloadConversation(path);
   } catch (err: any) {
     showError(err?.message || '操作失败');
@@ -588,7 +654,7 @@ async function linkAgentSessionById(sessionId: string): Promise<void> {
   try {
     await linkAgentSession(path, sessionId);
     closeAgentMenus();
-    showSuccess('已关联，下次运行会共享这个会话的上下文');
+    showSuccess('已切换，本工程的文档之后都会用这个会话');
     await reloadConversation(path);
   } catch (err: any) {
     showError(err?.message || '操作失败');
@@ -617,10 +683,23 @@ async function triggerAgentRun(): Promise<void> {
   // 划词攒进 Agent 托盘的疑问/注释拼进这一轮的 prompt 前面，作为对话上下文，
   // 而不是走批注锚定/回复那一整套持久化流程；发送后托盘清空
   const trayPrefix = buildTrayPromptPrefix(path);
-  const prompt = trayPrefix
-    ? (typedPrompt ? `${trayPrefix}\n\n${typedPrompt}` : trayPrefix)
-    : (typedPrompt || undefined);
-  const displayText = prompt || '处理这个文档的批注';
+  // /mdv 命令必须在 prompt 最前面才会被当成 slash command，所以托盘内容放到命令后面
+  const mdvCommand = mdvChipOn
+    ? ['/mdv', mdvPathChipOn ? quoteIfNeeded(docRelPath(path)) : '', typedPrompt].filter(Boolean).join(' ')
+    : '';
+  const prompt = mdvCommand
+    ? (trayPrefix ? `${mdvCommand}\n\n${trayPrefix}` : mdvCommand)
+    : trayPrefix
+      ? (typedPrompt ? `${trayPrefix}\n\n${typedPrompt}` : trayPrefix)
+      : (typedPrompt || undefined);
+  // 只有选了 /mdv 才允许输入框为空；否则空消息没有意义，不再默认当成"处理批注"
+  if (!prompt) {
+    showError('请输入内容，或点 /mdv 处理批注');
+    return;
+  }
+  mdvChipOn = mdvPathChipOn = false;
+  renderChatChips();
+  const displayText = prompt;
 
   if (input) {
     input.value = '';

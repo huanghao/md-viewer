@@ -76,6 +76,12 @@ export function getDb(): Database {
       run_id     TEXT,
       updated_at INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS agent_workspace_sessions (
+      workspace_path TEXT PRIMARY KEY,
+      session_id     TEXT NOT NULL,
+      updated_at     INTEGER NOT NULL
+    );
   `);
 
   db.exec(`

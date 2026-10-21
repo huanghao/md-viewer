@@ -165,15 +165,17 @@
         </div>
         <div class="agent-chat-stats" id="agentChatStats"></div>
         <div class="agent-chat-messages" id="agentChatMessages">
-          <div class="agent-chat-empty">还没有对话，在下面输入内容开始，或者留空直接发送 = 处理这个文档的批注。</div>
+          <div class="agent-chat-empty">还没有对话，在下面输入内容开始，或点 /mdv 处理这个文档的批注。</div>
         </div>
         <div class="agent-chat-footer">
           <span class="agent-chat-status" id="agentChatStatus"></span>
           <div class="agent-tray hidden" id="agentTray"></div>
           <div class="agent-chat-compose">
             <div class="agent-chat-input-resizer" id="agentChatInputResizer" title="拖拽调整输入框高度"></div>
-            <textarea class="agent-chat-input" id="agentChatInput" rows="4" placeholder="给 Agent 发消息，留空发送 = 处理这个文档的批注（Enter 换行，⌘/Ctrl+Enter 发送）"></textarea>
+            <div class="agent-chat-chips hidden" id="agentChatChips"></div>
+            <textarea class="agent-chat-input" id="agentChatInput" rows="4" placeholder="给 Agent 发消息（Enter 换行，⌘/Ctrl+Enter 发送）"></textarea>
             <div class="agent-chat-compose-actions">
+              <button class="agent-mdv-btn" id="agentMdvBtn" type="button" title="插入 /mdv 命令，并带上当前文档">/mdv</button>
               <div class="agent-model-controls">
                 <select class="agent-chat-select agent-engine-select" id="agentEngineSelect" title="Engine"></select>
                 <select class="agent-chat-select agent-model-select" id="agentModelInput" title="Model"></select>

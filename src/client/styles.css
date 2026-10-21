@@ -3060,6 +3060,47 @@
       padding: 6px 8px;
       line-height: 1.4;
     }
+    .agent-chat-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .agent-chat-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      max-width: 100%;
+      padding: 1px 4px 1px 8px;
+      border: 1px solid var(--color-border);
+      border-radius: 999px;
+      background: var(--color-bg-secondary);
+      color: var(--color-text-primary);
+      font-size: 11px;
+      line-height: 18px;
+    }
+    .agent-chat-chip.is-command { font-family: var(--font-mono, monospace); }
+    .agent-chat-chip-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .agent-chat-chip-remove {
+      border: none;
+      background: transparent;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1;
+      padding: 0 3px;
+    }
+    .agent-chat-chip-remove:hover { color: var(--color-text-primary); }
+    .agent-mdv-btn {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: transparent;
+      color: var(--color-text-muted);
+      font-family: var(--font-mono, monospace);
+      font-size: 11px;
+      padding: 2px 6px;
+      cursor: pointer;
+    }
+    .agent-mdv-btn:hover, .agent-mdv-btn.is-active { color: var(--color-text-primary); background: var(--color-bg-secondary); }
     .agent-chat-compose-actions {
       display: flex;
       align-items: center;

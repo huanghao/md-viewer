@@ -46,13 +46,97 @@ function upsertSessionId(path: string, existing: AgentSession | null, sessionId:
   }
 }
 
-/** 获取（或按需创建）文档对应的 session id；sessionIdOverride 用于手动关联到已有会话。 */
-export function ensureAgentSessionId(docPath: string, sessionIdOverride?: string): string {
+function workspaceDocPrefix(workspacePath: string): string {
+  return workspacePath.endsWith("/") ? workspacePath : workspacePath + "/";
+}
+
+/** workspace 当前使用的 session id（没有显式设置过则为 null）。 */
+export function getWorkspaceSessionId(workspacePath: string): string | null {
+  const row = getDb().query("SELECT session_id FROM agent_workspace_sessions WHERE workspace_path = ?")
+    .get(workspacePath) as { session_id: string } | null;
+  return row?.session_id ?? null;
+}
+
+function putWorkspaceSessionId(workspacePath: string, sessionId: string): void {
+  getDb().query(`
+    INSERT INTO agent_workspace_sessions (workspace_path, session_id, updated_at) VALUES (?, ?, ?)
+    ON CONFLICT(workspace_path) DO UPDATE SET session_id = excluded.session_id, updated_at = excluded.updated_at
+  `).run(workspacePath, sessionId, Date.now());
+}
+
+/** 该 session 是否有任意文档正在运行（同一 session 并发 --resume 会写坏 jsonl，所以锁在 session 级）。 */
+export function isAgentSessionRunning(sessionId: string): boolean {
+  return !!getDb().query("SELECT 1 FROM agent_sessions WHERE session_id = ? AND running = 1 LIMIT 1").get(sessionId);
+}
+
+function isWorkspaceRunning(workspacePath: string): boolean {
+  const prefix = workspaceDocPrefix(workspacePath);
+  const rows = getDb().query("SELECT doc_path FROM agent_sessions WHERE running = 1").all() as Array<{ doc_path: string }>;
+  return rows.some((r) => r.doc_path === workspacePath || r.doc_path.startsWith(prefix));
+}
+
+/**
+ * workspace 的默认 session：显式设置过就用它；否则取该 workspace 下最近用过的文档 session
+ * （老数据迁移，"关联到最近的 session"）；都没有就新建一个。结果会落库，后续稳定返回同一个。
+ */
+function ensureWorkspaceSessionId(workspacePath: string, seed?: string): string {
+  const existing = getWorkspaceSessionId(workspacePath);
+  if (existing) return existing;
+  const prefix = workspaceDocPrefix(workspacePath);
+  const rows = getDb().query("SELECT * FROM agent_sessions ORDER BY updated_at DESC, rowid DESC").all() as AgentSessionRow[];
+  const recent = rows.find((r) => r.doc_path === workspacePath || r.doc_path.startsWith(prefix));
+  const sessionId = recent?.session_id || seed || randomUUID();
+  putWorkspaceSessionId(workspacePath, sessionId);
+  return sessionId;
+}
+
+/**
+ * 获取（或按需创建）文档对应的 session id。
+ * - 文档属于某个 workspace：用 workspace 当前 session（所有文档共享），文档行同步指向它，
+ *   这样运行锁和 session 列表里的"关联文档"都还是读 agent_sessions。
+ * - 不属于任何 workspace：退回文档级 session；sessionIdOverride 用于手动关联到已有会话。
+ */
+export function ensureAgentSessionId(docPath: string, sessionIdOverride?: string, workspacePath?: string | null): string {
   const path = normalizeDocPath(docPath);
   const existing = getAgentSession(path);
+  if (workspacePath) {
+    const sessionId = ensureWorkspaceSessionId(workspacePath, sessionIdOverride);
+    if (existing?.sessionId !== sessionId) upsertSessionId(path, existing, sessionId);
+    return sessionId;
+  }
   if (existing) return existing.sessionId;
   const sessionId = sessionIdOverride || randomUUID();
   upsertSessionId(path, existing, sessionId);
+  return sessionId;
+}
+
+/** 文档当前生效的 session（含运行状态）：workspace 内以 workspace session 为准，运行态按 session 级算。 */
+export function getEffectiveAgentSession(docPath: string, workspacePath?: string | null): AgentSession | null {
+  const path = normalizeDocPath(docPath);
+  const doc = getAgentSession(path);
+  const wsSession = workspacePath ? getWorkspaceSessionId(workspacePath) : null;
+  if (!wsSession) return doc;
+  return {
+    docPath: path,
+    sessionId: wsSession,
+    running: isAgentSessionRunning(wsSession),
+    runId: doc?.sessionId === wsSession ? doc.runId : null,
+    updatedAt: doc?.updatedAt ?? Date.now(),
+  };
+}
+
+/** 把 workspace 的默认 session 指向某个已有 session。workspace 内有运行中的 Agent 时不允许改。 */
+export function setWorkspaceAgentSession(workspacePath: string, sessionId: string): boolean {
+  if (isWorkspaceRunning(workspacePath) || isAgentSessionRunning(sessionId)) return false;
+  putWorkspaceSessionId(workspacePath, sessionId);
+  return true;
+}
+
+/** 给 workspace 换一个全新的 session，之后该 workspace 下的文档都用它。运行中不允许换。 */
+export function resetWorkspaceAgentSession(workspacePath: string): string | null {
+  if (isWorkspaceRunning(workspacePath)) return null;
+  const sessionId = randomUUID();
+  putWorkspaceSessionId(workspacePath, sessionId);
   return sessionId;
 }
 
@@ -61,6 +145,7 @@ export function tryMarkAgentRunning(docPath: string, runId: string): boolean {
   const path = normalizeDocPath(docPath);
   const existing = getAgentSession(path);
   if (existing?.running) return false;
+  if (existing && isAgentSessionRunning(existing.sessionId)) return false;
   getDb().query(
     "UPDATE agent_sessions SET running = 1, run_id = ?, updated_at = ? WHERE doc_path = ?"
   ).run(runId, Date.now(), path);
@@ -166,6 +251,13 @@ export function listAgentSessionsForWorkspace(workspacePath: string): AgentSessi
         firstPrompt: null,
       });
     }
+  }
+  // 刚新建、还没跑过的当前 session 没有任何文档行，也要出现在列表里，否则切换后看不到"当前"
+  const current = getWorkspaceSessionId(workspacePath);
+  if (current && !bySession.has(current)) {
+    const row = getDb().query("SELECT updated_at FROM agent_workspace_sessions WHERE workspace_path = ?")
+      .get(workspacePath) as { updated_at: number };
+    bySession.set(current, { sessionId: current, docPaths: [], updatedAt: row.updated_at, firstPrompt: null });
   }
   const summaries = Array.from(bySession.values());
   for (const s of summaries) s.firstPrompt = getSessionFirstPrompt(s.sessionId);

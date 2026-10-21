@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { handleAgentEventLine } from "../../src/handlers/agent-handlers";
+import { buildSentPrompt, handleAgentEventLine } from "../../src/handlers/agent-handlers";
 import { ensureAgentSessionId, getAgentRuns, getAgentSession, insertAgentRun, tryMarkAgentRunning } from "../../src/agent-storage";
 import { resetDbForTesting } from "../../src/annotation-db";
 import type { AgentTranscriptMsg } from "../../src/agent-storage";
@@ -116,5 +116,14 @@ describe("handleAgentEventLine（claude stream-json）", () => {
     const event = { type: "assistant", message: { model: "m", content: [{ type: "thinking", thinking: "" }, { type: "text", text: "" }, { type: "unknown_block" }] } };
     handleAgentEventLine(JSON.stringify(event), "run-1", "/tmp/x.md", "s1", transcript);
     expect(transcript).toEqual([]);
+  });
+});
+
+describe("buildSentPrompt", () => {
+  it("普通消息带上当前文档前缀", () => {
+    expect(buildSentPrompt("这个文件写了什么", "/ws/a.md")).toBe("[当前文档: /ws/a.md]\n这个文件写了什么");
+  });
+  it("以 / 开头的 slash command 原样发送，不加前缀", () => {
+    expect(buildSentPrompt("/mdv docs/a.md 只改第三条", "/ws/docs/a.md")).toBe("/mdv docs/a.md 只改第三条");
   });
 });

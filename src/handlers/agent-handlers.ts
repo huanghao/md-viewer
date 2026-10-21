@@ -3,14 +3,12 @@ import { randomUUID } from "crypto";
 import type { Context } from "hono";
 import { broadcastEvent } from "../sse.ts";
 import { listAgentBackendStatuses, resolveAgentCommand } from "../agent-backends.ts";
-import { listAnnotations } from "../annotation-storage.ts";
-import { isOpen } from "../annotation-status.ts";
 import { findWorkspaceForPath, getWorkspaceAgentCommand } from "../workspace-storage.ts";
 import {
   ensureAgentSessionId,
   finishAgentRun,
   getAgentRuns,
-  getAgentSession,
+  getEffectiveAgentSession,
   getAgentUsageSummary,
   getRunsBySession,
   insertAgentRun,
@@ -18,8 +16,10 @@ import {
   listRecentAgentRuns,
   markAgentIdle,
   resetAgentSessionId,
+  resetWorkspaceAgentSession,
   sessionHasHistory,
   setAgentSessionId,
+  setWorkspaceAgentSession,
   tryMarkAgentRunning,
   type AgentRunUsage,
   type AgentTranscriptMsg,
@@ -28,6 +28,15 @@ import { log } from "../utils.ts";
 import { buildPiArgv, handlePiEventLine } from "../pi-agent.ts";
 import { listPiModels, listPiProviders } from "../pi-models.ts";
 
+/**
+ * 以 "/" 开头的自定义消息是 slash command（比如 `/mdv doc.md 只改第三条`），必须原样放在最前面
+ * 才会被识别，不能再加 [当前文档] 前缀；命令里的路径由用户/前端自己带。
+ */
+export function buildSentPrompt(customPrompt: string, docPath: string): string {
+  if (customPrompt.startsWith("/")) return customPrompt;
+  return `[当前文档: ${docPath}]\n${customPrompt}`;
+}
+
 export async function handleStartAgentRun(c: Context) {
   const body = await c.req.json<{ path?: string; sessionIdOverride?: string; backend?: string; provider?: string; model?: string; prompt?: string; thinking?: string }>().catch(() => ({}) as any);
   const rawPath = body?.path;
@@ -35,33 +44,24 @@ export async function handleStartAgentRun(c: Context) {
 
   const docPath = resolve(rawPath);
   const customPrompt = body?.prompt?.trim();
+  if (!customPrompt) return c.json({ error: "缺少 prompt 参数" }, 400);
 
-  if (!customPrompt) {
-    const openCount = listAnnotations(docPath).filter((a) => isOpen(a.status)).length;
-    if (openCount === 0) {
-      return c.json({ error: "该文档没有待处理的评论" }, 400);
-    }
-  }
-
-  const existingSession = getAgentSession(docPath);
+  const existingSession = getEffectiveAgentSession(docPath, findWorkspaceForPath(docPath));
   if (existingSession?.running) {
     return c.json({ error: "该文档已有 Agent 运行中" }, 409);
   }
 
-  const sessionId = ensureAgentSessionId(docPath, body?.sessionIdOverride);
-  const isResume = sessionHasHistory(sessionId);
-
   const workspacePath = findWorkspaceForPath(docPath);
+  const sessionId = ensureAgentSessionId(docPath, body?.sessionIdOverride, workspacePath);
+  const isResume = sessionHasHistory(sessionId);
   const cwd = workspacePath || dirname(docPath);
 
   // pi（earendil-works/pi）是并排试用的另一条 Agent 运行时路径，不走 agent-backends.yaml
   // 那套 claude 系 CLI 的 argv/解析逻辑（形状完全不同，见 pi-agent.ts 头部注释），
   // 复用同一套 session/run 存储 + SSE 广播，只是 spawn 和解析这两步单独实现。
   if (body?.backend === "pi") {
-    const displayPrompt = customPrompt || "处理这个文档的批注";
-    const sentPrompt = customPrompt
-      ? `[当前文档: ${docPath}]\n${customPrompt}`
-      : `/mdv 处理这个文件的批注：${docPath}`;
+    const displayPrompt = customPrompt;
+    const sentPrompt = buildSentPrompt(customPrompt, docPath);
     const argv = buildPiArgv({ prompt: sentPrompt, sessionId, provider: body?.provider || "kimi-coding", model: body?.model, thinking: body?.thinking });
 
     const runId = randomUUID();
@@ -98,10 +98,8 @@ export async function handleStartAgentRun(c: Context) {
   // displayPrompt：透传给前端/落库展示的原始内容；sentPrompt：实际发给 CLI 的内容——
   // 自定义消息里通常不会带文件路径（比如"这个文件写的是什么"），必须每轮都显式带上文档路径，
   // 否则 agent 会把"这个文件"理解成系统提示里注入的其它文件（比如 CLAUDE.md）。
-  const displayPrompt = customPrompt || "处理这个文档的批注";
-  const sentPrompt = customPrompt
-    ? `[当前文档: ${docPath}]\n${customPrompt}`
-    : `/mdv 处理这个文件的批注：${docPath}`;
+  const displayPrompt = customPrompt;
+  const sentPrompt = buildSentPrompt(customPrompt, docPath);
   const argv = [
     ...agentCommand,
     "-p", sentPrompt,
@@ -343,7 +341,8 @@ export async function handleGetAgentUsage(c: Context) {
 export function handleGetAgentSession(c: Context) {
   const path = c.req.query("path");
   if (!path) return c.json({ error: "缺少 path 参数" }, 400);
-  return c.json({ session: getAgentSession(resolve(path)) });
+  const docPath = resolve(path);
+  return c.json({ session: getEffectiveAgentSession(docPath, findWorkspaceForPath(docPath)) });
 }
 
 export function handleListWorkspaceAgentSessions(c: Context) {
@@ -355,16 +354,22 @@ export function handleListWorkspaceAgentSessions(c: Context) {
 export async function handleLinkAgentSession(c: Context) {
   const body = await c.req.json<{ path?: string; sessionId?: string }>().catch(() => ({}) as any);
   if (!body?.path || !body?.sessionId) return c.json({ error: "缺少 path / sessionId 参数" }, 400);
-  const ok = setAgentSessionId(resolve(body.path), body.sessionId);
-  if (!ok) return c.json({ error: "该文档已有 Agent 运行中，无法切换会话" }, 409);
+  const docPath = resolve(body.path);
+  const workspacePath = findWorkspaceForPath(docPath);
+  const ok = workspacePath
+    ? setWorkspaceAgentSession(workspacePath, body.sessionId)
+    : setAgentSessionId(docPath, body.sessionId);
+  if (!ok) return c.json({ error: "有 Agent 运行中，无法切换会话" }, 409);
   return c.json({ ok: true });
 }
 
 export async function handleNewAgentSession(c: Context) {
   const body = await c.req.json<{ path?: string }>().catch(() => ({}) as any);
   if (!body?.path) return c.json({ error: "缺少 path 参数" }, 400);
-  const sessionId = resetAgentSessionId(resolve(body.path));
-  if (!sessionId) return c.json({ error: "该文档已有 Agent 运行中，无法新建会话" }, 409);
+  const docPath = resolve(body.path);
+  const workspacePath = findWorkspaceForPath(docPath);
+  const sessionId = workspacePath ? resetWorkspaceAgentSession(workspacePath) : resetAgentSessionId(docPath);
+  if (!sessionId) return c.json({ error: "有 Agent 运行中，无法新建会话" }, 409);
   return c.json({ ok: true, sessionId });
 }
 

@@ -174,6 +174,8 @@ describe("workspace 级默认 session", () => {
     expect(tryMarkAgentRunning(`${ws}/a.md`, "run-1")).toBe(true);
     expect(tryMarkAgentRunning(`${ws}/b.md`, "run-2")).toBe(false);
     expect(getEffectiveAgentSession(`${ws}/b.md`, ws)?.running).toBe(true);
+    // 另一篇文档也要能拿到正在运行的 run id，前端才能接上进度事件
+    expect(getEffectiveAgentSession(`${ws}/b.md`, ws)?.runId).toBe("run-1");
     expect(resetWorkspaceAgentSession(ws)).toBeNull();
     markAgentIdle(`${ws}/a.md`);
     expect(tryMarkAgentRunning(`${ws}/b.md`, "run-3")).toBe(true);

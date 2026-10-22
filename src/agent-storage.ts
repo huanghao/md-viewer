@@ -64,6 +64,13 @@ function putWorkspaceSessionId(workspacePath: string, sessionId: string): void {
   `).run(workspacePath, sessionId, Date.now());
 }
 
+/** 该 session 当前正在运行的 run id（任意文档发起的都算）。 */
+function getRunningRunIdForSession(sessionId: string): string | null {
+  const row = getDb().query("SELECT run_id FROM agent_sessions WHERE session_id = ? AND running = 1 LIMIT 1")
+    .get(sessionId) as { run_id: string | null } | null;
+  return row?.run_id ?? null;
+}
+
 /** 该 session 是否有任意文档正在运行（同一 session 并发 --resume 会写坏 jsonl，所以锁在 session 级）。 */
 export function isAgentSessionRunning(sessionId: string): boolean {
   return !!getDb().query("SELECT 1 FROM agent_sessions WHERE session_id = ? AND running = 1 LIMIT 1").get(sessionId);
@@ -120,7 +127,8 @@ export function getEffectiveAgentSession(docPath: string, workspacePath?: string
     docPath: path,
     sessionId: wsSession,
     running: isAgentSessionRunning(wsSession),
-    runId: doc?.sessionId === wsSession ? doc.runId : null,
+    // 工程内共用会话：别的文档发起的运行也要能认出来，否则切到另一篇文档就接不上进度事件
+    runId: getRunningRunIdForSession(wsSession),
     updatedAt: doc?.updatedAt ?? Date.now(),
   };
 }

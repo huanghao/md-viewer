@@ -21,6 +21,7 @@ import { showError, showSuccess } from './ui/toast';
 import { escapeHtml } from './utils/escape';
 import { buildTrayPromptPrefix, clearTray, renderTray } from './agent-tray';
 import { renderMath } from './content-renderer';
+import { hydrateAnnotationsFromRemote } from './annotation/persistence';
 import { storageGetNumber, storageSet } from './utils/storage';
 
 const AGENT_MODEL_OVERRIDE_KEY = 'md-viewer:agent-model-override';
@@ -422,6 +423,17 @@ function setRunning(running: boolean, since?: number): void {
 // ==================== 加载 ====================
 
 export async function onAgentTabActivated(path: string | null): Promise<void> {
+  // 同一个工程内共用一个会话：换文档不需要重载对话，保留已经收到的实时消息，
+  // 否则运行中切换文档会丢掉已流出的内容，只剩一条"重新连接"占位
+  if (path && currentDocPath && path !== currentDocPath && currentSessionId) {
+    const ws = guessWorkspaceForPath(path);
+    if (ws && ws === guessWorkspaceForPath(currentDocPath)) {
+      currentDocPath = path;
+      renderTray(path);
+      renderChatChips();
+      return;
+    }
+  }
   currentDocPath = path;
   renderTray(path);
   if (agentBackends.length === 0) {
@@ -757,6 +769,8 @@ export function handleAgentRunStatusEvent(data: { runId: string; docPath: string
   if (data.runId !== activeRunId) return;
   activeRunId = null;
   setRunning(false);
+  // agent 处理批注会通过 CLI 往库里写回复，运行结束后刷新当前文档的评论
+  if (data.docPath === state.currentFile) void hydrateAnnotationsFromRemote(data.docPath);
 
   if (data.status === 'success') {
     // 成功态由 run divider / stats 展示；不再额外插入一条“完成”消息，占用一行。

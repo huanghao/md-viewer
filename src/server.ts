@@ -11,7 +11,8 @@ import { log } from "./utils.ts";
 import { broadcastEvent } from "./sse.ts";
 import { bootstrapWorkspaceIndexes } from "./handlers/workspace-handlers.ts";
 import { pruneScanMetrics } from "./scan-metrics-storage.ts";
-import { pruneOrphanedAgentSessions, resetStuckRunningAgentSessions } from "./agent-storage.ts";
+import { pruneOrphanedAgentSessions } from "./agent-storage.ts";
+import { recoverStuckAgentRuns } from "./agent-recovery.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
 import { otelMiddleware } from "./otel-middleware.ts";
 import { registerAgentRoutes } from "./routes/agent.ts";
@@ -65,8 +66,9 @@ if (import.meta.main) {
   pruneScanMetrics(30);
   const prunedSessions = pruneOrphanedAgentSessions();
   if (prunedSessions > 0) log(`🧹 清理了 ${prunedSessions} 条指向已删除文档的 Agent session 关联`);
-  const stuckRuns = resetStuckRunningAgentSessions();
-  if (stuckRuns > 0) log(`🧹 清理了 ${stuckRuns} 条上次进程重启时卡在"运行中"的 Agent 记录`);
+  const recovered = recoverStuckAgentRuns();
+  if (recovered.finalized > 0) log(`🧹 收尾了 ${recovered.finalized} 条上次重启时卡在"运行中"的 Agent 记录`);
+  if (recovered.reattached > 0) log(`🔗 有 ${recovered.reattached} 个重启前启动的 Agent 仍在运行，等它们结束后收尾`);
 
   process.on("SIGINT", () => process.exit(0));
   process.on("SIGTERM", () => process.exit(0));

@@ -15,6 +15,7 @@ import {
   listAgentSessionsForWorkspace,
   listRecentAgentRuns,
   markAgentIdle,
+  setAgentRunPid,
   resetAgentSessionId,
   resetWorkspaceAgentSession,
   sessionHasHistory,
@@ -96,6 +97,7 @@ export async function handleStartAgentRun(c: Context) {
       return c.json({ error: error?.message || "启动 pi 进程失败" }, 500);
     }
 
+    setAgentRunPid(runId, proc.pid);
     void streamPiAgentRun(proc, { runId, docPath, sessionId, initialPrompt: displayPrompt });
 
     return c.json({ success: true, runId, sessionId, resumed: isResume, command: argv, backend: "pi" });
@@ -141,6 +143,7 @@ export async function handleStartAgentRun(c: Context) {
     return c.json({ error: error?.message || "启动 Agent 进程失败" }, 500);
   }
 
+  setAgentRunPid(runId, proc.pid);
   void streamAgentRun(proc, { runId, docPath, sessionId, initialPrompt: displayPrompt });
 
   return c.json({ success: true, runId, sessionId, resumed: isResume, command: agentCommand, backend: backendName });
@@ -173,7 +176,7 @@ export function handleListPiProviders(c: Context) {
   return c.json({ providers: listPiProviders() });
 }
 
-function extractToolResultText(content: any): string {
+export function extractToolResultText(content: any): string {
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
     return content.map((c: any) => (c?.type === "text" ? c.text : "")).filter(Boolean).join("\n");
@@ -181,7 +184,7 @@ function extractToolResultText(content: any): string {
   return "";
 }
 
-function truncate(text: string, max = 400): string {
+export function truncate(text: string, max = 400): string {
   return text.length > max ? text.slice(0, max) + "…" : text;
 }
 

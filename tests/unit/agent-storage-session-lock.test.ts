@@ -13,7 +13,7 @@ import {
   insertAgentRun,
   markAgentIdle,
   resetAgentSessionId,
-  resetStuckRunningAgentSessions,
+  clearUnbackedRunningFlags,
   setAgentSessionId,
   tryMarkAgentRunning,
 } from "../../src/agent-storage";
@@ -109,27 +109,19 @@ describe("setAgentSessionId / resetAgentSessionId", () => {
   });
 });
 
-describe("resetStuckRunningAgentSessions", () => {
-  it("把状态卡在 running 的 agent_runs 标成 error，并解开对应文档的运行中锁", () => {
-    const sessionId = ensureAgentSessionId("/tmp/g.md");
-    tryMarkAgentRunning("/tmp/g.md", "run-stuck");
-    insertAgentRun({ id: "run-stuck", docPath: "/tmp/g.md", sessionId, workspacePath: null, command: ["claude", "-p", "hi"] });
-
-    const count = resetStuckRunningAgentSessions();
-    expect(count).toBe(1);
-    expect(getAgentSession("/tmp/g.md")?.running).toBe(false);
-
-    // 再跑一次是幂等的，没有更多卡住的记录了
-    expect(resetStuckRunningAgentSessions()).toBe(0);
-  });
-
-  it("没有卡住的记录时返回 0，不影响正常运行中的记录", () => {
-    ensureAgentSessionId("/tmp/h.md");
+describe("clearUnbackedRunningFlags", () => {
+  it("清掉没有 running run 支撑的文档运行标记，保留有支撑的", () => {
+    const sid1 = ensureAgentSessionId("/tmp/g.md");
+    tryMarkAgentRunning("/tmp/g.md", "run-dead");
+    const sid2 = ensureAgentSessionId("/tmp/h.md");
     tryMarkAgentRunning("/tmp/h.md", "run-live");
-    // 没有对应的 agent_runs 行处于 running 状态，扫描应该是 0
-    expect(resetStuckRunningAgentSessions()).toBe(0);
-    // 文档本身的运行中标记不受影响（这个函数只认 agent_runs.status，不是 agent_sessions.running）
+    insertAgentRun({ id: "run-live", docPath: "/tmp/h.md", sessionId: sid2, workspacePath: null, command: ["claude", "-p", "hi"] });
+
+    // 测试共用同一个库，前面的用例可能留有别的运行标记，只断言这两篇文档的状态
+    expect(clearUnbackedRunningFlags()).toBeGreaterThanOrEqual(1);
+    expect(getAgentSession("/tmp/g.md")?.running).toBe(false);
     expect(getAgentSession("/tmp/h.md")?.running).toBe(true);
+    expect(sid1).not.toBe(sid2);
   });
 });
 

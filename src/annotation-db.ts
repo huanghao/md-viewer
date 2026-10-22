@@ -126,6 +126,10 @@ export function getDb(): Database {
     if (!cols.some((col) => col.name === "transcript_json")) {
       db.exec(`ALTER TABLE agent_runs ADD COLUMN transcript_json TEXT`);
     }
+    // 子进程 pid：服务重启后据此认出还活着的孤儿 run，别当成中断
+    if (!cols.some((col) => col.name === "pid")) {
+      db.exec(`ALTER TABLE agent_runs ADD COLUMN pid INTEGER`);
+    }
   }
 
   seedQuickComments(db);

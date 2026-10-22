@@ -167,20 +167,35 @@ export function markAgentIdle(docPath: string): void {
   ).run(Date.now(), path);
 }
 
+export interface RunningAgentRun {
+  id: string;
+  docPath: string;
+  sessionId: string;
+  startedAt: number;
+  command: string | null;
+  pid: number | null;
+}
+
+export function listRunningAgentRuns(): RunningAgentRun[] {
+  const rows = getDb().query("SELECT id, doc_path, session_id, started_at, command, pid FROM agent_runs WHERE status = 'running'")
+    .all() as Array<{ id: string; doc_path: string; session_id: string; started_at: number; command: string | null; pid: number | null }>;
+  return rows.map((r) => ({ id: r.id, docPath: r.doc_path, sessionId: r.session_id, startedAt: r.started_at, command: r.command, pid: r.pid }));
+}
+
+export function setAgentRunPid(runId: string, pid: number): void {
+  getDb().query("UPDATE agent_runs SET pid = ? WHERE id = ?").run(pid, runId);
+}
+
 /**
- * 服务启动时清掉上一次进程留下的"运行中"标记。开发时 `bun --watch` 一存文件就重启，
- * 之前那次 Agent 运行的子进程即便还活着，父进程一没，stdout 管道就断了——服务端再也
- * 收不到它的输出、没法调用 finishAgentRun/markAgentIdle，运行记录会卡在 running 状态，
- * 那份文档的"该文档已有 Agent 运行中"锁也会一直锁死，直到手动清库。启动时扫一遍归零。
+ * 清掉没有任何"运行中"run 支撑的文档运行标记。服务重启后，开发时 `bun --watch` 一存文件就重启，
+ * 上一次的子进程成了孤儿、再没人回写状态，这些标记会把文档锁死；还活着的孤儿 run 的标记要保留
+ * （由 agent-recovery 等它结束），所以这里按"agent_runs 里是否还有对应的 running 记录"判断。
  */
-export function resetStuckRunningAgentSessions(): number {
-  const db = getDb();
-  const stuckRuns = db.query("SELECT id, doc_path FROM agent_runs WHERE status = 'running'").all() as Array<{ id: string; doc_path: string }>;
-  if (stuckRuns.length === 0) return 0;
-  db.query("UPDATE agent_runs SET status = 'error', finished_at = ?, error = ? WHERE status = 'running'")
-    .run(Date.now(), "服务重启，运行中断");
-  db.query("UPDATE agent_sessions SET running = 0, run_id = NULL WHERE running = 1").run();
-  return stuckRuns.length;
+export function clearUnbackedRunningFlags(): number {
+  return getDb().query(`
+    UPDATE agent_sessions SET running = 0, run_id = NULL
+    WHERE running = 1 AND (run_id IS NULL OR run_id NOT IN (SELECT id FROM agent_runs WHERE status = 'running'))
+  `).run().changes;
 }
 
 /** 把某文档手动指向另一个已有 session（多文档共享会话）。不允许在运行中改。 */
@@ -210,14 +225,11 @@ export interface AgentSessionSummary {
   firstPrompt: string | null;
 }
 
-/** session 第一次运行时发的 prompt，从 agent_runs.command（CLI argv）里取 -p 后面那一项 */
-function getSessionFirstPrompt(sessionId: string): string | null {
-  const row = getDb()
-    .query(`SELECT command FROM agent_runs WHERE session_id = ? ORDER BY started_at ASC LIMIT 1`)
-    .get(sessionId) as { command: string | null } | null;
-  if (!row?.command) return null;
+/** 从保存的 CLI argv（agent_runs.command）里取出发给 agent 的 prompt，去掉 [当前文档] 前缀 */
+export function extractPromptFromCommand(command: string | null): string | null {
+  if (!command) return null;
   try {
-    const argv: string[] = JSON.parse(row.command);
+    const argv: string[] = JSON.parse(command);
     // claude/kc/mc/codex 是 "-p <prompt>" 紧挨着；pi 的 flag 全部排在前面、prompt 是
     // argv 最后一项（见 pi-agent.ts buildPiArgv 的注释），两种形状都要认——不然 pi 跑出来的
     // session 这里会把 "-p" 后面那个 flag（比如 "--session-id"）错当成 prompt 预览文本
@@ -227,11 +239,20 @@ function getSessionFirstPrompt(sessionId: string): string | null {
     if (!prompt || prompt.startsWith("-")) return null;
     // 自定义 prompt 会被自动加上 [当前文档: xxx]\n 前缀（见 handleStartAgentRun），对预览没用，去掉
     const cleaned = prompt.replace(/^\[当前文档:[^\]]*\]\n/, "").trim();
-    if (!cleaned) return null;
-    return cleaned.length > 60 ? cleaned.slice(0, 60) + "…" : cleaned;
+    return cleaned || null;
   } catch {
     return null;
   }
+}
+
+/** session 第一次运行时发的 prompt（预览用，截断到 60 字） */
+function getSessionFirstPrompt(sessionId: string): string | null {
+  const row = getDb()
+    .query(`SELECT command FROM agent_runs WHERE session_id = ? ORDER BY started_at ASC LIMIT 1`)
+    .get(sessionId) as { command: string | null } | null;
+  const prompt = extractPromptFromCommand(row?.command ?? null);
+  if (!prompt) return null;
+  return prompt.length > 60 ? prompt.slice(0, 60) + "…" : prompt;
 }
 
 /**

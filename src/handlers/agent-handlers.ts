@@ -46,7 +46,6 @@ export function buildSentPrompt(customPrompt: string, docPath: string): string {
 export const AGENT_SYSTEM_PROMPT = [
   "你在 md-viewer 的 Agent tab 里工作，用户在浏览器里阅读你改的 Markdown 文档。",
   "- 涉及外部项目、论文、版本、数据等事实时，先用 WebSearch / WebFetch 联网核对再写（这两个工具可能需要先用 ToolSearch 加载）；联网失败才凭已有知识，并在文中和回复里说明。",
-  "- 写 Markdown 时，加粗/斜体的标记内不要以全角标点结尾：写 `**写入**：…`，不要写 `**写入：**…`，否则 `**` 会原样显示。",
   "- 最终回复保持简短：改动已经在文档里，不要把改了什么再逐条复述，只说需要用户决定或没能核对的事。",
 ].join("\n");
 

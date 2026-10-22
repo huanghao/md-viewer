@@ -51,7 +51,6 @@ Apply every actionable comment without waiting for confirmation: edit the docume
 
 - Verify current or external claims before editing, and do it on the web (WebSearch / WebFetch; in Claude Code they may be deferred tools, so load them with ToolSearch first) rather than from memory. Only fall back to what you already know if the web is unreachable, and say so in the document or reply.
 - Fix broken Markdown or LaTeX when a comment identifies a rendering problem.
-- When writing bold or italic, keep full-width punctuation outside the markers: `**写入**：从对话…`, not `**写入：**从对话…`. CommonMark does not close an emphasis marker that follows punctuation and is directly followed by a letter or CJK character, so the `**` shows up literally in mdv, GitHub and most previews. The same applies to `，。、；）` and to other CJK or ASCII punctuation at the end of the emphasized span.
 - Integrate the fix into normal prose where it belongs, not as a Q&A trace appended to the passage — comment-driven edits default to answering each comment in place, which turns the document into a transcript. Rewrite the unclear passage itself; write for a new reader, not only the commenter.
 - After editing, reread only the changed section (previous heading through the changed text, e.g. `sed -n 'A,Bp'`) and confirm it still reads as one coherent passage. This is the guard against the transcript failure above, so do it, but don't narrate it in the final message unless you found something to fix.
 

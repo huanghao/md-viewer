@@ -34,7 +34,7 @@ import {
 // Functions that live in annotation.ts are injected here to avoid circular deps.
 
 interface RenderingCallbacks {
-  persistAnnotations: (filePath: string, annotations: Annotation[], errorPrefix?: string) => void;
+  persistAnnotationAnchors: (filePath: string, annotations: Annotation[]) => void;
   showPopover: (ann: Annotation, x: number, y: number) => void;
   hidePopover: (force?: boolean) => void;
   renderAnnotationList: (filePath: string | null) => void;
@@ -237,7 +237,7 @@ export function applyAnnotations(): void {
 
     if (changed) {
       if (currentFile) {
-        _callbacks?.persistAnnotations(currentFile, changedAnnotations, '同步评论锚点失败');
+        _callbacks?.persistAnnotationAnchors(currentFile, changedAnnotations);
       }
     }
   }

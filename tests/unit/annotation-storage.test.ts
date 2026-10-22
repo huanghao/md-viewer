@@ -8,6 +8,8 @@ import {
   listAnnotatedDocuments,
   getAnnotationsByDocument,
   upsertAnnotation,
+  listAnnotations,
+  syncAnnotationAnchors,
   updateAnnotationStatus,
   deleteAnnotation,
   resetDbForTesting,
@@ -141,5 +143,28 @@ describe('annotation-storage', () => {
     expect(after.total).toBe(2);
     expect(after.annotations.some((item) => item.id === 'a2')).toBe(false);
     expect(after.annotations.find((item) => item.id === 'a1')?.status).toBe('resolved');
+  });
+});
+
+describe("syncAnnotationAnchors", () => {
+  it("只更新锚点字段，不覆盖库里已有的 thread（页面里的评论串可能是旧的）", () => {
+    const path = "/tmp/anchor-sync.md";
+    upsertAnnotation(path, { id: "a1", start: 1, length: 3, quote: "abc", note: "q", createdAt: 1, status: "anchored" });
+    appendAnnotationReply(path, { id: "a1" }, "已处理", "claude");
+
+    const r = syncAnnotationAnchors(path, [{ id: "a1", start: 9, length: 4, status: "unanchored", confidence: 0.5 }]);
+    expect(r.updated).toBe(1);
+
+    const [ann] = listAnnotations(path);
+    expect(ann.start).toBe(9);
+    expect(ann.status).toBe("unanchored");
+    expect(ann.thread?.some((t) => t.type === "reply" && t.author === "claude")).toBe(true);
+  });
+
+  it("已 resolved 的评论不会被锚点同步改回 anchored", () => {
+    const path = "/tmp/anchor-sync-resolved.md";
+    upsertAnnotation(path, { id: "b1", start: 1, length: 3, quote: "abc", note: "q", createdAt: 1, status: "resolved" });
+    syncAnnotationAnchors(path, [{ id: "b1", start: 2, length: 3, status: "anchored" }]);
+    expect(listAnnotations(path)[0].status).toBe("resolved");
   });
 });

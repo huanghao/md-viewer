@@ -64,7 +64,9 @@ import {
 } from './annotation-rendering';
 import {
   persistAnnotation,
+  persistAnnotationAnchors,
   persistAnnotations,
+  hydrateAnnotationsFromRemote,
   setAnnotations,
   registerPersistenceCallbacks,
 } from './annotation/persistence';
@@ -1108,7 +1110,7 @@ export function initAnnotationElements(): void {
     hidePopover,
   });
   registerRenderingCallbacks({
-    persistAnnotations,
+    persistAnnotationAnchors,
     showPopover,
     hidePopover,
     renderAnnotationList,
@@ -1118,6 +1120,10 @@ export function initAnnotationElements(): void {
     showPopover,
     persistAnnotation,
     applyAnnotations,
+  });
+  // agent / CLI 可能在页面不知情时往库里追加回复；回到页面时重新拉一次，别让页面一直停在旧串上
+  window.addEventListener('focus', () => {
+    if (state.currentFilePath) void hydrateAnnotationsFromRemote(state.currentFilePath);
   });
   invalidateAnnotationElementsCache();
   registerCollapseCallback(() => {

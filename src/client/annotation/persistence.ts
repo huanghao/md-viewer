@@ -5,7 +5,7 @@ import {
   ensureAnnotationSerials,
   replaceAnnotationInState,
 } from '../annotation-state';
-import { upsertAnnotationRemote, fetchAnnotations } from '../api/annotations';
+import { upsertAnnotationRemote, syncAnnotationAnchorsRemote, fetchAnnotations } from '../api/annotations';
 import { adjustAnnotationCount, state as appState } from '../state';
 import { isOpen, isUnanchored } from '../../annotation-status';
 import { showError } from '../ui/toast';
@@ -51,6 +51,21 @@ export function persistAnnotation(filePath: string, annotation: Annotation, erro
       adjustAnnotationCount(filePath, -1);
       import('../ui/sidebar').then(({ renderSidebar }) => renderSidebar());
     });
+}
+
+// 重新定位锚点后只回写锚点字段；整条 upsert 会带上页面里可能已过期的 thread
+export function persistAnnotationAnchors(filePath: string, annotations: Annotation[]): void {
+  if (annotations.length === 0) return;
+  const anchors = annotations.map((a) => ({
+    id: a.id,
+    start: a.start,
+    length: a.length,
+    status: a.status,
+    confidence: a.confidence ?? null,
+  }));
+  void syncAnnotationAnchorsRemote(filePath, anchors).catch((error) => {
+    showError(`同步评论锚点失败: ${error?.message || '未知错误'}`);
+  });
 }
 
 export function persistAnnotations(filePath: string, annotations: Annotation[], errorPrefix = '评论保存失败'): void {

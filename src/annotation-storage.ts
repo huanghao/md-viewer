@@ -355,6 +355,44 @@ export function replaceAnnotations(docPath: string, annotations: any[]): { saved
   return { saved: normalized.length };
 }
 
+export interface AnnotationAnchorUpdate {
+  id: string;
+  start: number;
+  length: number;
+  status?: string;
+  confidence?: number | null;
+}
+
+/**
+ * 只同步锚点相关字段（位置/状态/置信度），不碰 thread。前端重新定位锚点时用它：
+ * 页面里的评论可能比库里旧（agent/CLI 在页面不知情时追加了回复），整条 upsert 会把
+ * 库里的 thread 用旧的覆盖掉，回复就丢了。已 resolved 的评论状态不被锚点同步改回去。
+ */
+export function syncAnnotationAnchors(docPath: string, items: AnnotationAnchorUpdate[]): { updated: number } {
+  const path = normalizeDocPath(docPath);
+  if (!path) return { updated: 0 };
+  const database = getDb();
+  const stmt = database.prepare(`
+    UPDATE annotations
+    SET start = ?, length = ?, confidence = ?,
+        status = CASE WHEN status = 'resolved' THEN status ELSE ? END
+    WHERE id = ? AND doc_path = ?
+  `);
+  let updated = 0;
+  const tx = database.transaction((list: AnnotationAnchorUpdate[]) => {
+    for (const item of list) {
+      const start = Number(item?.start);
+      const length = Number(item?.length);
+      if (!item?.id || !Number.isFinite(start) || !Number.isFinite(length)) continue;
+      const status = item.status === "unanchored" ? "unanchored" : "anchored";
+      const confidence = typeof item.confidence === "number" ? item.confidence : null;
+      updated += stmt.run(start, length, confidence, status, String(item.id), path).changes;
+    }
+  });
+  tx(items);
+  return { updated };
+}
+
 export function upsertAnnotation(
   docPath: string,
   annotation: any

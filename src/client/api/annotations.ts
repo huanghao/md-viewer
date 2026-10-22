@@ -27,6 +27,25 @@ export async function upsertAnnotationRemote(path: string, annotation: Annotatio
   return data.annotation as Annotation;
 }
 
+export interface AnnotationAnchorPayload {
+  id: string;
+  start: number;
+  length: number;
+  status?: string;
+  confidence?: number | null;
+}
+
+/** 只同步锚点（位置/状态/置信度），不带 thread，避免用页面里的旧评论串覆盖库里的新回复。 */
+export async function syncAnnotationAnchorsRemote(path: string, anchors: AnnotationAnchorPayload[]): Promise<void> {
+  const response = await fetch('/api/annotations/anchors', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, anchors }),
+  });
+  const data = await readJsonOrThrow(response);
+  if (data?.success !== true) throw new Error(data?.error || '同步评论锚点失败');
+}
+
 export async function replyAnnotationRemote(
   path: string,
   ref: { id?: string; serial?: number },

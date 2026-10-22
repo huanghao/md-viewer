@@ -10,6 +10,7 @@ import {
   listQuickComments,
   replaceQuickComments,
   resolveAllOpenAnnotations,
+  syncAnnotationAnchors,
   updateAnnotationStatus,
   upsertAnnotation,
 } from "../annotation-storage.ts";
@@ -72,6 +73,18 @@ export async function handleUpsertAnnotation(c: Context) {
     return c.json({ success: true, annotation: result.annotation });
   } catch (error: any) {
     return c.json({ error: error?.message || "保存评论失败" }, 500);
+  }
+}
+
+export async function handleSyncAnnotationAnchors(c: Context) {
+  try {
+    const body = await c.req.json();
+    const { path } = parseAnnotationRef(body);
+    if (!path) return c.json({ error: "缺少 path 参数" }, 400);
+    const items = Array.isArray(body?.anchors) ? body.anchors : [];
+    return c.json({ success: true, ...syncAnnotationAnchors(path, items) });
+  } catch (error: any) {
+    return c.json({ error: error?.message || "同步评论锚点失败" }, 500);
   }
 }
 

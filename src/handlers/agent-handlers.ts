@@ -37,6 +37,22 @@ export function buildSentPrompt(customPrompt: string, docPath: string): string {
   return `[当前文档: ${docPath}]\n${customPrompt}`;
 }
 
+/**
+ * Agent tab 里直接对话时不会触发 mdv skill，写作/调研习惯得由 mdv 自己带上。
+ * 只给官方 claude backend 加（其它 CLI 不一定认 --append-system-prompt）；
+ * 每轮都要传，--resume 不会保留上一轮的 system prompt。
+ */
+export const AGENT_SYSTEM_PROMPT = [
+  "你在 md-viewer 的 Agent tab 里工作，用户在浏览器里阅读你改的 Markdown 文档。",
+  "- 涉及外部项目、论文、版本、数据等事实时，先用 WebSearch / WebFetch 联网核对再写（这两个工具可能需要先用 ToolSearch 加载）；联网失败才凭已有知识，并在文中和回复里说明。",
+  "- 写 Markdown 时，加粗/斜体的标记内不要以全角标点结尾：写 `**写入**：…`，不要写 `**写入：**…`，否则 `**` 会原样显示。",
+  "- 最终回复保持简短：改动已经在文档里，不要把改了什么再逐条复述，只说需要用户决定或没能核对的事。",
+].join("\n");
+
+export function agentSystemPromptArgs(backendName: string | null): string[] {
+  return backendName === "claude" ? ["--append-system-prompt", AGENT_SYSTEM_PROMPT] : [];
+}
+
 export async function handleStartAgentRun(c: Context) {
   const body = await c.req.json<{ path?: string; sessionIdOverride?: string; backend?: string; provider?: string; model?: string; prompt?: string; thinking?: string }>().catch(() => ({}) as any);
   const rawPath = body?.path;
@@ -106,6 +122,7 @@ export async function handleStartAgentRun(c: Context) {
     isResume ? "--resume" : "--session-id", sessionId,
     "--output-format", "stream-json",
     "--verbose",
+    ...agentSystemPromptArgs(backendName),
     ...(body?.model ? ["--model", body.model] : []),
   ];
 

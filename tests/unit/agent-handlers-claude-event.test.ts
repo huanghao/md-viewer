@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { buildSentPrompt, handleAgentEventLine } from "../../src/handlers/agent-handlers";
+import { agentSystemPromptArgs, buildSentPrompt, handleAgentEventLine } from "../../src/handlers/agent-handlers";
 import { ensureAgentSessionId, getAgentRuns, getAgentSession, insertAgentRun, tryMarkAgentRunning } from "../../src/agent-storage";
 import { resetDbForTesting } from "../../src/annotation-db";
 import type { AgentTranscriptMsg } from "../../src/agent-storage";
@@ -125,5 +125,17 @@ describe("buildSentPrompt", () => {
   });
   it("以 / 开头的 slash command 原样发送，不加前缀", () => {
     expect(buildSentPrompt("/mdv docs/a.md 只改第三条", "/ws/docs/a.md")).toBe("/mdv docs/a.md 只改第三条");
+  });
+});
+
+describe("agentSystemPromptArgs", () => {
+  it("官方 claude backend 带上 mdv 的写作/联网提示", () => {
+    const args = agentSystemPromptArgs("claude");
+    expect(args[0]).toBe("--append-system-prompt");
+    expect(args[1]).toContain("WebSearch");
+  });
+  it("其它 backend 和 workspace 自定义命令不加这个参数", () => {
+    expect(agentSystemPromptArgs("codex")).toEqual([]);
+    expect(agentSystemPromptArgs(null)).toEqual([]);
   });
 });

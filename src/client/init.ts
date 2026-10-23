@@ -20,8 +20,6 @@ import {
   getAnnotations,
   switchAnnotationTab,
   openComposerFromPending,
-  canOpenComposerFromSelection,
-  openCommentComposerFromSelection,
   handleSelectionForAnnotation,
 } from './annotation';
 import { currentPdfViewer, setPdfDefaultScale } from './pdf-state';
@@ -386,19 +384,6 @@ import {
       if (input) { input.focus(); input.select(); }
     },
     shouldActivate: () => !isInputFocused(),
-  });
-
-  registerAction({
-    id: 'open-annotation-composer',
-    label: '选中文本后写评论',
-    category: 'view',
-    defaultKey: `${modKey}+e`,
-    context: '选中文本后',
-    handler: () => {
-      const filePath = document.getElementById('content')?.getAttribute('data-current-file') || null;
-      openCommentComposerFromSelection(filePath);
-    },
-    shouldActivate: () => canOpenComposerFromSelection() && !isInputFocused(),
   });
 
   registerAction({

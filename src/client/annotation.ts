@@ -1067,19 +1067,6 @@ export function handleSelectionForAnnotation(filePath: string | null): void {
   });
 }
 
-export function canOpenComposerFromSelection(): boolean {
-  if (state.pendingAnnotation) return true;
-
-  const el = getElements();
-  const renderedFilePath = el.content?.getAttribute('data-current-file');
-  if (!renderedFilePath || !el.reader) return false;
-
-  const selection = getSelectionForReader(el.reader);
-  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return false;
-  const range = selection.getRangeAt(0);
-  return el.reader.contains(range.commonAncestorContainer) && !!selection.toString().trim();
-}
-
 export function openCommentComposerFromPending(): boolean {
   const pending = state.pendingAnnotation;
   if (!pending) return false;
@@ -1091,13 +1078,6 @@ export function openCommentComposerFromPending(): boolean {
   hideQuickAdd(false);
   openComposerFromPending();
   return true;
-}
-
-export function openCommentComposerFromSelection(filePath: string | null): boolean {
-  // mouseup uses a deferred callback; read the live selection here so a fast
-  // Cmd+E immediately after selecting text does not miss the pending state.
-  if (!state.pendingAnnotation) handleSelectionForAnnotation(filePath);
-  return openCommentComposerFromPending();
 }
 
 // ==================== 初始化 ====================

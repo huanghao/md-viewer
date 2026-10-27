@@ -21,3 +21,4 @@
 - [Focus frecency](./focus-frecency.md)
 - [Paragraph diff](./2026-06-11-paragraph-diff-design.md)
 - [视觉设计标准](./visual-design-standard.md)
+- [前端迁移到 React：目标与试点设计](./20261025-frontend-react-pilot.md)

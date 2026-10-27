@@ -2,8 +2,28 @@
 import * as esbuild from 'esbuild';
 import * as fs from 'fs';
 import * as path from 'path';
+import { execFileSync } from 'child_process';
 
 const watch = process.argv.includes('--watch');
+
+// Tailwind 只生成 React 组件用到的工具类（见 src/client/tailwind.css），
+// 追加到 esbuild 产出的 client.css 之后，页面仍只引一个样式文件。
+const tailwindPlugin: esbuild.Plugin = {
+  name: 'tailwind-append',
+  setup(build) {
+    build.onEnd((result) => {
+      if (result.errors.length > 0) return;
+      const tmp = path.join('dist', 'tailwind.tmp.css');
+      execFileSync(
+        path.join('node_modules', '.bin', 'tailwindcss'),
+        ['-i', 'src/client/tailwind.css', '-o', tmp, ...(watch ? [] : ['--minify'])],
+        { stdio: ['ignore', 'ignore', 'inherit'] }
+      );
+      fs.appendFileSync(path.join('dist', 'client.css'), '\n' + fs.readFileSync(tmp, 'utf8'));
+      fs.rmSync(tmp);
+    });
+  },
+};
 
 const buildOptions: esbuild.BuildOptions = {
   entryPoints: { client: 'src/client/main.ts' },
@@ -14,6 +34,8 @@ const buildOptions: esbuild.BuildOptions = {
   format: 'iife',
   sourcemap: true,
   minify: !watch,
+  jsx: 'automatic',
+  plugins: [tailwindPlugin],
 };
 
 async function build() {

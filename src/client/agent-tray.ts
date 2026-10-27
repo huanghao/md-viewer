@@ -9,13 +9,27 @@
  */
 
 import { storageGet, storageSet } from './utils/storage';
-import { autoResizeComposerInput } from './annotation/thread-manager';
 
 export interface TrayItem {
   id: string;
   quote: string;
   note: string;
   createdAt: number;
+}
+
+// 托盘内容变化通知：视图（agent/Tray.tsx）据此重渲染；编辑草稿不通知，避免打断输入
+let trayVersion = 0;
+const trayListeners = new Set<() => void>();
+function notifyTray(): void {
+  trayVersion++;
+  trayListeners.forEach((l) => l());
+}
+export function subscribeTray(l: () => void): () => void {
+  trayListeners.add(l);
+  return () => { trayListeners.delete(l); };
+}
+export function getTrayVersion(): number {
+  return trayVersion;
 }
 
 function trayKey(filePath: string): string {
@@ -41,15 +55,15 @@ export function addTrayItem(filePath: string, quote: string, note = ''): void {
     createdAt: Date.now(),
   });
   setTray(filePath, items);
-  renderTray(filePath);
+  notifyTray();
 }
 
 export function removeTrayItem(filePath: string, id: string): void {
   setTray(filePath, getTray(filePath).filter((item) => item.id !== id));
-  renderTray(filePath);
+  notifyTray();
 }
 
-function updateTrayItemNote(filePath: string, id: string, note: string): void {
+export function updateTrayItemNote(filePath: string, id: string, note: string): void {
   const items = getTray(filePath);
   const item = items.find((it) => it.id === id);
   if (!item) return;
@@ -57,7 +71,7 @@ function updateTrayItemNote(filePath: string, id: string, note: string): void {
   setTray(filePath, items);
 }
 
-function updateTrayItemQuote(filePath: string, id: string, quote: string): void {
+export function updateTrayItemQuote(filePath: string, id: string, quote: string): void {
   const items = getTray(filePath);
   const item = items.find((it) => it.id === id);
   if (!item) return;
@@ -67,7 +81,7 @@ function updateTrayItemQuote(filePath: string, id: string, quote: string): void 
 
 export function clearTray(filePath: string): void {
   setTray(filePath, []);
-  renderTray(filePath);
+  notifyTray();
 }
 
 /** 把托盘里的标注拼成一段 prompt 前缀；托盘为空时返回 null，调用方据此决定要不要拼接 */
@@ -79,67 +93,4 @@ export function buildTrayPromptPrefix(filePath: string): string | null {
     return `${i + 1}. "${item.quote}"${notePart}`;
   });
   return `[划词标注]\n${lines.join('\n')}`;
-}
-
-export function renderTray(filePath: string | null): void {
-  const container = document.getElementById('agentTray');
-  if (!container) return;
-  container.replaceChildren();
-
-  const items = filePath ? getTray(filePath) : [];
-  if (!filePath || items.length === 0) {
-    container.classList.add('hidden');
-    return;
-  }
-  container.classList.remove('hidden');
-
-  items.forEach((item) => {
-    const chip = document.createElement('div');
-    chip.className = 'agent-tray-chip';
-
-    const quoteRow = document.createElement('div');
-    quoteRow.className = 'agent-tray-chip-row';
-
-    const quoteInput = document.createElement('textarea');
-    quoteInput.className = 'agent-tray-chip-quote';
-    quoteInput.rows = 1;
-    quoteInput.value = item.quote;
-    quoteInput.addEventListener('input', () => {
-      autoResizeComposerInput(quoteInput);
-      updateTrayItemQuote(filePath, item.id, quoteInput.value);
-    });
-
-    const removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'agent-tray-chip-remove';
-    removeBtn.textContent = '×';
-    removeBtn.title = '移除';
-    removeBtn.addEventListener('click', () => removeTrayItem(filePath, item.id));
-
-    quoteRow.append(quoteInput, removeBtn);
-
-    const noteInput = document.createElement('textarea');
-    noteInput.className = 'agent-tray-chip-note';
-    noteInput.rows = 1;
-    noteInput.placeholder = '备注（可选）';
-    noteInput.value = item.note;
-    noteInput.addEventListener('input', () => {
-      autoResizeComposerInput(noteInput);
-      updateTrayItemNote(filePath, item.id, noteInput.value);
-    });
-
-    chip.append(quoteRow, noteInput);
-    container.appendChild(chip);
-
-    // 初始高度按已有内容展开一次（新建的一行足够，编辑过的长草稿需要撑开）
-    autoResizeComposerInput(quoteInput);
-    autoResizeComposerInput(noteInput);
-  });
-
-  const clearBtn = document.createElement('button');
-  clearBtn.type = 'button';
-  clearBtn.className = 'agent-tray-clear-btn';
-  clearBtn.textContent = `清空 (${items.length})`;
-  clearBtn.addEventListener('click', () => clearTray(filePath));
-  container.appendChild(clearBtn);
 }

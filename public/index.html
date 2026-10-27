@@ -7,6 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.11.1/highlight.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/web/pdf_viewer.css">
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js"></script>
@@ -155,48 +156,13 @@
         <div class="annotation-empty">无评论（选中文本即可添加）</div>
       </div>
       <div class="annotation-agent-tab hidden" id="annotationAgentTab">
-        <div class="agent-chat-header">
-          <button class="agent-toolbar-icon-btn" id="agentSessionMenuButton" type="button" title="Recent sessions" aria-label="Recent sessions">◷</button>
-          <div class="agent-toolbar-popover agent-session-popover hidden" id="agentSessionMenu">
-            <div class="agent-menu-label">Recent sessions</div>
-            <div class="agent-session-list" id="agentSessionList"></div>
-          </div>
-          <button class="agent-toolbar-icon-btn" id="agentNewSessionBtn" type="button" title="New session" aria-label="New session">+</button>
-        </div>
+        <div class="agent-chat-header" id="agentChatHeader"></div>
         <div class="agent-chat-stats" id="agentChatStats"></div>
-        <div class="agent-chat-messages" id="agentChatMessages">
-          <div class="agent-chat-empty">还没有对话，在下面输入内容开始，或点 /mdv 处理这个文档的批注。</div>
-        </div>
+        <div class="agent-chat-messages" id="agentChatMessages"></div>
         <div class="agent-chat-footer">
           <span class="agent-chat-status" id="agentChatStatus"></span>
-          <div class="agent-tray hidden" id="agentTray"></div>
-          <div class="agent-chat-compose">
-            <div class="agent-chat-input-resizer" id="agentChatInputResizer" title="拖拽调整输入框高度"></div>
-            <div class="agent-chat-chips hidden" id="agentChatChips"></div>
-            <textarea class="agent-chat-input" id="agentChatInput" rows="4" placeholder="给 Agent 发消息（Enter 换行，⌘/Ctrl+Enter 发送）"></textarea>
-            <div class="agent-chat-compose-actions">
-              <button class="agent-mdv-btn" id="agentMdvBtn" type="button" title="插入 /mdv 命令，并带上当前文档">/mdv</button>
-              <div class="agent-model-controls">
-                <select class="agent-chat-select agent-engine-select" id="agentEngineSelect" title="Engine"></select>
-                <select class="agent-chat-select agent-model-select" id="agentModelInput" title="Model"></select>
-                <span class="agent-thinking-control hidden" id="agentThinkingSection">
-                  <select class="agent-chat-select agent-thinking-select" id="agentThinkingLevel" title="Thinking">
-                    <option value="">默认</option>
-                    <option value="off">off</option>
-                    <option value="minimal">minimal</option>
-                    <option value="low">low</option>
-                    <option value="medium">medium</option>
-                    <option value="high">high</option>
-                    <option value="xhigh">xhigh</option>
-                    <option value="max">max</option>
-                  </select>
-                </span>
-              </div>
-              <button class="agent-chat-send-btn" id="agentChatSendBtn" title="发送" aria-label="发送">
-                <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="currentColor"><path d="M1.8 2.2a.6.6 0 01.7-.1l11.5 5.4a.6.6 0 010 1l-11.5 5.4a.6.6 0 01-.85-.7l1.7-4.7a.3.3 0 01.28-.2h5.2a.3.3 0 000-.6h-5.2a.3.3 0 01-.28-.2l-1.7-4.7a.6.6 0 01.15-.6z"/></svg>
-              </button>
-            </div>
-          </div>
+          <div id="agentTrayRoot" style="display:contents"></div>
+          <div class="agent-chat-compose" id="agentChatCompose"></div>
         </div>
       </div>
     </aside>

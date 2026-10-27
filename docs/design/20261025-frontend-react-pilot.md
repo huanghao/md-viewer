@@ -1,0 +1,191 @@
+# 前端迁移到 React：目标与试点设计
+
+状态：试点进行中（已按「一步一步、测试保持通过」推进，进度见第 10 节）。试点通过前不改 `AGENTS.md`。
+
+## 1. 背景
+
+前端约 1.6 万行手写 TypeScript，直接拼 `innerHTML` 并手动维护 DOM：
+
+- 76 处 `innerHTML` 整块赋值、214 个 `addEventListener`、117 个模块级 `let` 状态。
+- 没有「数据没变就不更新」的机制，重绘范围和数据变化范围需要人工对齐。
+
+已出现的同类问题：
+
+- 增删改评论会调用 `renderAnnotationList`，它在 Agent tab 激活时会顺带重载 Agent 对话（先显示「加载中…」再重绘），表现为面板抖动。已用「路径没变就不重载」临时修复，但结构问题还在。
+- 重绘评论列表时要手动保存和恢复回复框草稿。
+- 循环导入靠 `initXxx(deps)` 回调注入绕开，`AGENTS.md` 里专门有规则。
+
+项目已长期维护（1000+ 提交），「手写 DOM 起步轻」不再是充分的理由。
+
+## 2. 决定
+
+**目标终态：整个前端由 React 承载**，渐进迁移，不长期维持「手写 DOM + React」两套并存。共存只是迁移过渡期，每迁一块就删掉对应的手写代码。
+
+迁移策略：
+
+- 先用 Agent 面板做试点，验证方案、桥接方式和收益。
+- 试点通过后，**新增 UI 一律用 React 写**，不再新增手写 DOM 面板；既有手写部分按优先级逐块迁移。
+- 不整体重写：每一步都能独立发布、独立回退。
+
+选 React 而不是 Preact，理由：
+
+- 本项目是 localhost 工具，前端打进本地可执行文件，几十 KB 的体积差异没有影响。
+- 生态、文档、问答最全，代码由 agent 维护时出错率更低。
+- 需要时可直接用成熟的第三方组件（拖拽排序、虚拟列表等）。
+
+## 3. 迁移范围与顺序
+
+| 阶段 | 区域 | 说明 |
+|---|---|---|
+| 试点 | Agent 面板 | 状态清晰，与文档内容区几乎无耦合 |
+| 第二阶段 | 设置页、侧边栏（文件树、tab 条、最近视图）、工具栏、状态栏 | 典型状态驱动 UI，收益最大 |
+| 第三阶段 | 评论列表与浮窗 | 依赖锚点位置计算，与文档内容区耦合，放在外围都迁完之后 |
+| 最后 | 文档内容区、Diff 视图、PDF 查看器 | 见下 |
+
+文档内容区、Diff 视图、PDF 查看器的特殊性：内容由 `marked` / pdfjs 命令式生成，批注高亮直接在这段 DOM 上打标记，框架不能接管其内部节点。终态是「**React 管外壳，命令式管内部**」：由一个 React 组件持有容器节点（`ref`），在 effect 里调用现有的渲染与批注代码，内部 DOM 不交给 React 渲染。这样 `main.ts`、`init.ts` 这类手写的装配代码最终可以删除，而内容渲染与批注逻辑保持原样。
+
+不做的事：不引入路由、不引入 SSR、不整体重写、不做与迁移无关的重构。
+
+## 4. 试点：Agent 面板
+
+### 4.1 现状
+
+`src/client/agent-runner.ts`（约 800 行）直接操作 `public/index.html` 里 `#annotationAgentTab` 下的固定节点：
+
+- 模块级状态：`currentDocPath`、`currentSessionId`、`activeRunId`、`liveMessages`、`pastRuns`、`agentBackends` 等。
+- `renderMessages`、`renderStats`、`renderSessionSelect`、`renderEngineSelect`、`renderChatChips`、`renderTray` 各自写 `innerHTML`。
+- 外部入口只有三个：`onAgentTabActivated(path)`、`handleAgentProgressEvent`、`handleAgentRunStatusEvent`，后两个由 `sse-connection.ts` 调用。
+
+### 4.2 目标结构
+
+```
+src/client/agent/
+  store.ts          外部状态 + reducer（纯函数，可单测）
+  AgentPanel.tsx    根组件，挂载到 #annotationAgentTab
+  Messages.tsx      消息流
+  Composer.tsx      输入框、chips、引擎/模型选择、发送
+  SessionBar.tsx    会话菜单、统计条
+  mount.ts          createRoot + 对外导出的三个入口
+```
+
+- `store.ts` 持有现有模块级状态，提供 `getSnapshot` / `subscribe`，组件用 `useSyncExternalStore` 读取。
+- 流式事件（`handleAgentProgressEvent` 等）改成 dispatch action，由 reducer 产生新状态；组件只订阅自己用到的切片。
+- `mount.ts` 保持对外三个入口函数签名不变，`annotation.ts` 和 `sse-connection.ts` 无需改动。
+- `public/index.html` 里 `#annotationAgentTab` 的内部节点改为由 React 渲染，外层容器和 tab 切换逻辑保持原样。
+
+### 4.3 与手写部分的桥接
+
+- 进入：沿用现有调用（`onAgentTabActivated`、SSE 回调）。
+- 出去：通过现有 `CustomEvent`（如评论刷新）或 `initXxx(deps)` 注入的回调，不让组件直接 import 手写 UI 模块，避免循环依赖。
+- 全局输入约定（Emacs 键、Cmd+Enter 提交）由 `utils/input-keys.ts` 在 `document` capture 阶段统一处理，对 React 渲染的 `textarea` 同样生效，不在组件里重复实现。提交判断使用 `isSubmitKey`。
+
+### 4.4 构建
+
+- esbuild 开启 JSX：`jsx: 'automatic'`，`tsconfig.json` 增加 `"jsx": "react-jsx"`。
+- 新增依赖：`react`、`react-dom`、对应 `@types`。
+- 输出仍是单个 `dist/client.js`，不改变产物结构。
+
+### 4.5 副作用与清理
+
+- SSE 订阅仍由 `sse-connection.ts` 持有，不进组件 effect，避免 StrictMode 开发期 effect 双跑造成重复订阅。
+- 组件内的 effect（定时器、`ResizeObserver` 等）必须写清理函数。
+- 运行中计时器（`runningTicker`）改为组件内 effect，由 `activeRunId` 驱动。
+
+## 5. 成功标准
+
+试点完成后逐条检查，全部满足才继续迁移其他面板：
+
+1. 评论的增删改、解决、同步不再触发 Agent 对话重载（从结构上消失，不依赖「路径没变」这类判断）。
+2. 流式输出时输入框内容、光标、选区、滚动位置不被打断。
+3. `agent-runner` 相关逻辑的代码量明显减少，且 reducer 有单测。
+4. 与手写部分的桥接点不超过现有的三个入口加少量事件，没有新增循环导入。
+5. `bun test tests/unit` 与 `bun run build` 通过，产物体积增长在可接受范围。
+
+## 6. 回退
+
+试点期间只替换 Agent 面板的内部实现，外部入口签名不变。不满足成功标准时，回退为恢复 `agent-runner.ts` 与 `index.html` 中对应节点，删除 `src/client/agent/` 与依赖，不影响其他模块。
+
+## 7. 风险
+
+| 风险 | 对策 |
+|---|---|
+| 流式输出频繁更新导致重渲染过多 | reducer 追加消息时保持旧消息对象引用不变，消息项用 `React.memo` |
+| 与手写部分共存时状态来源不一致 | 状态只放在 `store.ts`，手写代码通过三个入口读写，不直接改 DOM |
+| 迁移期出现行为回归 | 先为现有消息渲染、会话恢复、运行中重连补测试，再迁移 |
+| 开发期 StrictMode 双跑 effect | SSE 不进 effect；其余 effect 写清理 |
+
+## 8. 若试点通过，`AGENTS.md` 需要同步的规则
+
+- 「Frontend Rules」：新增 UI 用 React 组件、props、`useSyncExternalStore`；既有手写 DOM 部分在迁移完成前仍遵守 `data-action` 事件委托，迁完即删除这条规则。
+- 「Import Boundaries」：组件不直接 import 手写 UI 模块，跨边界走事件或注入回调。
+- 新增一条：不再新增手写 DOM 面板。
+- 「Removed Feature Boundary」不变：Agent 面板仍限定为针对当前文档评论的批量运行器。
+
+## 9. CSS 与设计 token
+
+### 9.1 现状（2026-10-25 统计，token 归位之前）
+
+- 没有使用 CSS 框架（无 Tailwind、Bootstrap、Sass、PostCSS）。
+- 样式是一个手写的 `src/client/styles.css`（约 4500 行），外加 `vendor-github-markdown.css`、`vendor-highlight-github.css`；文档内容区在 Shadow DOM 里，使用 `src/client/themes/` 的 Markdown 主题和代码高亮主题，与应用样式隔离。
+- 有一套**不完整**的 token，定义在 `:root`：
+  - 颜色 12 个（`--color-text-primary`、`--color-border`、`--color-accent`、`--color-error` 等）。
+  - 字号只有 `--text-xs`（11px）、`--text-sm`（13px）两档。
+  - 圆角 3 档（`--radius-sm/md/lg`），z-index 一组。
+  - **没有**间距、阴影、字重、行高、动效、深色模式的 token。
+- 使用情况：约 666 处 `var(--…)` 引用，但仍有约 447 处硬编码颜色、约 84 处直接写 px 的字号（10/11/12/14px 混用）、多种圆角取值（1/2/3/4/5/999px），以及 42 处内联 `style`。
+- `docs/design/visual-design-standard.md` 是 2026-04 的视觉审计，列出了按钮高度、圆角混用等不一致，尚未落实为统一规范。
+
+### 9.2 方向：React + Tailwind，token 先行
+
+CSS 方案定为 **Tailwind CSS v4**，与 React 迁移配合。顺序上 token 必须先稳住，否则迁一块就复制一次硬编码。
+
+1. **token 是唯一真相源**：所有设计值定义为 `src/client/tokens.css` 里 `:root` 的 CSS 变量。Tailwind v4 的 `@theme` 直接引用这些变量，utilities（`bg-surface`、`text-sm`、`rounded-md`）生成时读取同一份值，不在 Tailwind 配置里另写一套数值。
+2. **不启用 Tailwind 的 preflight**：只引入 theme 与 utilities，不引入全局 reset。现有 `styles.css` 里有 `* { margin:0; padding:0 }`、按钮、表单等基础样式，preflight 会与之冲突并改变存量页面外观。
+3. **新增和被迁移的组件用 Tailwind 类名**，不再往 `styles.css` 添加规则；迁完的区域同步删除对应的全局规则，`styles.css` 随迁移变小。
+4. **文档内容区的主题**（`themes/`，在 Shadow DOM 内）保持独立，不并入应用 token，也不应用 Tailwind；边界处只约定少量共享变量。
+5. **间距**：存量 CSS 里的 padding/margin/gap 不做批量替换（`padding: 4px 8px` 这类简写替换价值低、风险高）；Tailwind 的 `--spacing` 基准取 4px，新组件用 `p-2` 这类工具类。
+6. **深色模式**：token 为每个语义色预留同名变量，通过 `:root[data-theme="dark"]` 覆盖，组件只用语义色，不写具体颜色。该工作单独立项，不阻塞迁移。
+
+### 9.3 token 阶段进展
+
+**已完成：第 1 步，零视觉变化的 token 归位**
+
+- 新增 `src/client/tokens.css`，把原先 `styles.css` 里的 `:root` 搬入，并追加只含「代码里已有字面量」的 token：`--color-surface`、`--color-text-inverse`、`--color-accent-a8/a10/a12`、`--text-2xs/md/lg`、`--radius-xs/pill`。
+- 按语义做精确替换：文字色 token 只替换 `color` 属性，边框 token 只替换 `border*`/`outline*`，背景 token 只替换 `background*`，避免「值相同但语义不对」。共替换 168 处。
+- 校验：把新旧 CSS 中的 `var()` 全部展开成字面量并规范化后逐字比较，完全一致，视觉零变化。
+- `main.ts` 在 `styles.css` 之前引入 `tokens.css`。
+
+**待做：第 2 步，需要视觉评审的合并**（会改变外观，不能机械完成，需要逐项确认）
+
+- 灰色：存量有 161 种不同的 hex，其中灰阶就有 `#999 #aaa #bbb #8b949e #6a737d #e5e7eb #d1d5db #f0f0f0 #eee` 等十几种近似值，需要收敛到一个灰阶。
+- 字号：`12px` 出现 16 次，位于现有 `--text-xs`（11px）与 `--text-sm`（13px）之间，需要决定并入哪一档或新增一档。另有 9/15/18/20px 少量用法。
+- 圆角：3/5/1px 等零散取值收敛到现有档位。
+- 阴影与动效：补 `--shadow-*`、`--duration-*`、`--ease-*` 并替换重复写法。
+- 硬编码颜色：剩余约 280 处 hex 字面量，随组件迁移时就地换成语义色。
+
+**配色（2026-10-27）**：最终采用 english-coach 的配色（暖灰中性色 + 单一蓝色强调色，深色为偏绿的深灰），颜色 token 精简到 33 个（强调色透明度、success 两档、accent-strong、mark 副色等合并）。下面是深色模式的实现记录。
+
+**深色模式（跟随系统，2026-10-27）**：`tokens.css` 加了 `color-scheme: light dark` 与 `@media (prefers-color-scheme: dark)` 覆盖块；`styles.css` 里约 240 处颜色字面量按语义（文字/背景/边框的灰阶、accent/error/success/warning 色系、批注「纸色」`--mark-*`、diff 强调色、滚动条）并入变量，灰阶因此有轻微合并（浅色外观可能有极小色差）；正文换用 github-markdown-css 5.9.0 官方 auto 版（变量 + 深浅两套）；代码主题「GitHub」改为跟随系统；Notion / Bear 主题各加深色块。保留不变的是与模式无关的遮罩、深色提示条和 PDF 画布。
+
+### 9.4 验收
+
+- token 覆盖颜色、字号、圆角、阴影、动效，并有深色模式的变量位。
+- 新增和被迁移的组件样式里没有颜色、字号的字面量。
+- `styles.css` 随迁移同步变小。
+
+## 10. 实施顺序
+
+1. ~~token 归位（零视觉变化）~~ 已完成，见 9.3。
+2. ~~补 `agent-runner` 现有行为的测试~~ 已完成：`tests/unit/agent-runner.test.ts`（只看 DOM 输出与发出的请求）。
+3. ~~加依赖与构建配置~~ 已完成：react 19、tailwind v4（`src/client/tailwind.css`：无 preflight、无默认主题、颜色/字号/圆角用 `@theme inline reference` 映射到 tokens.css、只扫描 `*.tsx`）；`build.ts` 用 esbuild 的 `jsx: 'automatic'`，Tailwind 产物追加到 `client.css`，页面仍只引一个样式文件。冒烟测试 `react-smoke.test.tsx`。
+4. ~~抽出 `store.ts` 和 reducer~~ 已完成：`src/client/agent/store.ts`（纯 reducer，`agent-store.test.ts`），`agent-runner.ts` 的模块级状态全部改为读写 store。
+5. 逐块替换为组件（Messages → SessionBar → Composer）。
+   - ~~Messages、Stats~~ 已完成：沿用原 class 名与 DOM 结构，视觉不变；容器节点保留，React 只接管内部。
+   - ~~SessionBar~~ 已完成：菜单开合是组件内部状态，点外部关闭，新建/切换成功后关闭。
+   - ~~Composer、StatusLine~~ 已完成：输入框保持非受控（撤销栈、Emacs 键、输入法依赖浏览器原生行为）；chips、引擎/模型/思考强度（`useEngine`）、发送（`actions.ts`）、拖拽调高、运行计时全部是组件逻辑。托盘（`Tray.tsx`）：存储仍在 `agent-tray.ts`（加了订阅通知，编辑草稿不通知以免丢光标），视图是组件；空托盘不渲染。划词弹出的「加入托盘」小浮窗（`#agentTrayComposer`）属于评论浮窗，随第三阶段迁移。
+   - 后台重载（评论增删、同文档再激活）时，已有内容不再闪「加载中…」，数据到了直接替换。
+   - 注意：工具类位于 `@layer utilities`，存量无层样式优先级更高，新组件要用新的类名组合，不能指望工具类覆盖旧 `.agent-*` 规则。
+6. ~~删除旧的 `render*` 函数和 `index.html` 中对应静态节点~~ 已完成：`agent-runner.ts` 从约 800 行缩到约 130 行，只剩会话加载与 SSE 入口，不再碰 DOM；`annotation-layout.ts` 中已无用的 Agent 元素引用也已删除。
+7. 按第 5 节检查，决定是否进入第二阶段；同时处理 9.3 第 2 步的视觉合并。
+
+每一步都必须保持 `bun test tests/unit`、`go test -race ./cmd/workspace-scanner`、`bun run build` 通过。

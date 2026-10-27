@@ -1,0 +1,57 @@
+/*
+ * Tailwind 入口（只生成工具类，供 React 组件使用）。
+ *
+ * - 不引入 preflight（全局 reset），避免和存量样式冲突。
+ * - 不引入默认主题：颜色/字号/圆角全部映射到 tokens.css 的变量，token 是唯一真相源。
+ *   `@theme inline` 让工具类直接写成 var(--xxx)，不会再生成一份重复的变量声明。
+ * - 工具类位于 @layer utilities；存量 styles.css 是无层样式，优先级更高。
+ *   所以新组件要用全新的类名组合，不要指望工具类覆盖旧的 .agent-* 规则。
+ */
+@layer theme, base, components, utilities;
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+
+/* 只扫描 React 组件：全仓扫描会把 hidden/block/table 等通用词也生成成工具类，污染存量同名类 */
+@source "./**/*.tsx";
+
+@theme reference {
+  --*: initial;
+  --spacing: 4px;
+}
+
+@theme inline reference {
+  --color-text-primary: var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-text-muted: var(--color-text-muted);
+  --color-text-inverse: var(--color-text-inverse);
+  --color-border: var(--color-border);
+  --color-border-subtle: var(--color-border-subtle);
+  --color-bg-subtle: var(--color-bg-subtle);
+  --color-bg-secondary: var(--color-bg-secondary);
+  --color-surface: var(--color-surface);
+  --color-accent: var(--color-accent);
+  --color-accent-a10: var(--color-accent-a10);
+  --color-accent-bg: var(--color-accent-bg);
+  --color-accent-border: var(--color-accent-border);
+  --color-accent-text: var(--color-accent-text);
+  --color-error: var(--color-error);
+  --color-error-bg: var(--color-error-bg);
+  --color-error-border: var(--color-error-border);
+  --color-success: var(--color-success);
+  --color-success-bg: var(--color-success-bg);
+  --color-success-border: var(--color-success-border);
+  --color-warning: var(--color-warning);
+  --color-warning-bg: var(--color-warning-bg);
+  --color-warning-border: var(--color-warning-border);
+
+  --text-2xs: var(--text-2xs);
+  --text-xs: var(--text-xs);
+  --text-sm: var(--text-sm);
+  --text-md: var(--text-md);
+  --text-lg: var(--text-lg);
+
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-pill: var(--radius-pill);
+}

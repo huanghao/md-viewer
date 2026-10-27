@@ -217,3 +217,27 @@ describe('diffBlocks', () => {
     expect(result[4].changed).toBe(true);  // last paragraph — the only real edit
   });
 });
+
+describe('diffBlocks table rows', () => {
+  const t = (rows: string[]) => ['| 名称 | 值 |', '|---|---|', ...rows].join('\n');
+
+  it('marks only the changed data row', () => {
+    const r = diffBlocks(t(['| a | 1 |', '| b | 2 |', '| c | 3 |']), t(['| a | 1 |', '| b | 20 |', '| c | 3 |']));
+    expect(r[0].changed).toBe(true);
+    expect(r[0].changedRows).toEqual([2]);
+  });
+
+  it('marks added row, ignores moved rows and whitespace', () => {
+    const r = diffBlocks(t(['| a | 1 |', '| b | 2 |']), t(['|  b |  2 |', '| a | 1 |', '| d | 4 |']));
+    expect(r[0].changedRows).toEqual([3]);
+  });
+
+  it('marks header change', () => {
+    const r = diffBlocks(t(['| a | 1 |']), ['| 名称 | 数值 |', '|---|---|', '| a | 1 |'].join('\n'));
+    expect(r[0].changedRows).toEqual([0]);
+  });
+
+  it('non-table block has no changedRows', () => {
+    expect(diffBlocks('a | b', 'a | c')[0].changedRows).toBeUndefined();
+  });
+});

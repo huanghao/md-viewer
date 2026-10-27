@@ -1,24 +1,13 @@
+// 这些快捷键在所有平台都绑定 Ctrl（Cmd+W 被浏览器保留，页面拦不住）
 const isMac = navigator.platform.toUpperCase().includes('MAC');
-const mod = isMac ? '⌘' : 'Ctrl+';
-
-const modKey = isMac ? '⌘' : 'Ctrl';
+const mod = isMac ? '⌃' : 'Ctrl+';
 
 const SHORTCUTS = [
   { group: '导航' },
   { key: `${mod}F`, desc: '快速打开文件' },
   { key: 'j / k', desc: '文件列表上 / 下移动' },
-  { key: 'h / l', desc: '切换到左 / 右 tab' },
-  { key: `${modKey}+1~9`, desc: '跳到第 N 个文件' },
   { group: '文件' },
   { key: `${mod}W`, desc: '关闭当前文件' },
-  { group: '视图' },
-  { key: `${mod}K`, desc: '聚焦搜索框' },
-  { key: `${mod}+`, desc: '放大' },
-  { key: `${mod}−`, desc: '缩小' },
-  { key: `${mod}0`, desc: '重置缩放' },
-  { group: 'Diff 模式' },
-  { key: 'j', desc: '下一个变更块' },
-  { key: 'k', desc: '上一个变更块' },
   { group: '通用' },
   { key: 'Esc', desc: '关闭弹窗 / 批注面板' },
 ];

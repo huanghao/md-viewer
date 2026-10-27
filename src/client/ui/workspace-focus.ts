@@ -14,6 +14,7 @@ import { fuzzyMatch } from '../utils/fuzzy-search';
 import { getPinnedFiles } from '../utils/pinned-files';
 import { scanWorkspace } from '../workspace';
 import { renderFileRow } from './file-row';
+import { duplicateNameHints } from '../utils/file-names';
 import { getFileExtension } from '../utils/file-type';
 import { storageGet, storageSet } from '../utils/storage';
 import {
@@ -185,7 +186,7 @@ export function getActiveFiles(
 }
 
 
-function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>, query: string, displayTime?: number): string {
+function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>, query: string, displayTime?: number, nameHint?: string): string {
   return renderFileRow(file.path, file.name, displayTime ?? file.lastModified, {
     containerClass: 'tree-item file-node focus-file-item',
     onClickAction: 'focus-file-click',
@@ -194,6 +195,7 @@ function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>, query: str
     indentPx: 0,
     query,
     showClose: false,
+    nameHint,
   });
 }
 
@@ -333,8 +335,9 @@ function renderFocusWorkspaceGroup(
     ? `<span class="focus-ws-badge">${activeFiles.length}</span>`
     : `<span class="focus-ws-badge empty">0</span>`;
 
+  const nameHints = duplicateNameHints(activeFiles.map((f) => f.path));
   const filesHtml = hasFiles
-    ? activeFiles.map((f) => renderFocusFileItem(f, pinned, query, displayTimeMap?.get(f.path))).join('')
+    ? activeFiles.map((f) => renderFocusFileItem(f, pinned, query, displayTimeMap?.get(f.path), nameHints.get(f.path))).join('')
     : '';
 
   return `

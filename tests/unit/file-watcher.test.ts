@@ -75,7 +75,10 @@ describe('file watcher integration', () => {
     expect(unwatchFile(filePath)).toBe(true);
     expect(getWatchedFileCountForTesting()).toBe(0);
 
+    // macOS FSEvents 可能把 watch 之前那次 writeFileSync('before') 作为在途事件投递过来；
+    // 本用例只关心 unwatch 之后不再推送，所以先清掉此前收到的内容
     await wait(200);
+    chunks.length = 0;
     writeFileSync(filePath, 'after');
     await wait(1200);
 

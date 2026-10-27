@@ -20,7 +20,6 @@ import { createResizer } from './utils/resizer';
 import { getTextNodes, globalOffsetForPosition, globalOffsetForPositionEnd, positionForGlobalOffset, clamp, placeFloating, getReaderText } from './annotation/position';
 import { currentPdfViewer } from './pdf-state';
 import { isResolvedAnn, getAnchorTrack, matchesFilter, getVisibleAnnotations as getVisibleAnnotationsUtil } from './annotation/query';
-import { handleEmacsKeys } from './utils/emacs-keys';
 import { recordSignal } from './utils/focus-signals';
 import { initAgentRunner, onAgentTabActivated } from './agent-runner';
 import { addTrayItem } from './agent-tray';
@@ -83,6 +82,7 @@ import {
   autoResizeComposerInput,
 } from './annotation/thread-manager';
 import { getDiffViewActive } from './diff-view';
+import { isSubmitKey } from './utils/input-keys';
 
 // 用于在 popover 关闭/切换时保留 reply 草稿，与 DOM 生命周期解耦
 const popoverReplyDrafts = new Map<string, string>();
@@ -207,6 +207,8 @@ function updateAnnotationCount(): void {
 // ==================== Tab ====================
 
 const ANNOTATION_TAB_KEY = 'md-viewer:annotation-tab';
+// Agent 对话最近一次按哪个文档激活的：评论列表因增删改重绘时，路径没变就不要重载对话（会闪一下）
+let _agentActivatedPath: string | null = null;
 let _currentAnnotationTab: 'comments' | 'agent' =
   storageGet<string>(ANNOTATION_TAB_KEY, 'comments') === 'agent' ? 'agent' : 'comments';
 
@@ -232,6 +234,7 @@ export function switchAnnotationTab(tab: 'comments' | 'agent'): void {
   document.getElementById('annotationFilterMenu')?.classList.add('hidden');
 
   if (tab === 'agent') {
+    _agentActivatedPath = _listFilePath;
     void onAgentTabActivated(_listFilePath);
   }
 }
@@ -906,7 +909,10 @@ function resolvePositionedAnnotationOverlaps(listEl: HTMLElement, contentScrollH
 
 export function renderAnnotationList(filePath: string | null): void {
   _listFilePath = filePath;
-  if (_currentAnnotationTab === 'agent') void onAgentTabActivated(filePath);
+  if (_currentAnnotationTab === 'agent' && filePath !== _agentActivatedPath) {
+    _agentActivatedPath = filePath;
+    void onAgentTabActivated(filePath);
+  }
   const el = getElements();
   if (!el.annotationList) return;
   updateAnnotationCount();
@@ -1192,11 +1198,10 @@ export function initAnnotationElements(): void {
       return;
     }
 
-    // reply input keydown → Cmd+Enter 提交，Emacs keys
+    // reply input keydown → Cmd+Enter 提交
     if (target instanceof HTMLTextAreaElement && target.hasAttribute('data-reply-input')) {
       const ke = e as KeyboardEvent;
-      if (handleEmacsKeys(ke, target)) { ke.preventDefault(); return; }
-      if (ke.key !== 'Enter' || !(ke.metaKey || ke.ctrlKey)) return;
+      if (!isSubmitKey(ke)) return;
       ke.preventDefault();
       const id = target.getAttribute('data-reply-input');
       if (!id) return;
@@ -1226,12 +1231,7 @@ export function initAnnotationElements(): void {
 
   document.getElementById('composerCancelBtn')?.addEventListener('click', hideComposer);
   getElements().composerNote?.addEventListener('keydown', (event) => {
-    if (handleEmacsKeys(event, event.currentTarget as HTMLTextAreaElement)) {
-      event.preventDefault();
-      return;
-    }
-    if (event.key !== 'Enter') return;
-    if (!(event.metaKey || event.ctrlKey)) return; // Cmd/Ctrl+Enter 提交
+    if (!isSubmitKey(event)) return; // Cmd+Enter 提交
     event.preventDefault();
     const filePath = getActiveAnnotationFilePath();
     if (filePath) savePendingAnnotation(filePath);
@@ -1264,7 +1264,7 @@ export function initAnnotationElements(): void {
 
   getElements().agentTrayComposerNote?.addEventListener('keydown', (event) => {
     event.stopPropagation();
-    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+    if (isSubmitKey(event)) {
       event.preventDefault();
       submitTrayComposer();
     } else if (event.key === 'Escape') {
@@ -1398,12 +1398,7 @@ export function initAnnotationElements(): void {
   document.getElementById('annotationPopover')?.addEventListener('keydown', (event) => {
     const target = event.target as HTMLElement;
     if (!(target instanceof HTMLTextAreaElement)) return;
-    if (handleEmacsKeys(event, target)) {
-      event.preventDefault();
-      return;
-    }
-    if (event.key !== 'Enter') return;
-    if (!(event.metaKey || event.ctrlKey)) return; // Cmd/Ctrl+Enter 提交
+    if (!isSubmitKey(event)) return; // Cmd+Enter 提交
     const id = target.getAttribute('data-popover-reply-input');
     const filePath = getActiveAnnotationFilePath();
     if (!id || !filePath) return;

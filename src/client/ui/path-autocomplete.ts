@@ -138,6 +138,7 @@ export function attachPathAutocomplete(
   input.addEventListener('path-autocomplete-hide', hide as EventListener);
 
   input.addEventListener('keydown', (e) => {
+    if ((e as KeyboardEvent).isComposing) return; // 输入法组词中的 Enter/方向键归输入法
     const key = (e as KeyboardEvent).key;
     if (!isVisible()) return;
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'bun:test';
 import { Window } from 'happy-dom';
-import { handleEmacsKeys } from '../../src/client/utils/emacs-keys';
+import { handleEmacsKeys, planEmacsEdit } from '../../src/client/utils/emacs-keys';
 
 let win: Window;
 let KeyboardEventClass: typeof KeyboardEvent;
@@ -169,5 +169,38 @@ describe('popover reply draft save/restore pattern', () => {
     }
 
     expect(container.querySelector<HTMLTextAreaElement>('[data-popover-reply-input="ann-1"]')!.value).toBe('my reply');
+  });
+});
+
+describe('planEmacsEdit / kill ring', () => {
+  it('ctrl+k kills to line end, or the newline when already at end', () => {
+    expect(planEmacsEdit('k', 'abc\ndef', 1, 1, true)).toEqual({ type: 'delete', from: 1, to: 3, kill: true });
+    expect(planEmacsEdit('k', 'abc\ndef', 3, 3, true)).toEqual({ type: 'delete', from: 3, to: 4, kill: true });
+  });
+
+  it('ctrl+w kills previous word, ctrl+u kills to line start', () => {
+    expect(planEmacsEdit('w', 'foo bar ', 8, 8, false)).toEqual({ type: 'delete', from: 4, to: 8, kill: true });
+    expect(planEmacsEdit('u', 'ab\ncd', 5, 5, true)).toEqual({ type: 'delete', from: 3, to: 5, kill: true });
+  });
+
+  it('ctrl+n/p are ignored in single-line inputs', () => {
+    expect(planEmacsEdit('n', 'abc', 1, 1, false)).toBeNull();
+    expect(planEmacsEdit('p', 'abc', 1, 1, false)).toBeNull();
+  });
+
+  it('ctrl+y yanks what ctrl+k/u/w killed', () => {
+    const ta = makeTextarea('hello world', 5);
+    handleEmacsKeys(ctrl('k'), ta);
+    expect(ta.value).toBe('hello');
+    handleEmacsKeys(ctrl('a'), ta);
+    handleEmacsKeys(ctrl('y'), ta);
+    expect(ta.value).toBe(' worldhello');
+  });
+
+  it('ignores keys during IME composition', () => {
+    const ta = makeTextarea('abc', 3);
+    const e = new KeyboardEventClass('keydown', { key: 'h', ctrlKey: true, isComposing: true });
+    expect(handleEmacsKeys(e, ta)).toBe(false);
+    expect(ta.value).toBe('abc');
   });
 });

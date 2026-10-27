@@ -296,21 +296,6 @@ export function navigateFileInView(direction: 1 | -1): void {
   }
 }
 
-export function cycleTab(direction: 1 | -1): void {
-  const files = state.tabOrder.filter(p => state.sessionFiles.has(p));
-  if (files.length <= 1) return;
-  const currentIndex = state.currentFile ? files.indexOf(state.currentFile) : -1;
-  const nextIndex = (currentIndex + direction + files.length) % files.length;
-  void switchFile(files[nextIndex]);
-}
-
-export function jumpToTab(n: number): void {
-  const files = state.tabOrder.filter(p => state.sessionFiles.has(p));
-  if (files.length === 0) return;
-  const index = n === 9 ? files.length - 1 : n - 1;
-  if (index >= 0 && index < files.length) void switchFile(files[index]);
-}
-
 // ==================== File search ====================
 
 // 搜索文件

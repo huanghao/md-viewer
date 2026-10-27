@@ -27,7 +27,8 @@ export interface AgentCommandResolution {
   backendName: string | null;
 }
 
-const CONFIG_PATH = () => join(homedir(), ".config", "agent-backends.yaml");
+const home = () => process.env.HOME || homedir();
+const CONFIG_PATH = () => join(home(), ".config", "agent-backends.yaml");
 const SHIM_DIR = () => join(homedir(), ".cache", "agent-client");
 const ZSHRC_LOCAL = () => join(homedir(), ".zshrc.local");
 

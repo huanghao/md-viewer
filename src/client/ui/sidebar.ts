@@ -6,7 +6,7 @@ import { escapeAttr, escapeHtml } from '../utils/escape';
 import { generateDistinctNames } from '../utils/file-names';
 import { getFileListStatus } from '../utils/file-status';
 import { isJsonFile, isJsonlFile } from '../utils/file-type';
-import { renderFileRow } from './file-row';
+import { renderFileRow, renderNameWithHint } from './file-row';
 import { isPinned } from '../utils/pinned-files';
 import { getTabBatchTargets, type TabBatchAction } from '../utils/tab-batch';
 import { renderWorkspaceSidebar, bindWorkspaceEvents, type WorkspaceCallbacks } from './sidebar-workspace';
@@ -99,7 +99,7 @@ export function initTabsActions(container: HTMLElement, callbacks: TabsCallbacks
 }
 
 interface BatchCount { others: number; right: number; unmodified: number; all: number; }
-interface FileEntry { path: string; displayName: string; name: string; isMissing?: boolean; }
+interface FileEntry { path: string; displayName: string; name: string; nameHint?: string; isMissing?: boolean; }
 
 export function renderTabsHTML(
   filesWithDisplay: FileEntry[],
@@ -115,7 +115,7 @@ export function renderTabsHTML(
     return `
       <div class="${classes.join(' ')}" data-index="${index}" data-path="${escapeAttr(file.path)}"
            data-action="switch-file">
-        <span class="tab-name">${escapeHtml(file.displayName)}</span>
+        <span class="tab-name">${renderNameWithHint(escapeHtml(file.name), file.nameHint)}</span>
         <span class="tab-close" data-action="remove-file" data-path="${escapeAttr(file.path)}">×</span>
       </div>
     `;
@@ -156,6 +156,7 @@ interface FileDragState {
 let tabDragState: TabDragState | null = null;
 let fileDragState: FileDragState | null = null;
 import { attachPathAutocomplete } from './path-autocomplete';
+import { isSubmitKey } from '../utils/input-keys';
 
 export function resetSidebarFileAnchor(): void {
   hasAutoAnchoredCurrentFile = false;
@@ -301,7 +302,7 @@ export function renderSearchBox(): void {
     ? `搜索已打开的文件 (${kKey})`
     : tab === 'focus'
     ? `搜索最近文件 (${kKey})`
-    : '搜索或输入路径（Enter补全，Cmd/Ctrl+Enter添加）';
+    : '搜索或输入路径（Enter补全，Cmd+Enter添加）';
 
   if (!input || !clearBtn) {
     container.innerHTML = `
@@ -345,7 +346,7 @@ export function renderSearchBox(): void {
     });
 
     input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      if (isSubmitKey(e)) {
         e.preventDefault();
         input!.dispatchEvent(new Event('path-autocomplete-hide'));
         searchBoxCallbacks?.handleUnifiedInputSubmit(input!.value);
@@ -355,7 +356,7 @@ export function renderSearchBox(): void {
         // 自动补全面板已消费 Enter/Tab/Escape，不再触发统一提交逻辑
         return;
       }
-      if (e.key === 'Enter') {
+      if (e.key === 'Enter' && !e.isComposing && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         input!.dispatchEvent(new Event('path-autocomplete-hide'));
         searchBoxCallbacks?.handleUnifiedInputSubmit(input!.value);
@@ -708,8 +709,9 @@ export function renderFiles(): void {
   const filesWithDisplay = generateDistinctNames(orderedMap);
 
   container.innerHTML = filesWithDisplay.map(file => {
-    return renderFileRow(file.path, file.displayName || file.name, undefined, {
+    return renderFileRow(file.path, file.name, undefined, {
       containerClass: 'file-item',
+      nameHint: file.nameHint,
       onClickAction: 'switch-file',
       showPin: true,
       showTime: false,

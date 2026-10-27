@@ -1,6 +1,8 @@
 export interface BlockDiff {
   content: string;
   changed: boolean;
+  /** 表格块独有：变化的行下标。0 = 表头，1.. = 数据行（不含分隔行），与渲染后的 <tr> 顺序一致。 */
+  changedRows?: number[];
 }
 
 // 列表起始行：`- `/`* `/`+ ` 或 `1. `/`1) `。要求标记后紧跟空格，避免误判 "---"（hr）或 "**加粗**"。
@@ -93,6 +95,15 @@ function normalizeKey(content: string): string {
   return content.replace(/\s+/g, ' ').trim();
 }
 
+const TABLE_SEP_RE = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
+
+/** GFM 表格块 → 行文本（表头 + 数据行，去掉分隔行）；不是表格返回 null。 */
+export function tableRows(block: string): string[] | null {
+  const lines = block.split('\n');
+  if (lines.length < 2 || !lines[0].includes('|') || !TABLE_SEP_RE.test(lines[1]) || !lines[1].includes('-')) return null;
+  return [lines[0], ...lines.slice(2)];
+}
+
 export function diffBlocks(oldText: string, newText: string): BlockDiff[] {
   const oldBlocks = splitBlocks(oldText);
   const newBlocks = splitBlocks(newText);
@@ -109,6 +120,15 @@ export function diffBlocks(oldText: string, newText: string): BlockDiff[] {
     oldCount.set(key, (oldCount.get(key) ?? 0) + 1);
   }
 
+  // 旧文档所有表格行的多重集合：表格块变化时，按行内容判断哪些行是新的/改过的
+  const oldRowCount = new Map<string, number>();
+  for (const b of oldBlocks) {
+    for (const r of tableRows(b) ?? []) {
+      const k = normalizeKey(r);
+      oldRowCount.set(k, (oldRowCount.get(k) ?? 0) + 1);
+    }
+  }
+
   return newBlocks.map(content => {
     const key = isFenceBlock(content) ? content : normalizeKey(content);
     const count = oldCount.get(key) ?? 0;
@@ -116,6 +136,15 @@ export function diffBlocks(oldText: string, newText: string): BlockDiff[] {
       oldCount.set(key, count - 1);
       return { content, changed: false };
     }
-    return { content, changed: true };
+    const rows = tableRows(content);
+    if (!rows) return { content, changed: true };
+    const changedRows: number[] = [];
+    rows.forEach((r, i) => {
+      const k = normalizeKey(r);
+      const c = oldRowCount.get(k) ?? 0;
+      if (c > 0) oldRowCount.set(k, c - 1);
+      else changedRows.push(i);
+    });
+    return { content, changed: true, changedRows };
   });
 }

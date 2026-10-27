@@ -1,7 +1,6 @@
 import { escapeHtml } from '../utils/escape';
 import { replyAnnotationRemote } from '../api/annotations';
 import { showError } from '../ui/toast';
-import { handleEmacsKeys } from '../utils/emacs-keys';
 import {
   type Annotation,
   type AnnotationThreadItem,
@@ -10,6 +9,7 @@ import {
   replaceAnnotationInState,
 } from '../annotation-state';
 import { iconSvg } from './icons';
+import { isSubmitKey } from '../utils/input-keys';
 
 // Callback injection to avoid circular imports with annotation.ts
 let _renderAnnotationList: (filePath: string | null) => void = () => {};
@@ -152,9 +152,8 @@ export function editThreadItem(annotationId: string, itemId: string, filePath: s
   };
 
   textarea.addEventListener('keydown', (e) => {
-    if (handleEmacsKeys(e, textarea)) { e.preventDefault(); e.stopPropagation(); return; }
     if (e.key === 'Escape') { e.preventDefault(); cancel(); }
-    else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); save(); }
+    else if (isSubmitKey(e)) { e.preventDefault(); save(); }
   });
   textarea.addEventListener('input', () => {
     textarea.style.height = 'auto';

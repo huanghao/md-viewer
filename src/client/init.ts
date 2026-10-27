@@ -32,20 +32,17 @@ import {
 } from './toc-manager';
 import { flushAll as flushUndoQueue } from './utils/undo-queue';
 import { setupFindBar } from './find-bar';
+import { initInputKeys } from './utils/input-keys';
 import { initZoom, zoomIn, zoomOut, setZoomFromInput, updateZoomDisplay } from './zoom-controller';
 import {
   initDiffView,
-  getDiffViewActive,
   handleDiffButtonClick,
-  navigateDiffBlock,
 } from './diff-view';
 import {
   initFileSwitcher,
   switchFile,
   removeFileHandler,
   navigateFileInView,
-  cycleTab,
-  jumpToTab,
   searchFilesHandler,
   setupDragAndDrop,
   handleURLParams,
@@ -371,21 +368,6 @@ import {
     },
   });
 
-  const isMac = navigator.platform.toUpperCase().includes('MAC');
-  const modKey = isMac ? 'Cmd' : 'Ctrl';
-
-  registerAction({
-    id: 'focus-search',
-    label: '聚焦搜索框',
-    category: 'view',
-    defaultKey: `${modKey}+k`,
-    handler: () => {
-      const input = document.getElementById('searchInput') as HTMLInputElement | null;
-      if (input) { input.focus(); input.select(); }
-    },
-    shouldActivate: () => !isInputFocused(),
-  });
-
   registerAction({
     id: 'close-file',
     label: '关闭当前文件',
@@ -398,35 +380,14 @@ import {
     shouldActivate: () => !isInputFocused(),
   });
 
-  registerAction({
-    id: 'diff-next',
-    label: '下一个变更块',
-    category: 'diff',
-    defaultKey: 'j',
-    context: 'Diff 模式',
-    handler: () => navigateDiffBlock(1),
-    shouldActivate: () => getDiffViewActive() && !isInputFocused(),
-  });
-
-  registerAction({
-    id: 'diff-prev',
-    label: '上一个变更块',
-    category: 'diff',
-    defaultKey: 'k',
-    context: 'Diff 模式',
-    handler: () => navigateDiffBlock(-1),
-    shouldActivate: () => getDiffViewActive() && !isInputFocused(),
-  });
-
-  // j/k: 在当前侧边栏视角里上下移动文件（非 diff 模式，非输入框）
+  // j/k: 在当前侧边栏视角里上下移动文件（非输入框）
   registerAction({
     id: 'nav-file-down',
     label: '移到下一个文件',
     category: 'navigation',
     defaultKey: 'j',
-    context: '非 Diff 模式',
     handler: () => navigateFileInView(1),
-    shouldActivate: () => !getDiffViewActive() && !isInputFocused(),
+    shouldActivate: () => !isInputFocused(),
   });
 
   registerAction({
@@ -434,48 +395,9 @@ import {
     label: '移到上一个文件',
     category: 'navigation',
     defaultKey: 'k',
-    context: '非 Diff 模式',
     handler: () => navigateFileInView(-1),
-    shouldActivate: () => !getDiffViewActive() && !isInputFocused(),
-  });
-
-  // h/l: tab 左右切换（非输入框）
-  registerAction({
-    id: 'cycle-tab-next',
-    label: '切换到右边的 tab',
-    category: 'navigation',
-    defaultKey: 'l',
-    handler: () => cycleTab(1),
     shouldActivate: () => !isInputFocused(),
   });
-
-  registerAction({
-    id: 'cycle-tab-prev',
-    label: '切换到左边的 tab',
-    category: 'navigation',
-    defaultKey: 'h',
-    handler: () => cycleTab(-1),
-    shouldActivate: () => !isInputFocused(),
-  });
-
-  // Ctrl+Tab: captured at window level before browser default (works in Firefox; Chrome ignores it)
-  window.addEventListener('keydown', (e) => {
-    if (e.key !== 'Tab' || !e.ctrlKey) return;
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    cycleTab(e.shiftKey ? -1 : 1);
-  }, { capture: true });
-
-  for (let n = 1; n <= 9; n++) {
-    const tabN = n;
-    registerAction({
-      id: `jump-to-tab-${tabN}`,
-      label: `跳到第 ${tabN} 个文件`,
-      category: 'navigation',
-      defaultKey: `${modKey}+${tabN}`,
-      handler: () => jumpToTab(tabN),
-    });
-  }
 
   registerAction({
     id: 'quick-open',
@@ -486,24 +408,6 @@ import {
     shouldActivate: () => !isInputFocused(),
   });
 
-  registerAction({
-    id: 'zoom-in',
-    label: '放大',
-    category: 'view',
-    defaultKey: `${modKey}+=`,
-    handler: () => zoomIn(),
-    shouldActivate: () => !isInputFocused(),
-  });
-
-  registerAction({
-    id: 'zoom-out',
-    label: '缩小',
-    category: 'view',
-    defaultKey: `${modKey}+-`,
-    handler: () => zoomOut(),
-    shouldActivate: () => !isInputFocused(),
-  });
-
   initQuickOpen({
     getOpenFilePaths: () => Array.from(state.sessionFiles.keys()),
     openFile: (path) => addFileByPath(path, true),
@@ -511,6 +415,7 @@ import {
   });
 
   initDispatcher();
+  initInputKeys();
 
   // 添加批注文本选中监听
   document.addEventListener('mouseup', () => {

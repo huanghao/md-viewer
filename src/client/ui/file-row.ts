@@ -28,10 +28,21 @@ export interface FileRowOptions {
   indentPx: number;
   /** 搜索关键词，用于文件名高亮（空字符串表示不高亮） */
   query: string;
+  /** 同名文件的区分目录（见 renderNameWithHint） */
+  nameHint?: string;
   /** 是否显示关闭按钮（列表：true；其余：false） */
   showClose: boolean;
   /** 关闭按钮的 onclick JS 字符串（仅 showClose=true 时使用） */
   onCloseJs?: (path: string) => string;
+}
+
+/**
+ * 同名文件的统一名称渲染（同 VSCode）：文件名后紧跟淡色的区分目录。
+ * 无 hint 时原样返回 nameHtml。
+ */
+export function renderNameWithHint(nameHtml: string, hint?: string): string {
+  if (!hint) return nameHtml;
+  return `${nameHtml}<span class="name-hint">${escapeHtml(hint)}</span>`;
 }
 
 function highlightQuery(text: string, query: string): string {
@@ -129,7 +140,7 @@ export function renderFileRow(
       <span class="tree-toggle"></span>
       <span class="file-type-icon ${typeIcon.cls}">${escapeHtml(typeIcon.label)}</span>
       <span class="tree-status-inline">${statusBadge}</span>
-      <span class="tree-name" title="${escapeAttr(name)}"><span class="tree-name-full">${highlightedName}</span></span>
+      <span class="tree-name" title="${escapeAttr(opts.nameHint ? path : name)}"><span class="tree-name-full">${renderNameWithHint(highlightedName, opts.nameHint)}</span></span>
       ${annotationBadge}
       ${timeStr}
       ${pinBtn}

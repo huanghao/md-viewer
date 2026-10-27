@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync } from "fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import {
@@ -115,7 +115,7 @@ backends:
     process.env.HOME = tmpHome;
     const configPath = join(tmpHome, ".config", "agent-backends.yaml");
     mkdirSync(join(tmpHome, ".config"), { recursive: true });
-    Bun.write(configPath, `
+    writeFileSync(configPath, `
 default: kc
 backends:
   - name: kc

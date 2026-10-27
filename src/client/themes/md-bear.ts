@@ -1,8 +1,6 @@
-import githubMarkdownCSS from '../vendor-github-markdown.css';
-
 // Bear/iA Writer 主题：在 GitHub baseline 上叠加衬线字体 overrides
 // 保留所有 GFM 特性样式，只覆盖字体和颜色 token
-export const mdBear = githubMarkdownCSS + `
+export const mdBear = `
 
 /* ===== Bear / iA Writer theme overrides ===== */
 .markdown-body {
@@ -62,5 +60,21 @@ export const mdBear = githubMarkdownCSS + `
 }
 .markdown-body table th {
   background: #f0ede8;
+}
+
+/* 深色：跟随系统 */
+@media (prefers-color-scheme: dark) {
+  .markdown-body { color: #d6d3cd; background-color: #1c1b19; }
+  .markdown-body h1, .markdown-body h2, .markdown-body h3,
+  .markdown-body h4, .markdown-body h5, .markdown-body h6 { color: #ece9e3; border-bottom-color: #3d3a35; }
+  .markdown-body a { color: #ff7a93; }
+  .markdown-body em { color: #bdb9b1; }
+  .markdown-body code { background: #2a2825; color: #ff7a93; }
+  .markdown-body pre { background: #2a2825; }
+  .markdown-body pre code { background: transparent; color: inherit; }
+  .markdown-body blockquote { border-left-color: #4a463f; color: #9b968d; }
+  .markdown-body hr { border-top-color: #3d3a35; }
+  .markdown-body table th, .markdown-body table td { border-color: #3d3a35; }
+  .markdown-body table th { background: #2a2825; }
 }
 `;

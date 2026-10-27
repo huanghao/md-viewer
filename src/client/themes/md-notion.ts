@@ -1,8 +1,6 @@
-import githubMarkdownCSS from '../vendor-github-markdown.css';
-
 // Notion 主题：在 GitHub baseline 上叠加 typography/color overrides
 // 保留所有 GFM 特性样式（task list、alert、footnote 等），只覆盖视觉 token
-export const mdNotion = githubMarkdownCSS + `
+export const mdNotion = `
 
 /* ===== Notion theme overrides ===== */
 .markdown-body {
@@ -56,5 +54,21 @@ export const mdNotion = githubMarkdownCSS + `
 }
 .markdown-body table th, .markdown-body table td {
   border-color: rgba(55,53,47,0.2);
+}
+
+/* 深色：跟随系统 */
+@media (prefers-color-scheme: dark) {
+  .markdown-body { color: #e3e2e0; background-color: #191919; }
+  .markdown-body h1, .markdown-body h2, .markdown-body h3,
+  .markdown-body h4, .markdown-body h5, .markdown-body h6,
+  .markdown-body p { color: #e3e2e0; }
+  .markdown-body a { color: #529cca; }
+  .markdown-body code { background: rgba(135,131,120,0.3); color: #ff7369; }
+  .markdown-body pre { background: #202020; }
+  .markdown-body pre code { background: transparent; color: inherit; }
+  .markdown-body blockquote { color: #9b9a97; }
+  .markdown-body hr { border-top-color: rgba(255,255,255,0.13); }
+  .markdown-body table th { background: rgba(255,255,255,0.05); }
+  .markdown-body table th, .markdown-body table td { border-color: rgba(255,255,255,0.15); }
 }
 `;

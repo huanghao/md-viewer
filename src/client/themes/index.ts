@@ -18,7 +18,7 @@ export const MD_THEMES: ThemeMeta[] = [
 ];
 
 export const HL_THEMES: ThemeMeta[] = [
-  { key: 'github',        label: 'GitHub Light',  css: hlGithub },
+  { key: 'github',        label: 'GitHub（跟随系统）',  css: hlGithub },
   { key: 'github-dark',   label: 'GitHub Dark',   css: hlGithubDark },
   { key: 'atom-one-dark', label: 'Atom One Dark', css: hlAtomOneDark },
 ];

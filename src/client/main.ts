@@ -4,6 +4,7 @@
 // CSS entry points — esbuild extracts these into dist/client.css
 import './vendor-github-markdown.css';
 import './vendor-highlight-github.css';
+import './tokens.css';
 import './styles.css';
 
 // 本地 otel 接入，需在其它模块发起 fetch 之前注册好 instrumentation

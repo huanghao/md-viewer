@@ -4,6 +4,7 @@
 //           renderContent, renderBreadcrumb, showNearbyMenu, flashContentUpdated
 //           and helper functions: isHtmlPath, isJsonPath, isPdfPath, isUrlPath, applyPdfModeButtons
 
+import { highlightCodeBlocks } from './utils/code-highlight';
 import type { PdfViewerEntry } from './pdf-registry';
 import type { PdfViewerInstance } from './pdf-viewer.js';
 
@@ -909,6 +910,7 @@ export function renderContent() {
   container.scrollTop = file.savedScrollTop ?? 0;
   rewriteMarkdownAssetUrls(container, file.path);
   void renderMermaidDiagrams(container);
+  highlightCodeBlocks(container);
   renderMath(container);
 
   // 应用批注高亮

@@ -310,14 +310,14 @@ function renderKeybindingsTab(): string {
         <div class="kb-pref-row${isRecording ? ' recording' : ''}" data-action="${action.id}" style="
           display:flex;align-items:center;gap:10px;padding:9px 10px;
           border-radius:7px;border:1px solid transparent;margin-bottom:2px;
-          ${isRecording ? 'background:#eff6ff;border-color:#93c5fd;' : ''}
+          ${isRecording ? 'background:var(--color-accent-bg);border-color:var(--color-accent-border);' : ''}
         ">
           <span style="flex:1;font-size:13px;color:var(--color-text-primary,#222)">
             ${escapeHtml(action.label)}
             ${action.context ? `<span style="font-size:11px;color:var(--color-text-muted,#aaa);margin-left:6px;font-weight:normal">(${escapeHtml(action.context)})</span>` : ''}
           </span>
           ${isRecording
-            ? `<span class="kb-recording-badge" style="font-size:12px;color:#2563eb;background:#dbeafe;
+            ? `<span class="kb-recording-badge" style="font-size:12px;color:var(--color-accent-text);background:var(--color-accent-bg);
                 border-radius:5px;padding:3px 10px;animation:kb-pulse 1s ease-in-out infinite">按下按键…</span>`
             : displayKey
               ? `<span class="kb-key-display" style="display:inline-flex;gap:4px">${displayKey}</span>`
@@ -325,13 +325,13 @@ function renderKeybindingsTab(): string {
           }
           <button class="kb-edit-btn" data-action="${action.id}" style="
             width:26px;height:26px;border-radius:5px;border:1px solid var(--color-border,#ddd);
-            background:${isRecording ? '#2563eb' : 'var(--color-bg-primary,white)'};
-            color:${isRecording ? 'white' : 'var(--color-text-muted,#888)'};
+            background:${isRecording ? 'var(--color-accent)' : 'var(--color-surface)'};
+            color:${isRecording ? 'var(--color-text-inverse)' : 'var(--color-text-muted,#888)'};
             cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;
           " title="编辑">✎</button>
           <button class="kb-reset-btn" data-action="${action.id}" style="
             width:26px;height:26px;border-radius:5px;border:1px solid var(--color-border,#ddd);
-            background:var(--color-bg-primary,white);color:var(--color-text-muted,#aaa);
+            background:var(--color-surface);color:var(--color-text-muted,#aaa);
             cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;
           " title="重置为默认">↺</button>
         </div>
@@ -359,12 +359,12 @@ function formatKeyCombo(combo: string, isMac: boolean): string {
     .split('+')
     .map((part) => {
       if (isMac) {
-        if (part === 'Ctrl') return '<kbd style="display:inline-block;padding:2px 6px;border:1px solid #ccc;border-bottom:2px solid #bbb;border-radius:4px;background:#f9f9f9;font-size:11px;font-family:monospace">⌃</kbd>';
-        if (part === 'Cmd') return '<kbd style="display:inline-block;padding:2px 6px;border:1px solid #ccc;border-bottom:2px solid #bbb;border-radius:4px;background:#f9f9f9;font-size:11px;font-family:monospace">⌘</kbd>';
-        if (part === 'Alt') return '<kbd style="display:inline-block;padding:2px 6px;border:1px solid #ccc;border-bottom:2px solid #bbb;border-radius:4px;background:#f9f9f9;font-size:11px;font-family:monospace">⌥</kbd>';
-        if (part === 'Shift') return '<kbd style="display:inline-block;padding:2px 6px;border:1px solid #ccc;border-bottom:2px solid #bbb;border-radius:4px;background:#f9f9f9;font-size:11px;font-family:monospace">⇧</kbd>';
+        if (part === 'Ctrl') return '<kbd style="display:inline-block;padding:2px 6px;border:1px solid var(--color-border);border-bottom:2px solid var(--color-border);border-radius:4px;background:var(--color-bg-subtle);font-size:11px;font-family:monospace">⌃</kbd>';
+        if (part === 'Cmd') return '<kbd style="display:inline-block;padding:2px 6px;border:1px solid var(--color-border);border-bottom:2px solid var(--color-border);border-radius:4px;background:var(--color-bg-subtle);font-size:11px;font-family:monospace">⌘</kbd>';
+        if (part === 'Alt') return '<kbd style="display:inline-block;padding:2px 6px;border:1px solid var(--color-border);border-bottom:2px solid var(--color-border);border-radius:4px;background:var(--color-bg-subtle);font-size:11px;font-family:monospace">⌥</kbd>';
+        if (part === 'Shift') return '<kbd style="display:inline-block;padding:2px 6px;border:1px solid var(--color-border);border-bottom:2px solid var(--color-border);border-radius:4px;background:var(--color-bg-subtle);font-size:11px;font-family:monospace">⇧</kbd>';
       }
-      return `<kbd style="display:inline-block;padding:2px 6px;border:1px solid #ccc;border-bottom:2px solid #bbb;border-radius:4px;background:#f9f9f9;font-size:11px;font-family:monospace">${escapeHtml(part)}</kbd>`;
+      return `<kbd style="display:inline-block;padding:2px 6px;border:1px solid var(--color-border);border-bottom:2px solid var(--color-border);border-radius:4px;background:var(--color-bg-subtle);font-size:11px;font-family:monospace">${escapeHtml(part)}</kbd>`;
     })
     .join('');
 }

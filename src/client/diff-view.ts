@@ -6,6 +6,7 @@ import { mountScrollbar, unmountScrollbar, updateDiffMarkers, clearDiffMarkers }
 import { shouldRefreshDiff, refreshDiffBannerLabel } from './ui/diff-refresh';
 import { buildDiffBannerHTML, initDiffBannerActions, updateBannerForMode } from './ui/diff-banner';
 import { renderSidebar } from './ui/sidebar';
+import { highlightCodeBlocks } from './utils/code-highlight';
 import { protectMath } from './utils/math-protect';
 import { invalidateAnnotationElementsCache } from './annotation-layout';
 import { deleteSnapshot } from './api/snapshots';
@@ -251,6 +252,7 @@ export function renderParagraphDiffView(oldContent: string, newContent: string):
   const g = protectMath(safeNew);
   container.innerHTML = `<div class="markdown-body" id="reader">${g.restore((window as any).marked.parse(g.protected))}</div>`;
   invalidateAnnotationElementsCache();
+  highlightCodeBlocks(container);
   _renderMath(container);
 
   // Map rendered top-level block elements to diffBlocks[] by index
@@ -258,6 +260,15 @@ export function renderParagraphDiffView(oldContent: string, newContent: string):
   const blockEls = Array.from(
     container.querySelectorAll<HTMLElement>(sel.split(',').map(s => `.markdown-body > ${s}`).join(','))
   );
+
+  // 表格块：标出具体变化的行（<tr> 顺序 = 表头 + 数据行）
+  blocks.forEach((block, idx) => {
+    const el = blockEls[idx];
+    if (!block.changedRows || !el || el.tagName !== 'TABLE') return;
+    el.classList.add('diff-table-rows');
+    const trs = el.querySelectorAll<HTMLElement>('tr');
+    for (const r of block.changedRows) trs[r]?.classList.add('diff-row-changed');
+  });
 
   // 把连续的改动块归组，整组包在一个 wrapper div 里，作为一个导航单元
   const changedGroups: HTMLElement[][] = [];

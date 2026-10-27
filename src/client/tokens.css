@@ -1,0 +1,146 @@
+/*
+ * 设计 token：全站唯一的颜色 / 字号 / 圆角 / 层级来源。
+ * 配色取自 english-coach（暖灰中性色 + 单一蓝色强调色），颜色按用途命名，不按色值命名。
+ * 深色模式跟随系统：只在下方 @media 里覆盖颜色类 token，组件一律引用变量。
+ */
+:root {
+  color-scheme: light dark;
+
+  /* 布局 */
+  --font-scale: 1.0;
+  --sidebar-width: 260px;
+  --annotation-sidebar-width: 320px;
+
+  /* 文字 */
+  --color-text-primary:   #22221f;
+  --color-text-secondary: #67665f;
+  --color-text-muted:     #85847b;
+  --color-text-inverse:   #ffffff; /* 强调色底上的文字 */
+
+  /* 面：surface = 阅读区/卡片，bg-subtle = 侧栏等整体底色，bg-secondary = 悬停/分组/代码块底 */
+  --color-surface:        #ffffff;
+  --color-bg-subtle:      #f7f6f2;
+  --color-bg-secondary:   #f1f0eb;
+  --color-surface-a85:    rgba(255,255,255,0.85);
+  --color-hover:          rgba(34,34,31,0.05);
+
+  /* 线 */
+  --color-border:         #e6e4dd;
+  --color-border-subtle:  #eeede8;
+
+  /* 强调（蓝） */
+  --color-accent:         #3b6fe1;
+  --color-accent-text:    #315fc5; /* 作为文字/深色底使用 */
+  --color-accent-bg:      #eaf0ff;
+  --color-accent-border:  #c7d5fb;
+  --color-accent-a10:     rgba(59,111,225,0.1);
+
+  /* 状态 */
+  --color-error:          #b4403f;
+  --color-error-bg:       #faeae8;
+  --color-error-border:   #e8bcba;
+  --color-success:        #2f7d52;
+  --color-success-bg:     #e3f1e8;
+  --color-success-border: #b5d8c3;
+  --color-warning:        #c28a1c;
+  --color-warning-bg:     #fbf1d9;
+  --color-warning-border: #e5c97a;
+  --color-warning-text:   #8a5a0a;
+
+  /* 批注「纸色」标记 */
+  --mark-bg:              #f6ecd2;
+  --mark-border:          #c9b86a;
+  --mark-text:            #7c6a35;
+
+  /* diff 强调底色、滚动条 */
+  --diff-add-strong:      #cfe8d6;
+  --diff-del-strong:      #f3cfcc;
+  --scrollbar-thumb:       rgba(0,0,0,0.45);
+  --scrollbar-thumb-hover: rgba(0,0,0,0.6);
+
+  /* 字号 */
+  --text-2xs: 10px;
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+
+  /* 圆角 */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-pill: 999px;
+
+  /* z-index */
+  --z-menu: 20;
+  --z-scrollbar: 50;
+  --z-sidebar: 80;
+  --z-sidebar-resizer: 81;
+  --z-floating-btn: 90;
+  --z-dropdown: 1000;
+  --z-tab-manager: 2100;
+  --z-autocomplete: 2500;
+  --z-quick-action: 2601;
+  --z-overlay: 9000;
+  --z-popover: 9998;
+  --z-quick-add: 9999;
+  --z-find-bar: 10000;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-text-primary:   #ecece6;
+    --color-text-secondary: #a8a89f;
+    --color-text-muted:     #8f8f86;
+    --color-text-inverse:   #14213a;
+
+    --color-surface:        #1f221f;
+    --color-bg-subtle:      #161816;
+    --color-bg-secondary:   #272b27;
+    --color-surface-a85:    rgba(31,34,31,0.85);
+    --color-hover:          rgba(236,236,230,0.07);
+
+    --color-border:         #2f342f;
+    --color-border-subtle:  #262a26;
+
+    --color-accent:         #8aafff;
+    --color-accent-text:    #a7c3ff;
+    --color-accent-bg:      #263550;
+    --color-accent-border:  #3d557d;
+    --color-accent-a10:     rgba(138,175,255,0.14);
+
+    --color-error:          #ef8584;
+    --color-error-bg:       #402625;
+    --color-error-border:   #7a4846;
+    --color-success:        #7fd0a0;
+    --color-success-bg:     #22382b;
+    --color-success-border: #3f6a50;
+    --color-warning:        #e3b45c;
+    --color-warning-bg:     #3a2f1a;
+    --color-warning-border: #7a6330;
+    --color-warning-text:   #e3b45c;
+
+    --mark-bg:              rgba(227,180,92,0.2);
+    --mark-border:          rgba(227,180,92,0.5);
+    --mark-text:            #dcc48a;
+
+    --diff-add-strong:      rgba(127,208,160,0.35);
+    --diff-del-strong:      rgba(239,133,132,0.35);
+    --scrollbar-thumb:       rgba(236,236,230,0.3);
+    --scrollbar-thumb-hover: rgba(236,236,230,0.5);
+  }
+}
+
+/* github-markdown-css 的内部变量接到我们自己的 token 上：正文、表格、引用、代码底色随全站配色（浅/深）统一 */
+.markdown-body {
+  --fgColor-default: var(--color-text-primary);
+  --fgColor-muted: var(--color-text-secondary);
+  --fgColor-accent: var(--color-accent-text);
+  --bgColor-default: var(--color-surface);
+  --bgColor-muted: var(--color-bg-secondary);
+  --bgColor-neutral-muted: var(--color-hover);
+  --borderColor-default: var(--color-border);
+  --borderColor-muted: var(--color-border-subtle);
+  --borderColor-accent-emphasis: var(--color-accent);
+}

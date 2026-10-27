@@ -21,8 +21,10 @@ describe('theme registry', () => {
     expect(keys).toContain('atom-one-dark');
   });
 
-  it('every theme has non-empty css', () => {
-    for (const t of MD_THEMES) {
+  // 基础样式（github-markdown-css / highlight github）由 main.ts 静态引入，
+  // 所以 github 主题本身不带额外样式；其余主题只是叠加的覆盖层
+  it('non-baseline themes have non-empty css', () => {
+    for (const t of MD_THEMES.filter((t) => t.key !== 'github')) {
       expect(t.css.length).toBeGreaterThan(100);
     }
     for (const t of HL_THEMES) {
@@ -38,9 +40,8 @@ describe('theme registry', () => {
 });
 
 describe('getMdThemeCss', () => {
-  it('returns github CSS for "github"', () => {
-    const css = getMdThemeCss('github');
-    expect(css).toContain('.markdown-body');
+  it('github 是基础样式，不需要额外覆盖', () => {
+    expect(getMdThemeCss('github')).toBe('');
   });
 
   it('returns notion CSS for "notion"', () => {
@@ -69,28 +70,23 @@ describe('getMdThemeCss', () => {
     expect(css).toBe(githubCss);
   });
 
-  // Notion and Bear layer on top of github baseline — both must contain github base
-  it('notion theme includes github baseline CSS', () => {
-    const notion = getMdThemeCss('notion');
-    const github = getMdThemeCss('github');
-    // Notion = github + overrides, so it must be longer
-    expect(notion.length).toBeGreaterThan(github.length);
-    // And must contain the github base
-    expect(notion).toContain(github.slice(0, 200));
-  });
-
-  it('bear theme includes github baseline CSS', () => {
-    const bear = getMdThemeCss('bear');
-    const github = getMdThemeCss('github');
-    expect(bear.length).toBeGreaterThan(github.length);
-    expect(bear).toContain(github.slice(0, 200));
+  // 覆盖层不能内嵌基础样式：内嵌会让基础样式的深色变量盖掉全站 token 映射
+  it('notion / bear 是纯覆盖层，且各自带深色块', () => {
+    for (const key of ['notion', 'bear']) {
+      const css = getMdThemeCss(key);
+      expect(css).toContain('@media (prefers-color-scheme: dark)');
+      expect(css).not.toContain('--bgColor-default');
+      expect(css).not.toContain('[object');
+    }
   });
 });
 
 describe('getHlThemeCss', () => {
-  it('returns github light CSS for "github"', () => {
+  it('github 跟随系统：深色块在 prefers-color-scheme: dark 里，且代码底色透明交给外层 pre', () => {
     const css = getHlThemeCss('github');
-    expect(css).toContain('.hljs');
+    expect(css).toMatch(/@media \(prefers-color-scheme: dark\)\s*\{[\s\S]*#ff7b72/);
+    expect(css).toContain('.hljs { background: transparent; }');
+    expect(css).not.toContain('[object');
   });
 
   it('returns dark background for "github-dark"', () => {

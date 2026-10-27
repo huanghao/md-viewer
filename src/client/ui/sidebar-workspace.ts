@@ -27,8 +27,10 @@ import {
   scanWorkspace,
 } from '../workspace';
 import { clearListDiff, clearWorkspaceModified } from '../workspace-state';
-import { renderFileRow } from './file-row';
+import { renderFileRow, renderNameWithHint } from './file-row';
+import { duplicateNameHints } from '../utils/file-names';
 import { fuzzyMatch } from '../utils/fuzzy-search';
+import { isSubmitKey } from '../utils/input-keys';
 
 
 const ADD_WORKSPACE_DIALOG_ID = 'addWorkspaceDialogOverlay';
@@ -293,7 +295,7 @@ function createAddWorkspaceDialog(): HTMLElement {
     attachPathAutocomplete(input, { kind: 'directory', markdownOnly: false });
     input.addEventListener('input', updateWorkspacePathPreview);
     input.addEventListener('keydown', (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      if (isSubmitKey(e)) {
         e.preventDefault();
         confirmAddWorkspaceDialog();
       }
@@ -382,7 +384,7 @@ function renderEmptyWorkspace(): string {
   return `
     <div class="empty-workspace">
       <p>暂无工作区</p>
-      <p style="font-size: 12px; color: #57606a; margin-top: 8px;">
+      <p style="font-size: 12px; color: var(--color-text-secondary); margin-top: 8px;">
         在上方输入目录路径后回车添加
       </p>
     </div>
@@ -611,6 +613,8 @@ function renderMissingOpenFiles(workspaceId: string, workspacePath: string, tree
     }))
   ];
 
+  const missingHints = duplicateNameHints(missingRows.map((row) => row.path));
+
   return `
     <div class="tree-missing-section">
       <div class="tree-missing-title">已删除</div>
@@ -622,7 +626,7 @@ function renderMissingOpenFiles(workspaceId: string, workspacePath: string, tree
             <span class="tree-toggle"></span>
             <span class="file-type-icon ${typeIcon.cls}">${escapeHtml(typeIcon.label)}</span>
             <span class="tree-status-inline"><span class="status-badge status-deleted">D</span></span>
-            <span class="tree-name" title="${escapeAttr(row.name)}"><span class="tree-name-full">${escapeHtml(stripWorkspaceTreeDisplayExtension(row.name) || row.name)}</span></span>
+            <span class="tree-name" title="${escapeAttr(row.name)}"><span class="tree-name-full">${renderNameWithHint(escapeHtml(stripWorkspaceTreeDisplayExtension(row.name) || row.name), missingHints.get(row.path))}</span></span>
             ${row.hasRetry ? `<button class="tree-inline-action" title="重试加载" data-action="retry-missing-file" data-path="${escapeAttr(row.path)}">↻</button>` : ''}
             ${row.hasClose ? `<button class="tree-inline-action danger" title="关闭文件" data-action="close-file" data-path="${escapeAttr(row.path)}">×</button>` : ''}
           </div>

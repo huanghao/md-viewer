@@ -188,4 +188,12 @@ CSS 方案定为 **Tailwind CSS v4**，与 React 迁移配合。顺序上 token 
 6. ~~删除旧的 `render*` 函数和 `index.html` 中对应静态节点~~ 已完成：`agent-runner.ts` 从约 800 行缩到约 130 行，只剩会话加载与 SSE 入口，不再碰 DOM；`annotation-layout.ts` 中已无用的 Agent 元素引用也已删除。
 7. 按第 5 节检查，决定是否进入第二阶段；同时处理 9.3 第 2 步的视觉合并。
 
+**第二阶段进度**
+- ~~状态栏~~ 已完成（2026-10-29）：`src/client/statusbar/`（`store.ts` 外部状态、`StatusBar.tsx` 组件），`statusbar.ts` 对外两个入口函数签名不变，`init.ts` 里 `mountStatusbar()` 挂载；`index.html` 里 `#statusbar` 改为空容器。测试 `statusbar.test.tsx`。
+- ~~设置/偏好~~ 已完成（2026-10-31）：`src/client/preferences/`。`controller.ts` 管开合、标签页、保存与取消（无 React 依赖）；`PreferencesDialog.tsx` 管外壳与导航；四个标签页各自组件，保存逻辑由标签页通过 `registerPreferencesSaver` 注册。`ui/preferences.ts` 只负责首次挂载，对外入口不变（`init.ts` 的 Escape 改用 `isPreferencesOpen()`，不再查 DOM）。测试 `preferences.test.tsx`。
+  - 保留的既有行为：取消会还原主题预览；点击遮罩或 × 关闭不还原；快捷键改动即时写入，与保存无关。
+  - 「清空评论状态」按钮（空实现）已删除，连同 `POST /api/annotations/clear`，用户确认从未使用。
+  - 有意的小改动：评论标签页保存失败时弹出错误提示并保持对话框打开（原来是未捕获的异常）。
+- 待做：工具栏、侧边栏（`sidebar.ts` 860 行、`sidebar-workspace.ts` 890 行、`workspace-focus.ts` 528 行）。
+
 每一步都必须保持 `bun test tests/unit`、`go test -race ./cmd/workspace-scanner`、`bun run build` 通过。

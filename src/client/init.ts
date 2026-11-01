@@ -7,7 +7,7 @@ import { loadFile } from './api/files';
 import { renderSidebar, initTabsActions, initFileListActions, initWorkspaceActions, initSearchBoxCallbacks, toggleTabManager, applyTabBatchAction } from './ui/sidebar';
 import { initToolbarActions } from './main-actions';
 import { showError } from './ui/toast';
-import { showPreferences, closePreferences } from './ui/preferences';
+import { showPreferences, closePreferences, isPreferencesOpen } from './ui/preferences';
 import { hideShortcutsHelp, isShortcutsHelpVisible } from './ui/shortcuts-help';
 import { registerAction, initDispatcher } from './keybindings';
 import { initQuickOpen, showQuickOpen, hideQuickOpen } from './ui/quick-open';
@@ -32,6 +32,7 @@ import {
 } from './toc-manager';
 import { flushAll as flushUndoQueue } from './utils/undo-queue';
 import { setupFindBar } from './find-bar';
+import { mountStatusbar } from './statusbar';
 import { initInputKeys } from './utils/input-keys';
 import { initZoom, zoomIn, zoomOut, setZoomFromInput, updateZoomDisplay } from './zoom-controller';
 import {
@@ -361,8 +362,7 @@ import {
       const qoOverlay = document.querySelector('.quick-open-overlay') as HTMLElement | null;
       if (qoOverlay && qoOverlay.style.display !== 'none') { hideQuickOpen(); return; }
       if (isShortcutsHelpVisible()) { hideShortcutsHelp(); return; }
-      const settingsEl = document.getElementById('preferencesOverlay');
-      if (settingsEl?.classList.contains('show')) { closePreferences(); return; }
+      if (isPreferencesOpen()) { closePreferences(); return; }
       const addWsEl = document.getElementById('addWorkspaceDialogOverlay');
       if (addWsEl?.classList.contains('show')) { addWsEl.classList.remove('show'); }
     },
@@ -525,6 +525,7 @@ import {
   initSSEConnection({ onFileLoaded, updateToolbarButtons });
   await refreshCurrentFile();
   connectSSE();
+  mountStatusbar();
   setupFindBar();
 
 })();

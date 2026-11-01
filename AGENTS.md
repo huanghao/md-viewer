@@ -70,6 +70,10 @@ bun run build:scanner
 - Do not inline equivalent status checks such as `status !== "resolved"`.
 - If annotation status values change, update server aggregation, client badge updates, UI filtering, and related tests together.
 
+## Dependencies
+
+- Before adding or upgrading dependencies, or touching lockfiles, CDN links, or toolchain versions, read `~/workspace/dotclaude/notes/dependency-policy.md`.
+
 ## Documentation
 
 - Documentation governance lives in `docs/文档治理规范.md`.

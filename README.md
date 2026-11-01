@@ -14,6 +14,16 @@ Local Markdown/PDF/HTML reading tool with file watching, workspace navigation, t
 
 Removed features are not part of the current product: chat, todo, RAG/vector search, translation, agent monitor, and external sync flows.
 
+## Requirements
+
+| Item | Minimum | Verified |
+|---|---|---|
+| Bun | 1.2.5 (`engines` in `package.json`) | 1.2.5 / 1.2.10 / 1.2.20 / 1.3.0 / 1.4.3: unit tests and build pass; 1.2.4 and below fail 9–10 tests |
+| Go (scanner) | 1.23 (`go.mod`; fsnotify needs it) | 1.27 with `-lang` floor checks and `go test -race` |
+| Platforms | macOS | Linux and Windows not verified (Go daemon uses a unix socket) |
+
+Browser-side libraries (marked, Mermaid, KaTeX, highlight.js, PDF.js) load from jsdelivr with pinned versions, so a first run needs network access. Dependency policy: `~/workspace/dotclaude/notes/dependency-policy.md`.
+
 ## Development
 
 Install dependencies:

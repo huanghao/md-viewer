@@ -69,16 +69,6 @@ export async function openFileInBrowser(path: string): Promise<void> {
   }
 }
 
-export function looksLikePathInput(value: string): boolean {
-  const v = value.trim();
-  if (!v) return false;
-  if (/^https?:\/\//i.test(v)) return true;
-  if (v.startsWith('/') || v.startsWith('~/') || v.startsWith('./') || v.startsWith('../')) return true;
-  if (v.includes('/') || v.includes('\\')) return true;
-  if (/\.[a-zA-Z0-9]{1,10}$/.test(v)) return true;
-  return false;
-}
-
 // ==================== Add confirm UI ====================
 
 type PendingAddAction =

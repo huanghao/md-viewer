@@ -3,6 +3,7 @@ import type { PdfAnnotationBridge } from './pdf-annotation';
 import { state } from './state';
 import { currentPdfViewer, setCurrentPdfViewer } from './pdf-state';
 import { storageSet } from './utils/storage';
+import { toolbarStore } from './toolbar/store';
 
 export interface PdfViewerEntry {
   viewer: PdfViewerInstance;
@@ -19,11 +20,7 @@ export const PDF_MODE_KEY = 'md-viewer:pdf-mode';
 export const PDF_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 
 export function applyPdfModeButtons(mode: 'select' | 'annotate'): void {
-  const isAnnotate = mode === 'annotate';
-  const selectBtn = document.getElementById('pdfModeSelectBtn');
-  const annotateBtn = document.getElementById('pdfModeAnnotateBtn');
-  if (selectBtn) selectBtn.classList.toggle('is-active', !isAnnotate);
-  if (annotateBtn) annotateBtn.classList.toggle('is-active', isAnnotate);
+  toolbarStore.setPdf(true, mode);
 }
 
 export function setPdfMode(mode: 'select' | 'annotate'): void {

@@ -7,6 +7,7 @@ import { shouldRefreshDiff, refreshDiffBannerLabel } from './ui/diff-refresh';
 import { buildDiffBannerHTML, initDiffBannerActions, updateBannerForMode } from './ui/diff-banner';
 import { renderSidebar } from './ui/sidebar';
 import { highlightCodeBlocks } from './utils/code-highlight';
+import { toolbarStore } from './toolbar/store';
 import { protectMath } from './utils/math-protect';
 import { invalidateAnnotationElementsCache } from './annotation-layout';
 import { deleteSnapshot } from './api/snapshots';
@@ -395,8 +396,7 @@ export async function handleDiffButtonClick(): Promise<void> {
 
   diffViewActive = true;
   diffViewFilePath = state.currentFile;
-  const diffBtn = document.getElementById('diffButton');
-  if (diffBtn) diffBtn.classList.add('active');
+  toolbarStore.setDiff({ active: true });
   document.getElementById('content')?.classList.add('diff-active');
 
   // 插入 banner 到 #content 父元素
@@ -432,8 +432,7 @@ export function closeDiffView(): void {
   diffViewActive = false;
   diffViewFilePath = null;
   currentDiffBlockIndex = -1;
-  const diffBtn = document.getElementById('diffButton');
-  if (diffBtn) diffBtn.classList.remove('active');
+  toolbarStore.setDiff({ active: false });
   document.getElementById('content')?.classList.remove('diff-active');
 
   // 移除 banner
@@ -507,8 +506,7 @@ export async function acceptDiffUpdate(): Promise<void> {
 
   diffViewActive = false;
   diffViewFilePath = null;
-  const diffBtn = document.getElementById('diffButton');
-  if (diffBtn) diffBtn.classList.remove('active');
+  toolbarStore.setDiff({ active: false });
   const banner = document.getElementById('diffBanner');
   if (banner) banner.remove();
   document.getElementById('content')?.classList.remove('diff-active');

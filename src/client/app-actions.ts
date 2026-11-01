@@ -18,6 +18,7 @@ import {
 import { getDiffViewActive, setDiffViewActive } from './diff-view';
 import { fetchSnapshot } from './api/snapshots';
 import { clearDiffMarkers } from './ui/doc-scrollbar';
+import { toolbarStore } from './toolbar/store';
 
 export let _setPendingAnnotation: ((ann: any, filePath: string, x: number, y: number) => void) | null = null;
 export function set_setPendingAnnotation(fn: typeof _setPendingAnnotation) { _setPendingAnnotation = fn; }
@@ -93,12 +94,9 @@ export function renderAll(): void {
 
 // ── Toolbar buttons ─────────────────────────────────────────────────────────
 export async function updateToolbarButtons(): Promise<void> {
-  const diffButton = document.getElementById('diffButton');
-  const refreshButton = document.getElementById('refreshButton');
-
   if (!state.currentFile) {
-    if (diffButton) diffButton.style.display = 'none';
-    if (refreshButton) refreshButton.style.display = 'none';
+    toolbarStore.setDiff({ visible: false });
+    toolbarStore.setRefreshVisible(false);
     return;
   }
 
@@ -106,14 +104,14 @@ export async function updateToolbarButtons(): Promise<void> {
   if (!file) return;
 
   if (file.isMissing) {
-    if (diffButton) diffButton.style.display = 'none';
-    if (refreshButton) refreshButton.style.display = 'none';
+    toolbarStore.setDiff({ visible: false });
+    toolbarStore.setRefreshVisible(false);
     return;
   }
 
   const isDirty = file.lastModified > file.displayedModified;
-  if (diffButton) diffButton.style.display = isDirty && !file.isRemote ? 'flex' : 'none';
-  if (refreshButton) refreshButton.style.display = isDirty ? 'flex' : 'none';
+  toolbarStore.setDiff({ visible: isDirty && !file.isRemote });
+  toolbarStore.setRefreshVisible(isDirty);
 }
 
 // ── File refresh ─────────────────────────────────────────────────────────────
@@ -145,8 +143,7 @@ async function syncFileFromDisk(path: string, options: { silent?: boolean; highl
   if (state.currentFile === path || state.currentFile === data.path) {
     if (getDiffViewActive()) {
       setDiffViewActive(false);
-      const diffBtn = document.getElementById('diffButton');
-      if (diffBtn) diffBtn.classList.remove('active');
+      toolbarStore.setDiff({ active: false });
       const banner = document.getElementById('diffBanner');
       if (banner) banner.remove();
       document.getElementById('content')?.classList.remove('diff-active');

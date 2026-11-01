@@ -21,69 +21,13 @@ afterEach(() => {
 
 function makeCallbacks(): ToolbarCallbacks {
   return {
-    handleDiffButtonClick: mock(() => {}),
-    handleRefreshButtonClick: mock(() => {}),
-    showSettingsDialog: mock(() => {}),
     switchAnnotationTab: mock((_tab: string) => {}),
-    zoomIn: mock(() => {}),
-    zoomOut: mock(() => {}),
-    setPdfMode: mock((_mode: string) => {}),
     addFile: mock(() => {}),
     handleUnifiedInputSubmit: mock((_v?: string) => {}),
     dismissQuickActionConfirm: mock(() => {}),
     refreshFile: mock((_path: string) => {}),
   };
 }
-
-describe('initToolbarActions — toolbar buttons', () => {
-  it('点击 data-action="show-settings" 调用 showSettingsDialog()', () => {
-    doc.body.innerHTML = `<button data-action="show-settings">设置</button>`;
-    const cbs = makeCallbacks();
-    initToolbarActions(doc.body, cbs);
-    (doc.querySelector('[data-action="show-settings"]') as HTMLElement).click();
-    expect(cbs.showSettingsDialog).toHaveBeenCalledTimes(1);
-  });
-
-  it('点击 data-action="diff-button" 调用 handleDiffButtonClick()', () => {
-    doc.body.innerHTML = `<button data-action="diff-button">Diff</button>`;
-    const cbs = makeCallbacks();
-    initToolbarActions(doc.body, cbs);
-    (doc.querySelector('[data-action="diff-button"]') as HTMLElement).click();
-    expect(cbs.handleDiffButtonClick).toHaveBeenCalledTimes(1);
-  });
-
-  it('点击 data-action="refresh-button" 调用 handleRefreshButtonClick()', () => {
-    doc.body.innerHTML = `<button data-action="refresh-button">刷新</button>`;
-    const cbs = makeCallbacks();
-    initToolbarActions(doc.body, cbs);
-    (doc.querySelector('[data-action="refresh-button"]') as HTMLElement).click();
-    expect(cbs.handleRefreshButtonClick).toHaveBeenCalledTimes(1);
-  });
-
-  it('点击 data-action="zoom-in" 调用 zoomIn()', () => {
-    doc.body.innerHTML = `<button data-action="zoom-in">+</button>`;
-    const cbs = makeCallbacks();
-    initToolbarActions(doc.body, cbs);
-    (doc.querySelector('[data-action="zoom-in"]') as HTMLElement).click();
-    expect(cbs.zoomIn).toHaveBeenCalledTimes(1);
-  });
-
-  it('点击 data-action="zoom-out" 调用 zoomOut()', () => {
-    doc.body.innerHTML = `<button data-action="zoom-out">-</button>`;
-    const cbs = makeCallbacks();
-    initToolbarActions(doc.body, cbs);
-    (doc.querySelector('[data-action="zoom-out"]') as HTMLElement).click();
-    expect(cbs.zoomOut).toHaveBeenCalledTimes(1);
-  });
-
-  it('点击 data-action="set-pdf-mode" 调用 setPdfMode(mode)', () => {
-    doc.body.innerHTML = `<button data-action="set-pdf-mode" data-mode="annotate">批注</button>`;
-    const cbs = makeCallbacks();
-    initToolbarActions(doc.body, cbs);
-    (doc.querySelector('[data-action="set-pdf-mode"]') as HTMLElement).click();
-    expect(cbs.setPdfMode).toHaveBeenCalledWith('annotate');
-  });
-});
 
 describe('initToolbarActions — annotation tabs', () => {
   it('点击 data-action="switch-annotation-tab" 调用 switchAnnotationTab(tab)', () => {

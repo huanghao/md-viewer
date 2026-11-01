@@ -6,24 +6,17 @@ import { escapeAttr, escapeHtml } from '../utils/escape';
 import { generateDistinctNames } from '../utils/file-names';
 import { getFileListStatus } from '../utils/file-status';
 import { isJsonFile, isJsonlFile } from '../utils/file-type';
-import { renderFileRow, renderNameWithHint } from './file-row';
+import { renderFileRow } from './file-row';
+import { tabsStore } from '../tabs/store';
 import { isPinned } from '../utils/pinned-files';
 import { getTabBatchTargets, type TabBatchAction } from '../utils/tab-batch';
 import { renderWorkspaceSidebar, bindWorkspaceEvents, type WorkspaceCallbacks } from './sidebar-workspace';
 import { syncAnnotationSidebarLayout } from '../annotation';
+import { sidebarHeaderStore } from '../sidebar/store';
 
-let lastEscAt = 0;
-let lastEscValue = '';
 let hasAutoAnchoredCurrentFile = false;
-let tabManagerOpen = false;
-let tabManagerGlobalBound = false;
-let tabsScrollLeft = 0;
-let tabsScrollHandlerBound = false;
-let lastTabsRenderKey = '';
 
 export interface SearchBoxCallbacks {
-  handleUnifiedInputSubmit: (value?: string) => void;
-  dismissQuickActionConfirm: () => void;
   renderContent: () => void;
 }
 
@@ -65,86 +58,9 @@ export function initFileListActions(callbacks: FileListCallbacks): void {
   });
 }
 
-export interface TabsCallbacks {
-  switchFile: (path: string) => void;
-  removeFile: (path: string) => void;
-  applyTabBatchAction: (action: string) => void;
-  toggleTabManager: () => void;
-}
-
-let tabsCallbacks: TabsCallbacks | null = null;
-
-export function initTabsActions(container: HTMLElement, callbacks: TabsCallbacks): void {
-  tabsCallbacks = callbacks;
-  container.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement;
-    const actionEl = target.closest('[data-action]') as HTMLElement | null;
-    if (!actionEl) return;
-    const action = actionEl.dataset.action;
-    if (action === 'remove-file') {
-      e.stopPropagation();
-      const path = actionEl.dataset.path;
-      if (path) tabsCallbacks?.removeFile(path);
-    } else if (action === 'switch-file') {
-      const path = actionEl.dataset.path;
-      if (path) tabsCallbacks?.switchFile(path);
-    } else if (action === 'toggle-tab-manager') {
-      e.stopPropagation();
-      tabsCallbacks?.toggleTabManager();
-    } else if (action === 'batch-action') {
-      const batch = actionEl.dataset.batch;
-      if (batch) tabsCallbacks?.applyTabBatchAction(batch);
-    }
-  });
-}
-
-interface BatchCount { others: number; right: number; unmodified: number; all: number; }
 interface FileEntry { path: string; displayName: string; name: string; nameHint?: string; isMissing?: boolean; }
 
-export function renderTabsHTML(
-  filesWithDisplay: FileEntry[],
-  currentFile: string | null,
-  tabManagerIsOpen: boolean,
-  batchCount: BatchCount,
-): string {
-  const tabsHtml = filesWithDisplay.map((file, index) => {
-    const isCurrent = file.path === currentFile;
-    const classes = ['tab'];
-    if (isCurrent) classes.push('active');
-    if (file.isMissing) classes.push('deleted');
-    return `
-      <div class="${classes.join(' ')}" data-index="${index}" data-path="${escapeAttr(file.path)}"
-           data-action="switch-file">
-        <span class="tab-name">${renderNameWithHint(escapeHtml(file.name), file.nameHint)}</span>
-        <span class="tab-close" data-action="remove-file" data-path="${escapeAttr(file.path)}">×</span>
-      </div>
-    `;
-  }).join('');
-
-  return `
-    <div class="tabs-scroll">${tabsHtml}</div>
-    <div class="tab-manager-wrap">
-      <button class="tab-manager-toggle ${tabManagerIsOpen ? 'active' : ''}" type="button"
-              data-action="toggle-tab-manager">≡ Tabs (${filesWithDisplay.length})</button>
-      <div class="tab-manager-panel ${tabManagerIsOpen ? 'show' : ''}"
-        <div class="tab-manager-row tab-manager-actions-row">
-          <button class="tab-manager-action" type="button" data-action="batch-action" data-batch="close-others">关闭其他 (${batchCount.others})</button>
-          <button class="tab-manager-action" type="button" data-action="batch-action" data-batch="close-right">关闭右侧 (${batchCount.right})</button>
-          <button class="tab-manager-action" type="button" data-action="batch-action" data-batch="close-unmodified">关闭未修改 (${batchCount.unmodified})</button>
-          <button class="tab-manager-action danger" type="button" data-action="batch-action" data-batch="close-all">关闭全部 (${batchCount.all})</button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-interface TabDragState {
-  fromIdx: number;
-  insertIdx: number;
-  ghost: HTMLElement;
-  srcEl: HTMLElement;
-  offsetX: number;
-  offsetY: number;
-}
+const DRAG_THRESHOLD = 4; // px，小于此移动距离视为 click，不启动拖拽
 interface FileDragState {
   fromPath: string;
   insertIdx: number;
@@ -153,10 +69,7 @@ interface FileDragState {
   offsetX: number;
   offsetY: number;
 }
-let tabDragState: TabDragState | null = null;
 let fileDragState: FileDragState | null = null;
-import { attachPathAutocomplete } from './path-autocomplete';
-import { isSubmitKey } from '../utils/input-keys';
 
 export function resetSidebarFileAnchor(): void {
   hasAutoAnchoredCurrentFile = false;
@@ -196,59 +109,8 @@ export function setSidebarTab(tab: 'focus' | 'full' | 'list'): void {
   }
 }
 
-if (typeof window !== 'undefined') {
-  document.addEventListener('sidebar:set-tab', (e) => {
-    setSidebarTab((e as CustomEvent<{ tab: string }>).detail.tab as Parameters<typeof setSidebarTab>[0]);
-  });
-  document.addEventListener('click', (ev: MouseEvent) => {
-    const el = (ev.target as Element).closest('[data-action]') as HTMLElement | null;
-    if (!el) return;
-    if (el.dataset.action === 'set-sidebar-tab') {
-      const tab = el.dataset.tab;
-      if (tab) setSidebarTab(tab as Parameters<typeof setSidebarTab>[0]);
-    }
-  });
-}
 
-export function toggleTabManager(): void {
-  tabManagerOpen = !tabManagerOpen;
-  renderTabs();
-}
-
-function closeTabManager(): void {
-  if (!tabManagerOpen) return;
-  tabManagerOpen = false;
-  renderTabs();
-}
-
-function ensureTabManagerGlobalEvents(): void {
-  if (tabManagerGlobalBound) return;
-  tabManagerGlobalBound = true;
-  document.addEventListener('click', (event) => {
-    if (!tabManagerOpen) return;
-    const target = event.target as HTMLElement | null;
-    if (target?.closest('.tab-manager-wrap')) return;
-    closeTabManager();
-  });
-}
-
-function ensureTabsScrollHandler(): void {
-  if (tabsScrollHandlerBound) return;
-  tabsScrollHandlerBound = true;
-
-  const container = document.getElementById('tabs');
-  if (!container) return;
-
-  // 使用事件委托，只绑定一次
-  container.addEventListener('scroll', (event) => {
-    const target = event.target as HTMLElement;
-    if (target.classList.contains('tabs-scroll')) {
-      tabsScrollLeft = target.scrollLeft;
-    }
-  }, { passive: true, capture: true });
-}
-
-export function applyTabBatchAction(action: TabBatchAction): void {
+export function applyTabBatchAction(action: TabBatchAction, removeFile: (path: string) => void): void {
   const filesWithDisplay = generateDistinctNames(state.sessionFiles);
   const targets = getTabBatchTargets(
     action,
@@ -262,11 +124,11 @@ export function applyTabBatchAction(action: TabBatchAction): void {
     }
   );
   const closeable = targets.filter((path) => !isPinned(path));
-  if (!tabsCallbacks || closeable.length === 0) {
+  if (closeable.length === 0) {
     renderTabs();
     return;
   }
-  closeable.forEach((path) => tabsCallbacks!.removeFile(path));
+  closeable.forEach((path) => removeFile(path));
 }
 
 function rerenderByMode(): void {
@@ -277,287 +139,14 @@ function rerenderByMode(): void {
   renderFiles();
 }
 
-function looksLikePathInput(value: string): boolean {
-  const v = value.trim();
-  if (!v) return false;
-  if (/^https?:\/\//i.test(v)) return true;
-  if (v.startsWith('/') || v.startsWith('~/') || v.startsWith('./') || v.startsWith('../')) return true;
-  if (v.includes('/') || v.includes('\\')) return true;
-  if (/\.[a-zA-Z0-9]{1,10}$/.test(v)) return true;
-  return false;
-}
-
-// 渲染搜索框
-export function renderSearchBox(): void {
-  const container = document.getElementById('searchBox');
-  if (!container) return;
-
-  let input = container.querySelector('#searchInput') as HTMLInputElement | null;
-  let clearBtn = container.querySelector('#searchClear') as HTMLButtonElement | null;
-
-  const tab = state.config.sidebarTab;
-  const isMac = navigator.platform.toUpperCase().includes('MAC');
-  const kKey = isMac ? '⌘K' : 'Ctrl+K';
-  const placeholder = tab === 'list'
-    ? `搜索已打开的文件 (${kKey})`
-    : tab === 'focus'
-    ? `搜索最近文件 (${kKey})`
-    : '搜索或输入路径（Enter补全，Cmd+Enter添加）';
-
-  if (!input || !clearBtn) {
-    container.innerHTML = `
-      <div class="search-wrapper">
-        <span class="search-icon">🔍</span>
-        <input
-          type="text"
-          class="search-input"
-          placeholder="${placeholder}"
-          id="searchInput"
-        />
-        <button class="search-clear" id="searchClear">×</button>
-      </div>
-    `;
-
-    input = container.querySelector('#searchInput') as HTMLInputElement | null;
-    clearBtn = container.querySelector('#searchClear') as HTMLButtonElement | null;
-    if (!input || !clearBtn) return;
-
-    // 路径补全仅在“像路径”的输入下触发，避免干扰普通搜索
-    attachPathAutocomplete(input, {
-      kind: 'file',
-      markdownOnly: false,
-      shouldActivate: looksLikePathInput
-    });
-
-    input.addEventListener('input', (e) => {
-      searchBoxCallbacks?.dismissQuickActionConfirm();
-      const query = (e.target as HTMLInputElement).value;
-      lastEscAt = 0;
-      lastEscValue = '';
-      setSearchQuery(query);
-      if (clearBtn) {
-        clearBtn.style.display = query ? 'block' : 'none';
-      }
-      rerenderByMode();
-      // If current file is JSON, re-render with new query
-      if (state.currentFile && (isJsonFile(state.currentFile) || isJsonlFile(state.currentFile))) {
-        searchBoxCallbacks?.renderContent();
-      }
-    });
-
-    input.addEventListener('keydown', (e) => {
-      if (isSubmitKey(e)) {
-        e.preventDefault();
-        input!.dispatchEvent(new Event('path-autocomplete-hide'));
-        searchBoxCallbacks?.handleUnifiedInputSubmit(input!.value);
-        return;
-      }
-      if (e.defaultPrevented) {
-        // 自动补全面板已消费 Enter/Tab/Escape，不再触发统一提交逻辑
-        return;
-      }
-      if (e.key === 'Enter' && !e.isComposing && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        input!.dispatchEvent(new Event('path-autocomplete-hide'));
-        searchBoxCallbacks?.handleUnifiedInputSubmit(input!.value);
-      }
-      if (e.key === 'Escape') {
-        searchBoxCallbacks?.dismissQuickActionConfirm();
-        const now = Date.now();
-        const currentValue = input!.value;
-        const isDoubleEsc = now - lastEscAt < 900 && lastEscValue === currentValue;
-        if (isDoubleEsc && currentValue) {
-          setSearchQuery('');
-          input!.value = '';
-          if (clearBtn) clearBtn.style.display = 'none';
-          rerenderByMode();
-          lastEscAt = 0;
-          lastEscValue = '';
-          e.preventDefault();
-          return;
-        }
-        lastEscAt = now;
-        lastEscValue = currentValue;
-      }
-    });
-
-    clearBtn.addEventListener('click', () => {
-      setSearchQuery('');
-      if (input) {
-        input.value = '';
-      }
-      clearBtn!.style.display = 'none';
-      rerenderByMode();
-      input?.focus();
-    });
+/** 统一搜索框的输入、清空、双击 Esc 都走这里：更新全局搜索词并重绘当前视图 */
+export function setSidebarSearchQuery(query: string): void {
+  setSearchQuery(query);
+  sidebarHeaderStore.setSnapshot({ tab: state.config.sidebarTab, query });
+  rerenderByMode();
+  if (state.currentFile && (isJsonFile(state.currentFile) || isJsonlFile(state.currentFile))) {
+    searchBoxCallbacks?.renderContent();
   }
-
-  // 同步显示（避免输入时强行覆盖用户正在编辑的值）
-  if (document.activeElement !== input && input.value !== state.searchQuery) {
-    input.value = state.searchQuery;
-  }
-  clearBtn.style.display = state.searchQuery ? 'block' : 'none';
-  // 同步 placeholder（切换 tab 时更新）
-  input.placeholder = placeholder;
-}
-
-// 渲染当前文件路径（已移除，功能由面包屑导航提供）
-export function renderCurrentPath(): void {
-  const container = document.getElementById('currentPath');
-  if (!container) return;
-
-  // 隐藏当前路径区域
-  container.innerHTML = '';
-  container.style.display = 'none';
-}
-
-function renderViewTabs(): void {
-  const container = document.getElementById('modeSwitchRow');
-  if (!container) return;
-
-  const tab = state.config.sidebarTab;
-  const tabs: Array<{ key: 'focus' | 'full' | 'list'; label: string }> = [
-    { key: 'focus', label: '最近' },
-    { key: 'full', label: '工作区' },
-    { key: 'list', label: '打开' },
-  ];
-
-  container.innerHTML = `
-    <div class="view-tabs">
-      ${tabs.map(t => `
-        <button class="view-tab${tab === t.key ? ' active' : ''}"
-                data-action="set-sidebar-tab" data-tab="${t.key}">${t.label}</button>
-      `).join('')}
-    </div>
-  `;
-}
-
-const DRAG_THRESHOLD = 4; // px，小于此移动距离视为 click，不启动拖拽
-
-function bindTabDragEvents(tabsScrollEl: HTMLElement): void {
-  tabsScrollEl.addEventListener('pointerdown', (e: PointerEvent) => {
-    if (e.button !== 0) return;
-    const tab = (e.target as HTMLElement).closest('.tab') as HTMLElement | null;
-    if (!tab) return;
-    if ((e.target as HTMLElement).classList.contains('tab-close')) return;
-
-    const fromIdx = parseInt(tab.dataset.index || '-1', 10);
-    if (fromIdx < 0) return;
-
-    const startX = e.clientX;
-    const startY = e.clientY;
-    let dragging = false;
-    let ghost: HTMLElement | null = null;
-
-    const tabRect = tab.getBoundingClientRect();
-    const offsetX = e.clientX - tabRect.left;
-    const offsetY = e.clientY - tabRect.top;
-
-    // 记录所有 tab 的原始位置（拖拽开始时快照，之后不再变），用于阈值判断
-    let tabOrigRects: Array<{ origIdx: number; left: number; width: number }> = [];
-
-    function startDrag(): void {
-      dragging = true;
-      ghost = document.createElement('div');
-      ghost.className = 'tab-drag-ghost';
-      ghost.innerHTML = tab!.querySelector('.tab-name')?.outerHTML || tab!.innerHTML;
-      ghost.style.width = tabRect.width + 'px';
-      ghost.style.left  = tabRect.left + 'px';
-      ghost.style.top   = tabRect.top  + 'px';
-      document.body.appendChild(ghost);
-      tab!.classList.add('tab-dragging');
-      // 快照原始位置（此时 transform 还没加）
-      tabOrigRects = [...tabsScrollEl.querySelectorAll<HTMLElement>('.tab')].map(el => ({
-        origIdx: parseInt(el.dataset.index || '0', 10),
-        left: el.getBoundingClientRect().left,
-        width: el.getBoundingClientRect().width,
-      }));
-      tabDragState = { fromIdx, insertIdx: fromIdx, ghost, srcEl: tab!, offsetX, offsetY };
-    }
-
-    function cleanup(): void {
-      tabsScrollEl.querySelectorAll<HTMLElement>('.tab').forEach(el => { el.style.transform = ''; });
-      if (ghost) { ghost.remove(); ghost = null; }
-      tab!.classList.remove('tab-dragging');
-      tabDragState = null;
-    }
-
-    function onMove(e: PointerEvent): void {
-      if (!dragging) {
-        if (Math.abs(e.clientX - startX) < DRAG_THRESHOLD && Math.abs(e.clientY - startY) < DRAG_THRESHOLD) return;
-        e.preventDefault();
-        startDrag();
-      }
-      if (!tabDragState || !ghost) return;
-      const { srcEl } = tabDragState;
-
-      ghost.style.left = (e.clientX - offsetX) + 'px';
-      ghost.style.top  = (e.clientY - offsetY) + 'px';
-
-      // 用原始位置（拖拽开始时快照）判断阈值，避免 translateX 偏移导致来回体感不一致
-      const mouseX = e.clientX;
-      // 按原始 left 升序遍历（快照已按 DOM 顺序，即原始顺序）
-      const others = tabOrigRects.filter(t => t.origIdx !== fromIdx);
-
-      let newInsertIdx = fromIdx;
-      let found = false;
-      for (let i = 0; i < others.length; i++) {
-        const t = others[i];
-        if (mouseX < t.left + t.width) {
-          const movingRight = t.origIdx > fromIdx;
-          // 向右拖：越过目标原始左边 1/3；向左拖：越过目标原始右边 1/3
-          const trigger = movingRight ? t.left + t.width / 3 : t.left + t.width * 2 / 3;
-          newInsertIdx = mouseX < trigger ? t.origIdx : t.origIdx + 1;
-          if (t.origIdx >= fromIdx) newInsertIdx -= 1;
-          found = true;
-          break;
-        }
-      }
-      if (!found) newInsertIdx = state.tabOrder.length - 1;
-
-      tabDragState.insertIdx = newInsertIdx;
-
-      const allTabEls = [...tabsScrollEl.querySelectorAll<HTMLElement>('.tab')];
-      const ghostW = ghost.offsetWidth;
-      allTabEls.forEach((el, i) => {
-        if (el === srcEl) return;
-        let dx = 0;
-        if (newInsertIdx < fromIdx) {
-          if (i >= newInsertIdx && i < fromIdx) dx = ghostW;
-        } else {
-          if (i > fromIdx && i <= newInsertIdx) dx = -ghostW;
-        }
-        el.style.transform = dx !== 0 ? `translateX(${dx}px)` : '';
-      });
-    }
-
-    function onUp(): void {
-      tab!.removeEventListener('pointermove', onMove);
-      tab!.removeEventListener('pointerup', onUp);
-      tab!.removeEventListener('pointercancel', onCancel);
-
-      if (!dragging) return; // 没拖过阈值，视为 click，不处理排序
-
-      const insertIdx = tabDragState?.insertIdx ?? fromIdx;
-      cleanup();
-      lastTabsRenderKey = '';
-      if (fromIdx !== insertIdx) moveTabOrder(fromIdx, insertIdx);
-      renderTabs();
-      renderFiles();
-    }
-
-    function onCancel(): void {
-      tab!.removeEventListener('pointermove', onMove);
-      tab!.removeEventListener('pointerup', onUp);
-      tab!.removeEventListener('pointercancel', onCancel);
-      if (dragging) cleanup();
-    }
-
-    tab.setPointerCapture(e.pointerId);
-    tab.addEventListener('pointermove', onMove);
-    tab.addEventListener('pointerup', onUp);
-    tab.addEventListener('pointercancel', onCancel);
-  });
 }
 
 function bindFileDragEvents(fileListEl: HTMLElement): void {
@@ -734,11 +323,9 @@ export function renderSidebar(): void {
     container.classList.toggle('workspace-mode', tab === 'focus' || tab === 'full');
   }
 
-  renderSearchBox();
-  renderViewTabs();
+  sidebarHeaderStore.setSnapshot({ tab, query: state.searchQuery });
 
   if (tab === 'list') {
-    renderCurrentPath();
     const listEl = document.getElementById('fileList');
     if (listEl) listEl.className = 'file-list';
     renderFiles();
@@ -747,7 +334,6 @@ export function renderSidebar(): void {
   }
 
   // focus or full — workspace rendering
-  renderCurrentPath();
   if (!container) return;
 
   let fileListContainer = document.getElementById('fileList');
@@ -769,22 +355,8 @@ export function renderSidebar(): void {
 // 渲染标签页
 export function renderTabs(): void {
   const allFiles = Array.from(state.sessionFiles.values());
-  const container = document.getElementById('tabs');
-  if (!container) return;
-  ensureTabManagerGlobalEvents();
-  ensureTabsScrollHandler();
-
-  // 保存 tabs-scroll 的滚动位置
-  const prevTabsScroll = container.querySelector('.tabs-scroll') as HTMLElement | null;
-  if (prevTabsScroll) {
-    tabsScrollLeft = prevTabsScroll.scrollLeft;
-  }
-
   if (allFiles.length === 0) {
-    container.innerHTML = '';
-    container.style.display = 'none';
-    tabManagerOpen = false;
-    lastTabsRenderKey = '';
+    tabsStore.setSnapshot({ files: [], currentPath: null, batch: { others: 0, right: 0, unmodified: 0, all: 0 } });
     return;
   }
 
@@ -793,68 +365,24 @@ export function renderTabs(): void {
     .map(p => state.sessionFiles.get(p))
     .filter((f): f is FileInfo => !!f);
   const filesWithDisplay = generateDistinctNames(new Map(orderedFiles.map(f => [f.path, f])));
-  const tabsRenderSnapshot = filesWithDisplay
-    .map((file) => {
-      const status = getFileListStatus(file, hasListDiff(file.path));
-      return [
-        file.path,
-        file.displayName || file.name,
-        file.isMissing ? '1' : '0',
-        file.path === state.currentFile ? '1' : '0',
-        status.type,
-        status.badge || ''
-      ].join('|');
-    })
-    .join('||');
-  const nextTabsRenderKey = [
-    state.currentFile || '',
-    tabManagerOpen ? '1' : '0',
-    tabsRenderSnapshot
-  ].join('###');
 
-  // 确保 tabs 可见（display 可能被外部操作改为 none）
-  container.style.display = 'flex';
-
-  // 当 tabs 可见数据没有变化时，避免重复重建 DOM 导致滚动条闪烁
-  if (nextTabsRenderKey === lastTabsRenderKey) {
-    return;
-  }
-  lastTabsRenderKey = nextTabsRenderKey;
-
-  const batchCount = {
-    others: getTabBatchTargets('close-others', filesWithDisplay, state.currentFile, () => false).length,
-    right: getTabBatchTargets('close-right', filesWithDisplay, state.currentFile, () => false).length,
-    unmodified: getTabBatchTargets('close-unmodified', filesWithDisplay, state.currentFile, (path) => {
-      const file = filesWithDisplay.find((f) => f.path === path);
-      if (!file) return false;
-      const status = getFileListStatus(file, hasListDiff(file.path));
-      return status.type === 'normal' || status.type === 'new';
-    }).length,
-    all: getTabBatchTargets('close-all', filesWithDisplay, state.currentFile, () => false).length,
+  const countBatch = (action: TabBatchAction, filter: (path: string) => boolean) =>
+    getTabBatchTargets(action, filesWithDisplay, state.currentFile, filter).length;
+  const isUnmodified = (path: string) => {
+    const file = filesWithDisplay.find((f) => f.path === path);
+    if (!file) return false;
+    const status = getFileListStatus(file, hasListDiff(file.path));
+    return status.type === 'normal' || status.type === 'new';
   };
 
-  container.innerHTML = renderTabsHTML(filesWithDisplay, state.currentFile, tabManagerOpen, batchCount);
-
-  requestAnimationFrame(() => {
-    const tabsScrollEl = container.querySelector('.tabs-scroll') as HTMLElement | null;
-    if (tabsScrollEl) {
-      if (tabsScrollLeft > 0) tabsScrollEl.scrollLeft = tabsScrollLeft;
-      bindTabDragEvents(tabsScrollEl);
-      // 将当前 active tab 滚动到可视区域
-      const activeTab = tabsScrollEl.querySelector('.tab.active') as HTMLElement | null;
-      if (activeTab) {
-        const scrollEl = tabsScrollEl;
-        const tabLeft = activeTab.offsetLeft;
-        const tabRight = tabLeft + activeTab.offsetWidth;
-        const visibleLeft = scrollEl.scrollLeft;
-        const visibleRight = visibleLeft + scrollEl.clientWidth;
-        if (tabLeft < visibleLeft) {
-          scrollEl.scrollLeft = tabLeft - 8;
-        } else if (tabRight > visibleRight) {
-          scrollEl.scrollLeft = tabRight - scrollEl.clientWidth + 8;
-        }
-      }
-    }
-    syncAnnotationSidebarLayout();
+  tabsStore.setSnapshot({
+    files: filesWithDisplay.map((f) => ({ path: f.path, name: f.name, nameHint: f.nameHint, isMissing: !!f.isMissing })),
+    currentPath: state.currentFile,
+    batch: {
+      others: countBatch('close-others', () => false),
+      right: countBatch('close-right', () => false),
+      unmodified: countBatch('close-unmodified', isUnmodified),
+      all: countBatch('close-all', () => false),
+    },
   });
 }

@@ -5,6 +5,7 @@
 //           and helper functions: isHtmlPath, isJsonPath, isPdfPath, isUrlPath, applyPdfModeButtons
 
 import { highlightCodeBlocks } from './utils/code-highlight';
+import { toolbarStore } from './toolbar/store';
 import type { PdfViewerEntry } from './pdf-registry';
 import type { PdfViewerInstance } from './pdf-viewer.js';
 
@@ -91,11 +92,7 @@ export function isUrlPath(path: string): boolean {
 }
 
 function applyPdfModeButtons(mode: 'select' | 'annotate'): void {
-  const isAnnotate = mode === 'annotate';
-  const selectBtn = document.getElementById('pdfModeSelectBtn');
-  const annotateBtn = document.getElementById('pdfModeAnnotateBtn');
-  if (selectBtn) selectBtn.classList.toggle('is-active', !isAnnotate);
-  if (annotateBtn) annotateBtn.classList.toggle('is-active', isAnnotate);
+  toolbarStore.setPdf(true, mode);
 }
 
 // ── Content type detection ────────────────────────────────────────────────────
@@ -557,55 +554,16 @@ export function flashContentUpdated(): void {
 
 // ── Breadcrumb rendering ──────────────────────────────────────────────────────
 export function renderBreadcrumb() {
-  const container = document.getElementById('breadcrumb');
-  if (!container || !state.currentFile) {
-    if (container) container.innerHTML = '';
+  if (!state.currentFile) {
+    toolbarStore.setBreadcrumb(null);
     return;
   }
 
   const file = state.sessionFiles.get(state.currentFile);
   if (!file) return;
 
-  const homePrefixRe = /^\/(?:Users|home)\/[^/]+/;
-  const homeMatch = file.path.match(homePrefixRe);
-  const displayPath = homeMatch ? '~' + file.path.slice(homeMatch[0].length) : file.path;
-  // split on '/' but keep leading '~' as first segment
-  const rawParts = displayPath.startsWith('~/')
-    ? ['~', ...displayPath.slice(2).split('/').filter(Boolean)]
-    : displayPath.split('/').filter(Boolean);
-
-  const breadcrumbItems = rawParts.map((part, i) => {
-    const isLast = i === rawParts.length - 1;
-    return isLast
-      ? `<span class="breadcrumb-item active" title="${escapeAttr(file.path)}">${escapeHtml(part)}</span>`
-      : `<span class="breadcrumb-item" title="${escapeAttr(file.path)}">${escapeHtml(part)}</span><span class="breadcrumb-separator">/</span>`;
-  }).join('');
-
-  // 显示面包屑路径和复制按钮
-  container.innerHTML = `
-    ${breadcrumbItems}
-    <button class="copy-filename-button" data-action="copy-relative-path" data-path="${escapeAttr(file.path)}" title="复制相对路径">
-      <span class="copy-icon"></span>
-      <span class="check-icon">
-        <svg viewBox="0 0 16 16" fill="currentColor">
-          <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path>
-        </svg>
-      </span>
-      <span class="copy-tooltip">复制相对路径</span>
-    </button>
-    <button class="copy-filename-button copy-abspath-button" data-action="copy-absolute-path" data-path="${escapeAttr(file.path)}" title="复制绝对路径">
-      <span class="copy-abspath-icon">/</span>
-      <span class="check-icon">
-        <svg viewBox="0 0 16 16" fill="currentColor">
-          <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path>
-        </svg>
-      </span>
-      <span class="copy-tooltip">复制绝对路径</span>
-    </button>
-    <button class="copy-filename-button open-in-editor-button" data-action="open-in-editor" data-path="${escapeAttr(file.path)}" title="在 VS Code 中打开">
-      <span class="open-editor-icon">↗</span>
-    </button>
-  `;
+  // 面包屑与复制按钮由工具栏（React）渲染
+  toolbarStore.setBreadcrumb(file.path);
 
   const charCount = file.content.trim().length;
   updateStatusbarFile(charCount, file.createdAt, file.gitCreatedAt);
@@ -746,10 +704,7 @@ export function renderContent() {
   _currentPdfBridge!.value = null;
   container.removeAttribute('data-pdf');
   if (!state.currentFile || !isPdfPath(state.currentFile)) {
-    const pdfModeSelectBtnHide = document.getElementById('pdfModeSelectBtn');
-    const pdfModeAnnotateBtnHide = document.getElementById('pdfModeAnnotateBtn');
-    if (pdfModeSelectBtnHide) pdfModeSelectBtnHide.style.display = 'none';
-    if (pdfModeAnnotateBtnHide) pdfModeAnnotateBtnHide.style.display = 'none';
+    toolbarStore.setPdf(false, toolbarStore.getState().pdfMode);
   }
 
   if (!state.currentFile) {
@@ -832,10 +787,6 @@ export function renderContent() {
       // Restore and apply saved PDF mode
       const savedPdfMode = storageGet<string>(PDF_MODE_KEY, 'select') as 'select' | 'annotate';
       existingEntry.viewer.setAnnotateMode(savedPdfMode === 'annotate');
-      const pdfModeSelectBtn = document.getElementById('pdfModeSelectBtn');
-      const pdfModeAnnotateBtn = document.getElementById('pdfModeAnnotateBtn');
-      if (pdfModeSelectBtn) pdfModeSelectBtn.style.display = '';
-      if (pdfModeAnnotateBtn) pdfModeAnnotateBtn.style.display = '';
       applyPdfModeButtons(savedPdfMode);
       return;
     }
@@ -885,10 +836,6 @@ export function renderContent() {
       // Restore and apply saved PDF mode
       const savedPdfMode = storageGet<string>(PDF_MODE_KEY, 'select') as 'select' | 'annotate';
       pdfViewerInstance.setAnnotateMode(savedPdfMode === 'annotate');
-      const pdfModeSelectBtn = document.getElementById('pdfModeSelectBtn');
-      const pdfModeAnnotateBtn = document.getElementById('pdfModeAnnotateBtn');
-      if (pdfModeSelectBtn) pdfModeSelectBtn.style.display = '';
-      if (pdfModeAnnotateBtn) pdfModeAnnotateBtn.style.display = '';
       applyPdfModeButtons(savedPdfMode);
     });
     return; // don't fall through to markdown renderer

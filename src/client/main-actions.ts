@@ -1,11 +1,5 @@
 export interface ToolbarCallbacks {
-  handleDiffButtonClick: () => void;
-  handleRefreshButtonClick: () => void;
-  showSettingsDialog: () => void;
   switchAnnotationTab: (tab: string) => void;
-  zoomIn: () => void;
-  zoomOut: () => void;
-  setPdfMode: (mode: string) => void;
   addFile: () => void;
   handleUnifiedInputSubmit: (value?: string) => void;
   dismissQuickActionConfirm: () => void;
@@ -19,12 +13,6 @@ export function initToolbarActions(root: HTMLElement | Document, callbacks: Tool
     if (!el) return;
     const action = el.dataset.action;
     switch (action) {
-      case 'show-settings':         callbacks.showSettingsDialog(); break;
-      case 'diff-button':           callbacks.handleDiffButtonClick(); break;
-      case 'refresh-button':        callbacks.handleRefreshButtonClick(); break;
-      case 'zoom-in':               callbacks.zoomIn(); break;
-      case 'zoom-out':              callbacks.zoomOut(); break;
-      case 'set-pdf-mode':          callbacks.setPdfMode(el.dataset.mode ?? ''); break;
       case 'switch-annotation-tab': callbacks.switchAnnotationTab(el.dataset.tab ?? ''); break;
       case 'add-file':              callbacks.addFile(); break;
       case 'unified-input-submit':  callbacks.handleUnifiedInputSubmit(); break;

@@ -194,6 +194,9 @@ CSS 方案定为 **Tailwind CSS v4**，与 React 迁移配合。顺序上 token 
   - 保留的既有行为：取消会还原主题预览；点击遮罩或 × 关闭不还原；快捷键改动即时写入，与保存无关。
   - 「清空评论状态」按钮（空实现）已删除，连同 `POST /api/annotations/clear`，用户确认从未使用。
   - 有意的小改动：评论标签页保存失败时弹出错误提示并保持对话框打开（原来是未捕获的异常）。
-- 待做：工具栏、侧边栏（`sidebar.ts` 860 行、`sidebar-workspace.ts` 890 行、`workspace-focus.ts` 528 行）。
+- ~~工具栏~~ 已完成（2026-11-01）：`src/client/toolbar/`（`store.ts` 状态与 setter，`Toolbar.tsx` 组件）；`toolbar.ts` 的 `mountToolbar(deps)` 注入动作。面包屑、复制按钮、缩放输入框（聚焦时草稿、Enter 提交、Esc 放弃）、Diff/刷新、PDF 模式按钮全部由 React 渲染。各模块改为调用 store setter，不再写 DOM。`main-actions.ts` 中工具栏的 data-action 分支已删除。测试 `toolbar.test.tsx`，`zoom-controller.test.ts` 改为断言 store。
+- ~~文档标签栏~~ 已完成（2026-11-01）：`src/client/tabs/`（`store.ts` 快照，`TabStrip.tsx` 组件，`drag.ts` 拖拽）；`tabs.ts` 的 `mountTabStrip(deps)` 注入动作，并负责 `#tabs` 容器的显隐。`renderTabs()` 只计算快照并推送。拖拽保持原有指针事件逻辑（幽灵元素与让位动画仍是命令式 DOM），管理面板的开合状态在组件内，点击外部关闭。测试 `tab-strip.test.tsx`（拖拽未做自动化测试，需人工在浏览器确认）。
+- ~~侧边栏头部（搜索框、视图切换）~~ 已完成（2026-11-02）：`src/client/sidebar/`（`store.ts` 保存当前 tab 与搜索词，`SidebarHeader.tsx` 含 `SearchBox` 与 `ViewTabs`）；`sidebar-header.ts` 的 `mountSidebarHeader(deps)` 注入动作。`renderSidebar` 只推送 store。搜索词写入统一经过 `setSidebarSearchQuery`，JSON 文件的内容高亮在清空时也会刷新（原来只在输入时刷新）。路径补全仍用 `attachPathAutocomplete`，挂一次。死掉的 `#currentPath` 与 `renderCurrentPath` 已删除；`sidebar:set-tab` 事件无人派发，一并删除。`looksLikePathInput` 收敛到 `utils/path-input.ts`。测试 `sidebar-header.test.tsx`；键盘与输入的整体行为在真实浏览器里用 CDP 验证（happy-dom 下 input 的键盘事件派发不到 React，所以按键判断抽成了纯函数）。
+- 待做：侧边栏主体（文件列表 `renderFiles`、工作区树 `ui/sidebar-workspace.ts`、focus 视图 `ui/workspace-focus.ts`）（`sidebar.ts` 约 390 行、`sidebar-workspace.ts` 890 行、`workspace-focus.ts` 528 行）。
 
 每一步都必须保持 `bun test tests/unit`、`go test -race ./cmd/workspace-scanner`、`bun run build` 通过。

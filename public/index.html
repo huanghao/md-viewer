@@ -42,8 +42,6 @@
             <div class="add-file-confirm-actions" id="quickActionConfirmActions"></div>
           </div>
         </div>
-        <!-- 当前文件路径 -->
-        <div id="currentPath"></div>
       </div>
 
       <!-- 文件列表区（上半部分） -->
@@ -75,30 +73,7 @@
       <!-- 主区域 -->
       <main class="main">
       <!-- 工具栏 -->
-      <div class="toolbar">
-        <div class="breadcrumb" id="breadcrumb"></div>
-        <div class="spacer"></div>
-        <button class="toolbar-text-button" id="pdfModeSelectBtn" data-action="set-pdf-mode" data-mode="select" title="文本选择模式" style="display:none">
-          <span>[𝐓 选择]</span>
-        </button>
-        <button class="toolbar-text-button" id="pdfModeAnnotateBtn" data-action="set-pdf-mode" data-mode="annotate" title="拉框批注模式" style="display:none">
-          <span>[⬚ 批注]</span>
-        </button>
-        <button class="toolbar-text-button" id="diffButton" data-action="diff-button" style="display: none;" title="查看修改内容">
-          <span id="diffButtonText">[± Diff]</span>
-        </button>
-        <button class="toolbar-text-button" id="refreshButton" data-action="refresh-button" style="display: none;" title="文件已更新，点击刷新">
-          <span id="refreshButtonText">[↻ 刷新]</span>
-        </button>
-        <div class="zoom-control" id="zoomControl">
-          <button class="zoom-step-btn" id="zoomOutBtn" data-action="zoom-out" title="缩小 (⌘−)">−</button>
-          <input class="zoom-input" id="fontScaleInput" type="text" value="100%" title="缩放比例，可直接输入（如 150%）" />
-          <button class="zoom-step-btn" id="zoomInBtn" data-action="zoom-in" title="放大 (⌘+)">+</button>
-        </div>
-        <button class="toolbar-text-button" data-action="show-settings" title="设置">
-          <span id="settingsButtonText">[⚙ 设置]</span>
-        </button>
-      </div>
+      <div class="toolbar" id="toolbar"></div>
 
       <!-- 标签页 -->
       <div class="tabs" id="tabs"></div>

@@ -9,6 +9,7 @@ import {
   updateZoomDisplay,
 } from '../../src/client/zoom-controller';
 import { PDF_ZOOM_DEFAULT } from '../../src/client/zoom';
+import { toolbarStore } from '../../src/client/toolbar/store';
 
 class MemoryStorage implements Storage {
   private data = new Map<string, string>();
@@ -165,50 +166,43 @@ describe('setPdfZoomValue', () => {
 });
 
 describe('updateZoomDisplay', () => {
-  it('shows MD percentage in input value', () => {
-    getElementMock.mockReturnValue(mockInput);
+  it('shows MD percentage in toolbar store', () => {
     initZoom(makeDeps('/test.md'));
-    mockInput.value = '';
     updateZoomDisplay();
-    expect(mockInput.value).toBe('100%');
+    expect(toolbarStore.getState().zoomText).toBe('100%');
   });
 
-  it('shows PDF percentage in input value', () => {
-    getElementMock.mockReturnValue(mockInput);
+  it('shows PDF percentage in toolbar store', () => {
     const deps = makeDeps('/test.pdf');
     initZoom(deps);
     storage.setItem('md-viewer:pdf-zoom:/test.pdf', '2');
     updateZoomDisplay();
-    expect(mockInput.value).toBe('200%');
+    expect(toolbarStore.getState().zoomText).toBe('200%');
   });
 
-  it('skips update when input is focused', () => {
+  it('updates store even when input is focused (the toolbar keeps the draft)', () => {
     activeElement = mockInput;
-    getElementMock.mockReturnValue(mockInput);
     initZoom(makeDeps('/test.md'));
-    mockInput.value = 'typing...';
     updateZoomDisplay();
-    expect(mockInput.value).toBe('typing...');
+    expect(toolbarStore.getState().zoomText).toBe('100%');
   });
 
-  it('force=true overrides focus and updates value', () => {
+  it('force=true blurs the focused zoom input and updates value', () => {
     const blurMock = mock();
-    const focusedInput = { value: 'typing...', blur: blurMock };
+    const focusedInput = { id: 'fontScaleInput', value: 'typing...', blur: blurMock };
     activeElement = focusedInput;
-    getElementMock.mockReturnValue(focusedInput);
     initZoom(makeDeps('/test.md'));
     updateZoomDisplay(true);
-    expect(focusedInput.value).toBe('100%');
+    expect(toolbarStore.getState().zoomText).toBe('100%');
     expect(blurMock).toHaveBeenCalled();
   });
 
   it('force=true on file switch shows new file zoom', () => {
-    getElementMock.mockReturnValue(mockInput);
     const deps = makeDeps('/test.pdf');
     initZoom(deps);
     storage.setItem('md-viewer:pdf-zoom:/test.pdf', '1.75');
     updateZoomDisplay(true);
-    expect(mockInput.value).toBe('175%');
+    expect(toolbarStore.getState().zoomText).toBe('175%');
   });
 });
 

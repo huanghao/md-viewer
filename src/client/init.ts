@@ -1,11 +1,16 @@
 // App initialization — runs the IIFE startup sequence
-import { state, restoreState, saveState, markFileMissing, markWorkspaceFailed } from './state';
+import { state, restoreState, saveState, markFileMissing, markWorkspaceFailed, moveTabOrder } from './state';
 import { setAnnotationSummaries } from './state';
 import { pruneDeadFeatureStorageKeys, pruneStalePerFileStorage } from './utils/storage';
 import { hydrateExpandedWorkspaces } from './workspace';
 import { loadFile } from './api/files';
-import { renderSidebar, initTabsActions, initFileListActions, initWorkspaceActions, initSearchBoxCallbacks, toggleTabManager, applyTabBatchAction } from './ui/sidebar';
+import { renderSidebar, renderTabs, renderFiles, initFileListActions, initWorkspaceActions, initSearchBoxCallbacks, applyTabBatchAction, setSidebarSearchQuery, setSidebarTab } from './ui/sidebar';
+import { mountTabStrip } from './tabs';
+import { mountSidebarHeader } from './sidebar-header';
+import { looksLikePathInput } from './utils/path-input';
+import type { TabBatchAction } from './utils/tab-batch';
 import { initToolbarActions } from './main-actions';
+import { mountToolbar } from './toolbar';
 import { showError } from './ui/toast';
 import { showPreferences, closePreferences, isPreferencesOpen } from './ui/preferences';
 import { hideShortcutsHelp, isShortcutsHelpVisible } from './ui/shortcuts-help';
@@ -47,7 +52,6 @@ import {
   searchFilesHandler,
   setupDragAndDrop,
   handleURLParams,
-  looksLikePathInput,
   clearAddConfirm,
   isAddConfirmVisible,
   addFileByPath,
@@ -88,10 +92,6 @@ import {
   setupSidebarCollapse,
   setupSidebarResize,
 } from './ui/sidebar-layout';
-import {
-  copyRelativePath,
-  copyAbsolutePath,
-} from './utils/clipboard';
 
 (async () => {
   console.time('[init] total');
@@ -141,30 +141,19 @@ import {
     getPdfViewer: (filePath) => pdfViewerRegistry.get(filePath)?.viewer ?? null,
   });
 
-  // Wire zoom input field
-  const zoomInput = document.getElementById('fontScaleInput') as HTMLInputElement | null;
-  if (zoomInput) {
-    let savedValue = '';
-
-    zoomInput.addEventListener('focus', () => {
-      savedValue = zoomInput.value;
-      zoomInput.select();
-    });
-
-    zoomInput.addEventListener('blur', () => {
-      setZoomFromInput(zoomInput.value);
+  // 工具栏（面包屑、缩放、Diff/刷新、PDF 模式、设置）：React 渲染，这里注入动作
+  mountToolbar({
+    onDiff: () => void handleDiffButtonClick(),
+    onRefresh: handleRefreshButtonClick,
+    onZoomIn: zoomIn,
+    onZoomOut: zoomOut,
+    onZoomCommit: (raw) => {
+      setZoomFromInput(raw);
       updateZoomDisplay();
-    });
-
-    zoomInput.addEventListener('keydown', (e: KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        zoomInput.blur();
-      } else if (e.key === 'Escape') {
-        zoomInput.value = savedValue;
-        zoomInput.blur();
-      }
-    });
-  }
+    },
+    onPdfMode: (mode) => setPdfMode(mode),
+    onSettings: showPreferences,
+  });
 
   // 初始化批注功能
   initAnnotationElements();
@@ -230,47 +219,39 @@ import {
     renderMath,
   });
 
-  // 工具栏 + annotation tabs：document 级事件委托，一次性注册
+  // annotation tabs 等仍用 document 级事件委托，一次性注册
+  // 统一输入提交：像路径则添加文件，否则全文搜索（工具栏与侧边栏搜索框共用）
+  const submitUnifiedInput = (raw: string) => {
+    const value = raw.trim();
+    if (!value) return;
+    if (!looksLikePathInput(value)) {
+      searchFilesHandler(value).catch((err: any) => showError(`搜索失败: ${err?.message || '未知错误'}`));
+      return;
+    }
+    handleSmartAddInput(value).catch((err: any) => showError(`添加失败: ${err?.message || '未知错误'}`));
+  };
+
   initToolbarActions(document, {
-    handleDiffButtonClick: () => void handleDiffButtonClick(),
-    handleRefreshButtonClick,
-    showSettingsDialog: showPreferences,
     switchAnnotationTab: (tab) => switchAnnotationTab(tab as 'comments'),
-    zoomIn,
-    zoomOut,
-    setPdfMode: (mode) => setPdfMode(mode as 'select' | 'annotate'),
     addFile: () => {
       const input = document.getElementById('searchInput') as HTMLInputElement;
       if (input) handleSmartAddInput(input.value).catch((err: any) => showError(`添加失败: ${err?.message || '未知错误'}`));
     },
     handleUnifiedInputSubmit: (value?: string) => {
       const input = document.getElementById('searchInput') as HTMLInputElement | null;
-      const raw = (typeof value === 'string' ? value : input?.value || '').trim();
-      if (!raw) return;
-      if (!looksLikePathInput(raw)) {
-        searchFilesHandler(raw).catch((err: any) => showError(`搜索失败: ${err?.message || '未知错误'}`));
-        return;
-      }
-      handleSmartAddInput(raw).catch((err: any) => showError(`添加失败: ${err?.message || '未知错误'}`));
+      submitUnifiedInput(typeof value === 'string' ? value : input?.value || '');
     },
     dismissQuickActionConfirm: () => { if (isAddConfirmVisible()) clearAddConfirm(); },
     refreshFile,
   });
 
-  // search box callbacks（sidebar.ts 使用）
-  initSearchBoxCallbacks({
-    handleUnifiedInputSubmit: (value?: string) => {
-      const input = document.getElementById('searchInput') as HTMLInputElement | null;
-      const raw = (typeof value === 'string' ? value : input?.value || '').trim();
-      if (!raw) return;
-      if (!looksLikePathInput(raw)) {
-        searchFilesHandler(raw).catch((err: any) => showError(`搜索失败: ${err?.message || '未知错误'}`));
-        return;
-      }
-      handleSmartAddInput(raw).catch((err: any) => showError(`添加失败: ${err?.message || '未知错误'}`));
-    },
+  // 侧边栏头部：搜索框与视图切换由 React 渲染，这里注入动作
+  initSearchBoxCallbacks({ renderContent });
+  mountSidebarHeader({
+    onQueryChange: setSidebarSearchQuery,
+    onSubmit: submitUnifiedInput,
     dismissQuickActionConfirm: () => { if (isAddConfirmVisible()) clearAddConfirm(); },
-    renderContent,
+    setSidebarTab,
   });
 
   // 注册 fileList 回调（委托到 .sidebar，一次性注册，永久有效）
@@ -293,16 +274,18 @@ import {
     },
   });
 
-  // 注册 tabs 回调（一次性注册，renderTabs 重建 innerHTML 后委托仍有效）
-  const tabsContainer = document.getElementById('tabs');
-  if (tabsContainer) {
-    initTabsActions(tabsContainer, {
-      switchFile: (path) => void switchFile(path),
-      removeFile: removeFileHandler,
-      applyTabBatchAction: (action) => applyTabBatchAction(action as any),
-      toggleTabManager,
-    });
-  }
+  // 文档标签栏：React 渲染，这里注入动作
+  mountTabStrip({
+    switchFile: (path) => void switchFile(path),
+    removeFile: removeFileHandler,
+    batch: (action: TabBatchAction) => applyTabBatchAction(action, removeFileHandler),
+    reorder: (fromIdx, insertIdx) => {
+      if (fromIdx !== insertIdx) moveTabOrder(fromIdx, insertIdx);
+      renderTabs();
+      renderFiles();
+    },
+    onLayout: syncAnnotationSidebarLayout,
+  });
 
   // 根据配置渲染侧边栏
   renderSidebar();
@@ -317,21 +300,6 @@ import {
   console.timeEnd('[init] total');
   syncAnnotationsForCurrentFile(true);
   if (state.currentFile) updateToc(state.currentFile);
-
-  // 面包屑复制按钮：一次性绑定，renderBreadcrumb 重建 innerHTML 后委托仍有效
-  document.getElementById('breadcrumb')?.addEventListener('click', (ev) => {
-    const btn = (ev.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
-    if (!btn?.dataset.path) return;
-    if (btn.dataset.action === 'copy-relative-path') copyRelativePath(btn.dataset.path, ev);
-    else if (btn.dataset.action === 'copy-absolute-path') copyAbsolutePath(btn.dataset.path, ev);
-    else if (btn.dataset.action === 'open-in-editor') {
-      fetch('/api/open-in-editor', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: btn.dataset.path }),
-      }).catch(() => {});
-    }
-  });
 
   setupDragAndDrop();
   setupSidebarResize();

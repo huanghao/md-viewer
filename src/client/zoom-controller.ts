@@ -1,4 +1,5 @@
 import { storageSet, storageGetNumber } from './utils/storage';
+import { toolbarStore } from './toolbar/store';
 import { clampZoom, zoomStep, pdfZoomKey, parseZoomInput, MD_ZOOM_MIN, MD_ZOOM_MAX, PDF_ZOOM_MIN, PDF_ZOOM_MAX, PDF_ZOOM_DEFAULT } from './zoom';
 
 export interface ZoomDeps {
@@ -87,15 +88,10 @@ export function getPdfZoom(filePath: string): number {
 }
 
 export function updateZoomDisplay(force = false): void {
-  const input = document.getElementById('fontScaleInput') as HTMLInputElement | null;
-  if (!input) return;
-  if (!force && document.activeElement === input) return;
-  if (force && document.activeElement === input) (input as HTMLElement).blur();
+  // 强制刷新时先让正在编辑的缩放输入框失焦（失焦会提交草稿），再显示当前值
+  const active = document.activeElement as HTMLElement | null;
+  if (force && active?.id === 'fontScaleInput') active.blur();
   const currentFile = _deps.getCurrentFile();
-  if (isPdf(currentFile)) {
-    const scale = getPdfZoom(currentFile!);
-    input.value = `${Math.round(scale * 100)}%`;
-  } else {
-    input.value = `${Math.round(currentFontScale * 100)}%`;
-  }
+  const scale = isPdf(currentFile) ? getPdfZoom(currentFile!) : currentFontScale;
+  toolbarStore.setZoomText(`${Math.round(scale * 100)}%`);
 }

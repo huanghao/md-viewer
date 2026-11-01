@@ -638,17 +638,6 @@ export function listRecentlyResolvedAnnotations(
   }));
 }
 
-export function clearAllAnnotations(): { deleted: number; documents: number } {
-  const database = getDb();
-  const row = database
-    .query(`SELECT COUNT(1) as count, COUNT(DISTINCT doc_path) as docs FROM annotations`)
-    .get() as { count: number; docs: number } | null;
-  const deleted = Number(row?.count || 0);
-  const documents = Number(row?.docs || 0);
-  database.query(`DELETE FROM annotations`).run();
-  return { deleted, documents };
-}
-
 export function tidyMissingFiles(): { deleted: number; documents: number } {
   const database = getDb();
   const paths = database

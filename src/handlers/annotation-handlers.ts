@@ -2,7 +2,6 @@ import type { Context } from "hono";
 import { calculateOpenCount } from "../annotation-status.ts";
 import {
   appendAnnotationReply,
-  clearAllAnnotations,
   deleteAnnotation,
   importLegacyAnnotations,
   listAnnotatedDocuments,
@@ -155,15 +154,6 @@ export async function handleMigrateAnnotations(c: Context) {
     return c.json({ success: true, ...result });
   } catch (error: any) {
     return c.json({ error: error?.message || "迁移评论失败" }, 500);
-  }
-}
-
-export async function handleClearAllAnnotations(c: Context) {
-  try {
-    const result = clearAllAnnotations();
-    return c.json({ success: true, ...result });
-  } catch (error: any) {
-    return c.json({ error: error?.message || "清空评论失败" }, 500);
   }
 }
 

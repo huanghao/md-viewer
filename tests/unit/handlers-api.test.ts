@@ -3,7 +3,6 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'os';
 import { basename, join, resolve } from 'path';
 import {
-  handleClearAllAnnotations,
   handleDeleteAnnotation,
   handleDetectPath,
   handleGetAnnotationSummaries,
@@ -429,9 +428,6 @@ describe('handlers — annotation APIs', () => {
 
     const deleteResponse = await handleDeleteAnnotation(makeContext({ body: { path: docPath, serial: 1 } }));
     expect(await readJson(deleteResponse)).toEqual({ success: true, deleted: true });
-
-    const clearResponse = await handleClearAllAnnotations(makeContext());
-    expect(await readJson(clearResponse)).toEqual({ success: true, deleted: 0, documents: 0 });
   });
 
   it('returns only anchored annotation summaries using the shared status count semantics', async () => {

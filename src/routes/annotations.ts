@@ -1,6 +1,5 @@
 import type { Hono } from "hono";
 import {
-  handleClearAllAnnotations,
   handleDeleteAnnotation,
   handleGetAnnotationSummaries,
   handleGetAnnotations,
@@ -24,7 +23,6 @@ export function registerAnnotationRoutes(app: Hono): void {
   app.post("/api/annotations/status", handleUpdateAnnotationStatus);
   app.post("/api/annotations/resolve-all", handleResolveAllAnnotations);
   app.post("/api/annotations/migrate", handleMigrateAnnotations);
-  app.post("/api/annotations/clear", handleClearAllAnnotations);
   app.get("/api/quick-comments", handleGetQuickComments);
   app.post("/api/quick-comments", handleUpsertQuickComments);
 }

@@ -1,7 +1,6 @@
-// TDD: renderFileRow 生成的 HTML 不含 window.*，用 data-action 驱动
+// 列表行的点击与关闭由 data-action 委托驱动（不依赖 window.* 内联事件）
 import { describe, expect, it, beforeEach, afterEach, mock } from 'bun:test';
 import { Window } from 'happy-dom';
-import { renderFileRow } from '../../src/client/ui/file-row';
 import { initFileListActions, type FileListCallbacks } from '../../src/client/ui/sidebar';
 
 let win: Window;
@@ -18,48 +17,6 @@ beforeEach(() => {
 afterEach(() => {
   doc.body.innerHTML = '';
   win.close();
-});
-
-describe('renderFileRow with data-action', () => {
-  it('生成的 HTML 不含 window.', () => {
-    const html = renderFileRow('/a.md', 'a.md', undefined, {
-      containerClass: 'file-item',
-      onClickAction: 'switch-file',
-      showPin: false,
-      showTime: false,
-      indentPx: 0,
-      query: '',
-      showClose: true,
-    });
-    expect(html).not.toContain('window.');
-  });
-
-  it('外层 div 带 data-action="switch-file" 和 data-path', () => {
-    const html = renderFileRow('/a.md', 'a.md', undefined, {
-      containerClass: 'file-item',
-      onClickAction: 'switch-file',
-      showPin: false,
-      showTime: false,
-      indentPx: 0,
-      query: '',
-      showClose: false,
-    });
-    expect(html).toContain('data-action="switch-file"');
-    expect(html).toContain('data-path="/a.md"');
-  });
-
-  it('关闭按钮带 data-action="remove-file" 和 data-path', () => {
-    const html = renderFileRow('/a.md', 'a.md', undefined, {
-      containerClass: 'file-item',
-      onClickAction: 'switch-file',
-      showPin: false,
-      showTime: false,
-      indentPx: 0,
-      query: '',
-      showClose: true,
-    });
-    expect(html).toContain('data-action="remove-file"');
-  });
 });
 
 describe('initFileListActions', () => {

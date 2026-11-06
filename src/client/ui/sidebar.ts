@@ -11,8 +11,9 @@ import { tabsStore } from '../tabs/store';
 import { isPinned } from '../utils/pinned-files';
 import { getTabBatchTargets, type TabBatchAction } from '../utils/tab-batch';
 import { bindWorkspaceEvents, prepareWorkspaceTree, type WorkspaceCallbacks } from './sidebar-workspace';
-import { renderFocusView } from './workspace-focus';
+import { prepareFocusView } from './workspace-focus';
 import { workspaceTreeStore } from '../workspace-tree/store';
+import { focusViewStore } from '../focus-view/store';
 import { sidebarHeaderStore } from '../sidebar/store';
 
 let hasAutoAnchoredCurrentFile = false;
@@ -194,9 +195,9 @@ export function renderSidebar(): void {
     // 先按搜索词启动工作区搜索（异步），再交给 React 工作区树重绘
     prepareWorkspaceTree();
     workspaceTreeStore.notify();
-  } else if (focusEl) {
-    focusEl.innerHTML = renderFocusView();
-    scrollCurrentFileIntoView(focusEl);
+  } else {
+    prepareFocusView();
+    focusViewStore.notify();
   }
 
   // 渲染标签页（两种模式都有）

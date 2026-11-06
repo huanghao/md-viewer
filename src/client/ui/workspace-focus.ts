@@ -8,12 +8,10 @@ import {
   isWorkspaceLoading,
   isWorkspaceFailed,
 } from '../state';
-import { escapeHtml, escapeAttr } from '../utils/escape';
 import { stripWorkspaceTreeDisplayExtension } from '../utils/workspace-file-name';
 import { fuzzyMatch } from '../utils/fuzzy-search';
 import { getPinnedFiles } from '../utils/pinned-files';
 import { scanWorkspace } from '../workspace';
-import { renderFileRow } from './file-row';
 import { duplicateNameHints } from '../utils/file-names';
 import { getFileExtension } from '../utils/file-type';
 import { storageGet, storageSet } from '../utils/storage';
@@ -186,19 +184,6 @@ export function getActiveFiles(
 }
 
 
-function renderFocusFileItem(file: FileTreeNode, pinned: Set<string>, query: string, displayTime?: number, nameHint?: string): string {
-  return renderFileRow(file.path, file.name, displayTime ?? file.lastModified, {
-    containerClass: 'tree-item file-node focus-file-item',
-    onClickAction: 'focus-file-click',
-    showPin: true,
-    showTime: true,
-    indentPx: 0,
-    query,
-    showClose: false,
-    nameHint,
-  });
-}
-
 function getActiveStrategies(): Set<string> {
   const s = state.config.focusStrategies;
   if (!Array.isArray(s) || s.length === 0) return new Set(['mtime']);
@@ -231,154 +216,74 @@ export function closeFilterPopup(): void {
   import('./sidebar').then(({ renderSidebar }) => renderSidebar());
 }
 
-function renderFilterBar(): string {
-  const currentWindow = state.config.focusWindowKey || '8h';
-  const activeStrategies = getActiveStrategies();
-  const activeTypes = getActiveTypes();
-  const typeOptions: Array<{ ext: string; label: string }> = [
-    { ext: 'md', label: 'MD' },
-    { ext: 'pdf', label: 'PDF' },
-    { ext: 'html', label: 'HTML' },
-    { ext: 'json', label: 'JSON' },
-  ];
-  const timeOptions: Array<{ key: string; label: string }> = [
-    { key: '8h', label: '8h' },
-    { key: '1d', label: '1d' },
-    { key: '2d', label: '2d' },
-    { key: '1w', label: '1w' },
-  ];
-
-  // 当前生效的标签
-  const activeStrategyTags = [
-    activeStrategies.has('mtime') ? '<span class="focus-active-tag">写</span>' : '',
-    activeStrategies.has('open')  ? '<span class="focus-active-tag">读</span>' : '',
-  ].filter(Boolean).join('');
-  const activeTimeLabel = `<span class="focus-active-tag">${currentWindow}</span>`;
-  const activeTypeTags = typeOptions
-    .filter(o => activeTypes.has(o.ext))
-    .map(o => `<span class="focus-active-tag">${o.label}</span>`)
-    .join('');
-
-  // popup 内容
-  const strategySection = `
-    <div class="focus-popup-section">
-      <div class="focus-popup-label">排序依据</div>
-      <div class="focus-popup-options">
-        <button class="focus-popup-option${activeStrategies.has('mtime') ? ' active' : ''}"
-                data-action="toggle-focus-strategy" data-key="mtime">写（mtime）</button>
-        <button class="focus-popup-option${activeStrategies.has('open') ? ' active' : ''}"
-                data-action="toggle-focus-strategy" data-key="open">读（最近打开）</button>
-      </div>
-    </div>
-    <div class="focus-popup-divider"></div>`;
-
-  const timeSection = `
-    <div class="focus-popup-section">
-      <div class="focus-popup-label">时间窗口</div>
-      <div class="focus-popup-options">
-        ${timeOptions.map(o => `
-          <button class="focus-popup-option${currentWindow === o.key ? ' active' : ''}"
-                  data-action="set-focus-window-key" data-key="${escapeAttr(o.key)}" data-also-toggle-filter="1">${o.label}</button>
-        `).join('')}
-      </div>
-    </div>
-    <div class="focus-popup-divider"></div>`;
-
-  const typeSection = `
-    <div class="focus-popup-section">
-      <div class="focus-popup-label">文件类型</div>
-      <div class="focus-popup-options">
-        ${typeOptions.map(o => `
-          <button class="focus-popup-option${activeTypes.has(o.ext) ? ' active' : ''}"
-                  data-action="toggle-focus-type-filter" data-key="${escapeAttr(o.ext)}">${o.label}</button>
-        `).join('')}
-      </div>
-    </div>`;
-
-  const popup = filterPopupOpen ? `
-    <div class="focus-filter-popup">
-      ${strategySection}
-      ${timeSection}
-      ${typeSection}
-    </div>` : '';
-
-  return `
-    <div class="focus-filter-bar">
-      <div class="focus-active-tags">${activeStrategyTags}<span class="focus-active-sep"></span>${activeTimeLabel}<span class="focus-active-sep"></span>${activeTypeTags}</div>
-      <div class="focus-filter-popup-wrap">
-        <button class="focus-filter-btn${filterPopupOpen ? ' active' : ''}"
-                data-action="toggle-filter-popup" title="筛选">
-          <svg viewBox="0 0 16 16" fill="currentColor" width="11" height="11">
-            <path d="M2 3h12L9.5 8v4.5l-3-1.5V8z"/>
-          </svg>
-        </button>
-        ${popup}
-      </div>
-    </div>
-  `;
+export interface FocusFilterModel {
+  activeStrategies: Set<string>;
+  windowKey: string;
+  activeTypes: Set<string>;
+  popupOpen: boolean;
 }
 
-function renderFocusWorkspaceGroup(
-  workspace: Workspace,
-  activeFiles: FileTreeNode[],
-  pinned: Set<string>,
-  loading: boolean,
-  query: string,
-  collapsed: Set<string>,
-  displayTimeMap?: Map<string, number>
-): string {
-  const hasFiles = activeFiles.length > 0;
-  const isCollapsed = collapsed.has(workspace.id);
-  const badge = loading
-    ? `<span class="focus-ws-badge empty">…</span>`
-    : hasFiles
-    ? `<span class="focus-ws-badge">${activeFiles.length}</span>`
-    : `<span class="focus-ws-badge empty">0</span>`;
-
-  const nameHints = duplicateNameHints(activeFiles.map((f) => f.path));
-  const filesHtml = hasFiles
-    ? activeFiles.map((f) => renderFocusFileItem(f, pinned, query, displayTimeMap?.get(f.path), nameHints.get(f.path))).join('')
-    : '';
-
-  return `
-    <div class="focus-ws-group${hasFiles ? ' has-files' : ''}">
-      <div class="focus-ws-header" data-action="focus-workspace-toggle" data-workspace-id="${escapeAttr(workspace.id)}">
-        <span class="focus-ws-arrow${!isCollapsed ? ' open' : ''}">▶</span>
-        <span class="focus-ws-name">${escapeHtml(workspace.name)}</span>
-        ${badge}
-      </div>
-      ${hasFiles && !isCollapsed ? `<div class="focus-ws-files">${filesHtml}</div>` : ''}
-    </div>
-  `;
+export interface FocusRowModel {
+  file: FileTreeNode;
+  nameHint?: string;
+  /** 写+读同时开启或只读时显示最近打开时间，否则显示修改时间 */
+  displayTime?: number;
 }
 
-export function renderFocusView(): string {
-  const workspaces = state.config.workspaces;
-  if (workspaces.length === 0) {
-    return '<div class="focus-empty">暂无工作区</div>';
+export interface FocusGroupModel {
+  workspace: Workspace;
+  collapsed: boolean;
+  rows: FocusRowModel[];
+}
+
+export type FocusViewModel =
+  | { kind: 'no-workspaces' }
+  | { kind: 'scanning'; filter: FocusFilterModel }
+  | { kind: 'empty'; filter: FocusFilterModel }
+  | { kind: 'ready'; filter: FocusFilterModel; query: string; groups: FocusGroupModel[] };
+
+function getFilterModel(): FocusFilterModel {
+  return {
+    activeStrategies: getActiveStrategies(),
+    windowKey: state.config.focusWindowKey || '8h',
+    activeTypes: getActiveTypes(),
+    popupOpen: filterPopupOpen,
+  };
+}
+
+/** 渲染前调用：启动各工作区的扫描（有副作用，不能放在渲染函数里） */
+export function prepareFocusView(): void {
+  refreshFocusWorkspaces(false);
+  for (const ws of state.config.workspaces) {
+    if (!state.fileTree.get(ws.id)) scheduleFocusWorkspaceScan(ws.id);
   }
+}
 
-  const activeStrategies = getActiveStrategies();
+/** focus 视图的全部数据；纯计算，供 React 组件渲染 */
+export function buildFocusView(): FocusViewModel {
+  const workspaces = state.config.workspaces;
+  if (workspaces.length === 0) return { kind: 'no-workspaces' };
+
+  const filter = getFilterModel();
+  const activeStrategies = filter.activeStrategies;
   const useMtime = activeStrategies.has('mtime');
-  const useOpen  = activeStrategies.has('open');
+  const useOpen = activeStrategies.has('open');
   const windowMs = FOCUS_WINDOW_MS[state.config.focusWindowKey || '8h'] ?? FOCUS_WINDOW_MS['8h'];
   const cutoff = Date.now() - windowMs;
   const pinned = getPinnedFiles();
   const query = state.searchQuery.trim().toLowerCase();
   const collapsed = getFocusCollapsed();
-  const activeTypes = getActiveTypes();
-  refreshFocusWorkspaces(false);
+  const activeTypes = filter.activeTypes;
 
   // 读模式需要 open/annotate 信号
   const lastOpenMap = useOpen
     ? buildLastOpenMap(signalCache, cutoff)
     : new Map<string, number>();
 
-  const allCandidates: Array<{ file: FileTreeNode; ws: typeof workspaces[0] }> = [];
+  const allCandidates: Array<{ file: FileTreeNode; ws: Workspace }> = [];
 
   for (const ws of workspaces) {
     const tree = state.fileTree.get(ws.id);
-    if (!tree) scheduleFocusWorkspaceScan(ws.id);
     if (!tree) continue;
 
     for (const f of collectFiles(tree)) {
@@ -418,7 +323,7 @@ export function renderFocusView(): string {
     const getTs = (f: FileTreeNode) => {
       let ts = 0;
       if (useMtime) ts = Math.max(ts, f.lastModified || 0);
-      if (useOpen)  ts = Math.max(ts, lastOpenMap.get(f.path) ?? 0);
+      if (useOpen) ts = Math.max(ts, lastOpenMap.get(f.path) ?? 0);
       return ts;
     };
     return getTs(b.file) - getTs(a.file);
@@ -433,13 +338,8 @@ export function renderFocusView(): string {
     : allCandidates;
 
   const hasLoadingWorkspaces = workspaces.some((ws) => isWorkspaceLoading(ws.id) || pendingScanIds.has(ws.id));
-  if (filtered.length === 0 && hasLoadingWorkspaces) {
-    return `<div class="focus-view">${renderFilterBar()}<div class="focus-empty">正在扫描最近文件…</div></div>`;
-  }
-
-  if (filtered.length === 0) {
-    return `<div class="focus-view">${renderFilterBar()}<div class="focus-empty">暂无最近文件</div></div>`;
-  }
+  if (filtered.length === 0 && hasLoadingWorkspaces) return { kind: 'scanning', filter };
+  if (filtered.length === 0) return { kind: 'empty', filter };
 
   // Group by workspace
   const byWs = new Map<string, FileTreeNode[]>();
@@ -452,13 +352,23 @@ export function renderFocusView(): string {
   // 读模式下显示最近打开时间；写+读同时开时也用最近打开时间（更能反映"最近活跃"）
   const displayTimeMap = useOpen ? lastOpenMap : undefined;
 
-  const groups = workspaces.map((ws) => {
+  const groups: FocusGroupModel[] = [];
+  for (const ws of workspaces) {
     const files = byWs.get(ws.id);
-    if (!files?.length) return '';
-    return renderFocusWorkspaceGroup(ws, files, pinned, false, query, collapsed, displayTimeMap);
-  }).join('');
+    if (!files?.length) continue;
+    const nameHints = duplicateNameHints(files.map((f) => f.path));
+    groups.push({
+      workspace: ws,
+      collapsed: collapsed.has(ws.id),
+      rows: files.map((file) => ({
+        file,
+        nameHint: nameHints.get(file.path),
+        displayTime: displayTimeMap?.get(file.path),
+      })),
+    });
+  }
 
-  return `<div class="focus-view">${renderFilterBar()}${groups}</div>`;
+  return { kind: 'ready', filter, query, groups };
 }
 
 // ── Functions moved here from sidebar-workspace.ts (no circular import) ──────

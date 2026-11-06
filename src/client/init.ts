@@ -9,6 +9,7 @@ import { mountTabStrip } from './tabs';
 import { mountSidebarHeader } from './sidebar-header';
 import { mountFileList } from './file-list';
 import { mountWorkspaceTree } from './workspace-tree';
+import { mountFocusView } from './focus-view';
 import { looksLikePathInput } from './utils/path-input';
 import type { TabBatchAction } from './utils/tab-batch';
 import { initToolbarActions } from './main-actions';
@@ -299,6 +300,7 @@ import {
 
   // 工作区视图：React 渲染树，数据由 renderSidebar 触发重绘
   mountWorkspaceTree({ onRendered: scrollCurrentFileIntoView });
+  mountFocusView({ onRendered: scrollCurrentFileIntoView });
 
   // 根据配置渲染侧边栏
   renderSidebar();

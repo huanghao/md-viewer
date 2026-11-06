@@ -10,6 +10,8 @@ export interface FileRowProps {
   indentPx: number;
   /** 是否显示关闭按钮（列表显示，工作区树不显示） */
   showClose: boolean;
+  /** 已格式化的相对时间（仅 focus 视图） */
+  timeText?: string;
 }
 
 function StatusMark({ status }: { status: FileRowStatus }) {
@@ -21,7 +23,7 @@ function StatusMark({ status }: { status: FileRowStatus }) {
 }
 
 /** 与原 renderFileRow 的 DOM 结构和 class 保持一致，点击与关闭仍由外层的 data-action 委托处理 */
-export function FileRow({ row, containerClass, clickAction, indentPx, showClose }: FileRowProps) {
+export function FileRow({ row, containerClass, clickAction, indentPx, showClose, timeText }: FileRowProps) {
   const classes = [containerClass, row.isMissing && 'missing', row.isCurrent && 'current'].filter(Boolean).join(' ');
   return (
     <div className={classes} data-path={row.path} data-action={clickAction}>
@@ -37,6 +39,7 @@ export function FileRow({ row, containerClass, clickAction, indentPx, showClose 
         </span>
       </span>
       {row.annotationCount > 0 && <span className="annotation-count-badge">{row.annotationCount}</span>}
+      {timeText && <span className="focus-file-time">{timeText}</span>}
       <button
         type="button"
         className={`tree-pin-btn${row.pinned ? ' active' : ''}`}

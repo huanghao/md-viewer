@@ -5,7 +5,8 @@ import {
   globToRegex,
   isIgnored,
   getActiveFiles,
-  renderFocusView,
+  buildFocusView,
+  prepareFocusView,
 } from '../../src/client/ui/workspace-focus';
 import { formatRelativeTimeShort as formatRelativeTime } from '../../src/client/utils/format';
 
@@ -215,7 +216,7 @@ describe('getActiveFiles', () => {
 
 });
 
-describe('renderFocusView', () => {
+describe('buildFocusView', () => {
   it('shows a scanning state while workspace trees are being loaded', () => {
     globalThis.fetch = mock(async () => Response.json({
       name: 'repo',
@@ -227,10 +228,35 @@ describe('renderFocusView', () => {
       { id: 'ws-loading', name: 'repo', path: '/repo', isExpanded: false },
     ];
 
-    const html = renderFocusView();
+    prepareFocusView();
+    const view = buildFocusView();
 
-    expect(html).toContain('正在扫描最近文件');
+    expect(view.kind).toBe('scanning');
     expect(state.workspaceLoadingIds.has('ws-loading')).toBe(true);
+  });
+
+  it('groups recently modified files by workspace', () => {
+    globalThis.fetch = mock(async () => new Response('{}', { status: 500 })) as any;
+    state.config.workspaces = [
+      { id: 'ws-recent', name: 'notes', path: '/notes', isExpanded: true },
+    ];
+    state.fileTree.set('ws-recent', {
+      name: 'notes',
+      path: '/notes',
+      type: 'directory',
+      children: [
+        { name: 'a.md', path: '/notes/a.md', type: 'file', lastModified: Date.now() },
+        { name: 'old.md', path: '/notes/old.md', type: 'file', lastModified: Date.now() - 30 * 86400000 },
+      ],
+    });
+
+    const view = buildFocusView();
+
+    expect(view.kind).toBe('ready');
+    if (view.kind !== 'ready') return;
+    expect(view.groups.map((g) => g.workspace.id)).toEqual(['ws-recent']);
+    expect(view.groups[0].rows.map((r) => r.file.path)).toEqual(['/notes/a.md']);
+    expect(view.groups[0].collapsed).toBe(false);
   });
 });
 

@@ -1,7 +1,6 @@
-import { state, getSessionFile } from '../state';
+import { state } from '../state';
 import { state as annotationState } from '../annotation-state';
-import { hasListDiff, hasWorkspaceModified, isWorkspacePathMissing } from '../workspace-state';
-import { getFileListStatus } from '../utils/file-status';
+import { getFileRowState } from '../utils/file-row-status';
 import { getFileTypeIcon } from '../utils/file-type';
 import { stripWorkspaceTreeDisplayExtension } from '../utils/workspace-file-name';
 import { formatRelativeTimeShort } from '../utils/format';
@@ -56,26 +55,14 @@ export function renderFileRow(
   opts: FileRowOptions,
 ): string {
   const isCurrent = state.currentFile === path;
-  const openedFile = getSessionFile(path);
-  const listDiff = hasListDiff(path);
-  const isMissing = !!openedFile?.isMissing || isWorkspacePathMissing(path);
-  const wsModified = hasWorkspaceModified(path);
+  const { isMissing, status } = getFileRowState(path);
 
-  // 状态 badge（优先级：D > M > 蓝点）
+  // 状态 badge
   let statusBadge = '&nbsp;';
-  if (openedFile) {
-    const status = getFileListStatus(openedFile, listDiff);
-    if (status.badge === 'dot') {
-      statusBadge = '<span class="new-dot"></span>';
-    } else if (status.badge) {
-      statusBadge = `<span class="status-badge status-${status.type}" style="color: ${status.color}">${status.badge}</span>`;
-    }
-  } else if (isMissing) {
-    statusBadge = '<span class="status-badge status-deleted" style="color: #ff3b30">D</span>';
-  } else if (wsModified) {
-    statusBadge = '<span class="status-badge status-modified" style="color: #ff9500">M</span>';
-  } else if (listDiff) {
+  if (status.kind === 'dot') {
     statusBadge = '<span class="new-dot"></span>';
+  } else if (status.kind === 'badge') {
+    statusBadge = `<span class="status-badge ${status.cls}" style="color: ${status.color}">${status.text}</span>`;
   }
 
   // 文件名：strip 扩展名 + 搜索高亮

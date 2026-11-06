@@ -1,17 +1,16 @@
 import type { FileInfo } from '../types';
-import { state, setSearchQuery, getFilteredFiles, saveState, moveTabOrder } from '../state';
+import { state, setSearchQuery, getFilteredFiles } from '../state';
 import { hasListDiff } from '../workspace-state';
 import { saveConfig } from '../config';
-import { escapeAttr, escapeHtml } from '../utils/escape';
 import { generateDistinctNames } from '../utils/file-names';
 import { getFileListStatus } from '../utils/file-status';
 import { isJsonFile, isJsonlFile } from '../utils/file-type';
-import { renderFileRow } from './file-row';
+import { buildFileListRow } from '../file-list/model';
+import { fileListStore } from '../file-list/store';
 import { tabsStore } from '../tabs/store';
 import { isPinned } from '../utils/pinned-files';
 import { getTabBatchTargets, type TabBatchAction } from '../utils/tab-batch';
 import { renderWorkspaceSidebar, bindWorkspaceEvents, type WorkspaceCallbacks } from './sidebar-workspace';
-import { syncAnnotationSidebarLayout } from '../annotation';
 import { sidebarHeaderStore } from '../sidebar/store';
 
 let hasAutoAnchoredCurrentFile = false;
@@ -58,25 +57,12 @@ export function initFileListActions(callbacks: FileListCallbacks): void {
   });
 }
 
-interface FileEntry { path: string; displayName: string; name: string; nameHint?: string; isMissing?: boolean; }
-
-const DRAG_THRESHOLD = 4; // px，小于此移动距离视为 click，不启动拖拽
-interface FileDragState {
-  fromPath: string;
-  insertIdx: number;
-  ghost: HTMLElement;
-  srcEl: HTMLElement;
-  offsetX: number;
-  offsetY: number;
-}
-let fileDragState: FileDragState | null = null;
-
 export function resetSidebarFileAnchor(): void {
   hasAutoAnchoredCurrentFile = false;
 }
 
 // 将当前打开的文件滚动到侧边栏40%位置
-function scrollCurrentFileIntoView(container: HTMLElement): void {
+export function scrollCurrentFileIntoView(container: HTMLElement): void {
   if (!state.currentFile) return;
   if (hasAutoAnchoredCurrentFile) return;
 
@@ -149,140 +135,17 @@ export function setSidebarSearchQuery(query: string): void {
   }
 }
 
-function bindFileDragEvents(fileListEl: HTMLElement): void {
-  if ((fileListEl as any).__fileDragBound) return;
-  (fileListEl as any).__fileDragBound = true;
-
-  fileListEl.addEventListener('pointerdown', (e: PointerEvent) => {
-    if (e.button !== 0) return;
-    const item = (e.target as HTMLElement).closest('.file-item') as HTMLElement | null;
-    if (!item) return;
-    if ((e.target as HTMLElement).closest('.close, .tree-pin-btn')) return;
-
-    const fromPath = item.dataset.path || '';
-    if (!fromPath) return;
-    const fromIdx = state.tabOrder.indexOf(fromPath);
-    if (fromIdx < 0) return;
-
-    const startX = e.clientX;
-    const startY = e.clientY;
-    let dragging = false;
-    let ghost: HTMLElement | null = null;
-
-    const itemRect = item.getBoundingClientRect();
-    const offsetX = e.clientX - itemRect.left;
-    const offsetY = e.clientY - itemRect.top;
-
-    function startDrag(): void {
-      dragging = true;
-      ghost = document.createElement('div');
-      ghost.className = 'file-drag-ghost';
-      ghost.textContent = item!.querySelector('.tree-name-full')?.textContent || fromPath.split('/').pop() || fromPath;
-      ghost.style.width = itemRect.width + 'px';
-      ghost.style.left  = itemRect.left + 'px';
-      ghost.style.top   = itemRect.top  + 'px';
-      document.body.appendChild(ghost);
-      item!.classList.add('file-item-dragging');
-      fileDragState = { fromPath, insertIdx: fromIdx, ghost, srcEl: item!, offsetX, offsetY };
-    }
-
-    function cleanup(): void {
-      fileListEl.querySelectorAll<HTMLElement>('.file-item').forEach(el => { el.style.transform = ''; });
-      if (ghost) { ghost.remove(); ghost = null; }
-      item!.classList.remove('file-item-dragging');
-      fileDragState = null;
-    }
-
-    function onMove(e: PointerEvent): void {
-      if (!dragging) {
-        if (Math.abs(e.clientX - startX) < DRAG_THRESHOLD && Math.abs(e.clientY - startY) < DRAG_THRESHOLD) return;
-        e.preventDefault();
-        startDrag();
-      }
-      if (!fileDragState || !ghost) return;
-      const { srcEl } = fileDragState;
-
-      ghost.style.left = (e.clientX - offsetX) + 'px';
-      ghost.style.top  = (e.clientY - offsetY) + 'px';
-
-      const mouseY = e.clientY;
-      const itemEls = [...fileListEl.querySelectorAll<HTMLElement>('.file-item:not(.file-item-dragging)')];
-
-      let newInsertIdx = fromIdx;
-      let found = false;
-      for (let i = 0; i < itemEls.length; i++) {
-        const r = itemEls[i].getBoundingClientRect();
-        if (mouseY < r.bottom) {
-          const itemPath = itemEls[i].dataset.path || '';
-          const origIdx = state.tabOrder.indexOf(itemPath);
-          if (origIdx < 0) continue;
-          newInsertIdx = mouseY < r.top + r.height / 2 ? origIdx : origIdx + 1;
-          if (origIdx >= fromIdx) newInsertIdx -= 1;
-          found = true;
-          break;
-        }
-      }
-      if (!found) newInsertIdx = state.tabOrder.length - 1;
-
-      fileDragState.insertIdx = newInsertIdx;
-
-      const allItemEls = [...fileListEl.querySelectorAll<HTMLElement>('.file-item')];
-      const ghostH = ghost.offsetHeight;
-      allItemEls.forEach((el, i) => {
-        if (el === srcEl) return;
-        let dy = 0;
-        if (newInsertIdx < fromIdx) {
-          if (i >= newInsertIdx && i < fromIdx) dy = ghostH;
-        } else {
-          if (i > fromIdx && i <= newInsertIdx) dy = -ghostH;
-        }
-        el.style.transform = dy !== 0 ? `translateY(${dy}px)` : '';
-      });
-    }
-
-    function onUp(): void {
-      item!.removeEventListener('pointermove', onMove);
-      item!.removeEventListener('pointerup', onUp);
-      item!.removeEventListener('pointercancel', onCancel);
-
-      if (!dragging) return;
-
-      const insertIdx = fileDragState?.insertIdx ?? fromIdx;
-      cleanup();
-      if (fromIdx >= 0 && fromIdx !== insertIdx) moveTabOrder(fromIdx, insertIdx);
-      renderTabs();
-      renderFiles();
-    }
-
-    function onCancel(): void {
-      item!.removeEventListener('pointermove', onMove);
-      item!.removeEventListener('pointerup', onUp);
-      item!.removeEventListener('pointercancel', onCancel);
-      if (dragging) cleanup();
-    }
-
-    item.setPointerCapture(e.pointerId);
-    item.addEventListener('pointermove', onMove);
-    item.addEventListener('pointerup', onUp);
-    item.addEventListener('pointercancel', onCancel);
-  });
-}
-
 // 渲染文件列表
 export function renderFiles(): void {
-  const container = document.getElementById('fileList');
-  if (!container) return;
-
+  // 文件列表由 React 渲染（file-list/），这里只计算快照
   if (state.sessionFiles.size === 0) {
-    container.innerHTML = '<div class="empty-tip">点击上方添加 Markdown/HTML 文件</div>';
+    fileListStore.setSnapshot({ rows: [], empty: '点击上方添加 Markdown/HTML 文件' });
     return;
   }
 
-  // 使用过滤后的文件列表
   const filteredFiles = getFilteredFiles();
-
   if (filteredFiles.length === 0) {
-    container.innerHTML = '<div class="empty-tip">未找到匹配的文件</div>';
+    fileListStore.setSnapshot({ rows: [], empty: '未找到匹配的文件' });
     return;
   }
 
@@ -295,24 +158,9 @@ export function renderFiles(): void {
   }
 
   const orderedMap = new Map(orderedPaths.map(p => [p, state.sessionFiles.get(p)!]));
-  const filesWithDisplay = generateDistinctNames(orderedMap);
-
-  container.innerHTML = filesWithDisplay.map(file => {
-    return renderFileRow(file.path, file.name, undefined, {
-      containerClass: 'file-item',
-      nameHint: file.nameHint,
-      onClickAction: 'switch-file',
-      showPin: true,
-      showTime: false,
-      indentPx: 0,
-      query: state.searchQuery.toLowerCase().trim(),
-      showClose: true,
-    });
-  }).join('');
-
-  bindFileDragEvents(container);
-  // 滚动当前文件到侧边栏40%位置
-  scrollCurrentFileIntoView(container);
+  const query = state.searchQuery.toLowerCase().trim();
+  const rows = generateDistinctNames(orderedMap).map(file => buildFileListRow(file, query));
+  fileListStore.setSnapshot({ rows, empty: null });
 }
 
 // 渲染整个侧边栏（根据模式选择）
@@ -325,28 +173,24 @@ export function renderSidebar(): void {
 
   sidebarHeaderStore.setSnapshot({ tab, query: state.searchQuery });
 
+  // 两种视图共用 #fileList 滚动容器，各自的内容容器二选一显示
+  const openEl = document.getElementById('openFileList');
+  const workspaceEl = document.getElementById('workspaceList');
+  if (openEl) openEl.hidden = tab !== 'list';
+  if (workspaceEl) workspaceEl.hidden = tab === 'list';
+
   if (tab === 'list') {
-    const listEl = document.getElementById('fileList');
-    if (listEl) listEl.className = 'file-list';
     renderFiles();
     renderTabs();
     return;
   }
 
   // focus or full — workspace rendering
-  if (!container) return;
+  if (!container || !workspaceEl) return;
 
-  let fileListContainer = document.getElementById('fileList');
-  if (!fileListContainer) {
-    fileListContainer = document.createElement('div');
-    fileListContainer.id = 'fileList';
-    container.appendChild(fileListContainer);
-  }
-  fileListContainer.className = 'file-list';
-
-  fileListContainer.innerHTML = renderWorkspaceSidebar();
+  workspaceEl.innerHTML = renderWorkspaceSidebar();
   bindWorkspaceEvents(workspaceCallbacks ?? undefined);
-  scrollCurrentFileIntoView(fileListContainer);
+  scrollCurrentFileIntoView(workspaceEl);
 
   // 渲染标签页（两种模式都有）
   renderTabs();

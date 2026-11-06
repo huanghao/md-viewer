@@ -4,9 +4,10 @@ import { setAnnotationSummaries } from './state';
 import { pruneDeadFeatureStorageKeys, pruneStalePerFileStorage } from './utils/storage';
 import { hydrateExpandedWorkspaces } from './workspace';
 import { loadFile } from './api/files';
-import { renderSidebar, renderTabs, renderFiles, initFileListActions, initWorkspaceActions, initSearchBoxCallbacks, applyTabBatchAction, setSidebarSearchQuery, setSidebarTab } from './ui/sidebar';
+import { renderSidebar, renderTabs, renderFiles, initFileListActions, initWorkspaceActions, initSearchBoxCallbacks, applyTabBatchAction, setSidebarSearchQuery, setSidebarTab, scrollCurrentFileIntoView } from './ui/sidebar';
 import { mountTabStrip } from './tabs';
 import { mountSidebarHeader } from './sidebar-header';
+import { mountFileList } from './file-list';
 import { looksLikePathInput } from './utils/path-input';
 import type { TabBatchAction } from './utils/tab-batch';
 import { initToolbarActions } from './main-actions';
@@ -275,16 +276,24 @@ import {
   });
 
   // 文档标签栏：React 渲染，这里注入动作
+  // 标签栏与文件列表共用同一份排序状态
+  const reorderOpenFiles = (fromIdx: number, insertIdx: number) => {
+    if (fromIdx !== insertIdx) moveTabOrder(fromIdx, insertIdx);
+    renderTabs();
+    renderFiles();
+  };
   mountTabStrip({
     switchFile: (path) => void switchFile(path),
     removeFile: removeFileHandler,
     batch: (action: TabBatchAction) => applyTabBatchAction(action, removeFileHandler),
-    reorder: (fromIdx, insertIdx) => {
-      if (fromIdx !== insertIdx) moveTabOrder(fromIdx, insertIdx);
-      renderTabs();
-      renderFiles();
-    },
+    reorder: reorderOpenFiles,
     onLayout: syncAnnotationSidebarLayout,
+  });
+
+  // 文件列表（“打开”视图）：React 渲染，拖拽排序复用 reorderOpenFiles
+  mountFileList({
+    reorder: reorderOpenFiles,
+    onRendered: scrollCurrentFileIntoView,
   });
 
   // 根据配置渲染侧边栏

@@ -274,7 +274,9 @@ export function removeFileHandler(path: string) {
 }
 
 export function navigateFileInView(direction: 1 | -1): void {
-  const items = Array.from(document.querySelectorAll<HTMLElement>('#fileList [data-path]'));
+  // 列表与工作区内容共用 #fileList，隐藏的那一份不参与导航
+  const items = Array.from(document.querySelectorAll<HTMLElement>('#fileList [data-path]'))
+    .filter(el => el.offsetParent !== null);
   if (items.length === 0) return;
   const paths = items.map(el => el.dataset.path!);
   const currentIdx = state.currentFile ? paths.indexOf(state.currentFile) : -1;

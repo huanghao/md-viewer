@@ -8,6 +8,7 @@ import {
 } from './state';
 import { addWorkspace } from './workspace';
 import { loadFile, searchFiles, openFile, detectPathType } from './api/files';
+import { addConfirmStore } from './add-confirm/store';
 import { renderSidebar, resetSidebarFileAnchor } from './ui/sidebar';
 import { showSuccess, showError, showInfo } from './ui/toast';
 import { renderContent } from './content-renderer';
@@ -79,21 +80,11 @@ let pendingAddAction: PendingAddAction | null = null;
 
 export function clearAddConfirm(): void {
   pendingAddAction = null;
-  const bar = document.getElementById('quickActionConfirm') as HTMLElement | null;
-  const text = document.getElementById('quickActionConfirmText') as HTMLElement | null;
-  const actions = document.getElementById('quickActionConfirmActions') as HTMLElement | null;
-  if (bar) {
-    bar.style.display = 'none';
-    bar.className = 'add-file-confirm';
-  }
-  if (text) text.textContent = '';
-  if (actions) actions.innerHTML = '';
-  document.body.classList.remove('quick-action-confirm-visible');
+  addConfirmStore.hide();
 }
 
 export function isAddConfirmVisible(): boolean {
-  const bar = document.getElementById('quickActionConfirm') as HTMLElement | null;
-  return !!bar && bar.style.display !== 'none';
+  return addConfirmStore.getState().visible;
 }
 
 export function showAddConfirm(
@@ -104,35 +95,20 @@ export function showAddConfirm(
   const searchInput = document.getElementById('searchInput') as HTMLInputElement | null;
   searchInput?.dispatchEvent(new Event('path-autocomplete-hide'));
 
-  const bar = document.getElementById('quickActionConfirm') as HTMLElement | null;
-  const text = document.getElementById('quickActionConfirmText') as HTMLElement | null;
-  const actions = document.getElementById('quickActionConfirmActions') as HTMLElement | null;
-  if (!bar || !text || !actions) return;
-
-  text.textContent = message;
-  actions.innerHTML = '';
-  bar.className = `add-file-confirm state-${mode}`;
-  bar.style.display = 'flex';
-  document.body.classList.add('quick-action-confirm-visible');
-
-  if (opts.primaryLabel && opts.onPrimary) {
-    const primary = document.createElement('button');
-    primary.className = 'add-file-confirm-button primary';
-    primary.textContent = opts.primaryLabel;
-    primary.onclick = async () => {
-      await opts.onPrimary!();
-      clearAddConfirm();
-    };
-    actions.appendChild(primary);
-  }
-
-  if (opts.allowCancel !== false) {
-    const cancel = document.createElement('button');
-    cancel.className = 'add-file-confirm-button';
-    cancel.textContent = '取消';
-    cancel.onclick = () => clearAddConfirm();
-    actions.appendChild(cancel);
-  }
+  const onPrimary = opts.primaryLabel && opts.onPrimary
+    ? async () => {
+        await opts.onPrimary!();
+        clearAddConfirm();
+      }
+    : undefined;
+  addConfirmStore.show({
+    message,
+    mode,
+    primaryLabel: opts.primaryLabel,
+    onPrimary,
+    onCancel: clearAddConfirm,
+    allowCancel: opts.allowCancel !== false,
+  });
 }
 
 async function executePendingAddAction(): Promise<void> {

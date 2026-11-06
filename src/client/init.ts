@@ -10,6 +10,7 @@ import { mountSidebarHeader } from './sidebar-header';
 import { mountFileList } from './file-list';
 import { mountWorkspaceTree } from './workspace-tree';
 import { mountFocusView } from './focus-view';
+import { mountAddConfirmBar } from './add-confirm';
 import { looksLikePathInput } from './utils/path-input';
 import type { TabBatchAction } from './utils/tab-batch';
 import { initToolbarActions } from './main-actions';
@@ -248,6 +249,9 @@ import {
     refreshFile,
   });
 
+  // 添加确认条：React 渲染，file-switcher 通过 store 显示
+  mountAddConfirmBar();
+
   // 侧边栏头部：搜索框与视图切换由 React 渲染，这里注入动作
   initSearchBoxCallbacks({ renderContent });
   mountSidebarHeader({
@@ -346,8 +350,6 @@ import {
       if (qoOverlay && qoOverlay.style.display !== 'none') { hideQuickOpen(); return; }
       if (isShortcutsHelpVisible()) { hideShortcutsHelp(); return; }
       if (isPreferencesOpen()) { closePreferences(); return; }
-      const addWsEl = document.getElementById('addWorkspaceDialogOverlay');
-      if (addWsEl?.classList.contains('show')) { addWsEl.classList.remove('show'); }
     },
   });
 

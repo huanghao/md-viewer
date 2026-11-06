@@ -12,8 +12,7 @@ import {
 } from '../state';
 import { getWorkspaceMissingPaths } from '../workspace-state';
 import { searchFiles } from '../api/files';
-import { showError, showSuccess, showWarning } from './toast';
-import { attachPathAutocomplete } from './path-autocomplete';
+import { showError, showSuccess } from './toast';
 import {
   removeWorkspace,
   moveWorkspaceByOffset,
@@ -24,12 +23,8 @@ import {
 import { clearListDiff, clearWorkspaceModified } from '../workspace-state';
 import { duplicateNameHints } from '../utils/file-names';
 import { fuzzyMatch } from '../utils/fuzzy-search';
-import { isSubmitKey } from '../utils/input-keys';
 
 
-const ADD_WORKSPACE_DIALOG_ID = 'addWorkspaceDialogOverlay';
-const ADD_WORKSPACE_INPUT_ID = 'addWorkspacePathInput';
-const ADD_WORKSPACE_PREVIEW_ID = 'addWorkspacePathPreview';
 let pendingRemoveWorkspaceId: string | null = null;
 let removeOutsideClickBound = false;
 
@@ -39,12 +34,6 @@ let workspaceSearchLoading = false;
 let workspaceSearchLoaded = false;
 let workspaceSearchPaths = new Set<string>();
 let workspaceSearchSeq = 0;
-
-function getWorkspaceNameFromPath(path: string): string {
-  const parts = path.split('/').filter(Boolean);
-  return parts[parts.length - 1] || 'workspace';
-}
-
 
 function collectTreeFilePaths(node: FileTreeNode | undefined, bag: Set<string>): void {
   if (!node) return;
@@ -232,118 +221,6 @@ function ensureWorkspaceSearchResults(query: string): void {
   workspaceSearchLoaded = false;
   workspaceSearchPaths = new Set<string>();
   void runWorkspaceSearch(trimmed, roots, rootsKey, workspaceSearchSeq);
-}
-
-function updateWorkspacePathPreview(): void {
-  const input = document.getElementById(ADD_WORKSPACE_INPUT_ID) as HTMLTextAreaElement | null;
-  const preview = document.getElementById(ADD_WORKSPACE_PREVIEW_ID) as HTMLElement | null;
-  if (!preview) return;
-
-  const value = input?.value.trim() || '';
-  preview.textContent = value || '路径预览：在上方输入后这里会显示完整路径';
-}
-
-function createAddWorkspaceDialog(): HTMLElement {
-  const existing = document.getElementById(ADD_WORKSPACE_DIALOG_ID);
-  if (existing) return existing;
-
-  const overlay = document.createElement('div');
-  overlay.id = ADD_WORKSPACE_DIALOG_ID;
-  overlay.className = 'sync-dialog-overlay add-workspace-overlay';
-  overlay.innerHTML = `
-    <div class="sync-dialog add-workspace-dialog">
-      <div class="sync-dialog-header">
-        <div class="sync-dialog-title">添加工作区</div>
-        <button class="sync-dialog-close" data-action="close-add-workspace">×</button>
-      </div>
-      <div class="sync-dialog-body">
-        <div class="sync-dialog-field">
-          <label class="sync-dialog-label">📁 工作区路径</label>
-          <textarea
-            id="${ADD_WORKSPACE_INPUT_ID}"
-            class="sync-dialog-input workspace-path-input"
-            rows="3"
-            placeholder="/Users/huanghao/workspace/md-viewer"
-          ></textarea>
-          <div class="workspace-path-hint">支持粘贴长路径。按 Ctrl/Cmd + Enter 快速确认。</div>
-          <div id="${ADD_WORKSPACE_PREVIEW_ID}" class="workspace-path-preview">路径预览：在上方输入后这里会显示完整路径</div>
-        </div>
-      </div>
-      <div class="sync-dialog-footer add-workspace-footer">
-        <button class="sync-dialog-btn" data-action="close-add-workspace">取消</button>
-        <button class="sync-dialog-btn sync-dialog-btn-primary" data-action="confirm-add-workspace">添加</button>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(overlay);
-
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) {
-      closeAddWorkspaceDialog();
-    }
-  });
-
-  const input = overlay.querySelector(`#${ADD_WORKSPACE_INPUT_ID}`) as HTMLTextAreaElement | null;
-  if (input) {
-    attachPathAutocomplete(input, { kind: 'directory', markdownOnly: false });
-    input.addEventListener('input', updateWorkspacePathPreview);
-    input.addEventListener('keydown', (e) => {
-      if (isSubmitKey(e)) {
-        e.preventDefault();
-        confirmAddWorkspaceDialog();
-      }
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        closeAddWorkspaceDialog();
-      }
-    });
-  }
-
-  return overlay;
-}
-
-function showAddWorkspaceDialog(): void {
-  const overlay = createAddWorkspaceDialog();
-  overlay.classList.add('show');
-
-  const input = document.getElementById(ADD_WORKSPACE_INPUT_ID) as HTMLTextAreaElement | null;
-  if (input) {
-    input.value = '';
-    updateWorkspacePathPreview();
-    input.focus();
-  }
-}
-
-function closeAddWorkspaceDialog(): void {
-  const overlay = document.getElementById(ADD_WORKSPACE_DIALOG_ID);
-  if (overlay) {
-    overlay.classList.remove('show');
-  }
-}
-
-async function confirmAddWorkspaceDialog(): Promise<void> {
-  try {
-    const input = document.getElementById(ADD_WORKSPACE_INPUT_ID) as HTMLTextAreaElement | null;
-    const path = input?.value.trim() || '';
-    if (!path) {
-      showWarning('请输入工作区路径');
-      input?.focus();
-      return;
-    }
-
-    const name = getWorkspaceNameFromPath(path);
-    const { addWorkspace } = await import('../workspace');
-    const workspace = addWorkspace(name, path);
-
-    const { renderSidebar } = await import('./sidebar');
-    renderSidebar();
-    closeAddWorkspaceDialog();
-    showSuccess(`已添加工作区: ${workspace.name}`);
-  } catch (error: any) {
-    console.error('添加工作区失败:', error);
-    showError(`添加工作区失败: ${error?.message || '未知错误'}`);
-  }
 }
 
 export interface MissingRowModel {
@@ -687,12 +564,6 @@ export function bindWorkspaceEvents(callbacks?: WorkspaceCallbacks): void {
         case 'retry-missing-file':
           e.stopPropagation();
           if (path) await handleRetryMissingFile(path);
-          break;
-        case 'close-add-workspace':
-          closeAddWorkspaceDialog();
-          break;
-        case 'confirm-add-workspace':
-          await confirmAddWorkspaceDialog();
           break;
         case 'workspace-move-up':
           if (workspaceId) await handleMoveWorkspaceUp(workspaceId);

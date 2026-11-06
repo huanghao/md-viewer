@@ -1,8 +1,7 @@
-import type { Workspace, FileTreeNode, FileInfo } from '../types';
+import type { Workspace, FileTreeNode } from '../types';
 import { compareFileNames } from '../utils/file-sort';
 import {
   state,
-  getSessionFile,
   getSessionFiles,
   hasSessionFile,
   markWorkspaceLoading,
@@ -11,12 +10,8 @@ import {
   isWorkspaceLoading,
   isWorkspaceFailed,
 } from '../state';
-import { renderFocusView } from './workspace-focus';
-import { isWorkspacePathMissing, getWorkspaceMissingPaths } from '../workspace-state';
+import { getWorkspaceMissingPaths } from '../workspace-state';
 import { searchFiles } from '../api/files';
-import { escapeHtml, escapeAttr } from '../utils/escape';
-import { getFileTypeIcon } from '../utils/file-type';
-import { stripWorkspaceTreeDisplayExtension } from '../utils/workspace-file-name';
 import { showError, showSuccess, showWarning } from './toast';
 import { attachPathAutocomplete } from './path-autocomplete';
 import {
@@ -27,7 +22,6 @@ import {
   scanWorkspace,
 } from '../workspace';
 import { clearListDiff, clearWorkspaceModified } from '../workspace-state';
-import { renderFileRow, renderNameWithHint } from './file-row';
 import { duplicateNameHints } from '../utils/file-names';
 import { fuzzyMatch } from '../utils/fuzzy-search';
 import { isSubmitKey } from '../utils/input-keys';
@@ -352,224 +346,37 @@ async function confirmAddWorkspaceDialog(): Promise<void> {
   }
 }
 
-// 渲染工作区模式侧边栏
-export function renderWorkspaceSidebar(): string {
-  if (state.config.sidebarTab === 'focus') {
-    return renderFocusView();
-  }
-  const query = state.searchQuery.trim().toLowerCase();
-  ensureWorkspaceSearchResults(query);
-  return `${renderWorkspaceSection(query)}`;
+export interface MissingRowModel {
+  path: string;
+  name: string;
+  nameHint?: string;
+  isCurrent: boolean;
+  hasRetry: boolean;
+  hasClose: boolean;
 }
 
-// 渲染工作区区域
-function renderWorkspaceSection(query: string): string {
-  const workspaces = state.config.workspaces;
-  const workspaceItems = workspaces
-    .map((ws, index) => renderWorkspaceItem(ws, index, workspaces.length, query))
-    .filter(Boolean)
-    .join('');
+export type WorkspaceTreeStatus =
+  | { kind: 'searching' }
+  | { kind: 'loading' }
+  | { kind: 'failed' }
+  | { kind: 'unavailable'; query: boolean }
+  | { kind: 'empty'; query: boolean }
+  | { kind: 'ready'; tree: FileTreeNode };
 
-  return `
-    <div class="workspace-section">
-      ${workspaces.length === 0 ? renderEmptyWorkspace() : ''}
-      ${workspaces.length > 0 && !workspaceItems ? '<div class="empty-workspace"><p>未找到匹配内容</p></div>' : ''}
-      ${workspaceItems}
-    </div>
-  `;
-}
-
-// 渲染空工作区提示
-function renderEmptyWorkspace(): string {
-  return `
-    <div class="empty-workspace">
-      <p>暂无工作区</p>
-      <p style="font-size: 12px; color: var(--color-text-secondary); margin-top: 8px;">
-        在上方输入目录路径后回车添加
-      </p>
-    </div>
-  `;
-}
-
-// 渲染单个工作区
-function renderWorkspaceItem(workspace: Workspace, index: number, total: number, query: string): string {
-  const isCurrent = state.currentWorkspace === workspace.id;
-  const rawTree = query ? buildSearchTree(workspace, query) : state.fileTree.get(workspace.id);
-
-  const tree: FileTreeNode | undefined = rawTree;
-
-  const shouldExpand = query ? true : workspace.isExpanded;
-  const canMoveUp = index > 0;
-  const canMoveDown = index < total - 1;
-  const workspaceMatched = !query || !!fuzzyMatch(workspace.name, query) || !!fuzzyMatch(workspace.path, query);
-  const hasTreeMatch = !!tree && !!tree.children && tree.children.length > 0;
-  const missingSection = shouldExpand ? renderMissingOpenFiles(workspace.id, workspace.path, tree, query) : '';
-  const hasMissingMatch = !!missingSection;
-
-  if (query && !workspaceMatched && !hasTreeMatch && !hasMissingMatch) {
-    return '';
-  }
-
-  return `
-    <div class="workspace-item">
-      <div class="workspace-header ${isCurrent ? 'active' : ''}" data-action="workspace-toggle" data-workspace-id="${escapeAttr(workspace.id)}">
-        <span class="workspace-toggle${shouldExpand ? ' open' : ''}">▶</span>
-        <span class="workspace-icon">${isWorkspaceFailed(workspace.id) ? '⚠️' : '📁'}</span>
-        <span class="workspace-name${isWorkspaceFailed(workspace.id) ? ' workspace-name--failed' : ''}">${escapeHtml(workspace.name)}</span>
-        ${pendingRemoveWorkspaceId === workspace.id ? `
-          <div class="workspace-remove-actions" data-stop-propagation="true">
-            ${canMoveUp ? `
-            <button
-              class="workspace-order-btn"
-              title="上移"
-              data-action="workspace-move-up" data-workspace-id="${escapeAttr(workspace.id)}"
-            >↑</button>
-            ` : ''}
-            ${canMoveDown ? `
-            <button
-              class="workspace-order-btn"
-              title="下移"
-              data-action="workspace-move-down" data-workspace-id="${escapeAttr(workspace.id)}"
-            >↓</button>
-            ` : ''}
-            <button
-              class="workspace-order-btn"
-              title="在 VS Code 中打开目录"
-              data-action="workspace-open-in-editor" data-workspace-id="${escapeAttr(workspace.id)}" data-path="${escapeAttr(workspace.path)}"
-            >↗</button>
-            <button
-              class="workspace-remove-confirm"
-              title="确认移除"
-              data-action="workspace-confirm-remove" data-workspace-id="${escapeAttr(workspace.id)}"
-            >删</button>
-          </div>
-        ` : `
-          <div class="workspace-remove-actions" data-stop-propagation="true">
-            ${canMoveUp ? `
-            <button
-              class="workspace-order-btn"
-              title="上移"
-              data-action="workspace-move-up" data-workspace-id="${escapeAttr(workspace.id)}"
-            >↑</button>
-            ` : ''}
-            ${canMoveDown ? `
-            <button
-              class="workspace-order-btn"
-              title="下移"
-              data-action="workspace-move-down" data-workspace-id="${escapeAttr(workspace.id)}"
-            >↓</button>
-            ` : ''}
-          <button
-            class="workspace-order-btn"
-            title="在 VS Code 中打开目录"
-            data-action="workspace-open-in-editor" data-workspace-id="${escapeAttr(workspace.id)}" data-path="${escapeAttr(workspace.path)}"
-          >↗</button>
-          <button
-            class="workspace-remove"
-            title="移除工作区"
-            data-action="workspace-ask-remove" data-workspace-id="${escapeAttr(workspace.id)}"
-          >
-            ×
-          </button>
-          </div>
-        `}
-      </div>
-      ${shouldExpand ? renderFileTree(workspace.id, tree, query) : ''}
-      ${missingSection}
-    </div>
-  `;
-}
-
-// 渲染文件树
-function renderFileTree(workspaceId: string, tree: FileTreeNode | undefined, query: string): string {
-  if (query && workspaceSearchLoading && workspaceSearchQuery === query) {
-    return `
-      <div class="file-tree loading">
-        <div class="tree-loading">搜索中...</div>
-      </div>
-    `;
-  }
-
-  if (isWorkspaceLoading(workspaceId)) {
-    return `
-      <div class="file-tree loading">
-        <div class="tree-loading">加载中...</div>
-      </div>
-    `;
-  }
-
-  if (isWorkspaceFailed(workspaceId)) {
-    return `
-      <div class="file-tree empty">
-        <div class="tree-empty" data-action="retry-workspace-scan" data-workspace-id="${escapeAttr(workspaceId)}" style="cursor: pointer;">加载失败，点击重试</div>
-      </div>
-    `;
-  }
-
-  if (!tree) {
-    return `
-      <div class="file-tree empty">
-        <div class="tree-empty">${query ? '未找到匹配文件' : '目录暂不可用'}</div>
-      </div>
-    `;
-  }
-
-  if (!tree.children || tree.children.length === 0) {
-    return `
-      <div class="file-tree empty">
-        <div class="tree-empty">${query ? '未找到匹配文件' : '此目录下没有 Markdown/HTML 文件'}</div>
-      </div>
-    `;
-  }
-
-  return `
-    <div class="file-tree">
-      ${tree.children.map(node => renderTreeNode(workspaceId, node, 1)).join('')}
-    </div>
-  `;
-}
-
-// 渲染文件树节点
-function renderTreeNode(workspaceId: string, node: FileTreeNode, depth: number): string {
-  const indentPx = 4 + depth * 8;
-
-  if (node.type === 'file') {
-    const rowHtml = renderFileRow(node.path, node.name, node.lastModified, {
-      containerClass: 'tree-item file-node',
-      onClickAction: 'file-click',
-      showPin: true,
-      showTime: false,
-      indentPx,
-      query: state.searchQuery.trim().toLowerCase(),
-      showClose: false,
-    });
-
-    return `<div class="tree-node">${rowHtml}</div>`;
-  }
-
-  // 目录
-  const isExpanded = node.isExpanded !== false;  // 默认展开
-  const hasChildren = node.children && node.children.length > 0;
-
-  return `
-    <div class="tree-node">
-      <div class="tree-item directory-node">
-        <span class="tree-indent" style="width: ${indentPx}px"></span>
-        <span class="tree-toggle${hasChildren && isExpanded ? ' open' : ''}" ${hasChildren ? `data-action="node-click" data-workspace-id="${escapeAttr(workspaceId)}" data-node-path="${escapeAttr(node.path)}"` : ''}>${hasChildren ? '▶' : ''}</span>
-        <span class="tree-name" ${hasChildren ? `data-action="node-click" data-workspace-id="${escapeAttr(workspaceId)}" data-node-path="${escapeAttr(node.path)}"` : ''}>${escapeHtml(node.name)}</span>
-        ${node.fileCount ? `<span class="tree-count">${node.fileCount}</span>` : ''}
-      </div>
-      ${isExpanded && hasChildren ? `
-        <div class="file-tree">
-          ${node.children!.map(child => renderTreeNode(workspaceId, child, depth + 1)).join('')}
-        </div>
-      ` : ''}
-    </div>
-  `;
+export interface WorkspaceViewModel {
+  workspace: Workspace;
+  isCurrent: boolean;
+  isFailed: boolean;
+  expanded: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  /** 折叠时为 null，不计算树状态 */
+  treeStatus: WorkspaceTreeStatus | null;
+  missingRows: MissingRowModel[];
 }
 
 // 文件已从磁盘删除后，不会出现在扫描树里；这里保留一个特殊区块给重试/关闭操作。
-function renderMissingOpenFiles(workspaceId: string, workspacePath: string, tree: FileTreeNode | undefined, query: string): string {
+function getMissingOpenFileRows(workspacePath: string, tree: FileTreeNode | undefined, query: string): MissingRowModel[] {
   const filePathsInTree = new Set<string>();
   collectTreeFilePaths(tree, filePathsInTree);
 
@@ -592,11 +399,7 @@ function renderMissingOpenFiles(workspaceId: string, workspacePath: string, tree
       return !!fuzzyMatch(name, query) || !!fuzzyMatch(path, query);
     });
 
-  if (missingOpenedFiles.length === 0 && missingPaths.length === 0) {
-    return '';
-  }
-
-  const missingRows = [
+  const rows: Array<Omit<MissingRowModel, 'nameHint'>> = [
     ...missingOpenedFiles.map((file) => ({
       path: file.path,
       name: file.path.split('/').pop() || file.name,
@@ -610,30 +413,60 @@ function renderMissingOpenFiles(workspaceId: string, workspacePath: string, tree
       isCurrent: state.currentFile === path,
       hasRetry: false,
       hasClose: false,
-    }))
+    })),
   ];
 
-  const missingHints = duplicateNameHints(missingRows.map((row) => row.path));
+  const hints = duplicateNameHints(rows.map((row) => row.path));
+  return rows.map((row) => ({ ...row, nameHint: hints.get(row.path) }));
+}
 
-  return `
-    <div class="tree-missing-section">
-      <div class="tree-missing-title">已删除</div>
-      ${missingRows.map((row) => {
-        const typeIcon = getFileTypeIcon(row.path);
-        return `
-          <div class="tree-item file-node missing ${row.isCurrent ? 'current' : ''}" data-action="file-click" data-path="${escapeAttr(row.path)}">
-            <span class="tree-indent" style="width: 12px"></span>
-            <span class="tree-toggle"></span>
-            <span class="file-type-icon ${typeIcon.cls}">${escapeHtml(typeIcon.label)}</span>
-            <span class="tree-status-inline"><span class="status-badge status-deleted">D</span></span>
-            <span class="tree-name" title="${escapeAttr(row.name)}"><span class="tree-name-full">${renderNameWithHint(escapeHtml(stripWorkspaceTreeDisplayExtension(row.name) || row.name), missingHints.get(row.path))}</span></span>
-            ${row.hasRetry ? `<button class="tree-inline-action" title="重试加载" data-action="retry-missing-file" data-path="${escapeAttr(row.path)}">↻</button>` : ''}
-            ${row.hasClose ? `<button class="tree-inline-action danger" title="关闭文件" data-action="close-file" data-path="${escapeAttr(row.path)}">×</button>` : ''}
-          </div>
-        `;
-      }).join('')}
-    </div>
-  `;
+function getTreeStatus(workspaceId: string, tree: FileTreeNode | undefined, query: string): WorkspaceTreeStatus {
+  if (query && workspaceSearchLoading && workspaceSearchQuery === query) return { kind: 'searching' };
+  if (isWorkspaceLoading(workspaceId)) return { kind: 'loading' };
+  if (isWorkspaceFailed(workspaceId)) return { kind: 'failed' };
+  if (!tree) return { kind: 'unavailable', query: !!query };
+  if (!tree.children || tree.children.length === 0) return { kind: 'empty', query: !!query };
+  return { kind: 'ready', tree };
+}
+
+function buildWorkspaceViewModel(
+  workspace: Workspace,
+  index: number,
+  total: number,
+  query: string,
+): WorkspaceViewModel | null {
+  const tree: FileTreeNode | undefined = query ? buildSearchTree(workspace, query) : state.fileTree.get(workspace.id);
+  const expanded = query ? true : workspace.isExpanded;
+  const workspaceMatched = !query || !!fuzzyMatch(workspace.name, query) || !!fuzzyMatch(workspace.path, query);
+  const hasTreeMatch = !!tree && !!tree.children && tree.children.length > 0;
+  const missingRows = expanded ? getMissingOpenFileRows(workspace.path, tree, query) : [];
+
+  if (query && !workspaceMatched && !hasTreeMatch && missingRows.length === 0) return null;
+
+  return {
+    workspace,
+    isCurrent: state.currentWorkspace === workspace.id,
+    isFailed: isWorkspaceFailed(workspace.id),
+    expanded,
+    canMoveUp: index > 0,
+    canMoveDown: index < total - 1,
+    treeStatus: expanded ? getTreeStatus(workspace.id, tree, query) : null,
+    missingRows,
+  };
+}
+
+/** 工作区模式的全部视图数据；搜索结果的异步加载由 prepareWorkspaceTree 负责，这里保持纯计算 */
+export function buildWorkspaceViewModels(query: string): WorkspaceViewModel[] {
+  const workspaces = state.config.workspaces;
+  return workspaces.flatMap((ws, index) => {
+    const vm = buildWorkspaceViewModel(ws, index, workspaces.length, query);
+    return vm ? [vm] : [];
+  });
+}
+
+/** 渲染前调用：按当前搜索词启动工作区搜索（异步，完成后会自行重绘侧边栏） */
+export function prepareWorkspaceTree(): void {
+  ensureWorkspaceSearchResults(state.searchQuery.trim().toLowerCase());
 }
 
 // 绑定工作区模式事件
@@ -785,6 +618,11 @@ async function handlePinFile(path: string): Promise<void> {
   pinFile(path);
   const { renderSidebar } = await import('./sidebar');
   renderSidebar();
+}
+
+/** 工作区树渲染读取：当前处于“再次点击确认移除”状态的工作区 */
+export function getPendingRemoveWorkspaceId(): string | null {
+  return pendingRemoveWorkspaceId;
 }
 
 export function bindWorkspaceEvents(callbacks?: WorkspaceCallbacks): void {

@@ -10,7 +10,9 @@ import { fileListStore } from '../file-list/store';
 import { tabsStore } from '../tabs/store';
 import { isPinned } from '../utils/pinned-files';
 import { getTabBatchTargets, type TabBatchAction } from '../utils/tab-batch';
-import { renderWorkspaceSidebar, bindWorkspaceEvents, type WorkspaceCallbacks } from './sidebar-workspace';
+import { bindWorkspaceEvents, prepareWorkspaceTree, type WorkspaceCallbacks } from './sidebar-workspace';
+import { renderFocusView } from './workspace-focus';
+import { workspaceTreeStore } from '../workspace-tree/store';
 import { sidebarHeaderStore } from '../sidebar/store';
 
 let hasAutoAnchoredCurrentFile = false;
@@ -173,11 +175,13 @@ export function renderSidebar(): void {
 
   sidebarHeaderStore.setSnapshot({ tab, query: state.searchQuery });
 
-  // 两种视图共用 #fileList 滚动容器，各自的内容容器二选一显示
+  // 三种视图共用 #fileList 滚动容器，各自的内容容器按当前 tab 二选一显示
   const openEl = document.getElementById('openFileList');
   const workspaceEl = document.getElementById('workspaceList');
+  const focusEl = document.getElementById('focusList');
   if (openEl) openEl.hidden = tab !== 'list';
-  if (workspaceEl) workspaceEl.hidden = tab === 'list';
+  if (workspaceEl) workspaceEl.hidden = tab !== 'full';
+  if (focusEl) focusEl.hidden = tab !== 'focus';
 
   if (tab === 'list') {
     renderFiles();
@@ -185,12 +189,15 @@ export function renderSidebar(): void {
     return;
   }
 
-  // focus or full — workspace rendering
-  if (!container || !workspaceEl) return;
-
-  workspaceEl.innerHTML = renderWorkspaceSidebar();
   bindWorkspaceEvents(workspaceCallbacks ?? undefined);
-  scrollCurrentFileIntoView(workspaceEl);
+  if (tab === 'full') {
+    // 先按搜索词启动工作区搜索（异步），再交给 React 工作区树重绘
+    prepareWorkspaceTree();
+    workspaceTreeStore.notify();
+  } else if (focusEl) {
+    focusEl.innerHTML = renderFocusView();
+    scrollCurrentFileIntoView(focusEl);
+  }
 
   // 渲染标签页（两种模式都有）
   renderTabs();

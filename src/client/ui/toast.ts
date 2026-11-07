@@ -35,12 +35,12 @@ export function showToast(options: ToastOptions | string) {
 
   // 创建 Toast 元素
   const toast = document.createElement('div');
-  toast.className = `toast toast-${config.type}`;
+  toast.className = `toast toast-${config.type}${config.duration === 0 ? ' toast-sticky' : ''}`;
 
   // 图标
   const icons = {
     success: '✓',
-    error: '✗',
+    error: '!',
     warning: '⚠',
     info: 'ℹ'
   };

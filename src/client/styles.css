@@ -1844,16 +1844,25 @@
     }
     .toast-action:hover { background: var(--color-accent-a10); }
 
+    /* 粘性提示：关闭按钮固定在右上角，正文预留出位置 */
+    .toast.toast-sticky {
+      position: relative;
+      padding-right: 36px;
+    }
     .toast-close {
-      flex-shrink: 0;
-      margin-left: 8px;
-      padding: 2px 6px;
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 24px;
+      height: 24px;
+      padding: 0;
       border: none;
       border-radius: var(--radius-sm);
       background: transparent;
       color: var(--color-text-secondary);
       font-size: var(--text-lg);
-      line-height: 1;
+      line-height: 24px;
+      text-align: center;
       cursor: pointer;
     }
     .toast-close:hover { background: var(--color-bg-subtle); color: var(--color-text); }

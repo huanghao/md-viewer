@@ -78,9 +78,13 @@ import {
   appendReply,
   editThreadItem,
   deleteThreadItem,
+  startThreadItemEdit,
   autoResizeReplyInput,
   autoResizeComposerInput,
 } from './annotation/thread-manager';
+import { mountAnnotationList } from './annotation-list';
+import { annotationListStore } from './annotation-list/store';
+import { buildAnnotationListView } from './annotation-list/model';
 import { getDiffViewActive } from './diff-view';
 import { isSubmitKey } from './utils/input-keys';
 
@@ -877,36 +881,6 @@ function afterAnnotationWritePdf(filePath: string, isPdf: boolean | undefined): 
   renderAnnotationList(filePath);
 }
 
-function resolvePositionedAnnotationOverlaps(listEl: HTMLElement, contentScrollHeight: number): void {
-  const canvas = listEl.querySelector('.annotation-canvas') as HTMLElement | null;
-  if (!canvas) return;
-  const items = Array.from(canvas.querySelectorAll('.annotation-item.positioned')) as HTMLElement[];
-  if (items.length === 0) return;
-
-  // 先批量读取所有 offsetHeight（避免 read-write 交替导致 layout thrashing）
-  const heights = items.map((item) => item.offsetHeight);
-
-  const gap = 6;
-  let previousBottom = 0;
-  const tops: number[] = [];
-  for (let i = 0; i < items.length; i++) {
-    const rawAnchorTop = Number(items[i].getAttribute('data-anchor-top') || '0');
-    const anchorTop = Number.isFinite(rawAnchorTop) ? Math.max(0, rawAnchorTop) : 0;
-    const resolvedTop = Math.max(anchorTop, previousBottom > 0 ? previousBottom + gap : anchorTop);
-    tops.push(resolvedTop);
-    previousBottom = resolvedTop + heights[i];
-  }
-
-  // 批量写入 style.top
-  for (let i = 0; i < items.length; i++) {
-    items[i].style.top = `${Math.round(tops[i])}px`;
-  }
-
-  const minHeight = Math.max(0, contentScrollHeight);
-  const neededHeight = Math.ceil(previousBottom + 24);
-  canvas.style.height = `${Math.max(minHeight, neededHeight)}px`;
-}
-
 export function renderAnnotationList(filePath: string | null): void {
   _listFilePath = filePath;
   if (_currentAnnotationTab === 'agent' && filePath !== _agentActivatedPath) {
@@ -918,77 +892,16 @@ export function renderAnnotationList(filePath: string | null): void {
   updateAnnotationCount();
   updateControlState();
 
-  // 保存 reply input 草稿，重建 DOM 后恢复
-  const replyDrafts = new Map<string, string>();
-  el.annotationList.querySelectorAll<HTMLTextAreaElement>('[data-reply-input]').forEach((input) => {
-    const id = input.getAttribute('data-reply-input');
-    if (id && input.value.trim()) replyDrafts.set(id, input.value);
-  });
-
-  if (!filePath || state.annotations.length === 0) {
-    el.annotationList.innerHTML = '<div class="annotation-empty">无评论（选中文本即可添加）</div>';
-    return;
-  }
-
-  const sorted = getVisibleAnnotationsUtil(state.annotations, state.filter, state.includeUnanchored);
-  if (sorted.length === 0) {
-    el.annotationList.innerHTML = '<div class="annotation-empty">当前筛选下无评论</div>';
-    return;
-  }
-
-  const renderItem = (ann: Annotation, index: number, positioned = false, top = 0) => `
-    <div class="annotation-item ${state.activeAnnotationId === ann.id ? 'is-active' : ''} status-${getAnchorTrack(ann)}${isResolvedAnn(ann) ? ' is-resolved' : ''}${positioned ? ' positioned' : ''}" data-annotation-id="${ann.id}"${positioned ? ` data-anchor-top="${Math.max(0, Math.round(top))}" style="top:${Math.max(0, Math.round(top))}px"` : ''}>
-      <div class="annotation-row-top">
-        <div class="annotation-row-title">#${ann.serial || index + 1} | ${escapeHtml(displayQuoteOf(ann).substring(0, 28))}${displayQuoteOf(ann).length > 28 ? '...' : ''}</div>
-        <div class="annotation-row-actions">
-          <button class="annotation-icon-action" data-action="prev" data-id="${ann.id}" title="上一条">${iconSvg('up')}</button>
-          <button class="annotation-icon-action" data-action="next" data-id="${ann.id}" title="下一条">${iconSvg('down')}</button>
-          <button class="annotation-icon-action resolve${isResolvedAnn(ann) ? ' is-resolved' : ''}" data-action="resolve" data-id="${ann.id}" title="${isResolvedAnn(ann) ? '重新打开' : '标记已解决'}">${isResolvedAnn(ann) ? iconSvg('reopen') : iconSvg('check')}</button>
-          <button class="annotation-icon-action danger" data-action="delete" data-id="${ann.id}" title="删除">${iconSvg('trash')}</button>
-        </div>
-      </div>
-      <div class="annotation-thread">${renderThreadListHTML(ann, state.density === 'simple')}</div>
-      ${state.density === 'simple' ? '' : `
-        <div class="annotation-reply-entry" data-reply-entry="${ann.id}" role="button" tabindex="0">
-          <textarea rows="1" data-reply-input="${ann.id}" placeholder="输入回复内容（Cmd+Enter 提交）"></textarea>
-        </div>
-      `}
-    </div>
-  `;
-
-  if (state.density === 'default') {
-    const tops = sorted.map((ann) => getAnnotationAnchorTopById(ann.id));
-    let maxTop = 0;
-    const positionedHtml = sorted.map((ann, index) => {
-      const top = tops[index] ?? (index * 88);
-      maxTop = Math.max(maxTop, top);
-      return renderItem(ann, index, true, top);
-    }).join('');
-    const content = document.getElementById('content');
-    const canvasHeight = Math.max(content?.scrollHeight || 0, maxTop + 180);
-    el.annotationList.classList.add('default-mode');
-    el.annotationList.innerHTML = `<div class="annotation-canvas" style="height:${canvasHeight}px">${positionedHtml}</div>`;
-    resolvePositionedAnnotationOverlaps(el.annotationList, content?.scrollHeight || 0);
-    syncAnnotationScrollWithContent();
-  } else {
-    el.annotationList.classList.remove('default-mode');
-    el.annotationList.innerHTML = sorted.map((ann, index) => renderItem(ann, index)).join('');
-  }
-
-  // 恢复 reply input 草稿
-  if (replyDrafts.size > 0) {
-    el.annotationList.querySelectorAll<HTMLTextAreaElement>('[data-reply-input]').forEach((input) => {
-      const id = input.getAttribute('data-reply-input');
-      if (id && replyDrafts.has(id)) input.value = replyDrafts.get(id)!;
-    });
-  }
-
-  // 延迟到下一帧批量处理，避免 render 时多次强制 layout
-  requestAnimationFrame(() => {
-    el.annotationList?.querySelectorAll('[data-reply-input]').forEach((inputEl) => {
-      autoResizeReplyInput(inputEl as HTMLTextAreaElement);
-    });
-  });
+  const density = state.density;
+  annotationListStore.setView(buildAnnotationListView({
+    filePath,
+    annotations: state.annotations,
+    visible: getVisibleAnnotationsUtil(state.annotations, state.filter, state.includeUnanchored),
+    density,
+    activeId: state.activeAnnotationId,
+    anchorTopOf: (id) => (density === 'default' ? getAnnotationAnchorTopById(id) : null),
+    contentScrollHeight: document.getElementById('content')?.scrollHeight || 0,
+  }));
 }
 
 // ==================== 事件处理 ====================
@@ -1088,6 +1001,7 @@ export function openCommentComposerFromPending(): boolean {
 
 // ==================== 初始化 ====================
 export function initAnnotationElements(): void {
+  mountAnnotationList();
   registerPersistenceCallbacks({
     applyAnnotations,
     renderAnnotationList,
@@ -1146,7 +1060,7 @@ export function initAnnotationElements(): void {
       e.stopPropagation();
       const itemId = editBtn.getAttribute('data-edit-thread-item');
       const annotationId = editBtn.getAttribute('data-annotation-id');
-      if (itemId && annotationId) editThreadItem(annotationId, itemId, fp);
+      if (itemId && annotationId) startThreadItemEdit(annotationId, itemId);
       return;
     }
 
@@ -1198,24 +1112,6 @@ export function initAnnotationElements(): void {
       return;
     }
 
-    // reply input keydown → Cmd+Enter 提交
-    if (target instanceof HTMLTextAreaElement && target.hasAttribute('data-reply-input')) {
-      const ke = e as KeyboardEvent;
-      if (!isSubmitKey(ke)) return;
-      ke.preventDefault();
-      const id = target.getAttribute('data-reply-input');
-      if (!id) return;
-      appendReply(id, fp, target.value);
-      target.value = '';
-      renderAnnotationList(fp);
-    }
-  });
-
-  document.getElementById('annotationList')?.addEventListener('input', (e) => {
-    const target = e.target as HTMLElement;
-    if (target instanceof HTMLTextAreaElement && target.hasAttribute('data-reply-input')) {
-      autoResizeReplyInput(target);
-    }
   });
 
   document.addEventListener('annotation:created', (e: Event) => {

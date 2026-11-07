@@ -204,4 +204,14 @@ CSS 方案定为 **Tailwind CSS v4**，与 React 迁移配合。顺序上 token 
 - ~~“添加工作区”对话框~~：删除。`showAddWorkspaceDialog` 没有任何调用方，对话框无法打开；添加工作区实际走确认条（`kind: 'add-workspace'`）。同时删除了它专用的 CSS 与 Escape 分支。
 - 阶段 2（设置、状态栏、工具栏、标签栏、侧边栏）到此完成。
 
+**第三阶段进度**（评论、浮窗、Agent 托盘）
+- ~~评论列表（侧边栏 comments 标签的卡片）~~ 已完成（2026-11-07）：`src/client/annotation-list/`（`store.ts` 保存视图、正在编辑的条目与回复草稿；`model.ts` 把排序后的评论转成行数据；`layout.ts` 为 default 密度的重叠消解；`AnnotationList.tsx` 渲染）；`annotation-list.ts` 的 `mountAnnotationList()` 挂到 `#annotationList`，`annotation.ts` 的 `renderAnnotationList` 只计算视图并推送 store。
+  - 标记结构与 class 不变，行内操作、点击激活、上下条跳转仍由容器上的委托处理。
+  - 回复输入框改为组件内状态，草稿放在 store 里，列表重建后保留；提交（Cmd+Enter）在组件内完成，不再经委托。
+  - 评论条目的编辑从原地改写 DOM 改为 store 驱动（`startThreadItemEdit` / `commitThreadItemEdit` / `stopThreadItemEdit`）。Esc 取消、Cmd+Enter 保存、焦点移到同一卡片内不取消，行为不变。
+  - 浮窗（popover）里的评论仍是字符串渲染，它的编辑仍走 `editThreadItem`（原地改写），待浮窗迁移时一并删除。
+  - 有意的小改动：筛选后为空或无评论时，容器的 `default-mode` 类会被移除（原来保留）。
+  - 测试 `annotation-list.test.tsx`；简洁/默认两种密度、编辑保存与取消、回复提交、草稿保留、深色模式经 CDP 真实浏览器验证。
+- 尚未迁移：评论浮窗（popover 与其回复输入）、划词后的新建 composer 与选区标记、Agent 托盘选择弹窗（`#agentTrayComposer`）。
+
 每一步都必须保持 `bun test tests/unit`、`go test -race ./cmd/workspace-scanner`、`bun run build` 通过。

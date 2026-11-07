@@ -8,8 +8,9 @@ import {
   ensureAnnotationThread,
   replaceAnnotationInState,
 } from '../annotation-state';
-import { iconSvg } from './icons';
+import { annotationListStore, isEditingThreadItem } from '../annotation-list/store';
 import { isSubmitKey } from '../utils/input-keys';
+import { iconSvg } from './icons';
 
 // Callback injection to avoid circular imports with annotation.ts
 let _renderAnnotationList: (filePath: string | null) => void = () => {};
@@ -86,6 +87,7 @@ export function appendReply(annotationId: string, filePath: string, text: string
     });
 }
 
+/** popover 中的评论编辑（popover 仍为字符串渲染，直接改写其 DOM） */
 export function editThreadItem(annotationId: string, itemId: string, filePath: string): void {
   const lineEl = document.querySelector(
     `.annotation-thread-line[data-thread-item-id="${itemId}"][data-annotation-id="${annotationId}"]`
@@ -166,6 +168,46 @@ export function editThreadItem(annotationId: string, itemId: string, filePath: s
     if (related && annotationItem && annotationItem.contains(related)) return;
     setTimeout(() => { if (!committed) cancel(); }, 150);
   });
+}
+
+/** 进入评论条目的编辑态（由 AnnotationList 组件渲染 textarea） */
+export function startThreadItemEdit(annotationId: string, itemId: string): void {
+  annotationListStore.setEditing({ annotationId, itemId });
+}
+
+/** 退出编辑态；仅当当前正在编辑的正是这一条时才生效，避免误关另一条的编辑 */
+export function stopThreadItemEdit(annotationId: string, itemId: string): void {
+  if (isEditingThreadItem(annotationId, itemId)) annotationListStore.setEditing(null);
+}
+
+/** 保存评论条目编辑；内容为空或未变化时等同于取消 */
+export function commitThreadItemEdit(annotationId: string, itemId: string, filePath: string, rawText: string): void {
+  annotationListStore.setEditing(null);
+  const ann = state.annotations.find((a) => a.id === annotationId);
+  if (!ann) return;
+  const thread = getCommentThread(ann);
+  const item = thread.find((t) => t.id === itemId);
+  if (!item) return;
+  const newText = rawText.trim();
+  if (!newText || newText === item.note) return;
+
+  item.note = newText;
+  if (thread[0]?.id === itemId) ann.note = newText;
+  ann.thread = thread;
+  _persistAnnotation(filePath, ann, '编辑评论失败');
+  // 立即更新 DOM：列表和 popover
+  _renderAnnotationList(filePath);
+  // 如果 popover 正在显示这条评论，同步更新 popover 内容
+  if (state.pinnedAnnotationId === annotationId) {
+    const mark = document.querySelector(`[data-annotation-id="${annotationId}"]`) as HTMLElement | null;
+    const rect = mark?.getBoundingClientRect();
+    _showPopover(ann, rect ? rect.right + 8 : 120, rect ? rect.top + 8 : 120);
+  }
+}
+
+/** 让列表立即按最新数据重绘（例如回复提交后） */
+export function refreshAnnotationList(filePath: string): void {
+  _renderAnnotationList(filePath);
 }
 
 export function deleteThreadItem(annotationId: string, itemId: string, filePath: string): void {

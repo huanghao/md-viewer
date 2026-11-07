@@ -1,3 +1,5 @@
+import { escapeHtml } from '../utils/escape';
+
 // Toast 类型
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
@@ -57,7 +59,7 @@ export function showToast(options: ToastOptions | string) {
     : '';
   toast.innerHTML = `
     <span class="toast-icon">${icons[config.type!]}</span>
-    <span class="toast-message">${config.message}</span>
+    <span class="toast-message">${escapeHtml(config.message)}</span>
     ${actionHtml}
     ${closeHtml}
     ${progressHtml}

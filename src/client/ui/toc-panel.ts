@@ -1,14 +1,17 @@
 import type { TocItem } from '../toc-extractor';
+import { escapeHtml } from '../utils/escape';
 
 export type TocJumpFn = (item: TocItem) => void;
 
-function renderItems(items: TocItem[]): string {
+/** 标题来自原始 Markdown，可能含有 HTML，所有插入内容都必须转义 */
+export function renderItems(items: TocItem[]): string {
   return items.map(item => {
-    const pageBadge = item.pageNum ? `<span class="toc-page-badge">${item.pageNum}</span>` : '';
-    return `<a class="toc-item" data-level="${item.level}"
-       data-page="${item.pageNum ?? ''}"
-       data-anchor="${item.anchor ?? ''}"
-       title="${item.title}"><span class="toc-level-badge">#${item.level}</span><span class="toc-item-title">${item.title}</span>${pageBadge}</a>${renderItems(item.children)}`;
+    const title = escapeHtml(item.title);
+    const pageBadge = item.pageNum ? `<span class="toc-page-badge">${escapeHtml(String(item.pageNum))}</span>` : '';
+    return `<a class="toc-item" data-level="${escapeHtml(String(item.level))}"
+       data-page="${escapeHtml(String(item.pageNum ?? ''))}"
+       data-anchor="${escapeHtml(item.anchor ?? '')}"
+       title="${title}"><span class="toc-level-badge">#${escapeHtml(String(item.level))}</span><span class="toc-item-title">${title}</span>${pageBadge}</a>${renderItems(item.children)}`;
   }).join('');
 }
 

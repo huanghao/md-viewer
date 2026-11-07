@@ -217,6 +217,11 @@ CSS 方案定为 **Tailwind CSS v4**，与 React 迁移配合。顺序上 token 
   - 浮窗每次渲染从 `state.annotations` 取最新评论，后台保存替换对象后不会显示旧数据。
   - 旧的字符串渲染 `renderThreadListHTML` 与原地编辑 `editThreadItem` 已删除，浮窗与列表都走 store 驱动的编辑。
   - 测试 `annotation-popover.test.tsx`；打开、编辑保存、回复提交、草稿在切换后保留、Escape 取消经 CDP 真实浏览器验证。
-- 尚未迁移：划词后的新建 composer 与选区标记、Agent 托盘选择弹窗（`#agentTrayComposer`）。
+- ~~划词浮层（快捷入口、评论输入、Agent 托盘输入）~~ 已完成（2026-11-07）：`src/client/annotation-composer/`（`store.ts` 保存快捷入口模式、两个草稿与聚焦请求，`QuickAdd.tsx`、`Composer.tsx` 渲染）；`annotation-composer.ts` 的 `mountAnnotationComposer(deps)` 挂到三个静态容器。显隐、定位（`placeFloating`）仍在 `annotation.ts`。
+  - 三个容器（`#annotationQuickAddWrap`、`#annotationComposer`、`#agentTrayComposer`）在 HTML 中为空，内容全部由 React 渲染；原来的 id 保留。
+  - 草稿放在 store 中：快捷评论点击、保存、取消、Escape 都经 store 读写，不再读写 DOM 的 textarea。
+  - 拖拽改为绑定在面板上、按标题栏选择器匹配（标题栏由 React 渲染，挂载时可能还不存在）；评论浮窗同样改用这一方式。
+  - 测试 `annotation-composer.test.tsx`；划词→写评论→Cmd+Enter 保存、Agent 标签页下的托盘输入、两个浮层的拖拽，经 CDP 真实浏览器验证。
+- 尚未迁移：选区标记（`applyTempSelectionMark` 等会包裹正文文字的节点）。它直接改写正文 DOM，随第四阶段内容区一起处理。
 
 每一步都必须保持 `bun test tests/unit`、`go test -race ./cmd/workspace-scanner`、`bun run build` 通过。

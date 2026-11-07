@@ -78,10 +78,11 @@ import {
   deleteThreadItem,
   startThreadItemEdit,
   autoResizeReplyInput,
-  autoResizeComposerInput,
 } from './annotation/thread-manager';
 import { mountAnnotationList } from './annotation-list';
 import { mountPopoverNote } from './annotation-popover';
+import { mountAnnotationComposer } from './annotation-composer';
+import { composerStore } from './annotation-composer/store';
 import { popoverNoteStore } from './annotation-popover/store';
 import { annotationListStore } from './annotation-list/store';
 import { buildAnnotationListView } from './annotation-list/model';
@@ -115,32 +116,7 @@ export async function loadQuickComments(): Promise<void> {
 }
 
 function renderQuickPromptBtns(): void {
-  const container = document.getElementById('quickPromptBtns');
-  const section = document.getElementById('quickPromptsSection');
-  if (!container || !section) return;
-
-  if (_quickComments.length === 0) {
-    section.classList.add('hidden');
-    return;
-  }
-  section.classList.remove('hidden');
-
-  container.innerHTML = _quickComments.map((text, i) =>
-    `<button class="quick-add-btn quick-prompt" data-qc-index="${i}" aria-label="${text.replace(/"/g, '&quot;')}">
-      <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-        <path d="M8 2a6 6 0 110 12A6 6 0 018 2zm0 3v4m0 2.5v.5"/>
-      </svg>
-      ${text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
-    </button>`
-  ).join('');
-
-  container.querySelectorAll<HTMLButtonElement>('[data-qc-index]').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const idx = parseInt(btn.dataset.qcIndex ?? '0', 10);
-      onQuickCommentClick(_quickComments[idx] ?? '');
-    });
-  });
+  composerStore.setQuickAdd({ prompts: [..._quickComments] });
 }
 
 function onQuickCommentClick(note: string): void {
@@ -150,8 +126,7 @@ function onQuickCommentClick(note: string): void {
     hideQuickAdd(true);
     return;
   }
-  const el = getElements();
-  if (el.composerNote) el.composerNote.value = note;
+  composerStore.setDraft('comment', note);
   hideQuickAdd(false);
   savePendingAnnotation(filePath);
 }
@@ -265,11 +240,10 @@ export function dismissAnnotationPopupByEscape(): boolean {
 
 // ==================== UI 操作 ====================
 export function showQuickAdd(x: number, y: number, pendingData: Omit<Annotation, 'note' | 'createdAt'>): void {
+  composerStore.setQuickAdd({ mode: 'comment', trayAvailable: _currentAnnotationTab === 'agent' });
   renderQuickPromptBtns();
   const el = getElements();
   if (!el.quickAddWrap) return;
-  el.quickAddComment?.classList.remove('hidden');
-  document.getElementById('quickAddTray')?.classList.toggle('hidden', _currentAnnotationTab !== 'agent');
   // 新划词时关闭旧的 composer（明确的焦点转移）
   if (el.composer && !el.composer.classList.contains('hidden')) {
     hideComposer();
@@ -292,9 +266,7 @@ export function showQuickAdd(x: number, y: number, pendingData: Omit<Annotation,
 function showAgentTrayQuickAdd(x: number, y: number, pendingData: Omit<Annotation, 'note' | 'createdAt'>, filePath: string): void {
   const el = getElements();
   if (!el.quickAddWrap) return;
-  el.quickAddComment?.classList.add('hidden');
-  document.getElementById('quickPromptsSection')?.classList.add('hidden');
-  document.getElementById('quickAddTray')?.classList.remove('hidden');
+  composerStore.setQuickAdd({ mode: 'tray' });
   if (el.composer && !el.composer.classList.contains('hidden')) {
     hideComposer();
   }
@@ -335,7 +307,7 @@ function hideQuickAdd(clearPending = false): void {
 
 export function openTrayComposerFromPending(x?: number, y?: number): void {
   const el = getElements();
-  if (!state.pendingAnnotation || !el.agentTrayComposer || !el.agentTrayComposerNote) return;
+  if (!state.pendingAnnotation || !el.agentTrayComposer) return;
   applyTempSelectionMark();
   const pdfViewer = currentPdfViewer ?? undefined;
   const pendingAnn = state.pendingAnnotation as Annotation & {
@@ -346,27 +318,27 @@ export function openTrayComposerFromPending(x?: number, y?: number): void {
     const { x1, y1, x2, y2 } = pendingAnn.rectCoords;
     pdfViewer.drawTempRect(pendingAnn.page, x1, y1, x2, y2, 'yellow');
   }
-  el.agentTrayComposerNote.value = '';
+  composerStore.setDraft('tray', '');
   const left = typeof x === 'number' ? x : (el.quickAddWrap ? Number.parseFloat(el.quickAddWrap.style.left || '0') : 0);
   const top = typeof y === 'number' ? y : (el.quickAddWrap ? Number.parseFloat(el.quickAddWrap.style.top || '0') : 0);
   placeFloating(el.agentTrayComposer, left, top + 34);
   el.agentTrayComposer.classList.remove('hidden');
   hideQuickAdd(false);
-  el.agentTrayComposerNote.focus();
+  composerStore.requestFocus('tray');
 }
 
 function hideTrayComposer(): void {
   const el = getElements();
   if (!el.agentTrayComposer) return;
   el.agentTrayComposer.classList.add('hidden');
-  if (el.agentTrayComposerNote) el.agentTrayComposerNote.value = '';
+  composerStore.setDraft('tray', '');
 }
 
 function submitTrayComposer(): void {
   const el = getElements();
   const pending = state.pendingAnnotation;
   const filePath = state.pendingAnnotationFilePath;
-  const note = el.agentTrayComposerNote?.value.trim() || '';
+  const note = composerStore.getDraft('tray').trim();
   if (pending && filePath) addTrayItem(filePath, pending.quote, note);
   hideTrayComposer();
   hideQuickAdd(true);
@@ -374,7 +346,7 @@ function submitTrayComposer(): void {
 
 export function openComposerFromPending(x?: number, y?: number): void {
   const el = getElements();
-  if (!state.pendingAnnotation || !el.composer || !el.composerNote) return;
+  if (!state.pendingAnnotation || !el.composer) return;
   applyTempSelectionMark();
   const pdfViewer = currentPdfViewer ?? undefined;
   const pendingAnn = state.pendingAnnotation as Annotation & {
@@ -385,14 +357,13 @@ export function openComposerFromPending(x?: number, y?: number): void {
     const { x1, y1, x2, y2 } = pendingAnn.rectCoords;
     pdfViewer.drawTempRect(pendingAnn.page, x1, y1, x2, y2, 'yellow');
   }
-  el.composerNote.value = '';
-  autoResizeComposerInput(el.composerNote);
+  composerStore.setDraft('comment', '');
   const left = typeof x === 'number' ? x : (el.quickAddWrap ? Number.parseFloat(el.quickAddWrap.style.left || '0') : 0);
   const top = typeof y === 'number' ? y : (el.quickAddWrap ? Number.parseFloat(el.quickAddWrap.style.top || '0') : 0);
   placeFloating(el.composer, left, top + 34);
   el.composer.classList.remove('hidden');
   hideQuickAdd(false);
-  el.composerNote.focus();
+  composerStore.requestFocus('comment');
 }
 
 // 折叠 composer：隐藏浮窗但保留 pendingAnnotation、划线和输入内容
@@ -414,7 +385,7 @@ function expandComposer(): void {
     placeFloating(el.composer, rect.right + 6, rect.top - 8);
   }
   el.composer.classList.remove('hidden');
-  el.composerNote?.focus();
+  composerStore.requestFocus('comment');
 }
 
 // 清除 composer：真正取消，清除 pendingAnnotation 和划线
@@ -424,7 +395,7 @@ function hideComposer(): void {
   clearTempSelectionMark();
   state.pendingAnnotation = null;
   state.pendingAnnotationFilePath = null;
-  if (el.composerNote) el.composerNote.value = '';
+  composerStore.setDraft('comment', '');
   el.composer.classList.add('hidden');
 }
 
@@ -576,11 +547,11 @@ function hidePopover(force = false): void {
 // ==================== 评论操作 ====================
 export function savePendingAnnotation(filePath: string): void {
   const el = getElements();
-  if (!state.pendingAnnotation || !el.composerNote) return;
+  if (!state.pendingAnnotation) return;
   const pendingFilePath = state.pendingAnnotationFilePath;
   if (!pendingFilePath || pendingFilePath !== filePath) return;
 
-  const note = el.composerNote.value.trim();
+  const note = composerStore.getDraft('comment').trim();
   if (!note) return;
   const now = Date.now();
   const ann: Annotation = {
@@ -608,7 +579,7 @@ export function savePendingAnnotation(filePath: string): void {
     state.pendingAnnotation = null;
     state.pendingAnnotationFilePath = null;
     const composerEl = getElements();
-    if (composerEl.composerNote) composerEl.composerNote.value = '';
+    composerStore.setDraft('comment', '');
     composerEl.composer?.classList.add('hidden');
   } else {
     hideComposer();
@@ -1105,55 +1076,32 @@ export function initAnnotationElements(): void {
     if (filePath) recordSignal(filePath, 'annotate');
   });
 
-  // 绑定全局事件
-  document.getElementById('composerSaveBtn')?.addEventListener('click', () => {
-    const filePath = getActiveAnnotationFilePath();
-    if (filePath) savePendingAnnotation(filePath);
-  });
-
-  document.getElementById('composerCancelBtn')?.addEventListener('click', hideComposer);
-  getElements().composerNote?.addEventListener('keydown', (event) => {
-    if (!isSubmitKey(event)) return; // Cmd+Enter 提交
-    event.preventDefault();
-    const filePath = getActiveAnnotationFilePath();
-    if (filePath) savePendingAnnotation(filePath);
-  });
-  getElements().composerNote?.addEventListener('input', (event) => {
-    const input = event.currentTarget as HTMLTextAreaElement;
-    autoResizeComposerInput(input);
-  });
-  getElements().quickAddComment?.addEventListener('click', (event) => {
-    event.stopPropagation();
-    if (!openCommentComposerFromPending()) hideQuickAdd(true);
-  });
-
-  getElements().quickAddTray?.addEventListener('click', (event) => {
-    event.stopPropagation();
-    if (!state.pendingAnnotation) { hideQuickAdd(true); return; }
-    openTrayComposerFromPending();
-  });
-
-  getElements().agentTrayComposerSaveBtn?.addEventListener('click', (event) => {
-    event.stopPropagation();
-    submitTrayComposer();
-  });
-
-  getElements().agentTrayComposerCancelBtn?.addEventListener('click', (event) => {
-    event.stopPropagation();
-    hideTrayComposer();
-    hideQuickAdd(true);
-  });
-
-  getElements().agentTrayComposerNote?.addEventListener('keydown', (event) => {
-    event.stopPropagation();
-    if (isSubmitKey(event)) {
-      event.preventDefault();
-      submitTrayComposer();
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      hideTrayComposer();
-      hideQuickAdd(true);
-    }
+  // 划词浮层（快捷入口、评论输入、托盘输入）的内容由 React 渲染
+  mountAnnotationComposer({
+    quickAdd: {
+      onWriteComment: () => {
+        if (!openCommentComposerFromPending()) hideQuickAdd(true);
+      },
+      onAddTray: () => {
+        if (!state.pendingAnnotation) { hideQuickAdd(true); return; }
+        openTrayComposerFromPending();
+      },
+      onPrompt: (text) => onQuickCommentClick(text),
+    },
+    comment: {
+      onSave: () => {
+        const filePath = getActiveAnnotationFilePath();
+        if (filePath) savePendingAnnotation(filePath);
+      },
+      onCancel: () => hideComposer(),
+    },
+    tray: {
+      onSave: () => submitTrayComposer(),
+      onCancel: () => {
+        hideTrayComposer();
+        hideQuickAdd(true);
+      },
+    },
   });
 
   document.getElementById('popoverCloseBtn')?.addEventListener('click', () => {
@@ -1452,10 +1400,14 @@ export function initAnnotationElements(): void {
     hideTrayComposer();
   });
 
-  // 通用拖拽逻辑，供 composer 和 popover 复用
-  function makeDraggable(header: HTMLElement, panel: HTMLElement): void {
-    header.addEventListener('mousedown', (event) => {
-      if ((event.target as HTMLElement).closest('button, .annotation-row-actions')) return;
+  // 通用拖拽逻辑，供 composer 和 popover 复用：绑定在面板上，按选择器匹配标题栏
+  // （标题栏可能由 React 渲染，挂载时还不存在）
+  function makeDraggable(panel: HTMLElement, headerSelector: string): void {
+    panel.addEventListener('mousedown', (event) => {
+      const target = event.target as HTMLElement;
+      const header = target.closest(headerSelector) as HTMLElement | null;
+      if (!header) return;
+      if (target.closest('button, .annotation-row-actions')) return;
       const rect = panel.getBoundingClientRect();
       const startX = event.clientX;
       const startY = event.clientY;
@@ -1483,9 +1435,9 @@ export function initAnnotationElements(): void {
   }
 
   const el = getElements();
-  if (el.composerHeader && el.composer) makeDraggable(el.composerHeader, el.composer);
-  if (el.agentTrayComposerHeader && el.agentTrayComposer) makeDraggable(el.agentTrayComposerHeader, el.agentTrayComposer);
-  if (el.popoverHeader && el.popover) makeDraggable(el.popoverHeader, el.popover);
+  if (el.composer) makeDraggable(el.composer, '#annotationComposerHeader');
+  if (el.agentTrayComposer) makeDraggable(el.agentTrayComposer, '#agentTrayComposerHeader');
+  if (el.popover) makeDraggable(el.popover, '#annotationPopoverHeader');
 
   loadQuickComments();
 

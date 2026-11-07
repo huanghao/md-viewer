@@ -237,7 +237,10 @@ CSS 方案定为 **Tailwind CSS v4**，与 React 迁移配合。顺序上 token 
   1. ~~查找栏~~ 已完成（2026-11-08）：`src/client/find-bar/`（`store.ts` 保存可见性、查询词、匹配数与当前序号，`logic.ts` 为键盘动作与计数文本的纯函数，`FindBar.tsx` 渲染界面）；`find-bar.ts` 只保留高亮与滚动（直接修改正文 DOM，属于命令式内部）。`window.__showFindBar(visible)` 保留为原生壳的集成点，并改为真正按参数显示或隐藏（旧实现忽略参数，总是显示）。测试 `find-bar.test.tsx`；CDP 验证输入计数、Enter / Shift+Enter 切换、无结果、Esc 关闭并清除高亮，深色截图布局与迁移前一致。
   2. ~~侧边栏收起/展开按钮~~ 已完成（2026-11-08）：`src/client/sidebar-collapse/SidebarCollapseControls.tsx` 为无状态组件（显隐仍由 `body.sidebar-collapsed` 的 CSS 决定），`sidebar-collapse.ts` 挂到 `#sidebarCollapseHost` / `#sidebarFloatingOpenHost`；`ui/sidebar-layout.ts` 的 `setupSidebarCollapse` 名称保留（`main.ts` 重新导出），内部改为挂载组件。侧栏宽度拖拽与 `--sidebar-width` 仍为命令式（拖拽期间直接写 CSS 变量，属于布局内部）。测试 `sidebar-collapse.test.tsx`；CDP 验证收起、展开、刷新后状态保留。
      - 工作区轮询（`startWorkspacePolling`）是后台定时任务，不是界面，不迁移，保留在 `app-actions.ts`。
-  3. 文件切换与工作区树。
+  3. 文件切换与工作区树（2026-11-08 复核后重新划分）：
+     - 工作区树的渲染已经是 React（`workspace-tree/WorkspaceTree.tsx`）；`ui/sidebar-workspace.ts` 剩下的是动作逻辑，并通过 `document` 上的 `data-action` 委托处理点击。AGENTS.md 允许模板使用 `data-action` 委托，因此它不属于必须迁移的命令式界面。
+     - `file-switcher.ts`（约 320 行）是添加、切换、删除、搜索、URL 参数等业务逻辑；唯一的界面部分（添加确认条）已经是 store + React，`setupDragAndDrop` 只是 body 上的拖拽监听。它属于服务层，与轮询同类，不迁移。
+     - 因此方案 B 的第 3 步不再包含大规模的界面迁移。仍可选的改动是把工作区树的 `data-action` 委托改为 React 组件的显式回调，这是风格统一，不是功能需要，需要单独决定。
 - **选区标记：决定保留为命令式内部（2026-11-08）**。`applyTempSelectionMark` / `clearTempSelectionMark` 直接包裹正文文字节点，属于「React 管外壳，命令式管内部」中的内部 DOM，与内容渲染、批注高亮同类，不迁移到 React。
 - **深色模式核对（2026-11-08）**：CDP 截图核对批注列表、查找栏、Diff 横幅，均可读。查找栏与 Diff 的「关」按钮在窄窗口下与工具栏、侧栏悬浮按钮重叠，属于既有布局问题，未在本阶段修改。最近栏标签需要工作区数据才会出现，本次环境中没有工作区，未能核对。
 - 尚未完成：PDF 查看器外壳（指示器之外的部分，仍为命令式）；以及最后一步——删除 `main.ts`/`init.ts` 中的手写装配，这一步需要先决定 `init.ts` 的编排去向，并由用户做真实页面验收。

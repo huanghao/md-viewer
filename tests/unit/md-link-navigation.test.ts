@@ -49,4 +49,16 @@ describe('resolveMarkdownLinkPath', () => {
     expect(resolveMarkdownLinkPath('notes.markdown', currentFile))
       .toBe('/Users/huanghao/wiki/10-roadmaps/notes.markdown');
   });
+
+  it('href 为百分号编码的中文文件名时还原为真实路径', () => {
+    const currentFile = '/Users/me/workspace/thoughts/rg与fd使用指南.md';
+    expect(resolveMarkdownLinkPath('rg%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97.md', currentFile))
+      .toBe('/Users/me/workspace/thoughts/rg使用指南.md');
+    expect(resolveMarkdownLinkPath('fd%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97.md#x', currentFile))
+      .toBe('/Users/me/workspace/thoughts/fd使用指南.md');
+  });
+
+  it('非法编码序列不抛错，原样保留', () => {
+    expect(resolveMarkdownLinkPath('bad%E4.md', '/a/b.md')).toBe('/a/bad%E4.md');
+  });
 });

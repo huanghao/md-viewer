@@ -6,6 +6,7 @@
 
 import { highlightCodeBlocks } from './utils/code-highlight';
 import { toolbarStore } from './toolbar/store';
+import { pdfPageIndicatorStore } from './pdf-page-indicator/store';
 import type { PdfViewerEntry } from './pdf-registry';
 import type { PdfViewerInstance } from './pdf-viewer.js';
 
@@ -477,65 +478,41 @@ export async function renderMermaidDiagrams(container: HTMLElement): Promise<voi
 }
 
 // ── PDF page indicator ────────────────────────────────────────────────────────
+// 页码指示器的显示内容由 pdfPageIndicatorStore 驱动，React 外壳负责渲染；
+// 这里只负责在滚动时同步当前页，并把跳转动作交给 viewer。
+function currentVisiblePdfPage(container: HTMLElement): number {
+  const wrappers = container.querySelectorAll<HTMLElement>('.pdf-page-wrapper');
+  const mid = container.scrollTop + container.clientHeight / 2;
+  let best = 1;
+  for (const w of wrappers) {
+    if (w.offsetTop <= mid) best = parseInt(w.dataset.page || '1', 10);
+  }
+  return best;
+}
+
+// 直接滚动当前挂在容器里的页面节点，而不是经过 viewer 的 pageWrappers：
+// 快速切换/重复渲染时，闭包里的 viewer 可能已经脱离 DOM，offsetTop 会是 0。
+function scrollPdfPageIntoView(container: HTMLElement, page: number): void {
+  const wrapper = container.querySelector<HTMLElement>(`.pdf-page-wrapper[data-page="${page}"]`);
+  if (!wrapper) return;
+  container.scrollTo({ top: Math.max(0, wrapper.offsetTop - 100), behavior: 'smooth' });
+}
+
 export function mountPdfPageIndicator(viewer: PdfViewerInstance, container: HTMLElement): void {
-  const indicator = document.getElementById('pdfPageIndicator');
-  if (!indicator) return;
-  const label = indicator.querySelector<HTMLElement>('.pdf-page-indicator-label')!;
-  const input = indicator.querySelector<HTMLInputElement>('.pdf-page-indicator-input')!;
-  const total = viewer.getTotalPages();
+  pdfPageIndicatorStore.show({
+    page: currentVisiblePdfPage(container),
+    total: viewer.getTotalPages(),
+    onGoto: (page) => scrollPdfPageIntoView(container, page),
+  });
 
-  function currentVisiblePage(): number {
-    const wrappers = container.querySelectorAll<HTMLElement>('.pdf-page-wrapper');
-    const mid = container.scrollTop + container.clientHeight / 2;
-    let best = 1;
-    for (const w of wrappers) {
-      if (w.offsetTop <= mid) best = parseInt(w.dataset.page || '1', 10);
-    }
-    return best;
-  }
-
-  function showLabel(): void {
-    label.textContent = `${currentVisiblePage()} / ${total}`;
-    label.style.display = '';
-    input.style.display = 'none';
-  }
-
-  function showInput(): void {
-    input.max = String(total);
-    input.value = String(currentVisiblePage());
-    label.style.display = 'none';
-    input.style.display = '';
-    input.focus();
-    input.select();
-  }
-
-  showLabel();
-  indicator.style.display = 'block';
-
-  pdfPageIndicatorScrollHandler = () => { if (input.style.display === 'none') showLabel(); };
+  pdfPageIndicatorScrollHandler = () => {
+    pdfPageIndicatorStore.setPage(currentVisiblePdfPage(container));
+  };
   container.addEventListener('scroll', pdfPageIndicatorScrollHandler, { passive: true });
-
-  indicator.addEventListener('click', (e) => {
-    if (e.target === input) return;
-    if (input.style.display === 'none') showInput();
-  });
-
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      const page = Math.min(total, Math.max(1, parseInt(input.value, 10) || 1));
-      viewer.scrollToPage(page);
-      showLabel();
-    } else if (e.key === 'Escape') {
-      showLabel();
-    }
-  });
-
-  input.addEventListener('blur', () => showLabel());
 }
 
 export function unmountPdfPageIndicator(container: HTMLElement): void {
-  const indicator = document.getElementById('pdfPageIndicator');
-  if (indicator) indicator.style.display = 'none';
+  pdfPageIndicatorStore.hide();
   if (pdfPageIndicatorScrollHandler) {
     container.removeEventListener('scroll', pdfPageIndicatorScrollHandler);
     pdfPageIndicatorScrollHandler = null;

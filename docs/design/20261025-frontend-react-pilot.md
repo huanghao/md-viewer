@@ -222,6 +222,10 @@ CSS 方案定为 **Tailwind CSS v4**，与 React 迁移配合。顺序上 token 
   - 草稿放在 store 中：快捷评论点击、保存、取消、Escape 都经 store 读写，不再读写 DOM 的 textarea。
   - 拖拽改为绑定在面板上、按标题栏选择器匹配（标题栏由 React 渲染，挂载时可能还不存在）；评论浮窗同样改用这一方式。
   - 测试 `annotation-composer.test.tsx`；划词→写评论→Cmd+Enter 保存、Agent 标签页下的托盘输入、两个浮层的拖拽，经 CDP 真实浏览器验证。
-- 尚未迁移：选区标记（`applyTempSelectionMark` 等会包裹正文文字的节点）。它直接改写正文 DOM，随第四阶段内容区一起处理。
+- 尚未迁移：选区标记（`applyTempSelectionMark` 等会包裹正文文字的节点）。它直接改写正文 DOM，留到第四阶段处理。
+
+**第四阶段进度**（外壳 + 命令式内部）
+- ~~文档内容区外壳~~ 已完成（2026-11-07）：`src/client/content-shell/ContentShell.tsx` 持有 `#content`，不渲染任何子节点；`content-shell.ts` 的 `mountContentShell()` 用 `flushSync` 同步挂载，并在 `renderContent` 之前调用。内容仍由 `content-renderer.ts` 命令式维护。测试 `content-shell.test.tsx`；Markdown 渲染与占位清空经 CDP 验证。
+- 尚未完成：Diff 视图（`diff-view.ts`）与 PDF 查看器（`pdf-viewer.ts` / `pdf-registry.ts` / `pdf-annotation.ts`）的外壳；选区标记；以及最后一步——删除 `main.ts`/`init.ts` 中的手写装配。
 
 每一步都必须保持 `bun test tests/unit`、`go test -race ./cmd/workspace-scanner`、`bun run build` 通过。

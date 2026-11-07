@@ -8,6 +8,7 @@ import { renderSidebar, renderTabs, renderFiles, initFileListActions, initWorksp
 import { mountTabStrip } from './tabs';
 import { mountSidebarHeader } from './sidebar-header';
 import { mountFileList } from './file-list';
+import { mountContentShell } from './content-shell';
 import { mountWorkspaceTree } from './workspace-tree';
 import { mountFocusView } from './focus-view';
 import { mountAddConfirmBar } from './add-confirm';
@@ -110,6 +111,9 @@ import {
     updateToolbarButtons,
     evictPdfViewer,
   });
+
+  // 文档内容区外壳（React 持有节点，内部保持命令式）
+  mountContentShell();
 
   // 初始化内容渲染模块
   initContentRenderer({

@@ -3,8 +3,9 @@ import { loadFile } from './api/files';
 import { diffLines } from './utils/diff';
 import { diffBlocks } from './utils/diff-blocks';
 import { mountScrollbar, unmountScrollbar, updateDiffMarkers, clearDiffMarkers } from './ui/doc-scrollbar';
-import { shouldRefreshDiff, refreshDiffBannerLabel } from './ui/diff-refresh';
-import { buildDiffBannerHTML, initDiffBannerActions, updateBannerForMode } from './ui/diff-banner';
+import { shouldRefreshDiff } from './ui/diff-refresh';
+import { diffBannerStore } from './diff-banner/store';
+import { mountDiffBanner } from './diff-banner';
 import { renderSidebar } from './ui/sidebar';
 import { highlightCodeBlocks } from './utils/code-highlight';
 import { toolbarStore } from './toolbar/store';
@@ -40,6 +41,15 @@ export function initDiffView(deps: {
   _syncAnnotationsForCurrentFile = deps.syncAnnotationsForCurrentFile;
   _flashContentUpdated = deps.flashContentUpdated;
   _renderMath = deps.renderMath;
+  mountDiffBanner({
+    onNavigate: (dir) => {
+      if (diffMode === 'paragraph') navigateParagraphBlock(dir);
+      else navigateDiffBlock(dir);
+    },
+    onAccept: () => acceptDiffUpdate(),
+    onClose: () => closeDiffView(),
+    onSwitchMode: () => switchDiffMode(),
+  });
 }
 
 export function getDiffViewActive(): boolean {
@@ -192,8 +202,7 @@ function switchDiffMode(): void {
 
   diffMode = diffMode === 'paragraph' ? 'line' : 'paragraph';
 
-  const banner = document.getElementById('diffBanner');
-  if (banner) updateBannerForMode(banner, diffMode);
+  diffBannerStore.setMode(diffMode);
 
   renderDiffView(file.content, file.pendingContent);
   _syncAnnotationsForCurrentFile(false);
@@ -224,12 +233,11 @@ export function navigateParagraphBlock(direction: 1 | -1, changedEls?: HTMLEleme
 
   currentDiffBlockIndex = nextIndex;
 
-  const countEl = document.getElementById('diffNavCount');
-  if (countEl) countEl.textContent = `${nextIndex + 1} / ${total}`;
-  const prevBtn = document.getElementById('diffNavPrev') as HTMLButtonElement | null;
-  const nextBtn = document.getElementById('diffNavNext') as HTMLButtonElement | null;
-  if (prevBtn) prevBtn.disabled = nextIndex === 0;
-  if (nextBtn) nextBtn.disabled = nextIndex === total - 1;
+  diffBannerStore.setNav({
+    count: `${nextIndex + 1} / ${total}`,
+    prevDisabled: nextIndex === 0,
+    nextDisabled: nextIndex === total - 1,
+  });
 }
 
 export function renderParagraphDiffView(oldContent: string, newContent: string): void {
@@ -300,15 +308,11 @@ export function renderParagraphDiffView(oldContent: string, newContent: string):
   }
 
   // Update banner count
-  const banner = document.getElementById('diffBanner');
-  if (banner) {
-    const countEl = banner.querySelector<HTMLElement>('#diffNavCount');
-    if (countEl) countEl.textContent = `1 / ${changedEls.length}`;
-    const prevBtn = banner.querySelector<HTMLButtonElement>('#diffNavPrev');
-    const nextBtn = banner.querySelector<HTMLButtonElement>('#diffNavNext');
-    if (prevBtn) prevBtn.disabled = true;
-    if (nextBtn) nextBtn.disabled = changedEls.length <= 1;
-  }
+  diffBannerStore.setNav({
+    count: `1 / ${changedEls.length}`,
+    prevDisabled: true,
+    nextDisabled: changedEls.length <= 1,
+  });
 
   // Update scrollbar markers
   unmountScrollbar();
@@ -342,15 +346,11 @@ export function renderDiffView(oldContent: string, newContent: string): void {
   const { html: bodyHTML, totalBlocks } = renderInlineDiffHTML(lines);
 
   // 更新 banner（banner 元素在 #content 之外，由 handleDiffButtonClick 注入）
-  const banner = document.getElementById('diffBanner');
-  if (banner) {
-    const countEl = banner.querySelector<HTMLElement>('#diffNavCount');
-    if (countEl) countEl.textContent = `1 / ${totalBlocks}`;
-    const prevBtn = banner.querySelector<HTMLButtonElement>('#diffNavPrev');
-    const nextBtn = banner.querySelector<HTMLButtonElement>('#diffNavNext');
-    if (prevBtn) prevBtn.disabled = true;
-    if (nextBtn) nextBtn.disabled = totalBlocks <= 1;
-  }
+  diffBannerStore.setNav({
+    count: `1 / ${totalBlocks}`,
+    prevDisabled: true,
+    nextDisabled: totalBlocks <= 1,
+  });
 
   container.innerHTML = bodyHTML;
   invalidateAnnotationElementsCache();
@@ -376,7 +376,7 @@ export function refreshDiffIfActive(): void {
   if (!state.currentFile) return;
   const file = state.sessionFiles.get(state.currentFile);
   if (!shouldRefreshDiff({ diffViewActive, pendingContent: file?.pendingContent })) return;
-  refreshDiffBannerLabel(document);
+  diffBannerStore.setLabelOverride('Diff 模式 · 文件已再次更新，已刷新至最新版本');
   renderDiffView(file!.content, file!.pendingContent!);
   _syncAnnotationsForCurrentFile(false);
 }
@@ -399,30 +399,7 @@ export async function handleDiffButtonClick(): Promise<void> {
   toolbarStore.setDiff({ active: true });
   document.getElementById('content')?.classList.add('diff-active');
 
-  // 插入 banner 到 #content 父元素
-  const contentEl = document.getElementById('content');
-  const parent = contentEl?.parentElement;
-  if (parent && !document.getElementById('diffBanner')) {
-    const banner = document.createElement('div');
-    banner.id = 'diffBanner';
-    banner.className = 'diff-banner';
-    banner.innerHTML = buildDiffBannerHTML();
-    initDiffBannerActions(banner, {
-      onNavigate: (dir) => {
-        if (diffMode === 'paragraph') {
-          navigateParagraphBlock(dir);
-        } else {
-          navigateDiffBlock(dir);
-        }
-      },
-      onAccept: () => acceptDiffUpdate(),
-      onClose: () => closeDiffView(),
-      onSwitchMode: () => switchDiffMode(),
-    });
-    const prevBtn = banner.querySelector<HTMLButtonElement>('#diffNavPrev');
-    if (prevBtn) prevBtn.disabled = true;
-    parent.insertBefore(banner, contentEl);
-  }
+  diffBannerStore.show(diffMode);
 
   renderDiffView(file.content, newContent);
   _syncAnnotationsForCurrentFile(false);
@@ -436,8 +413,7 @@ export function closeDiffView(): void {
   document.getElementById('content')?.classList.remove('diff-active');
 
   // 移除 banner
-  const banner = document.getElementById('diffBanner');
-  if (banner) banner.remove();
+  diffBannerStore.hide();
 
   clearDiffMarkers();
   document.querySelectorAll<HTMLElement>('[data-para-changed]').forEach(el => {
@@ -481,12 +457,11 @@ export function navigateDiffBlock(direction: 1 | -1): void {
   currentDiffBlockIndex = nextIndex;
 
   // 更新 banner 计数和按钮状态
-  const countEl = document.getElementById('diffNavCount');
-  if (countEl) countEl.textContent = `${nextIndex + 1} / ${totalBlocks}`;
-  const prevBtn = document.getElementById('diffNavPrev') as HTMLButtonElement | null;
-  const nextBtn = document.getElementById('diffNavNext') as HTMLButtonElement | null;
-  if (prevBtn) prevBtn.disabled = nextIndex === 0;
-  if (nextBtn) nextBtn.disabled = nextIndex === totalBlocks - 1;
+  diffBannerStore.setNav({
+    count: `${nextIndex + 1} / ${totalBlocks}`,
+    prevDisabled: nextIndex === 0,
+    nextDisabled: nextIndex === totalBlocks - 1,
+  });
 }
 
 export async function acceptDiffUpdate(): Promise<void> {
@@ -507,8 +482,7 @@ export async function acceptDiffUpdate(): Promise<void> {
   diffViewActive = false;
   diffViewFilePath = null;
   toolbarStore.setDiff({ active: false });
-  const banner = document.getElementById('diffBanner');
-  if (banner) banner.remove();
+  diffBannerStore.hide();
   document.getElementById('content')?.classList.remove('diff-active');
   currentDiffBlockIndex = -1;
   clearDiffMarkers();

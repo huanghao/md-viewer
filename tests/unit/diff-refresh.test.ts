@@ -4,7 +4,7 @@
 
 import { describe, expect, it, beforeEach, afterEach, mock } from 'bun:test';
 import { Window } from 'happy-dom';
-import { shouldRefreshDiff, refreshDiffBannerLabel, type DiffRefreshDeps } from '../../src/client/ui/diff-refresh';
+import { shouldRefreshDiff, type DiffRefreshDeps } from '../../src/client/ui/diff-refresh';
 
 let win: Window;
 let doc: Document;
@@ -34,37 +34,5 @@ describe('shouldRefreshDiff', () => {
 
   it('diff 激活且有 pendingContent 时返回 true', () => {
     expect(shouldRefreshDiff({ diffViewActive: true, pendingContent: 'v3' })).toBe(true);
-  });
-});
-
-// ==================== refreshDiffBannerLabel ====================
-
-describe('refreshDiffBannerLabel', () => {
-  it('banner 不存在时不报错', () => {
-    doc.body.innerHTML = '';
-    expect(() => refreshDiffBannerLabel(doc)).not.toThrow();
-  });
-
-  it('banner 存在时更新 label 文字', () => {
-    doc.body.innerHTML = `
-      <div id="diffBanner">
-        <span class="diff-banner-label">Diff 模式 · 显示新版本变更</span>
-      </div>
-    `;
-    refreshDiffBannerLabel(doc);
-    const label = doc.querySelector('.diff-banner-label');
-    expect(label?.textContent).toBe('Diff 模式 · 文件已再次更新，已刷新至最新版本');
-  });
-
-  it('多次调用仍保持正确文字', () => {
-    doc.body.innerHTML = `
-      <div id="diffBanner">
-        <span class="diff-banner-label">Diff 模式 · 显示新版本变更</span>
-      </div>
-    `;
-    refreshDiffBannerLabel(doc);
-    refreshDiffBannerLabel(doc);
-    const label = doc.querySelector('.diff-banner-label');
-    expect(label?.textContent).toBe('Diff 模式 · 文件已再次更新，已刷新至最新版本');
   });
 });

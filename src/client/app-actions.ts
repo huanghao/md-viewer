@@ -1,6 +1,7 @@
 import type { FileData } from './types';
 import { state, saveState, addOrUpdateFile } from './state';
 import { renderSidebar } from './ui/sidebar';
+import { diffBannerStore } from './diff-banner/store';
 import { renderContent, flashContentUpdated, isHtmlPath } from './content-renderer';
 import { updateToc } from './toc-manager';
 import { updateZoomDisplay } from './zoom-controller';
@@ -144,8 +145,7 @@ async function syncFileFromDisk(path: string, options: { silent?: boolean; highl
     if (getDiffViewActive()) {
       setDiffViewActive(false);
       toolbarStore.setDiff({ active: false });
-      const banner = document.getElementById('diffBanner');
-      if (banner) banner.remove();
+      diffBannerStore.hide();
       document.getElementById('content')?.classList.remove('diff-active');
       clearDiffMarkers();
     }

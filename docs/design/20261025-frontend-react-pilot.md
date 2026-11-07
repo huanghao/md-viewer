@@ -226,6 +226,9 @@ CSS 方案定为 **Tailwind CSS v4**，与 React 迁移配合。顺序上 token 
 
 **第四阶段进度**（外壳 + 命令式内部）
 - ~~文档内容区外壳~~ 已完成（2026-11-07）：`src/client/content-shell/ContentShell.tsx` 持有 `#content`，不渲染任何子节点；`content-shell.ts` 的 `mountContentShell()` 用 `flushSync` 同步挂载，并在 `renderContent` 之前调用。内容仍由 `content-renderer.ts` 命令式维护。测试 `content-shell.test.tsx`；Markdown 渲染与占位清空经 CDP 验证。
-- 尚未完成：Diff 视图（`diff-view.ts`）与 PDF 查看器（`pdf-viewer.ts` / `pdf-registry.ts` / `pdf-annotation.ts`）的外壳；选区标记；以及最后一步——删除 `main.ts`/`init.ts` 中的手写装配。
+- ~~Diff 横幅~~ 已完成（2026-11-07）：`src/client/diff-banner/`（`store.ts` 保存可见性、模式、导航计数与按钮可用性，`DiffBanner.tsx` 渲染）；`diff-banner.ts` 的 `mountDiffBanner(callbacks)` 挂到静态 `#diffBannerHost`（`display: contents`，位置与原来一致）。`diff-view.ts` 与 `app-actions.ts` 改为调用 store，不再查询或插入 `#diffBanner`。删除 `ui/diff-banner.ts`（字符串模板与事件委托）与 `refreshDiffBannerLabel`（改为 store 的标题覆盖）。Diff 内容本身（段落/行级视图）仍由 `diff-view.ts` 命令式写入 `#content`。
+  - 测试 `diff-banner.test.tsx`；`diff-refresh.test.ts` 只保留 `shouldRefreshDiff`。
+  - 经 CDP 验证：修改磁盘文件 → 出现 Diff 按钮 → 打开横幅 → 切换行级/段落视图 → 关闭横幅。
+- 尚未完成：PDF 查看器（`pdf-viewer.ts` / `pdf-registry.ts` / `pdf-annotation.ts`）的外壳；选区标记；以及最后一步——删除 `main.ts`/`init.ts` 中的手写装配。
 
 每一步都必须保持 `bun test tests/unit`、`go test -race ./cmd/workspace-scanner`、`bun run build` 通过。

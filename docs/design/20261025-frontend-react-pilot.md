@@ -247,7 +247,9 @@ CSS 方案定为 **Tailwind CSS v4**，与 React 迁移配合。顺序上 token 
   - 划词选择、PDF 批注事件刷新高亮、`pdf:show-composer`、PDF 标记点击 → `annotation/interactions.ts`（`setupAnnotationInteractions`）。
   - 测试 `content-links.test.ts`、`annotation-interactions.test.tsx`；CDP 验证 `.md` 链接在 mdv 内打开，已加载的 PDF 链接跳到第 5 页。
   - 既有问题（未修改，逻辑原样搬移）：PDF 尚未加载时点击 `pdf://` 链接，跳页在 `setTimeout(…, 500)` 时还没有 viewer，因此不跳页。需要改为等待 viewer 就绪后再跳。
-  - 仍在 `init.ts` 的：`/api/config` 读取、`/api/file-created-at` 补全、键盘动作注册（Escape、关闭文件、导航、快速打开）、`beforeunload` 刷新撤销队列。这些属于服务或快捷键层，下一步再决定去向。
+  - 第二批（同日）：`/api/config` 读取 → `app-config.ts`（`loadClientConfig`，纯函数 `pickPdfDefaultScale`）；`/api/file-created-at` 补全 → `file-metadata.ts`（`backfillMissingCreatedTimes`，纯函数 `applyCreatedTimes`）；应用级快捷键动作 → `keyboard-actions.ts`（`registerAppKeyboardActions`，必须在 `initDispatcher` 之前调用）；`beforeunload` 刷新撤销队列 → `utils/undo-queue.ts` 的 `installUnloadFlush`。`init.ts` 降到 343 行。
+  - 测试 `app-config-and-metadata.test.ts`；CDP 验证 Ctrl+f 打开快速打开、Escape 关闭、j/k 无运行时异常。配置缩放与创建时间补全只做了单元测试，未在浏览器中核对。
+  - 此时 `init.ts` 只剩组合根：创建/挂载各模块、注入回调、按顺序启动（恢复状态、刷新当前文件、连接 SSE、挂载状态栏与查找栏）。
 - **选区标记：决定保留为命令式内部（2026-11-08）**。`applyTempSelectionMark` / `clearTempSelectionMark` 直接包裹正文文字节点，属于「React 管外壳，命令式管内部」中的内部 DOM，与内容渲染、批注高亮同类，不迁移到 React。
 - **深色模式核对（2026-11-08）**：CDP 截图核对批注列表、查找栏、Diff 横幅，均可读。查找栏与 Diff 的「关」按钮在窄窗口下与工具栏、侧栏悬浮按钮重叠，属于既有布局问题，未在本阶段修改。最近栏标签需要工作区数据才会出现，本次环境中没有工作区，未能核对。
 - 尚未完成：PDF 查看器外壳（指示器之外的部分，仍为命令式）；以及最后一步——删除 `main.ts`/`init.ts` 中的手写装配，这一步需要先决定 `init.ts` 的编排去向，并由用户做真实页面验收。

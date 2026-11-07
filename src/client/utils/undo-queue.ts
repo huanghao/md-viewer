@@ -68,3 +68,10 @@ export function cancelAllForFile(filePath: string, cancelFns: Map<string, () => 
     cancelFns.delete(opId);
   }
 }
+
+/** 页面卸载前把待写入的撤销队列全部落盘 */
+export function installUnloadFlush(): void {
+  window.addEventListener('beforeunload', () => {
+    flushAll();
+  });
+}

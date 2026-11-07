@@ -1,5 +1,5 @@
 // App initialization — runs the IIFE startup sequence
-import { state, restoreState, saveState, markFileMissing, markWorkspaceFailed, moveTabOrder } from './state';
+import { state, restoreState, markFileMissing, markWorkspaceFailed, moveTabOrder } from './state';
 import { setAnnotationSummaries } from './state';
 import { pruneDeadFeatureStorageKeys, pruneStalePerFileStorage } from './utils/storage';
 import { hydrateExpandedWorkspaces } from './workspace';
@@ -17,23 +17,22 @@ import { looksLikePathInput } from './utils/path-input';
 import type { TabBatchAction } from './utils/tab-batch';
 import { initToolbarActions } from './main-actions';
 import { mountToolbar } from './toolbar';
+import { currentPdfViewer } from './pdf-state';
 import { showError } from './ui/toast';
-import { showPreferences, closePreferences, isPreferencesOpen } from './ui/preferences';
-import { hideShortcutsHelp, isShortcutsHelpVisible } from './ui/shortcuts-help';
-import { registerAction, initDispatcher } from './keybindings';
-import { initQuickOpen, showQuickOpen, hideQuickOpen } from './ui/quick-open';
+import { showPreferences } from './ui/preferences';
+
+import { initDispatcher } from './keybindings';
+import { initQuickOpen, showQuickOpen } from './ui/quick-open';
 import { fetchAnnotationSummaries } from './api/annotations';
 import {
   initAnnotationElements,
   syncAnnotationSidebarLayout,
-  dismissAnnotationPopupByEscape,
   setPendingAnnotation,
   getAnnotations,
   switchAnnotationTab,
   openComposerFromPending,
   handleSelectionForAnnotation,
 } from './annotation';
-import { currentPdfViewer, setPdfDefaultScale } from './pdf-state';
 import {
   initTocManager,
   updateToc,
@@ -41,7 +40,10 @@ import {
   initTocPaneHeight,
   setupTocResize,
 } from './toc-manager';
-import { flushAll as flushUndoQueue } from './utils/undo-queue';
+import { installUnloadFlush } from './utils/undo-queue';
+import { loadClientConfig } from './app-config';
+import { backfillMissingCreatedTimes } from './file-metadata';
+import { registerAppKeyboardActions } from './keyboard-actions';
 import { setupFindBar } from './find-bar';
 import { setupContentLinks } from './content-links';
 import { setupAnnotationInteractions } from './annotation/interactions';
@@ -72,7 +74,6 @@ import {
   flashContentUpdated,
   renderMath,
 } from './content-renderer';
-import { resolveMarkdownLinkPath } from './utils/md-link';
 import { initSSEConnection, connectSSE } from './sse-connection';
 import {
   pdfViewerRegistry,
@@ -132,18 +133,8 @@ import {
     addFileByPath,
   });
 
-  // 拉取服务端客户端配置
-  try {
-    console.time('[init] /api/config');
-    const res = await fetch('/api/config');
-    if (res.ok) {
-      const cfg = await res.json();
-      if (cfg?.pdf?.defaultScale) {
-        setPdfDefaultScale(cfg.pdf.defaultScale);
-      }
-    }
-  } catch {}
-  console.timeEnd('[init] /api/config');
+  // 拉取服务端客户端配置（失败静默）
+  await loadClientConfig();
 
   initSidebarWidth();
   initSidebarCollapsed();
@@ -176,9 +167,7 @@ import {
     syncAnnotationSidebarLayout();
   });
 
-  window.addEventListener('beforeunload', () => {
-    flushUndoQueue();
-  });
+  installUnloadFlush();
 
   console.time('[init] restoreState');
   await restoreState(loadFile);
@@ -187,26 +176,8 @@ import {
   // 回收不属于当前会话任何文件的 pdf-zoom/pdf-scroll 历史遗留 key
   pruneStalePerFileStorage(state.sessionFiles.keys());
 
-  // 补全缺失的 createdAt / gitCreatedAt
-  const missingTimes = Array.from(state.sessionFiles.values())
-    .filter(f => !f.isRemote && (f.createdAt == null || f.gitCreatedAt == null))
-    .map(f => f.path);
-  if (missingTimes.length > 0) {
-    fetch('/api/file-created-at', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paths: missingTimes }),
-    }).then(r => r.json()).then((result: Record<string, { createdAt?: number; gitCreatedAt?: number }>) => {
-      let changed = false;
-      for (const [path, info] of Object.entries(result)) {
-        const file = state.sessionFiles.get(path);
-        if (!file) continue;
-        if (info.createdAt != null && file.createdAt == null) { file.createdAt = info.createdAt; changed = true; }
-        if (info.gitCreatedAt != null && file.gitCreatedAt == null) { file.gitCreatedAt = info.gitCreatedAt; changed = true; }
-      }
-      if (changed) saveState();
-    }).catch(() => {});
-  }
+  // 补全缺失的 createdAt / gitCreatedAt（后台）
+  backfillMissingCreatedTimes();
 
   applyTheme();
 
@@ -336,64 +307,8 @@ import {
   setupTocOpenBtn();
   setupAddConfirmDismiss();
   handleURLParams();
-  const isInputFocused = () => {
-    const tag = (document.activeElement as HTMLElement)?.tagName?.toLowerCase();
-    return tag === 'input' || tag === 'textarea';
-  };
 
-  registerAction({
-    id: 'escape',
-    label: 'Escape',
-    category: 'view',
-    defaultKey: 'Escape',
-    handler: () => {
-      if (dismissAnnotationPopupByEscape()) return;
-      const qoOverlay = document.querySelector('.quick-open-overlay') as HTMLElement | null;
-      if (qoOverlay && qoOverlay.style.display !== 'none') { hideQuickOpen(); return; }
-      if (isShortcutsHelpVisible()) { hideShortcutsHelp(); return; }
-      if (isPreferencesOpen()) { closePreferences(); return; }
-    },
-  });
-
-  registerAction({
-    id: 'close-file',
-    label: '关闭当前文件',
-    category: 'file',
-    defaultKey: 'Ctrl+w',
-    handler: () => {
-      const current = state.currentFile;
-      if (current) removeFileHandler(current);
-    },
-    shouldActivate: () => !isInputFocused(),
-  });
-
-  // j/k: 在当前侧边栏视角里上下移动文件（非输入框）
-  registerAction({
-    id: 'nav-file-down',
-    label: '移到下一个文件',
-    category: 'navigation',
-    defaultKey: 'j',
-    handler: () => navigateFileInView(1),
-    shouldActivate: () => !isInputFocused(),
-  });
-
-  registerAction({
-    id: 'nav-file-up',
-    label: '移到上一个文件',
-    category: 'navigation',
-    defaultKey: 'k',
-    handler: () => navigateFileInView(-1),
-    shouldActivate: () => !isInputFocused(),
-  });
-
-  registerAction({
-    id: 'quick-open',
-    label: '快速打开文件',
-    category: 'navigation',
-    defaultKey: 'Ctrl+f',
-    handler: () => showQuickOpen(),
-    shouldActivate: () => !isInputFocused(),
-  });
+  registerAppKeyboardActions({ removeFileHandler, navigateFileInView, showQuickOpen });
 
   initQuickOpen({
     getOpenFilePaths: () => Array.from(state.sessionFiles.keys()),

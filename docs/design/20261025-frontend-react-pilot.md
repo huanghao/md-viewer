@@ -235,7 +235,8 @@ CSS 方案定为 **Tailwind CSS v4**，与 React 迁移配合。顺序上 token 
   - 经 CDP 验证：PDF → Markdown → PDF 切换 6 次，PDF 页面节点保留，页码与回车跳转正常；深色模式下文字为白色。
 - **方案 B 路线（2026-11-08 确定）**，按顺序推进，每步单独提交并做浏览器验证。`init.ts` 最终只保留组合根（创建 store、挂载根节点、注入回调）。
   1. ~~查找栏~~ 已完成（2026-11-08）：`src/client/find-bar/`（`store.ts` 保存可见性、查询词、匹配数与当前序号，`logic.ts` 为键盘动作与计数文本的纯函数，`FindBar.tsx` 渲染界面）；`find-bar.ts` 只保留高亮与滚动（直接修改正文 DOM，属于命令式内部）。`window.__showFindBar(visible)` 保留为原生壳的集成点，并改为真正按参数显示或隐藏（旧实现忽略参数，总是显示）。测试 `find-bar.test.tsx`；CDP 验证输入计数、Enter / Shift+Enter 切换、无结果、Esc 关闭并清除高亮，深色截图布局与迁移前一致。
-  2. 工作区轮询、侧边栏收起与宽度。
+  2. ~~侧边栏收起/展开按钮~~ 已完成（2026-11-08）：`src/client/sidebar-collapse/SidebarCollapseControls.tsx` 为无状态组件（显隐仍由 `body.sidebar-collapsed` 的 CSS 决定），`sidebar-collapse.ts` 挂到 `#sidebarCollapseHost` / `#sidebarFloatingOpenHost`；`ui/sidebar-layout.ts` 的 `setupSidebarCollapse` 名称保留（`main.ts` 重新导出），内部改为挂载组件。侧栏宽度拖拽与 `--sidebar-width` 仍为命令式（拖拽期间直接写 CSS 变量，属于布局内部）。测试 `sidebar-collapse.test.tsx`；CDP 验证收起、展开、刷新后状态保留。
+     - 工作区轮询（`startWorkspacePolling`）是后台定时任务，不是界面，不迁移，保留在 `app-actions.ts`。
   3. 文件切换与工作区树。
 - **选区标记：决定保留为命令式内部（2026-11-08）**。`applyTempSelectionMark` / `clearTempSelectionMark` 直接包裹正文文字节点，属于「React 管外壳，命令式管内部」中的内部 DOM，与内容渲染、批注高亮同类，不迁移到 React。
 - **深色模式核对（2026-11-08）**：CDP 截图核对批注列表、查找栏、Diff 横幅，均可读。查找栏与 Diff 的「关」按钮在窄窗口下与工具栏、侧栏悬浮按钮重叠，属于既有布局问题，未在本阶段修改。最近栏标签需要工作区数据才会出现，本次环境中没有工作区，未能核对。

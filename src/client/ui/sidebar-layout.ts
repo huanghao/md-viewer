@@ -1,6 +1,7 @@
 // Sidebar layout: width, collapse, and resize management
 import { storageGet, storageSet, storageGetNumber } from '../utils/storage';
 import { createResizer } from '../utils/resizer';
+import { mountSidebarCollapseControls } from '../sidebar-collapse';
 
 export const SIDEBAR_WIDTH_STORAGE_KEY = 'md-viewer:sidebar-width';
 export const SIDEBAR_COLLAPSED_KEY = 'md-viewer:sidebar-collapsed';
@@ -37,12 +38,11 @@ export function initSidebarCollapsed(): void {
   if (saved === '1') setSidebarCollapsed(true);
 }
 
+/** 挂载收起/展开按钮（React），点击后调用 setSidebarCollapsed */
 export function setupSidebarCollapse(): void {
-  document.getElementById('sidebarCollapseBtn')?.addEventListener('click', () => {
-    setSidebarCollapsed(true);
-  });
-  document.getElementById('sidebarFloatingOpenBtn')?.addEventListener('click', () => {
-    setSidebarCollapsed(false);
+  mountSidebarCollapseControls({
+    onCollapse: () => setSidebarCollapsed(true),
+    onExpand: () => setSidebarCollapsed(false),
   });
 }
 

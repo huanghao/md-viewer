@@ -31,9 +31,7 @@
         <!-- 搜索框 -->
         <div class="sidebar-search-row">
           <div id="searchBox" style="flex:1;min-width:0;"></div>
-          <button class="sidebar-collapse-btn" id="sidebarCollapseBtn" title="收起侧边栏" aria-label="收起侧边栏">
-            <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5" fill="none"/><path d="M6 2.5v11"/></svg>
-          </button>
+          <div id="sidebarCollapseHost" style="display:contents"></div>
         </div>
         <div id="modeSwitchRow"></div>
         <div class="quick-action-confirm-host" id="quickActionConfirmHost"></div>
@@ -63,9 +61,7 @@
       </div>
       </aside>
       <div class="sidebar-resizer" id="sidebarResizer" title="拖拽调整侧边栏宽度"></div>
-      <button class="sidebar-floating-open-btn" id="sidebarFloatingOpenBtn" title="展开侧边栏" aria-label="展开侧边栏">
-        <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="1.5" fill="none"/><path d="M6 2.5v11"/><path d="M9 6l2 2-2 2"/></svg>
-      </button>
+      <div id="sidebarFloatingOpenHost" style="display:contents"></div>
 
       <!-- 主区域 -->
       <main class="main">

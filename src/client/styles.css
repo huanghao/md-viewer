@@ -4240,7 +4240,8 @@
       bottom: 20px;
       right: calc(var(--annotation-sidebar-width) + 20px);
       background: rgba(30, 30, 30, 0.75);
-      color: var(--color-text-inverse);
+      /* 背景固定为深色遮罩，文字不能跟随 --color-text-inverse（深色模式下是深色） */
+      color: #ffffff;
       border-radius: var(--radius-md);
       padding: 4px 10px;
       font-size: var(--text-sm);
@@ -4259,7 +4260,7 @@
       background: transparent;
       border: none;
       border-bottom: 1px solid rgba(255,255,255,0.6);
-      color: var(--color-text-inverse);
+      color: #ffffff;
       font-size: var(--text-sm);
       text-align: center;
       outline: none;

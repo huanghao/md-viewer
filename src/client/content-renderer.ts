@@ -785,6 +785,12 @@ export function renderContent() {
         updateScrollbar();
       },
     }).then((pdfViewerInstance) => {
+      // 加载期间如果又发生了一次渲染（重复渲染或切换到其它文件），容器已被清空或换成别的内容，
+      // 这个 viewer 的 el 已脱离容器。若仍注册它，会让指示器和跳转作用在看不见的页面上，直接销毁。
+      if (!container.contains(pdfViewerInstance.el)) {
+        pdfViewerInstance.destroy();
+        return;
+      }
       container.setAttribute('data-current-file', filePath);
       const savedScroll = storageGetNumber(pdfScrollKey(filePath), 0);
       pdfViewerRegistry.set(filePath, {

@@ -230,7 +230,9 @@ CSS 方案定为 **Tailwind CSS v4**，与 React 迁移配合。顺序上 token 
   - 测试 `diff-banner.test.tsx`；`diff-refresh.test.ts` 只保留 `shouldRefreshDiff`。
   - 经 CDP 验证：修改磁盘文件 → 出现 Diff 按钮 → 打开横幅 → 切换行级/段落视图 → 关闭横幅。
 - ~~PDF 页码指示器~~ 已完成（2026-11-07）：`src/client/pdf-page-indicator/`（`store.ts` 保存可见性、当前页、总页数、输入态与跳转回调，`PdfPageIndicator.tsx` 渲染标签/输入框）；`pdf-page-indicator.ts` 挂到静态 `#pdfPageIndicatorHost`。`content-renderer.ts` 的滚动监听只更新 store，回车跳转直接滚动当前挂载的 `.pdf-page-wrapper`。测试 `pdf-page-indicator.test.tsx`；经 CDP 验证：滚动同步页码、点击进入输入、回车跳到第 3 页、Esc 取消。
-  - 发现的既有问题（未在本步修复）：快速连续调用 `renderContent` 时，较早创建的 PDF viewer 可能在较晚之后 resolve，其 `pageWrappers` 脱离 DOM。原来的 `viewer.scrollToPage` 会因此滚到顶部；指示器已改为滚动挂载中的节点，不再受影响，但 `renderContent` 的重复创建本身仍需单独处理。
-- 尚未完成：PDF 查看器（`pdf-viewer.ts` / `pdf-registry.ts` / `pdf-annotation.ts`）的外壳（指示器之外的部分）；选区标记；以及最后一步——删除 `main.ts`/`init.ts` 中的手写装配。
+  - 既有竞态（已修复）：PDF viewer 异步创建，加载期间若再次 `renderContent`，较早的 viewer 会在 DOM 已被替换后才 resolve，并覆盖注册表、挂载指示器，导致跳转滚到顶部、切换文件后节点不一致。`renderContent` 现在销毁已脱离容器的陈旧 viewer；指示器滚动挂载中的页面节点。
+  - 深色模式：指示器文字原用 `--color-text-inverse`（深色模式下为深色），在深色遮罩上几乎不可见，改为固定白色。
+  - 经 CDP 验证：PDF → Markdown → PDF 切换 6 次，PDF 页面节点保留，页码与回车跳转正常；深色模式下文字为白色。
+- 尚未完成：PDF 查看器（`pdf-viewer.ts` / `pdf-registry.ts` / `pdf-annotation.ts`）的外壳（指示器之外的部分，仍为命令式）；选区标记；以及最后一步——删除 `main.ts`/`init.ts` 中的手写装配。
 
 每一步都必须保持 `bun test tests/unit`、`go test -race ./cmd/workspace-scanner`、`bun run build` 通过。

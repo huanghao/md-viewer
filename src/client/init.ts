@@ -19,6 +19,7 @@ import { initToolbarActions } from './main-actions';
 import { mountToolbar } from './toolbar';
 import { showError } from './ui/toast';
 import { showPreferences } from './ui/preferences';
+import { setThemeApplier } from './preferences/controller';
 
 import { initDispatcher } from './keybindings';
 import { initQuickOpen, showQuickOpen } from './ui/quick-open';
@@ -71,8 +72,8 @@ import {
   initContentRenderer,
   renderContent,
   flashContentUpdated,
-  renderMath,
 } from './content-renderer';
+import { renderMath } from './utils/math-render';
 import { initSSEConnection, connectSSE } from './sse-connection';
 import {
   pdfViewerRegistry,
@@ -256,7 +257,10 @@ import {
         showError('文件已删除，已标记为 D（无本地缓存）');
       }
     },
+    renderAll,
   });
+  // 偏好面板的主题即时预览：由组合根注入，避免 preferences 导入入口模块
+  setThemeApplier(applyTheme);
 
   // 文档标签栏：React 渲染，这里注入动作
   // 标签栏与文件列表共用同一份排序状态

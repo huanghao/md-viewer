@@ -350,6 +350,8 @@ export function prepareWorkspaceTree(): void {
 export interface WorkspaceCallbacks {
   switchFile: (path: string) => void;
   loadAndSwitchFile: (path: string) => Promise<void>;
+  /** 全量重绘（侧栏 + 正文 + 批注）；由组合根注入，避免 UI 模块导入入口 main.ts */
+  renderAll: () => void;
 }
 
 let _workspaceCallbacks: WorkspaceCallbacks | undefined;
@@ -442,9 +444,7 @@ async function handleFileClick(filePath: string): Promise<void> {
 async function handleCloseFile(filePath: string): Promise<void> {
   const { removeFile } = await import('../state');
   removeFile(filePath);
-
-  const main = await import('../main');
-  (main as any).renderAll();
+  _workspaceCallbacks?.renderAll();
 }
 
 async function handleRetryMissingFile(filePath: string): Promise<void> {
@@ -454,8 +454,7 @@ async function handleRetryMissingFile(filePath: string): Promise<void> {
   if (!fileData) return;
 
   addOrUpdateFile(fileData, state.currentFile === filePath);
-  const main = await import('../main');
-  (main as any).renderAll();
+  _workspaceCallbacks?.renderAll();
   showSuccess('文件已重新加载');
 }
 

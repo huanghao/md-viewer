@@ -76,9 +76,16 @@ export function cancelPreferences(): void {
   closePreferences();
 }
 
-/** 主题选择即时预览：主题模块在 main.ts 中，动态导入避免循环依赖 */
+let themeApplier: (() => void) | null = null;
+
+/** 组合根注入主题应用函数（applyTheme 位于 app-actions，本模块不直接依赖它） */
+export function setThemeApplier(fn: () => void): void {
+  themeApplier = fn;
+}
+
+/** 主题选择即时预览 */
 export function applyThemeLive(): void {
-  import('../main').then((m) => m.applyTheme()).catch(() => {});
+  themeApplier?.();
 }
 
 export async function saveConfigAndNotify(): Promise<void> {

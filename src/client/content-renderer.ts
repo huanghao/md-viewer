@@ -6,6 +6,7 @@
 
 import { highlightCodeBlocks } from './utils/code-highlight';
 import { sanitizeHtml } from './utils/html-sanitize';
+import { renderMath } from './utils/math-render';
 
 import { toolbarStore } from './toolbar/store';
 import { pdfPageIndicatorStore } from './pdf-page-indicator/store';
@@ -146,26 +147,6 @@ export function rewriteMarkdownAssetUrls(
     const resolved = resolveMarkdownAssetSrc(source, currentFilePath);
     if (!resolved) return;
     el.setAttribute('src', resolved);
-  });
-}
-
-// ── Math rendering ────────────────────────────────────────────────────────────
-export function renderMath(container: HTMLElement): void {
-  const renderMathInElement = (window as any).renderMathInElement;
-  if (!renderMathInElement) return;
-
-  const mathInline = state.config.mathInline !== false;
-  const delimiters = [
-    { left: '$$', right: '$$', display: true },
-    { left: '\\[', right: '\\]', display: true },
-    { left: '\\(', right: '\\)', display: false },
-    ...(mathInline ? [{ left: '$', right: '$', display: false }] : []),
-  ];
-
-  renderMathInElement(container, {
-    delimiters,
-    throwOnError: false,
-    ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
   });
 }
 

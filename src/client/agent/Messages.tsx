@@ -1,6 +1,6 @@
 import { Fragment, useLayoutEffect, useRef } from 'react';
 import type { AgentRun, AgentTranscriptMsg } from '../api/agent';
-import { renderMath } from '../content-renderer';
+import { renderMath } from '../utils/math-render';
 import { highlightCodeBlocks } from '../utils/code-highlight';
 import { sanitizeHtml } from '../utils/html-sanitize';
 

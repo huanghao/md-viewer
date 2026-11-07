@@ -233,6 +233,8 @@ CSS 方案定为 **Tailwind CSS v4**，与 React 迁移配合。顺序上 token 
   - 既有竞态（已修复）：PDF viewer 异步创建，加载期间若再次 `renderContent`，较早的 viewer 会在 DOM 已被替换后才 resolve，并覆盖注册表、挂载指示器，导致跳转滚到顶部、切换文件后节点不一致。`renderContent` 现在销毁已脱离容器的陈旧 viewer；指示器滚动挂载中的页面节点。
   - 深色模式：指示器文字原用 `--color-text-inverse`（深色模式下为深色），在深色遮罩上几乎不可见，改为固定白色。
   - 经 CDP 验证：PDF → Markdown → PDF 切换 6 次，PDF 页面节点保留，页码与回车跳转正常；深色模式下文字为白色。
-- 尚未完成：PDF 查看器（`pdf-viewer.ts` / `pdf-registry.ts` / `pdf-annotation.ts`）的外壳（指示器之外的部分，仍为命令式）；选区标记；以及最后一步——删除 `main.ts`/`init.ts` 中的手写装配。
+- **选区标记：决定保留为命令式内部（2026-11-08）**。`applyTempSelectionMark` / `clearTempSelectionMark` 直接包裹正文文字节点，属于「React 管外壳，命令式管内部」中的内部 DOM，与内容渲染、批注高亮同类，不迁移到 React。
+- **深色模式核对（2026-11-08）**：CDP 截图核对批注列表、查找栏、Diff 横幅，均可读。查找栏与 Diff 的「关」按钮在窄窗口下与工具栏、侧栏悬浮按钮重叠，属于既有布局问题，未在本阶段修改。最近栏标签需要工作区数据才会出现，本次环境中没有工作区，未能核对。
+- 尚未完成：PDF 查看器外壳（指示器之外的部分，仍为命令式）；以及最后一步——删除 `main.ts`/`init.ts` 中的手写装配，这一步需要先决定 `init.ts` 的编排去向，并由用户做真实页面验收。
 
 每一步都必须保持 `bun test tests/unit`、`go test -race ./cmd/workspace-scanner`、`bun run build` 通过。

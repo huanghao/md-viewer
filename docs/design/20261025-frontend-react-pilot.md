@@ -246,7 +246,7 @@ CSS 方案定为 **Tailwind CSS v4**，与 React 迁移配合。顺序上 token 
   - `pdf://` 与 Markdown 内部链接拦截 → `content-links.ts`（`setupContentLinks`，纯函数 `parsePdfLink`）。
   - 划词选择、PDF 批注事件刷新高亮、`pdf:show-composer`、PDF 标记点击 → `annotation/interactions.ts`（`setupAnnotationInteractions`）。
   - 测试 `content-links.test.ts`、`annotation-interactions.test.tsx`；CDP 验证 `.md` 链接在 mdv 内打开，已加载的 PDF 链接跳到第 5 页。
-  - 既有问题（未修改，逻辑原样搬移）：PDF 尚未加载时点击 `pdf://` 链接，跳页在 `setTimeout(…, 500)` 时还没有 viewer，因此不跳页。需要改为等待 viewer 就绪后再跳。
+  - 既有问题（已修复，2026-11-08）：PDF 尚未加载时点击 `pdf://` 链接，原来在 `setTimeout(…, 500)` 时 viewer 还没创建，因此不跳页。现在 `content-links.ts` 的 `waitForPdfViewer` 轮询 `pdfViewerRegistry`（上限 15 秒），viewer 登记后才跳页；CDP 验证全新加载 3 次都跳到第 5 页。
   - 第二批（同日）：`/api/config` 读取 → `app-config.ts`（`loadClientConfig`，纯函数 `pickPdfDefaultScale`）；`/api/file-created-at` 补全 → `file-metadata.ts`（`backfillMissingCreatedTimes`，纯函数 `applyCreatedTimes`）；应用级快捷键动作 → `keyboard-actions.ts`（`registerAppKeyboardActions`，必须在 `initDispatcher` 之前调用）；`beforeunload` 刷新撤销队列 → `utils/undo-queue.ts` 的 `installUnloadFlush`。`init.ts` 降到 343 行。
   - 测试 `app-config-and-metadata.test.ts`；CDP 验证 Ctrl+f 打开快速打开、Escape 关闭、j/k 无运行时异常。配置缩放与创建时间补全只做了单元测试，未在浏览器中核对。
   - 此时 `init.ts` 只剩组合根：创建/挂载各模块、注入回调、按顺序启动（恢复状态、刷新当前文件、连接 SSE、挂载状态栏与查找栏）。

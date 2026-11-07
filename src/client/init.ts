@@ -17,7 +17,6 @@ import { looksLikePathInput } from './utils/path-input';
 import type { TabBatchAction } from './utils/tab-batch';
 import { initToolbarActions } from './main-actions';
 import { mountToolbar } from './toolbar';
-import { currentPdfViewer } from './pdf-state';
 import { showError } from './ui/toast';
 import { showPreferences } from './ui/preferences';
 
@@ -323,7 +322,7 @@ import {
   setupContentLinks({
     addFileByPath,
     getCurrentFile: () => state.currentFile ?? null,
-    getCurrentPdfViewer: () => currentPdfViewer,
+    getPdfViewerForFile: (filePath) => pdfViewerRegistry.get(filePath)?.viewer ?? null,
   });
 
   // 批注交互：划词选择、PDF 批注事件同步高亮、PDF 标记点击

@@ -15,10 +15,34 @@ export function parsePdfLink(href: string): { filePath: string; page: number; qu
   };
 }
 
+export interface PdfJumpTarget {
+  scrollToPage(page: number): void;
+  highlightQuote(page: number, quote: string): void;
+}
+
 export interface ContentLinkDeps {
   addFileByPath: (path: string, focus?: boolean) => Promise<unknown>;
   getCurrentFile: () => string | null;
-  getCurrentPdfViewer: () => { scrollToPage(page: number): void; highlightQuote(page: number, quote: string): void } | null;
+  /** 按文件路径取已登记的 PDF viewer；未登记（仍在加载）时返回 null */
+  getPdfViewerForFile: (filePath: string) => PdfJumpTarget | null;
+}
+
+/**
+ * 等待指定文件的 PDF viewer 登记完成后返回；超时返回 null。
+ * PDF 创建是异步的，固定延时无法保证 viewer 已经就绪，所以轮询登记表。
+ */
+export async function waitForPdfViewer(
+  getViewer: () => PdfJumpTarget | null,
+  timeoutMs = 15000,
+  intervalMs = 100,
+): Promise<PdfJumpTarget | null> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const viewer = getViewer();
+    if (viewer) return viewer;
+    if (Date.now() >= deadline) return null;
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
 }
 
 /** 拦截文档中的 pdf:// 链接与 Markdown 内部链接，在 mdv 内打开 */
@@ -30,15 +54,13 @@ export function setupContentLinks(deps: ContentLinkDeps): void {
     if (!link) return;
     e.preventDefault();
 
-    deps.addFileByPath(link.filePath).then(() => {
-      setTimeout(() => {
-        const viewer = deps.getCurrentPdfViewer();
-        if (viewer) {
-          viewer.scrollToPage(link.page);
-          if (link.quote) viewer.highlightQuote(link.page, decodeURIComponent(link.quote));
-        }
-      }, 500);
-    });
+    deps.addFileByPath(link.filePath)
+      .then(() => waitForPdfViewer(() => deps.getPdfViewerForFile(link.filePath)))
+      .then((viewer) => {
+        if (!viewer) return;
+        viewer.scrollToPage(link.page);
+        if (link.quote) viewer.highlightQuote(link.page, decodeURIComponent(link.quote));
+      });
   });
 
   document.getElementById('content')?.addEventListener('click', (e) => {

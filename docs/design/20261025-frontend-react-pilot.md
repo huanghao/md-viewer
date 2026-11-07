@@ -254,4 +254,17 @@ CSS 方案定为 **Tailwind CSS v4**，与 React 迁移配合。顺序上 token 
 - **深色模式核对（2026-11-08）**：CDP 截图核对批注列表、查找栏、Diff 横幅，均可读。查找栏与 Diff 的「关」按钮在窄窗口下与工具栏、侧栏悬浮按钮重叠，属于既有布局问题，未在本阶段修改。最近栏标签需要工作区数据才会出现，本次环境中没有工作区，未能核对。
 - 尚未完成：PDF 查看器外壳（指示器之外的部分，仍为命令式）；以及最后一步——删除 `main.ts`/`init.ts` 中的手写装配，这一步需要先决定 `init.ts` 的编排去向，并由用户做真实页面验收。
 
+**架构复查（2026-11-08）**：迁移完成后对全量代码做了一次架构审查，发现的问题与处理如下。
+- ~~P0 Markdown 正文未消毒~~ 已修复（`2775cc0`）：`marked` 输出（正文普通渲染、Diff 视图、Agent 助手消息）原先直接写入 DOM，文档中的原始 HTML 可以执行脚本。新增 `utils/html-sanitize.ts`：基于 `<template>` 惰性解析的白名单（标签、属性、协议、style 过滤；丢弃 script/iframe 等，去掉 `data-*` 与事件属性），不引入第三方依赖。消毒发生在数学占位符还原之前。目录标题与提示消息的转义在 `995e027` 中已修复。浏览器验证：`window.__tocXss`、`__bodyXss`、`javascript:` 链接均不执行；表格、任务列表、代码、公式渲染正常。
+- ~~P1 运行时循环依赖~~ 已修复（`792d004`）：`annotation → agent-runner → agent/mount → agent/Messages → content-renderer → annotation` 这一 6 模块循环，由 `renderMath` 迁到 `utils/math-render.ts` 打破。以 SCC 脚本静态检查 `src/client`（忽略 `import type`）：修复前 1 个环，修复后无环。
+- ~~P1 UI 模块导入入口 `main.ts`~~ 已修复（`792d004`）：`sidebar-workspace` 的 `renderAll` 改为 `WorkspaceCallbacks` 注入，`preferences/controller` 的主题预览改为 `setThemeApplier` 注入，均由 `init.ts` 装配。
+- 未处理（待决定）：
+  - P1 `renderSidebar()` 广播式重绘（约 50 处调用，分布在约 10 个模块）与约 50 处全局状态写入（分布在 6 个模块）。这是状态流的大改动，需要单独设计后再做。
+  - P1 `ui/sidebar-workspace.ts` 中约 20 处动态 `import('./sidebar')`，同属状态流问题，与上一条一起处理。
+  - P2 仍用 `innerHTML` 的界面：`ui/toc-panel.ts`、`ui/quick-open.ts`、`ui/json-viewer.ts`、`diff-view.ts`、`ui/doc-scrollbar.ts`、`toc-manager.ts`。它们不在方案 B 中；其中 `toc-panel` 与 `quick-open` 的动态内容已转义，风险较低。
+  - P2 约 30 处 `document.addEventListener` 没有对应的卸载逻辑，集中在 `annotation/interactions.ts`、`annotation.ts`、`toc-manager.ts`、`content-renderer.ts`、`ui/sidebar-workspace.ts`。目前没有已知的重复绑定问题，但单页内反复挂载时可能累积。
+  - P3 约 15 个模块各自手写 store 的 `subscribe`，可抽成共享的 `createStore`。
+  - 安全（待确认）：同源的写入与命令类接口（`/api/file-write` 仅限 `*.toc.json`；工作区 Agent 命令与进程派生）若与 XSS 组合，理论上可能导致本地命令执行。消毒已切断 XSS 这一环；是否需要对写接口做 Origin/CSRF 校验，待决定。
+  - 产品决定：是否消毒所有 Markdown 还是仅远程内容（当前为全部消毒）；链接跳转引起的错误提示是否自动消失（当前为常驻，需手动关闭）。
+
 每一步都必须保持 `bun test tests/unit`、`go test -race ./cmd/workspace-scanner`、`bun run build` 通过。

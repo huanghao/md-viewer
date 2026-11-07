@@ -1,28 +1,24 @@
 import { resolveReaderElement } from './annotation-layout';
+import { createElement } from 'react';
+import { createRoot } from 'react-dom/client';
+import { FindBar } from './find-bar/FindBar';
+import { findBarStore } from './find-bar/store';
 
-// ==================== 页面内查找 ====================
+// ==================== 页内查找 ====================
+// 查找栏界面由 React（find-bar/FindBar.tsx）渲染，状态在 find-bar/store.ts；
+// 这里保留命令式的高亮与滚动逻辑，它们直接修改正文 DOM。
 export function setupFindBar() {
-  // 创建 find bar DOM
-  const bar = document.createElement('div');
-  bar.id = 'findBar';
-  bar.innerHTML = `
-    <input id="findBarInput" type="text" placeholder="查找..." autocomplete="off" spellcheck="false" />
-    <span id="findBarCount"></span>
-    <button id="findBarPrev" title="上一个 (⇧⌘G)">&#8593;</button>
-    <button id="findBarNext" title="下一个 (⌘G)">&#8595;</button>
-    <button id="findBarClose" title="关闭 (Esc)">&#10005;</button>
-  `;
-  document.body.appendChild(bar);
-
-  const input = document.getElementById('findBarInput') as HTMLInputElement;
-  const countEl = document.getElementById('findBarCount') as HTMLElement;
-  const prevBtn = document.getElementById('findBarPrev') as HTMLButtonElement;
-  const nextBtn = document.getElementById('findBarNext') as HTMLButtonElement;
-  const closeBtn = document.getElementById('findBarClose') as HTMLButtonElement;
+  const host = document.createElement('div');
+  host.id = 'findBarHost';
+  document.body.appendChild(host);
 
   let matches: Range[] = [];
   let currentIndex = -1;
   let highlightContainer: HTMLElement | null = null;
+
+  function publish() {
+    findBarStore.setMatches(matches.length, currentIndex);
+  }
 
   function clearHighlights() {
     if (highlightContainer) {
@@ -37,7 +33,7 @@ export function setupFindBar() {
     }
     matches = [];
     currentIndex = -1;
-    countEl.textContent = '';
+    publish();
   }
 
   function escapeRegex(s: string) {
@@ -108,7 +104,7 @@ export function setupFindBar() {
       currentIndex = 0;
       scrollToMatch(0);
     }
-    updateCount();
+    publish();
   }
 
   function scrollToMatch(index: number) {
@@ -121,56 +117,45 @@ export function setupFindBar() {
     if (current) current.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
 
-  function updateCount() {
-    if (matches.length === 0) {
-      countEl.textContent = input.value ? '无结果' : '';
-      countEl.className = input.value ? 'no-result' : '';
-    } else {
-      countEl.textContent = `${currentIndex + 1} / ${matches.length}`;
-      countEl.className = '';
-    }
-  }
-
   function next() {
     if (matches.length === 0) return;
     currentIndex = (currentIndex + 1) % matches.length;
     scrollToMatch(currentIndex);
-    updateCount();
+    publish();
   }
 
   function prev() {
     if (matches.length === 0) return;
     currentIndex = (currentIndex - 1 + matches.length) % matches.length;
     scrollToMatch(currentIndex);
-    updateCount();
+    publish();
   }
 
   function show() {
-    bar.classList.add('visible');
-    input.focus();
-    input.select();
-    if (input.value) highlightMatches(input.value);
+    findBarStore.show();
+    const query = findBarStore.getState().query;
+    if (query) highlightMatches(query);
   }
 
   function hide() {
-    bar.classList.remove('visible');
+    findBarStore.hide();
     clearHighlights();
   }
 
-  // 暴露给 Swift 调用（Swift 通过 evaluateJavaScript("window.__showFindBar(true/false)") 调用）
-  (window as any).__showFindBar = show;
+  createRoot(host).render(
+    createElement(FindBar, {
+      callbacks: {
+        onQuery: (query: string) => {
+          findBarStore.setQuery(query);
+          highlightMatches(query);
+        },
+        onNext: next,
+        onPrev: prev,
+        onClose: hide,
+      },
+    }),
+  );
 
-  input.addEventListener('input', () => highlightMatches(input.value));
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.shiftKey ? prev() : next();
-      e.preventDefault();
-    } else if (e.key === 'Escape') {
-      hide();
-      e.preventDefault();
-    }
-  });
-  prevBtn.addEventListener('click', prev);
-  nextBtn.addEventListener('click', next);
-  closeBtn.addEventListener('click', hide);
+  // 原生壳通过 evaluateJavaScript("window.__showFindBar(true/false)") 调用；保留为原生集成点。
+  (window as any).__showFindBar = (visible: boolean) => (visible ? show() : hide());
 }

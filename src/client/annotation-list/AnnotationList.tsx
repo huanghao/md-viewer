@@ -1,17 +1,15 @@
-import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useLayoutEffect, useSyncExternalStore } from 'react';
 import { syncAnnotationScrollWithContent } from '../annotation-layout';
 import { iconSvg } from '../annotation/icons';
 import {
   appendReply,
-  autoResizeReplyInput,
   commitThreadItemEdit,
   refreshAnnotationList,
   stopThreadItemEdit,
 } from '../annotation/thread-manager';
-import { isSubmitKey } from '../utils/input-keys';
 import { resolvePositionedAnnotationOverlaps } from './layout';
 import { annotationListStore, type AnnotationRowModel } from './store';
-import type { AnnotationThreadItem } from '../annotation-state';
+import { ReplyEntry, ThreadLines } from './thread-view';
 
 export interface AnnotationListProps {
   /** 列表容器（#annotationList）：React 根节点；default-mode 类与重叠消解作用于它 */
@@ -99,170 +97,35 @@ function AnnotationItem({ row, filePath, positioned, simple, editingItemId }: An
       </div>
       <div className="annotation-thread">
         {simple ? (
-          <SimpleThread row={row} />
+          <>
+            <div className="annotation-note simple">{row.simpleNote}</div>
+            {row.replyCount > 0 && <div className="annotation-reply-count">回复 {row.replyCount}</div>}
+          </>
         ) : (
-          <ThreadLines annotationId={row.id} filePath={filePath} thread={row.thread} editingItemId={editingItemId} />
+          <ThreadLines
+            annotationId={row.id}
+            thread={row.thread}
+            editingItemId={editingItemId}
+            onCommitEdit={(itemId, text) => {
+              annotationListStore.setEditing(null);
+              commitThreadItemEdit(row.id, itemId, filePath, text);
+            }}
+            onCancelEdit={(itemId) => stopThreadItemEdit(row.id, itemId)}
+          />
         )}
       </div>
       {!simple && (
-        <div className="annotation-reply-entry" data-reply-entry={row.id} role="button" tabIndex={0}>
-          <ReplyInput annotationId={row.id} filePath={filePath} />
-        </div>
+        <ReplyEntry
+          entryData={{ 'data-reply-entry': row.id }}
+          inputData={{ 'data-reply-input': row.id }}
+          draft={annotationListStore.getDraft(row.id)}
+          onDraftChange={(value) => annotationListStore.setDraft(row.id, value)}
+          onSubmit={(text) => {
+            appendReply(row.id, filePath, text);
+            refreshAnnotationList(filePath);
+          }}
+        />
       )}
     </div>
-  );
-}
-
-function SimpleThread({ row }: { row: AnnotationRowModel }) {
-  return (
-    <>
-      <div className="annotation-note simple">{row.simpleNote}</div>
-      {row.replyCount > 0 && <div className="annotation-reply-count">回复 {row.replyCount}</div>}
-    </>
-  );
-}
-
-interface ThreadLinesProps {
-  annotationId: string;
-  filePath: string;
-  thread: AnnotationThreadItem[];
-  editingItemId: string | null;
-}
-
-function ThreadLines({ annotationId, filePath, thread, editingItemId }: ThreadLinesProps) {
-  if (thread.length === 0) {
-    return <div className="annotation-thread-line">（无评论内容）</div>;
-  }
-  return (
-    <>
-      {thread.map((item) => {
-        const isReply = item.type === 'reply';
-        if (item.id === editingItemId) {
-          return (
-            <div
-              key={item.id}
-              className={`annotation-thread-line is-editing${isReply ? ' is-reply' : ''}`}
-              data-thread-item-id={item.id}
-              data-annotation-id={annotationId}
-            >
-              <ThreadEditInput annotationId={annotationId} itemId={item.id} filePath={filePath} initial={item.note} />
-            </div>
-          );
-        }
-        return (
-          <div
-            key={item.id}
-            className={`annotation-thread-line${isReply ? ' is-reply' : ''}`}
-            data-thread-item-id={item.id}
-            data-annotation-id={annotationId}
-          >
-            <span className="annotation-thread-text">{item.note}</span>
-            <button className="annotation-thread-edit-btn" data-edit-thread-item={item.id} data-annotation-id={annotationId} title="编辑" dangerouslySetInnerHTML={{ __html: iconSvg('edit') }} />
-            {isReply && (
-              <button className="annotation-thread-edit-btn" data-delete-thread-item={item.id} data-annotation-id={annotationId} title="删除回复" dangerouslySetInnerHTML={{ __html: iconSvg('trash') }} />
-            )}
-          </div>
-        );
-      })}
-    </>
-  );
-}
-
-interface ThreadEditInputProps {
-  annotationId: string;
-  itemId: string;
-  filePath: string;
-  initial: string;
-}
-
-/** 评论条目编辑态：Cmd+Enter 保存，Esc 取消，焦点离开同一卡片时取消 */
-function ThreadEditInput({ annotationId, itemId, filePath, initial }: ThreadEditInputProps) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  const settled = useRef(false);
-
-  useLayoutEffect(() => {
-    const textarea = ref.current;
-    if (!textarea) return;
-    textarea.style.height = `${Math.max(textarea.scrollHeight, 34)}px`;
-    textarea.focus();
-    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-  }, []);
-
-  const cancel = () => {
-    if (settled.current) return;
-    settled.current = true;
-    stopThreadItemEdit(annotationId, itemId);
-  };
-  const save = () => {
-    if (settled.current) return;
-    settled.current = true;
-    commitThreadItemEdit(annotationId, itemId, filePath, ref.current?.value ?? '');
-  };
-
-  return (
-    <textarea
-      ref={ref}
-      className="annotation-thread-edit-input"
-      placeholder="Cmd+Enter 保存，Esc 取消"
-      defaultValue={initial}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') {
-          e.preventDefault();
-          cancel();
-        } else if (isSubmitKey(e.nativeEvent)) {
-          e.preventDefault();
-          save();
-        }
-      }}
-      onInput={(e) => {
-        const textarea = e.currentTarget;
-        textarea.style.height = 'auto';
-        textarea.style.height = `${Math.min(200, Math.max(textarea.scrollHeight, 34))}px`;
-      }}
-      onBlur={(e) => {
-        // 焦点移到同一评论卡片内（如回复输入框）时不取消
-        const related = e.relatedTarget as HTMLElement | null;
-        const card = e.currentTarget.closest('.annotation-item');
-        if (related && card && card.contains(related)) return;
-        setTimeout(cancel, 150);
-      }}
-    />
-  );
-}
-
-interface ReplyInputProps {
-  annotationId: string;
-  filePath: string;
-}
-
-/** 回复输入框：草稿保存在 store 中，列表重建后保留；Cmd+Enter 提交 */
-function ReplyInput({ annotationId, filePath }: ReplyInputProps) {
-  const [value, setValue] = useState(() => annotationListStore.getDraft(annotationId));
-  const ref = useRef<HTMLTextAreaElement>(null);
-
-  useLayoutEffect(() => {
-    if (ref.current) autoResizeReplyInput(ref.current);
-  }, [value]);
-
-  return (
-    <textarea
-      ref={ref}
-      rows={1}
-      data-reply-input={annotationId}
-      placeholder="输入回复内容（Cmd+Enter 提交）"
-      value={value}
-      onChange={(e) => {
-        setValue(e.target.value);
-        annotationListStore.setDraft(annotationId, e.target.value);
-      }}
-      onKeyDown={(e) => {
-        if (!isSubmitKey(e.nativeEvent)) return;
-        e.preventDefault();
-        appendReply(annotationId, filePath, value);
-        setValue('');
-        annotationListStore.setDraft(annotationId, '');
-        refreshAnnotationList(filePath);
-      }}
-    />
   );
 }

@@ -74,22 +74,20 @@ import {
   registerThreadCallbacks,
   getCommentThread,
   getReplyCount,
-  renderThreadListHTML,
   appendReply,
-  editThreadItem,
   deleteThreadItem,
   startThreadItemEdit,
   autoResizeReplyInput,
   autoResizeComposerInput,
 } from './annotation/thread-manager';
 import { mountAnnotationList } from './annotation-list';
+import { mountPopoverNote } from './annotation-popover';
+import { popoverNoteStore } from './annotation-popover/store';
 import { annotationListStore } from './annotation-list/store';
 import { buildAnnotationListView } from './annotation-list/model';
 import { getDiffViewActive } from './diff-view';
 import { isSubmitKey } from './utils/input-keys';
 
-// 用于在 popover 关闭/切换时保留 reply 草稿，与 DOM 生命周期解耦
-const popoverReplyDrafts = new Map<string, string>();
 
 export type { Annotation, AnnotationThreadItem };
 export {
@@ -525,21 +523,7 @@ export function showPopover(ann: Annotation, x: number, y: number): void {
   const dq = displayQuoteOf(ann);
   const snippet = dq.substring(0, 22);
   el.popoverTitle.textContent = `#${ann.serial || 0} | ${snippet}${dq.length > 22 ? '...' : ''}`;
-  const threadHTML = renderThreadListHTML(ann, false);
-  const replyDraft = popoverReplyDrafts.get(ann.id) ?? '';
-  el.popoverNote.innerHTML = `
-    <div class="annotation-thread">${threadHTML}</div>
-    <div class="annotation-reply-entry" data-popover-reply-entry="${ann.id}" role="button" tabindex="0">
-      <textarea rows="1" data-popover-reply-input="${ann.id}" placeholder="输入回复内容（Cmd+Enter 提交）"></textarea>
-    </div>
-  `;
-  if (replyDraft) {
-    const newReplyInput = el.popoverNote.querySelector<HTMLTextAreaElement>(`[data-popover-reply-input="${ann.id}"]`);
-    if (newReplyInput) {
-      newReplyInput.value = replyDraft;
-      autoResizeReplyInput(newReplyInput);
-    }
-  }
+  popoverNoteStore.show(ann.id, getActiveAnnotationFilePath());
   if (el.popoverResolveBtn) {
     const resolved = isResolvedAnn(ann);
     el.popoverResolveBtn.title = resolved ? '重新打开' : '标记已解决';
@@ -902,6 +886,7 @@ export function renderAnnotationList(filePath: string | null): void {
     anchorTopOf: (id) => (density === 'default' ? getAnnotationAnchorTopById(id) : null),
     contentScrollHeight: document.getElementById('content')?.scrollHeight || 0,
   }));
+  popoverNoteStore.refresh();
 }
 
 // ==================== 事件处理 ====================
@@ -1002,6 +987,7 @@ export function openCommentComposerFromPending(): boolean {
 // ==================== 初始化 ====================
 export function initAnnotationElements(): void {
   mountAnnotationList();
+  mountPopoverNote();
   registerPersistenceCallbacks({
     applyAnnotations,
     renderAnnotationList,
@@ -1251,7 +1237,7 @@ export function initAnnotationElements(): void {
       event.stopPropagation();
       const itemId = editBtn.getAttribute('data-edit-thread-item');
       const annotationId = editBtn.getAttribute('data-annotation-id');
-      if (itemId && annotationId) editThreadItem(annotationId, itemId, filePath);
+      if (itemId && annotationId) popoverNoteStore.startEdit(itemId);
       return;
     }
     const deleteBtn = target.closest('[data-delete-thread-item]') as HTMLElement | null;
@@ -1291,32 +1277,6 @@ export function initAnnotationElements(): void {
     autoResizeReplyInput(input);
     input.focus();
   });
-  document.getElementById('annotationPopover')?.addEventListener('keydown', (event) => {
-    const target = event.target as HTMLElement;
-    if (!(target instanceof HTMLTextAreaElement)) return;
-    if (!isSubmitKey(event)) return; // Cmd+Enter 提交
-    const id = target.getAttribute('data-popover-reply-input');
-    const filePath = getActiveAnnotationFilePath();
-    if (!id || !filePath) return;
-    event.preventDefault();
-    appendReply(id, filePath, target.value);
-    target.value = '';
-    popoverReplyDrafts.delete(id);
-    const ann = state.annotations.find((item) => item.id === id);
-    const mark = document.querySelector(`[data-annotation-id="${id}"]`) as HTMLElement | null;
-    const rect = mark?.getBoundingClientRect();
-    if (ann) showPopover(ann, rect ? rect.right + 8 : 120, rect ? rect.top + 8 : 120);
-    renderAnnotationList(filePath);
-  });
-  document.getElementById('annotationPopover')?.addEventListener('input', (event) => {
-    const target = event.target as HTMLElement;
-    if (!(target instanceof HTMLTextAreaElement)) return;
-    const id = target.getAttribute('data-popover-reply-input');
-    if (!id) return;
-    popoverReplyDrafts.set(id, target.value);
-    autoResizeReplyInput(target);
-  });
-
   getElements().filterMenu?.querySelectorAll('.annotation-filter-item[data-filter]').forEach((node) => {
     node.addEventListener('click', () => {
       const next = (node as HTMLElement).getAttribute('data-filter') as AnnotationFilter | null;

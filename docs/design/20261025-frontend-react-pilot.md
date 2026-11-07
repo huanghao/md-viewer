@@ -212,6 +212,11 @@ CSS 方案定为 **Tailwind CSS v4**，与 React 迁移配合。顺序上 token 
   - 浮窗（popover）里的评论仍是字符串渲染，它的编辑仍走 `editThreadItem`（原地改写），待浮窗迁移时一并删除。
   - 有意的小改动：筛选后为空或无评论时，容器的 `default-mode` 类会被移除（原来保留）。
   - 测试 `annotation-list.test.tsx`；简洁/默认两种密度、编辑保存与取消、回复提交、草稿保留、深色模式经 CDP 真实浏览器验证。
-- 尚未迁移：评论浮窗（popover 与其回复输入）、划词后的新建 composer 与选区标记、Agent 托盘选择弹窗（`#agentTrayComposer`）。
+- ~~评论浮窗正文~~ 已完成（2026-11-07）：`src/client/annotation-popover/`（`store.ts` 保存当前评论、正在编辑的条目与回复草稿，`PopoverNote.tsx` 渲染）；`annotation-popover.ts` 的 `mountPopoverNote()` 挂到 `#popoverNote`。标题、按钮、拖拽、定位仍在 `annotation.ts`，`showPopover` 只调用 `popoverNoteStore.show`。
+  - 线程与回复输入与列表共用 `annotation-list/thread-view.tsx`（`ThreadLines`、`ReplyEntry`），列表与浮窗的结构、class、`data-*` 保持一致。
+  - 浮窗每次渲染从 `state.annotations` 取最新评论，后台保存替换对象后不会显示旧数据。
+  - 旧的字符串渲染 `renderThreadListHTML` 与原地编辑 `editThreadItem` 已删除，浮窗与列表都走 store 驱动的编辑。
+  - 测试 `annotation-popover.test.tsx`；打开、编辑保存、回复提交、草稿在切换后保留、Escape 取消经 CDP 真实浏览器验证。
+- 尚未迁移：划词后的新建 composer 与选区标记、Agent 托盘选择弹窗（`#agentTrayComposer`）。
 
 每一步都必须保持 `bun test tests/unit`、`go test -race ./cmd/workspace-scanner`、`bun run build` 通过。

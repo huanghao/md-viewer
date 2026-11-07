@@ -55,6 +55,8 @@ bun run build:scanner
 - Use event delegation (`data-action` + `data-*`) for HTML templates.
 - Use `CustomEvent` or explicit `initXxx(deps)` callback injection for cross-module coordination.
 - Third-party library globals (`marked`, `mermaid`, `pdfjsLib`, `renderMathInElement`) are allowed only as library integration points.
+- New UI must be React: a component under `src/client/<area>/` with a store (`getState`/`subscribe`/setters) read through `useSyncExternalStore`, mounted by `mountXxx(deps)` from the area's `src/client/<area>.ts`. Do not add new hand-written DOM templates or `innerHTML` UI.
+- Migrated areas keep imperative internals: content inside `#content`, PDF canvases/viewer, and selection marks are owned by their imperative modules; React owns the shell around them. Do not move those internals into React without a design update.
 - Avoid modal UI for ordinary input/editing. Prefer inline controls, sidebars, drawers, or existing panels. Confirmation UI is reserved for high-risk destructive actions.
 
 ## Import Boundaries

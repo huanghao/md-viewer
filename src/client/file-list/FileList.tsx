@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useSyncExternalStore, type PointerEvent } from 'react';
 import { startFileDrag } from './drag';
-import { fileListStore, type FileListRow } from './store';
+import { fileListStore } from './store';
 import { FileRow } from './FileRow';
 
 export interface FileListDeps {

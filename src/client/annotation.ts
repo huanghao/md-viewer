@@ -2,7 +2,6 @@
  * 圈点评论功能模块
  */
 
-import { escapeHtml } from './utils/escape';
 import {
   deleteAnnotationRemote,
   updateAnnotationStatusRemote,
@@ -14,12 +13,11 @@ import { enqueueOp } from './utils/undo-queue';
 import { isOpen, isResolved, isUnanchored, type AnnotationStatus } from '../annotation-status';
 import { adjustAnnotationCount, adjustUnanchoredCount } from './state';
 import { loadConfig } from './config';
-import { formatRelativeTimeShort } from './utils/format';
 import { storageGet, storageSet } from './utils/storage';
 import { createResizer } from './utils/resizer';
-import { getTextNodes, globalOffsetForPosition, globalOffsetForPositionEnd, positionForGlobalOffset, clamp, placeFloating, getReaderText } from './annotation/position';
+import { globalOffsetForPosition, globalOffsetForPositionEnd, positionForGlobalOffset, placeFloating, getReaderText } from './annotation/position';
 import { currentPdfViewer } from './pdf-state';
-import { isResolvedAnn, getAnchorTrack, matchesFilter, getVisibleAnnotations as getVisibleAnnotationsUtil } from './annotation/query';
+import { isResolvedAnn, getVisibleAnnotations as getVisibleAnnotationsUtil } from './annotation/query';
 import { recordSignal } from './utils/focus-signals';
 import { initAgentRunner, onAgentTabActivated } from './agent-runner';
 import { addTrayItem } from './agent-tray';
@@ -35,8 +33,6 @@ import {
   setQuickComments,
   getLastQuickAddPosition,
   nextAnnotationSerial,
-  normalizeThread,
-  ensureAnnotationThread,
   ensureAnnotationSerials,
   mergeAnnotationStatus,
   getAnnotations,
@@ -47,8 +43,6 @@ import {
   invalidateAnnotationElementsCache,
   registerCollapseCallback,
   setSidebarCollapsed,
-  loadAnnotationPanelOpen,
-  persistCurrentFilePanelOpen,
   setAnnotationSidebarWidth,
   initAnnotationSidebarWidth,
   syncAnnotationSidebarLayout,
@@ -72,9 +66,6 @@ import {
 import { iconSvg } from './annotation/icons';
 import {
   registerThreadCallbacks,
-  getCommentThread,
-  getReplyCount,
-  appendReply,
   deleteThreadItem,
   startThreadItemEdit,
   autoResizeReplyInput,
@@ -87,7 +78,6 @@ import { popoverNoteStore } from './annotation-popover/store';
 import { annotationListStore } from './annotation-list/store';
 import { buildAnnotationListView } from './annotation-list/model';
 import { getDiffViewActive } from './diff-view';
-import { isSubmitKey } from './utils/input-keys';
 
 
 export type { Annotation, AnnotationThreadItem };
@@ -335,7 +325,6 @@ function hideTrayComposer(): void {
 }
 
 function submitTrayComposer(): void {
-  const el = getElements();
   const pending = state.pendingAnnotation;
   const filePath = state.pendingAnnotationFilePath;
   const note = composerStore.getDraft('tray').trim();
@@ -546,7 +535,6 @@ function hidePopover(force = false): void {
 
 // ==================== 评论操作 ====================
 export function savePendingAnnotation(filePath: string): void {
-  const el = getElements();
   if (!state.pendingAnnotation) return;
   const pendingFilePath = state.pendingAnnotationFilePath;
   if (!pendingFilePath || pendingFilePath !== filePath) return;
@@ -925,7 +913,6 @@ export function handleSelectionForAnnotation(filePath: string | null): void {
   const prefixWindow = 200;
   const suffixWindow = 200;
   const quotePrefix = positionValid ? fullText.slice(Math.max(0, start - prefixWindow), start) : '';
-  const quoteSuffix = positionValid ? fullText.slice(end, Math.min(fullText.length, end + suffixWindow)) : '';
 
   const rects = range.getClientRects();
   const lastRect = rects.length > 0 ? rects[rects.length - 1] : range.getBoundingClientRect();

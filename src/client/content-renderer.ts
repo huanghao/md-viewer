@@ -17,7 +17,6 @@ import { escapeHtml, escapeAttr } from './utils/escape';
 import { normalizeJoinedPath } from './utils/md-link';
 import { renderJsonContent } from './ui/json-viewer';
 import { mountScrollbar, unmountScrollbar, updateScrollbar } from './ui/doc-scrollbar';
-import { getMdThemeCss, getHlThemeCss } from './themes/index';
 import {
   invalidateAnnotationElementsCache,
   applyAnnotations,
@@ -27,7 +26,7 @@ import { updateToc } from './toc-manager';
 import { HTML_READER_HOST_ID } from './annotation-layout';
 import { createPdfViewer } from './pdf-viewer.js';
 import { createPdfAnnotationBridge } from './pdf-annotation.js';
-import { currentPdfViewer, setCurrentPdfViewer } from './pdf-state';
+import { setCurrentPdfViewer } from './pdf-state';
 import { storageGet, storageGetNumber, storageSet } from './utils/storage';
 import { getPdfZoom } from './zoom-controller';
 import { pdfScrollKey } from './zoom';
@@ -44,32 +43,26 @@ const PDF_MODE_KEY = 'md-viewer:pdf-mode';
 // ── Injected deps (set via initContentRenderer) ───────────────────────────────
 let _pdfViewerRegistry: Map<string, PdfViewerEntry> | null = null;
 let _currentPdfBridge: { value: ReturnType<typeof createPdfAnnotationBridge> | null } | null = null;
-let _evictPdfViewer: ((filePath: string) => void) | null = null;
 let _scheduleEviction: ((filePath: string) => void) | null = null;
 let _cancelEviction: ((filePath: string) => void) | null = null;
 let _updateToolbarButtons: (() => Promise<void>) | null = null;
-let _syncAnnotationsForCurrentFile: ((force?: boolean) => void) | null = null;
 let _addFileByPath: ((path: string, focus?: boolean) => Promise<void>) | null = null;
 
 export interface ContentRendererDeps {
   pdfViewerRegistry: Map<string, PdfViewerEntry>;
   currentPdfBridgeRef: { value: ReturnType<typeof createPdfAnnotationBridge> | null };
-  evictPdfViewer: (filePath: string) => void;
   scheduleEviction: (filePath: string) => void;
   cancelEviction: (filePath: string) => void;
   updateToolbarButtons: () => Promise<void>;
-  syncAnnotationsForCurrentFile: (force?: boolean) => void;
   addFileByPath: (path: string, focus?: boolean) => Promise<void>;
 }
 
 export function initContentRenderer(deps: ContentRendererDeps): void {
   _pdfViewerRegistry = deps.pdfViewerRegistry;
   _currentPdfBridge = deps.currentPdfBridgeRef;
-  _evictPdfViewer = deps.evictPdfViewer;
   _scheduleEviction = deps.scheduleEviction;
   _cancelEviction = deps.cancelEviction;
   _updateToolbarButtons = deps.updateToolbarButtons;
-  _syncAnnotationsForCurrentFile = deps.syncAnnotationsForCurrentFile;
   _addFileByPath = deps.addFileByPath;
 }
 

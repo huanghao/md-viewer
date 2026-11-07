@@ -124,11 +124,9 @@ import {
   initContentRenderer({
     pdfViewerRegistry,
     currentPdfBridgeRef,
-    evictPdfViewer,
     scheduleEviction,
     cancelEviction,
     updateToolbarButtons,
-    syncAnnotationsForCurrentFile,
     addFileByPath,
   });
 

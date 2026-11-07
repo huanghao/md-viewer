@@ -1,5 +1,5 @@
 import type { PdfViewerInstance } from "./pdf-viewer.js";
-import { nextAnnotationSerial, showQuickAdd, showPopover, showPopoverBottomRight } from "./annotation.js";
+import { nextAnnotationSerial, showQuickAdd, showPopover } from "./annotation.js";
 import type { Annotation } from "./annotation.js";
 import { pdfPendingRectCoords, setPdfPendingRectCoords } from './pdf-state';
 

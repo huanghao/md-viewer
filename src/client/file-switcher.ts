@@ -12,7 +12,7 @@ import { addConfirmStore } from './add-confirm/store';
 import { renderSidebar, resetSidebarFileAnchor } from './ui/sidebar';
 import { showSuccess, showError, showInfo } from './ui/toast';
 import { renderContent } from './content-renderer';
-import { isHtmlPath, isPdfPath, isUrlPath } from './content-renderer';
+import { isPdfPath, isUrlPath } from './content-renderer';
 import { saveState } from './state';
 import { getDiffViewActive, closeDiffView } from './diff-view';
 import { renderTocPanel } from './ui/toc-panel.js';

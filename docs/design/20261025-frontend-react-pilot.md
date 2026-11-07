@@ -241,6 +241,13 @@ CSS 方案定为 **Tailwind CSS v4**，与 React 迁移配合。顺序上 token 
      - 工作区树的渲染已经是 React（`workspace-tree/WorkspaceTree.tsx`）；`ui/sidebar-workspace.ts` 剩下的是动作逻辑，并通过 `document` 上的 `data-action` 委托处理点击。AGENTS.md 允许模板使用 `data-action` 委托，因此它不属于必须迁移的命令式界面。
      - `file-switcher.ts`（约 320 行）是添加、切换、删除、搜索、URL 参数等业务逻辑；唯一的界面部分（添加确认条）已经是 store + React，`setupDragAndDrop` 只是 body 上的拖拽监听。它属于服务层，与轮询同类，不迁移。
      - 因此方案 B 的第 3 步不再包含大规模的界面迁移。仍可选的改动是把工作区树的 `data-action` 委托改为 React 组件的显式回调，这是风格统一，不是功能需要，需要单独决定。
+- **`init.ts` 下沉（2026-11-08）**：`init.ts` 从 522 行降到 428 行。挂在 `document` / `#content` 上的行为监听移到所属模块，依赖通过回调注入，不新增循环引用：
+  - 添加确认条的外部点击关闭 → `file-switcher.ts` 的 `setupAddConfirmDismiss()`。
+  - `pdf://` 与 Markdown 内部链接拦截 → `content-links.ts`（`setupContentLinks`，纯函数 `parsePdfLink`）。
+  - 划词选择、PDF 批注事件刷新高亮、`pdf:show-composer`、PDF 标记点击 → `annotation/interactions.ts`（`setupAnnotationInteractions`）。
+  - 测试 `content-links.test.ts`、`annotation-interactions.test.tsx`；CDP 验证 `.md` 链接在 mdv 内打开，已加载的 PDF 链接跳到第 5 页。
+  - 既有问题（未修改，逻辑原样搬移）：PDF 尚未加载时点击 `pdf://` 链接，跳页在 `setTimeout(…, 500)` 时还没有 viewer，因此不跳页。需要改为等待 viewer 就绪后再跳。
+  - 仍在 `init.ts` 的：`/api/config` 读取、`/api/file-created-at` 补全、键盘动作注册（Escape、关闭文件、导航、快速打开）、`beforeunload` 刷新撤销队列。这些属于服务或快捷键层，下一步再决定去向。
 - **选区标记：决定保留为命令式内部（2026-11-08）**。`applyTempSelectionMark` / `clearTempSelectionMark` 直接包裹正文文字节点，属于「React 管外壳，命令式管内部」中的内部 DOM，与内容渲染、批注高亮同类，不迁移到 React。
 - **深色模式核对（2026-11-08）**：CDP 截图核对批注列表、查找栏、Diff 横幅，均可读。查找栏与 Diff 的「关」按钮在窄窗口下与工具栏、侧栏悬浮按钮重叠，属于既有布局问题，未在本阶段修改。最近栏标签需要工作区数据才会出现，本次环境中没有工作区，未能核对。
 - 尚未完成：PDF 查看器外壳（指示器之外的部分，仍为命令式）；以及最后一步——删除 `main.ts`/`init.ts` 中的手写装配，这一步需要先决定 `init.ts` 的编排去向，并由用户做真实页面验收。

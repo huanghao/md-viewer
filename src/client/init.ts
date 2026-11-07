@@ -43,6 +43,8 @@ import {
 } from './toc-manager';
 import { flushAll as flushUndoQueue } from './utils/undo-queue';
 import { setupFindBar } from './find-bar';
+import { setupContentLinks } from './content-links';
+import { setupAnnotationInteractions } from './annotation/interactions';
 import { mountStatusbar } from './statusbar';
 import { initInputKeys } from './utils/input-keys';
 import { initZoom, zoomIn, zoomOut, setZoomFromInput, updateZoomDisplay } from './zoom-controller';
@@ -57,9 +59,10 @@ import {
   navigateFileInView,
   searchFilesHandler,
   setupDragAndDrop,
-  handleURLParams,
+  setupAddConfirmDismiss,
   clearAddConfirm,
   isAddConfirmVisible,
+  handleURLParams,
   addFileByPath,
   handleSmartAddInput,
 } from './file-switcher';
@@ -331,14 +334,7 @@ import {
   initTocPaneHeight();
   setupTocResize();
   setupTocOpenBtn();
-  document.addEventListener('click', (e) => {
-    if (!isAddConfirmVisible()) return;
-    const target = e.target as HTMLElement | null;
-    if (!target) return;
-    if (target.closest('.sidebar-header')) return;
-    if (target.closest('#quickActionConfirm')) return;
-    clearAddConfirm();
-  });
+  setupAddConfirmDismiss();
   handleURLParams();
   const isInputFocused = () => {
     const tag = (document.activeElement as HTMLElement)?.tagName?.toLowerCase();
@@ -408,110 +404,20 @@ import {
   initDispatcher();
   initInputKeys();
 
-  // 添加批注文本选中监听
-  document.addEventListener('mouseup', () => {
-    setTimeout(() => {
-      const filePath = document.getElementById('content')?.getAttribute('data-current-file') || null;
-      handleSelectionForAnnotation(filePath);
-    }, 0);
+  // 文档内链接（pdf:// 与 Markdown 内部链接）在 mdv 内打开
+  setupContentLinks({
+    addFileByPath,
+    getCurrentFile: () => state.currentFile ?? null,
+    getCurrentPdfViewer: () => currentPdfViewer,
   });
 
-  // 拦截 pdf:// 协议链接点击
-  document.addEventListener("click", (e) => {
-    const target = (e.target as HTMLElement).closest("a[href]") as HTMLAnchorElement | null;
-    if (!target) return;
-    const href = target.getAttribute("href") || "";
-    if (!href.startsWith("pdf://")) return;
-    e.preventDefault();
-
-    // Parse pdf://path/to/file.pdf#page=3&quote=some+text
-    const withoutProto = href.slice("pdf://".length);
-    const hashIdx = withoutProto.indexOf("#");
-    const filePart = hashIdx >= 0 ? withoutProto.slice(0, hashIdx) : withoutProto;
-    const paramStr = hashIdx >= 0 ? withoutProto.slice(hashIdx + 1) : "";
-    const params = new URLSearchParams(paramStr);
-    const pageNum = parseInt(params.get("page") || "1", 10);
-    const quote = params.get("quote") || "";
-
-    addFileByPath(filePart).then(() => {
-      setTimeout(() => {
-        if (currentPdfViewer) {
-          currentPdfViewer.scrollToPage(pageNum);
-          if (quote) currentPdfViewer.highlightQuote(pageNum, decodeURIComponent(quote));
-        }
-      }, 500);
-    });
-  });
-
-  // 拦截 markdown 内部 .md 链接点击，在 mdv 内打开
-  document.getElementById('content')?.addEventListener('click', (e) => {
-    const target = (e.target as HTMLElement).closest('a[href]') as HTMLAnchorElement | null;
-    if (!target) return;
-    const href = target.getAttribute('href') || '';
-    const currentFile = state.currentFile;
-    const absPath = resolveMarkdownLinkPath(href, currentFile);
-    if (!absPath) return;
-    e.preventDefault();
-    addFileByPath(absPath, true);
-  });
-
-  // App-level PDF annotation event listeners (registered once, delegate to current bridge)
-  document.addEventListener("annotations:loaded", () => {
-    currentPdfBridgeRef.value?.renderHighlights(getAnnotations());
-  });
-  document.addEventListener("annotation:created", () => {
-    currentPdfBridgeRef.value?.renderHighlights(getAnnotations());
-  });
-  document.addEventListener("annotation:deleted", () => {
-    currentPdfBridgeRef.value?.renderHighlights(getAnnotations());
-  });
-  document.addEventListener("annotation:highlights-changed", () => {
-    currentPdfBridgeRef.value?.renderHighlights(getAnnotations());
-  });
-
-  // 监听 pdf:show-composer 事件
-  document.addEventListener("pdf:show-composer", (e: Event) => {
-    const { annotation, filePath, clientX, clientY } = (e as CustomEvent).detail;
-    if (_setPendingAnnotation) {
-      _setPendingAnnotation(annotation, filePath, clientX, clientY);
-    }
-  });
-
-  // 页面刷新时，自动刷新当前正在展示的文件
-
-  // PDF temp selection mark 点击处理：失焦后重新点击黄色下划线恢复 composer
-  document.getElementById('content')?.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement;
-    const tempMark = target.closest('mark.pdf-selection-mark-temp');
-    if (!tempMark) return;
-    if (!tempMark.closest('.pdf-viewer-container')) return;
-    e.stopPropagation();
-    e.preventDefault();
-    const rect = (tempMark as HTMLElement).getBoundingClientRect();
-    openComposerFromPending(rect.right + 6, rect.top - 8);
-  });
-
-  // PDF annotation mark 点击处理
-  document.getElementById('content')?.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement;
-    const mark = target.closest('.annotation-mark');
-    if (!mark) return;
-    if (!mark.closest('.pdf-viewer-container')) return;
-
-    const annotationId = mark.getAttribute('data-annotation-id');
-    if (!annotationId) return;
-
-    e.stopPropagation();
-    e.preventDefault();
-
-    const annotations = getAnnotations();
-    const ann = annotations.find((a: any) => a.id === annotationId);
-    if (!ann) return;
-
-    const rect = (mark as HTMLElement).getBoundingClientRect();
-    document.dispatchEvent(new CustomEvent('pdf:show-popover', {
-      detail: { annotation: ann, x: rect.right + 8, y: rect.top }
-    }));
+  // 批注交互：划词选择、PDF 批注事件同步高亮、PDF 标记点击
+  setupAnnotationInteractions({
+    getAnnotations,
+    getBridge: () => currentPdfBridgeRef.value,
+    getPendingAnnotationSetter: () => _setPendingAnnotation,
+    openComposerFromPending,
+    handleSelectionForAnnotation,
   });
   initSSEConnection({ onFileLoaded, updateToolbarButtons });
   await refreshCurrentFile();

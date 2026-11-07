@@ -290,6 +290,18 @@ export async function searchFilesHandler(rawQuery?: string) {
 }
 
 // ==================== 拖拽支持 ====================
+/** 点击添加确认条以外的区域时关闭确认条（确认条与侧边栏头部内的操作除外） */
+export function setupAddConfirmDismiss(): void {
+  document.addEventListener('click', (e) => {
+    if (!isAddConfirmVisible()) return;
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+    if (target.closest('.sidebar-header')) return;
+    if (target.closest('#quickActionConfirm')) return;
+    clearAddConfirm();
+  });
+}
+
 export function setupDragAndDrop() {
   document.body.addEventListener('dragover', (e) => {
     e.preventDefault();

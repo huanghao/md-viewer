@@ -10,6 +10,8 @@ import { renderSidebar } from './ui/sidebar';
 import { highlightCodeBlocks } from './utils/code-highlight';
 import { toolbarStore } from './toolbar/store';
 import { protectMath } from './utils/math-protect';
+import { sanitizeHtml } from './utils/html-sanitize';
+
 import { invalidateAnnotationElementsCache } from './annotation-layout';
 import { deleteSnapshot } from './api/snapshots';
 
@@ -149,7 +151,7 @@ export function renderInlineDiffHTML(lines: import('./utils/diff').DiffLine[]): 
     // treats it as a thematic break (hr) instead.
     const safe = s.replace(/^([^\n]+)\n([-=]{2,}[ \t]*)$/mg, '$1\n\n$2');
     const g = protectMath(safe);
-    return g.restore((window as any).marked.parse(g.protected));
+    return g.restore(sanitizeHtml((window as any).marked.parse(g.protected)));
   };
 
   // 将变更段合并为 group，空行 equal 段不切断相邻变更
@@ -259,7 +261,7 @@ export function renderParagraphDiffView(oldContent: string, newContent: string):
 
   // Render safeNew (setext-normalized) so block count matches diffBlocks(safeOld, safeNew)
   const g = protectMath(safeNew);
-  container.innerHTML = `<div class="markdown-body" id="reader">${g.restore((window as any).marked.parse(g.protected))}</div>`;
+  container.innerHTML = `<div class="markdown-body" id="reader">${g.restore(sanitizeHtml((window as any).marked.parse(g.protected)))}</div>`;
   invalidateAnnotationElementsCache();
   highlightCodeBlocks(container);
   _renderMath(container);

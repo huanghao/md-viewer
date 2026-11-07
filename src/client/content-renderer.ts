@@ -5,6 +5,8 @@
 //           and helper functions: isHtmlPath, isJsonPath, isPdfPath, isUrlPath, applyPdfModeButtons
 
 import { highlightCodeBlocks } from './utils/code-highlight';
+import { sanitizeHtml } from './utils/html-sanitize';
+
 import { toolbarStore } from './toolbar/store';
 import { pdfPageIndicatorStore } from './pdf-page-indicator/store';
 import type { PdfViewerEntry } from './pdf-registry';
@@ -819,7 +821,8 @@ export function renderContent() {
 
   // 使用 marked 渲染 Markdown
   const mathGuard = protectMath(file.content);
-  const html = mathGuard.restore((window as any).marked.parse(mathGuard.protected));
+  // marked 输出可能含原始 HTML（文档内容不可信），先消毒再还原数学占位符
+  const html = mathGuard.restore(sanitizeHtml((window as any).marked.parse(mathGuard.protected)));
   const deletedNotice = file.isMissing
     ? `
       <div class="content-file-status deleted">

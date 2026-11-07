@@ -2,6 +2,8 @@ import { Fragment, useLayoutEffect, useRef } from 'react';
 import type { AgentRun, AgentTranscriptMsg } from '../api/agent';
 import { renderMath } from '../content-renderer';
 import { highlightCodeBlocks } from '../utils/code-highlight';
+import { sanitizeHtml } from '../utils/html-sanitize';
+
 import { escapeHtml } from '../utils/escape';
 import { fmtDuration, fmtTime, shouldRenderMsg } from './format';
 import { useAgentState } from './useAgentState';
@@ -10,7 +12,8 @@ import { useAgentState } from './useAgentState';
 // 保持纯文本——状态行/工具调用没有 markdown 语义，React 默认转义即可
 function renderMarkdown(text: string): string {
   try {
-    return (window as any).marked.parse(text);
+    // 助手输出不可信，渲染前消毒，防止注入脚本或事件属性
+    return sanitizeHtml((window as any).marked.parse(text));
   } catch {
     return escapeHtml(text);
   }

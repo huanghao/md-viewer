@@ -15,8 +15,7 @@ import { renderContent } from './content-renderer';
 import { isPdfPath, isUrlPath } from './content-renderer';
 import { saveState } from './state';
 import { getDiffViewActive, closeDiffView } from './diff-view';
-import { renderTocPanel } from './ui/toc-panel.js';
-import { updateToc } from './toc-manager';
+import { updateToc, resetTocPanel } from './toc-manager';
 import { updateZoomDisplay } from './zoom-controller';
 
 export interface FileSwitcherDeps {
@@ -208,8 +207,7 @@ export async function switchFile(path: string) {
   requestSidebarRender();
 
   // Immediately show loading state to avoid stale TOC during transition
-  const tocPanel = document.getElementById('tocPanel');
-  if (tocPanel) renderTocPanel(tocPanel, [], () => {}, true);
+  resetTocPanel('loading');
 
   // 懒加载：占位 entry 的 content 为空时，先拉内容再渲染
   const entry = state.sessionFiles.get(path);
@@ -244,8 +242,7 @@ export function removeFileHandler(path: string) {
     requestSidebarRender();
     renderContent();
     deps.syncAnnotationsForCurrentFile(true);
-    const panel = document.getElementById('tocPanel');
-    if (panel) renderTocPanel(panel, [], () => {});
+    resetTocPanel('empty');
   }
 }
 

@@ -34,13 +34,7 @@ import {
   openComposerFromPending,
   handleSelectionForAnnotation,
 } from './annotation';
-import {
-  initTocManager,
-  updateToc,
-  setupTocOpenBtn,
-  initTocPaneHeight,
-  setupTocResize,
-} from './toc-manager';
+import { initTocManager, updateToc, setupTocOpenBtn, initTocPaneHeight, setupTocResize, mountTocPanel } from './toc-manager';
 import { installUnloadFlush } from './utils/undo-queue';
 import { loadClientConfig } from './app-config';
 import { backfillMissingCreatedTimes } from './file-metadata';
@@ -134,6 +128,7 @@ import {
 
   // 消息提示容器：尽早挂载，之后的 showToast 才能立即显示
   mountToastStack();
+  mountTocPanel();
   // 状态变化（会话文件、标签顺序、当前工作区、批注摘要、配置等）→ 合并后重绘侧栏
   subscribeState(() => requestSidebarRender());
 

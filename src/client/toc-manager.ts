@@ -1,10 +1,12 @@
-import { escapeHtml } from './utils/escape';
 import type { TocItem } from './toc-extractor.js';
 import type { PdfViewerInstance } from './pdf-viewer.js';
 
 import { state } from './state';
 import { extractMdToc, extractPdfOutline, loadSidecar, saveSidecar, scanPdfHeadings, buildTree } from './toc-extractor.js';
-import { renderTocPanel, setActiveTocItem } from './ui/toc-panel.js';
+import { tocStore } from './toc/store';
+import { createElement } from 'react';
+import { createRoot } from 'react-dom/client';
+import { TocPanel } from './toc/TocPanel';
 import { storageGet, storageSet, storageGetNumber } from './utils/storage';
 import { resolveReaderElement } from './annotation-layout';
 
@@ -22,6 +24,57 @@ const TOC_OPEN_KEY = 'md-viewer:toc-open';
 const TOC_PANE_DEFAULT_HEIGHT = 240;
 const TOC_PANE_MIN_HEIGHT = 80;
 const TOC_PANE_MAX_HEIGHT = 600;
+
+function sidebarEl(): HTMLElement | null {
+  return document.querySelector('.sidebar') as HTMLElement | null;
+}
+
+/** 挂载目录面板（标题栏与列表）到 #tocPanelHost；组合根调用一次 */
+export function mountTocPanel(): void {
+  const host = document.getElementById('tocPanelHost');
+  if (!host) return;
+  createRoot(host).render(createElement(TocPanel));
+}
+
+function showTocLoading(): void {
+  tocStore.setLoading();
+  sidebarEl()?.classList.remove('toc-has-content', 'toc-visible');
+}
+
+function showTocEmpty(): void {
+  tocStore.setEmpty();
+  sidebarEl()?.classList.add('toc-has-content');
+}
+
+function showTocItems(toc: TocItem[], onJump: (item: TocItem) => void): void {
+  // 空目录与“无目录”等价：不显示标题栏，也不标记为有内容
+  if (toc.length === 0) {
+    showTocEmpty();
+    return;
+  }
+  tocStore.setItems(toc, onJump);
+  sidebarEl()?.classList.add('toc-has-content');
+}
+
+/** 供其它模块在切换文件、文件未加载时复位目录面板 */
+export function resetTocPanel(state: 'loading' | 'empty'): void {
+  if (state === 'loading') showTocLoading();
+  else showTocEmpty();
+}
+
+// 当前挂在正文上的目录滚动监听（切换文件时需要先移除）
+let tocScroll: { el: HTMLElement; handler: () => void } | null = null;
+
+function replaceTocScroll(el: HTMLElement | null, handler: (() => void) | null): void {
+  if (tocScroll) {
+    tocScroll.el.removeEventListener('scroll', tocScroll.handler);
+    tocScroll = null;
+  }
+  if (el && handler) {
+    el.addEventListener('scroll', handler);
+    tocScroll = { el, handler };
+  }
+}
 
 export function loadTocOpen(): boolean {
   // Default: open (only closed if explicitly saved as '0')
@@ -127,16 +180,8 @@ async function resolveOutlinePageNums(nodes: any[], pdfDoc: any, items: TocItem[
 }
 
 export async function updateToc(filePath: string): Promise<void> {
-  const panel = document.getElementById('tocPanel');
-  if (!panel) return;
-
-  // Always clean up the MD scroll handler when switching files
-  const contentEl = document.getElementById('content');
-  const prevHandler = contentEl && (contentEl as any).__tocScrollHandler;
-  if (prevHandler && contentEl) {
-    contentEl.removeEventListener('scroll', prevHandler);
-    (contentEl as any).__tocScrollHandler = null;
-  }
+  // 切换文件时总是先移除旧的正文滚动监听
+  replaceTocScroll(null, null);
 
   const isPdf = filePath.endsWith('.pdf');
   const lower = filePath.toLowerCase();
@@ -144,7 +189,7 @@ export async function updateToc(filePath: string): Promise<void> {
   const isHtml = lower.endsWith('.html') || lower.endsWith('.htm');
 
   if (!isPdf && !isMd && !isHtml) {
-    renderTocPanel(panel, [], () => {});
+    showTocEmpty();
     return;
   }
 
@@ -154,8 +199,8 @@ export async function updateToc(filePath: string): Promise<void> {
       const file = state.sessionFiles.get(filePath);
       const content = file?.content ?? '';
       if (!content) {
-        // File not yet loaded — stay in loading state, updateToc will be called again via onFileLoaded
-        renderTocPanel(panel, [], () => {}, true);
+        // 文件尚未加载：保持加载态，onFileLoaded 之后会再次调用 updateToc
+        showTocLoading();
         return;
       }
       toc = extractMdToc(content);
@@ -173,10 +218,10 @@ export async function updateToc(filePath: string): Promise<void> {
 
     // toolbar (48px) + tabs (~36px) = offset so heading isn't hidden under fixed headers
     const HEADER_OFFSET = 90;
-    const jumpToHeading = (title: string) => {
+    const jumpToHeading = (item: TocItem) => {
       const readerEl = resolveReaderElement();
       const headings = Array.from(readerEl?.querySelectorAll<HTMLElement>('h1, h2, h3') ?? []);
-      const target = headings.find(h => h.textContent?.trim() === title);
+      const target = headings.find(h => h.textContent?.trim() === item.title);
       if (target) {
         const contentEl = document.getElementById('content');
         if (contentEl) {
@@ -187,13 +232,17 @@ export async function updateToc(filePath: string): Promise<void> {
       }
     };
 
-    renderTocPanel(panel, toc, item => jumpToHeading(item.title));
+    if (toc.length === 0) {
+      showTocEmpty();
+    } else {
+      showTocItems(toc, jumpToHeading);
+    }
     applyTocVisibility(filePath);
 
-    // Highlight active TOC item on scroll
+    // 滚动时高亮当前所在标题
     const contentEl = document.getElementById('content');
-    if (contentEl && panel) {
-      const onScroll = () => {
+    if (contentEl) {
+      replaceTocScroll(contentEl, () => {
         const readerEl = resolveReaderElement();
         const headings = Array.from(readerEl?.querySelectorAll<HTMLElement>('h1, h2, h3') ?? []);
         if (!headings.length) return;
@@ -203,13 +252,8 @@ export async function updateToc(filePath: string): Promise<void> {
           if (h.offsetTop <= scrollTop + HEADER_OFFSET) current = h;
         }
         const title = current?.textContent?.trim() ?? '';
-        if (title) setActiveTocItem(panel, undefined, title);
-      };
-      // Remove previous listener if any
-      const prev = (contentEl as any).__tocScrollHandler;
-      if (prev) contentEl.removeEventListener('scroll', prev);
-      (contentEl as any).__tocScrollHandler = onScroll;
-      contentEl.addEventListener('scroll', onScroll);
+        if (title) tocStore.setActive({ title });
+      });
     }
     return;
   }
@@ -219,23 +263,23 @@ export async function updateToc(filePath: string): Promise<void> {
   };
 
   const showPdfToc = (toc: TocItem[]) => {
-    renderTocPanel(panel, toc, pdfJump);
+    showTocItems(toc, pdfJump);
     applyTocVisibility(filePath);
-    attachPdfScrollHighlight(panel);
+    attachPdfScrollHighlight();
   };
 
-  // PDF: try sidecar first
+  // PDF：先尝试 sidecar 缓存
   const sidecar = await loadSidecar(filePath);
   if (sidecar) {
     showPdfToc(sidecar);
     return;
   }
 
-  // PDF: wait for viewer to be ready, then try outline
+  // PDF：等待 viewer 就绪后尝试大纲
   const viewer = _getPdfViewerForFile(filePath);
   if (!viewer) return;
 
-  renderTocPanel(panel, [], () => {}, true); // loading state
+  showTocLoading();
 
   try {
     const pdfDoc = viewer.getPdfDoc();
@@ -249,10 +293,10 @@ export async function updateToc(filePath: string): Promise<void> {
     }
   } catch (err) {
     console.error('[TOC] outline read failed:', err);
-    // fall through to scan
+    // 继续走扫描
   }
 
-  // PDF: lazy scan via pdfjs doc (works on all pages, not just rendered ones)
+  // PDF：通过 pdfjs 文档懒扫描（覆盖所有页，而不只是已渲染的页）
   try {
     await scanPdfHeadings(
       filePath,
@@ -261,11 +305,11 @@ export async function updateToc(filePath: string): Promise<void> {
     );
   } catch (err) {
     console.error('[TOC] scan failed:', err);
-    panel.innerHTML = `<div class="toc-error">目录加载失败<br><span class="toc-error-detail">${escapeHtml(String(err))}</span></div>`;
+    tocStore.setError(String(err));
   }
 }
 
-export function attachPdfScrollHighlight(panel: HTMLElement): void {
+export function attachPdfScrollHighlight(): void {
   const contentEl = document.getElementById('content');
   if (!contentEl) return;
 
@@ -277,13 +321,10 @@ export function attachPdfScrollHighlight(panel: HTMLElement): void {
     for (const w of wrappers) {
       if (w.offsetTop <= mid) currentPage = parseInt(w.dataset.page || '1', 10);
     }
-    setActiveTocItem(panel, currentPage);
+    tocStore.setActive({ page: currentPage });
   };
 
-  const prev = (contentEl as any).__tocScrollHandler;
-  if (prev) contentEl.removeEventListener('scroll', prev);
-  (contentEl as any).__tocScrollHandler = onScroll;
-  contentEl.addEventListener('scroll', onScroll);
-  // Run once immediately to set initial state
+  replaceTocScroll(contentEl, onScroll);
+  // 立即执行一次，设置初始状态
   onScroll();
 }

@@ -199,8 +199,8 @@ export function startWorkspacePolling(): void {
     // force:false（内存命中，开销很低），"扫得更全"不再意味着"扫得更贵"。
     workspacePollRunning = true;
     try {
+      // scanWorkspace 写入 state.fileTree 并同步更新 M/蓝点集合，订阅会合并重绘
       await Promise.allSettled(toScan.map((workspace) => scanWorkspace(workspace.id)));
-      requestSidebarRender();
     } finally {
       workspacePollRunning = false;
     }

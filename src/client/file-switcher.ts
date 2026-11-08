@@ -119,7 +119,6 @@ async function executePendingAddAction(): Promise<void> {
   }
 
   const workspace = addWorkspace(getWorkspaceNameFromPath(pendingAddAction.path), pendingAddAction.path);
-  requestSidebarRender();
   showSuccess(`已添加工作区: ${workspace.name}`);
   setSearchQuery('');
 }

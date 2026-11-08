@@ -1,3 +1,5 @@
+import { createStore } from '../utils/create-store';
+
 export type AddConfirmMode = 'warning' | 'directory' | 'error';
 
 export interface AddConfirmState {
@@ -14,27 +16,16 @@ export interface AddConfirmState {
 
 const HIDDEN: AddConfirmState = { visible: false, message: '', mode: 'warning', allowCancel: true };
 
-let snapshot: AddConfirmState = HIDDEN;
-const listeners = new Set<() => void>();
-
-function set(next: AddConfirmState): void {
-  snapshot = next;
-  listeners.forEach((l) => l());
-}
+const store = createStore<AddConfirmState>(HIDDEN);
 
 /** 统一输入框下方的添加确认条：file-switcher 调用 show/hide，React 组件订阅 */
 export const addConfirmStore = {
-  getState: (): AddConfirmState => snapshot,
-  subscribe(listener: () => void): () => void {
-    listeners.add(listener);
-    return () => {
-      listeners.delete(listener);
-    };
-  },
+  getState: store.getState,
+  subscribe: store.subscribe,
   show(next: Omit<AddConfirmState, 'visible'>): void {
-    set({ ...next, visible: true });
+    store.replace({ ...next, visible: true });
   },
   hide(): void {
-    set(HIDDEN);
+    store.replace(HIDDEN);
   },
 };

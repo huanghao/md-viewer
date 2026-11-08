@@ -1,3 +1,5 @@
+import { createStore } from '../utils/create-store';
+
 export interface TabItem {
   path: string;
   name: string;
@@ -19,23 +21,17 @@ export interface TabsSnapshot {
   batch: TabBatchCounts;
 }
 
-let snapshot: TabsSnapshot = {
+const store = createStore<TabsSnapshot>({
   files: [],
   currentPath: null,
   batch: { others: 0, right: 0, unmodified: 0, all: 0 },
-};
-const listeners = new Set<() => void>();
+});
 
 export const tabsStore = {
-  getState: (): TabsSnapshot => snapshot,
-  subscribe(listener: () => void): () => void {
-    listeners.add(listener);
-    return () => listeners.delete(listener);
-  },
+  getState: store.getState,
+  subscribe: store.subscribe,
   setSnapshot(next: TabsSnapshot): void {
     // 内容没变就不通知：文件状态频繁刷新时避免重绘标签栏（原来用 renderKey 做同样的事）
-    if (JSON.stringify(next) === JSON.stringify(snapshot)) return;
-    snapshot = next;
-    listeners.forEach((l) => l());
+    store.replace(next, (a, b) => JSON.stringify(a) === JSON.stringify(b));
   },
 };

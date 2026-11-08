@@ -1,3 +1,5 @@
+import { createStore } from '../utils/create-store';
+
 export type SidebarTab = 'focus' | 'full' | 'list';
 
 export interface SidebarHeaderState {
@@ -5,21 +7,13 @@ export interface SidebarHeaderState {
   query: string;
 }
 
-let snapshot: SidebarHeaderState = { tab: 'focus', query: '' };
-const listeners = new Set<() => void>();
+const store = createStore<SidebarHeaderState>({ tab: 'focus', query: '' });
 
 /** 侧边栏头部（搜索框、视图切换）的状态；由 renderSidebar 与搜索输入推送，React 组件订阅 */
 export const sidebarHeaderStore = {
-  getState: (): SidebarHeaderState => snapshot,
-  subscribe(listener: () => void): () => void {
-    listeners.add(listener);
-    return () => {
-      listeners.delete(listener);
-    };
-  },
+  getState: store.getState,
+  subscribe: store.subscribe,
   setSnapshot(next: SidebarHeaderState): void {
-    if (next.tab === snapshot.tab && next.query === snapshot.query) return;
-    snapshot = next;
-    listeners.forEach((l) => l());
+    store.replace(next, (a, b) => a.tab === b.tab && a.query === b.query);
   },
 };

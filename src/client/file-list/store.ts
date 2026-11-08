@@ -1,3 +1,4 @@
+import { createStore } from '../utils/create-store';
 import type { FileRowStatus } from '../utils/file-row-status';
 
 export interface FileListRow {
@@ -23,22 +24,14 @@ export interface FileListSnapshot {
   empty: string | null;
 }
 
-let snapshot: FileListSnapshot = { rows: [], empty: null };
-const listeners = new Set<() => void>();
+const store = createStore<FileListSnapshot>({ rows: [], empty: null });
 
 /** 文件列表（侧边栏“打开”视图）的快照：renderFiles 推送，React 组件订阅 */
 export const fileListStore = {
-  getState: (): FileListSnapshot => snapshot,
-  subscribe(listener: () => void): () => void {
-    listeners.add(listener);
-    return () => {
-      listeners.delete(listener);
-    };
-  },
+  getState: store.getState,
+  subscribe: store.subscribe,
   setSnapshot(next: FileListSnapshot): void {
     // 内容没变就不通知：避免无关的状态刷新导致整列表重绘
-    if (JSON.stringify(next) === JSON.stringify(snapshot)) return;
-    snapshot = next;
-    listeners.forEach((l) => l());
+    store.replace(next, (a, b) => JSON.stringify(a) === JSON.stringify(b));
   },
 };

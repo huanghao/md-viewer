@@ -1,3 +1,5 @@
+import { createStore } from '../utils/create-store';
+
 /** Diff 横幅的状态：可见性、视图模式、导航计数与按钮可用性。横幅元素本身由 DiffBanner.tsx 渲染。 */
 export type DiffBannerMode = 'paragraph' | 'line';
 
@@ -20,34 +22,25 @@ const INITIAL: DiffBannerState = {
   nextDisabled: false,
 };
 
-let state: DiffBannerState = INITIAL;
-const listeners = new Set<() => void>();
-
-function emit(next: Partial<DiffBannerState>): void {
-  state = { ...state, ...next };
-  listeners.forEach((listener) => listener());
-}
+const store = createStore<DiffBannerState>(INITIAL);
 
 export const diffBannerStore = {
-  getState: (): DiffBannerState => state,
-  subscribe(listener: () => void): () => void {
-    listeners.add(listener);
-    return () => listeners.delete(listener);
-  },
+  getState: store.getState,
+  subscribe: store.subscribe,
   /** 进入 diff 模式：显示横幅并重置导航 */
   show(mode: DiffBannerMode): void {
-    emit({ ...INITIAL, visible: true, mode });
+    store.merge({ ...INITIAL, visible: true, mode });
   },
   hide(): void {
-    emit({ ...INITIAL });
+    store.merge({ ...INITIAL });
   },
   setMode(mode: DiffBannerMode): void {
-    emit({ mode, labelOverride: null });
+    store.merge({ mode, labelOverride: null });
   },
   setNav(nav: { count: string; prevDisabled: boolean; nextDisabled: boolean }): void {
-    emit(nav);
+    store.merge(nav);
   },
   setLabelOverride(text: string): void {
-    emit({ labelOverride: text });
+    store.merge({ labelOverride: text });
   },
 };

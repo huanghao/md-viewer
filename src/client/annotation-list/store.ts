@@ -1,3 +1,5 @@
+import { createStore } from '../utils/create-store';
+
 import type { AnnotationDensity, AnnotationThreadItem } from '../annotation-state';
 
 /** 评论列表的一行（已完成筛选、排序、定位计算） */
@@ -36,30 +38,21 @@ interface AnnotationListState {
   editing: ThreadItemEditing | null;
 }
 
-let state: AnnotationListState = {
+const store = createStore<AnnotationListState>({
   view: { kind: 'empty', text: '无评论（选中文本即可添加）' },
   editing: null,
-};
-const listeners = new Set<() => void>();
+});
 /** 回复草稿按 annotation id 保存，列表重建后保留（与 DOM 生命周期解耦） */
 const replyDrafts = new Map<string, string>();
 
-function emit(next: Partial<AnnotationListState>): void {
-  state = { ...state, ...next };
-  listeners.forEach((listener) => listener());
-}
-
 export const annotationListStore = {
-  getState: (): AnnotationListState => state,
-  subscribe(listener: () => void): () => void {
-    listeners.add(listener);
-    return () => listeners.delete(listener);
-  },
+  getState: store.getState,
+  subscribe: store.subscribe,
   setView(view: AnnotationListView): void {
-    emit({ view });
+    store.merge({ view });
   },
   setEditing(editing: ThreadItemEditing | null): void {
-    emit({ editing });
+    store.merge({ editing });
   },
   getDraft(annotationId: string): string {
     return replyDrafts.get(annotationId) ?? '';
@@ -72,6 +65,6 @@ export const annotationListStore = {
 };
 
 export function isEditingThreadItem(annotationId: string, itemId: string): boolean {
-  const editing = state.editing;
+  const editing = store.getState().editing;
   return !!editing && editing.annotationId === annotationId && editing.itemId === itemId;
 }

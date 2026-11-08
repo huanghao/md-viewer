@@ -1,3 +1,5 @@
+import { createStore } from '../utils/create-store';
+
 /**
  * 划词后的三个浮层（快捷入口、评论输入、Agent 托盘输入）的内容状态。
  * 浮层的显隐与定位仍由 annotation.ts 用 placeFloating 完成；这里只管内容。
@@ -20,35 +22,26 @@ interface ComposerStoreState {
   focusToken: Record<ComposerKind, number>;
 }
 
-let state: ComposerStoreState = {
+const store = createStore<ComposerStoreState>({
   quickAdd: { mode: 'comment', trayAvailable: false, prompts: [] },
   drafts: { comment: '', tray: '' },
   focusToken: { comment: 0, tray: 0 },
-};
-const listeners = new Set<() => void>();
-
-function emit(next: Partial<ComposerStoreState>): void {
-  state = { ...state, ...next };
-  listeners.forEach((listener) => listener());
-}
+});
 
 export const composerStore = {
-  getState: (): ComposerStoreState => state,
-  subscribe(listener: () => void): () => void {
-    listeners.add(listener);
-    return () => listeners.delete(listener);
-  },
+  getState: store.getState,
+  subscribe: store.subscribe,
   setQuickAdd(patch: Partial<QuickAddModel>): void {
-    emit({ quickAdd: { ...state.quickAdd, ...patch } });
+    store.merge({ quickAdd: { ...store.getState().quickAdd, ...patch } });
   },
   getDraft(kind: ComposerKind): string {
-    return state.drafts[kind];
+    return store.getState().drafts[kind];
   },
   setDraft(kind: ComposerKind, value: string): void {
-    if (state.drafts[kind] === value) return;
-    emit({ drafts: { ...state.drafts, [kind]: value } });
+    if (store.getState().drafts[kind] === value) return;
+    store.merge({ drafts: { ...store.getState().drafts, [kind]: value } });
   },
   requestFocus(kind: ComposerKind): void {
-    emit({ focusToken: { ...state.focusToken, [kind]: state.focusToken[kind] + 1 } });
+    store.merge({ focusToken: { ...store.getState().focusToken, [kind]: store.getState().focusToken[kind] + 1 } });
   },
 };

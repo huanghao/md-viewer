@@ -1,3 +1,5 @@
+import { createStore } from '../utils/create-store';
+
 /** PDF 页码指示器的状态：可见性、当前页、总页数，以及是否处于输入态。 */
 export interface PdfPageIndicatorState {
   visible: boolean;
@@ -9,36 +11,27 @@ export interface PdfPageIndicatorState {
 
 const INITIAL: PdfPageIndicatorState = { visible: false, page: 1, total: 1, editing: false, onGoto: null };
 
-let state: PdfPageIndicatorState = INITIAL;
-const listeners = new Set<() => void>();
-
-function emit(next: Partial<PdfPageIndicatorState>): void {
-  state = { ...state, ...next };
-  listeners.forEach((listener) => listener());
-}
+const store = createStore<PdfPageIndicatorState>(INITIAL);
 
 export const pdfPageIndicatorStore = {
-  getState: (): PdfPageIndicatorState => state,
-  subscribe(listener: () => void): () => void {
-    listeners.add(listener);
-    return () => listeners.delete(listener);
-  },
+  getState: store.getState,
+  subscribe: store.subscribe,
   show(opts: { page: number; total: number; onGoto: (page: number) => void }): void {
-    emit({ visible: true, page: opts.page, total: opts.total, onGoto: opts.onGoto, editing: false });
+    store.merge({ visible: true, page: opts.page, total: opts.total, onGoto: opts.onGoto, editing: false });
   },
   hide(): void {
-    emit({ ...INITIAL });
+    store.merge({ ...INITIAL });
   },
   /** 滚动同步当前页；输入态下不打断用户输入 */
   setPage(page: number): void {
-    if (state.editing || state.page === page) return;
-    emit({ page });
+    if (store.getState().editing || store.getState().page === page) return;
+    store.merge({ page });
   },
   startEdit(): void {
-    emit({ editing: true });
+    store.merge({ editing: true });
   },
   stopEdit(): void {
-    emit({ editing: false });
+    store.merge({ editing: false });
   },
 };
 

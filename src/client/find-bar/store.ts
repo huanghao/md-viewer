@@ -1,3 +1,5 @@
+import { createStore } from '../utils/create-store';
+
 /** 查找栏状态：可见性、查询词、匹配总数与当前序号（0 基，-1 表示无）。 */
 export interface FindBarState {
   visible: boolean;
@@ -10,30 +12,21 @@ export interface FindBarState {
 
 const INITIAL: FindBarState = { visible: false, query: '', current: -1, total: 0, focusToken: 0 };
 
-let state: FindBarState = INITIAL;
-const listeners = new Set<() => void>();
-
-function emit(next: Partial<FindBarState>): void {
-  state = { ...state, ...next };
-  listeners.forEach((listener) => listener());
-}
+const store = createStore<FindBarState>(INITIAL);
 
 export const findBarStore = {
-  getState: (): FindBarState => state,
-  subscribe(listener: () => void): () => void {
-    listeners.add(listener);
-    return () => listeners.delete(listener);
-  },
+  getState: store.getState,
+  subscribe: store.subscribe,
   show(): void {
-    emit({ visible: true, focusToken: state.focusToken + 1 });
+    store.merge({ visible: true, focusToken: store.getState().focusToken + 1 });
   },
   hide(): void {
-    emit({ visible: false });
+    store.merge({ visible: false });
   },
   setQuery(query: string): void {
-    if (state.query !== query) emit({ query });
+    if (store.getState().query !== query) store.merge({ query });
   },
   setMatches(total: number, current: number): void {
-    emit({ total, current });
+    store.merge({ total, current });
   },
 };

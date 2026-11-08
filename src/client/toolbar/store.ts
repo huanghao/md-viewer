@@ -1,3 +1,5 @@
+import { createStore } from '../utils/create-store';
+
 export type PdfMode = 'select' | 'annotate';
 
 export interface ToolbarState {
@@ -12,7 +14,7 @@ export interface ToolbarState {
   zoomText: string;
 }
 
-let state: ToolbarState = {
+const store = createStore<ToolbarState>({
   breadcrumbPath: null,
   pdfVisible: false,
   pdfMode: 'select',
@@ -20,22 +22,18 @@ let state: ToolbarState = {
   diffActive: false,
   refreshVisible: false,
   zoomText: '100%',
-};
-const listeners = new Set<() => void>();
+});
 
 function set(patch: Partial<ToolbarState>): void {
   // 值没变就不通知，避免每次文件刷新都重绘整个工具栏
-  if (Object.entries(patch).every(([k, v]) => state[k as keyof ToolbarState] === v)) return;
-  state = { ...state, ...patch };
-  listeners.forEach((l) => l());
+  const current = store.getState();
+  if (Object.entries(patch).every(([k, v]) => current[k as keyof ToolbarState] === v)) return;
+  store.merge(patch);
 }
 
 export const toolbarStore = {
-  getState: (): ToolbarState => state,
-  subscribe(listener: () => void): () => void {
-    listeners.add(listener);
-    return () => listeners.delete(listener);
-  },
+  getState: store.getState,
+  subscribe: store.subscribe,
   setBreadcrumb(path: string | null): void {
     set({ breadcrumbPath: path });
   },
@@ -43,7 +41,7 @@ export const toolbarStore = {
     set({ pdfVisible: visible, pdfMode: mode });
   },
   setDiff(patch: { visible?: boolean; active?: boolean }): void {
-    set({ diffVisible: patch.visible ?? state.diffVisible, diffActive: patch.active ?? state.diffActive });
+    set({ diffVisible: patch.visible ?? store.getState().diffVisible, diffActive: patch.active ?? store.getState().diffActive });
   },
   setRefreshVisible(visible: boolean): void {
     set({ refreshVisible: visible });

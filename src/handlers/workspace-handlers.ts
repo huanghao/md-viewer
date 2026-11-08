@@ -81,10 +81,34 @@ export function handleGetWorkspaceAgentCommand(c: Context) {
   return c.json({ command: getWorkspaceAgentCommand(resolve(path)) });
 }
 
+const AGENT_COMMAND_MAX_ARGS = 32;
+const AGENT_COMMAND_MAX_ARG_LENGTH = 1024;
+
+/**
+ * 校验用户配置的 Agent 命令。该命令会被直接作为可执行文件启动（不经过 shell），
+ * 所以这里只允许合理形状：非空字符串数组，数量与长度有上限，不含 NUL。
+ * 返回 null 表示清除自定义命令（回到默认 backend）。
+ */
+export function validateAgentCommand(input: unknown): { ok: true; command: string[] | null } | { ok: false; error: string } {
+  if (input === null || input === undefined) return { ok: true, command: null };
+  if (!Array.isArray(input) || !input.every((x) => typeof x === "string")) {
+    return { ok: false, error: "command 必须是字符串数组" };
+  }
+  if (input.length === 0) return { ok: true, command: null };
+  if (input.length > AGENT_COMMAND_MAX_ARGS) return { ok: false, error: `command 最多 ${AGENT_COMMAND_MAX_ARGS} 项` };
+  for (const arg of input as string[]) {
+    if (arg.length === 0 || arg.length > AGENT_COMMAND_MAX_ARG_LENGTH) return { ok: false, error: "command 参数长度不合法" };
+    if (arg.includes("\0")) return { ok: false, error: "command 参数含非法字符" };
+  }
+  return { ok: true, command: input as string[] };
+}
+
 export async function handleSetWorkspaceAgentCommand(c: Context) {
-  const body = await c.req.json<{ path?: string; command?: string[] | null }>().catch(() => ({}) as any);
+  const body = await c.req.json<{ path?: string; command?: unknown }>().catch(() => ({}) as any);
   if (!body?.path) return c.json({ error: "缺少 path 参数" }, 400);
-  setWorkspaceAgentCommand(resolve(body.path), body.command ?? null);
+  const checked = validateAgentCommand(body.command);
+  if (!checked.ok) return c.json({ error: checked.error }, 400);
+  setWorkspaceAgentCommand(resolve(body.path), checked.command);
   return c.json({ ok: true });
 }
 

@@ -124,7 +124,7 @@ export async function handleStartAgentRun(c: Context) {
     "--output-format", "stream-json",
     "--verbose",
     ...agentSystemPromptArgs(backendName),
-    ...(body?.model ? ["--model", body.model] : []),
+    ...(typeof body?.model === "string" && body.model ? ["--model", body.model] : []),
   ];
 
   const runId = randomUUID();

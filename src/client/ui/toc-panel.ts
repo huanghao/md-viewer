@@ -85,14 +85,14 @@ export function renderTocPanel(
 
 export function setActiveTocItem(container: HTMLElement, pageNum?: number, titleOrAnchor?: string): void {
   container.querySelectorAll('.toc-item').forEach(el => el.classList.remove('active'));
+  // 不把标题/锚点拼进 CSS 选择器：标题里的引号会让 querySelector 抛异常，改为直接比较属性
+  const items = Array.from(container.querySelectorAll<HTMLElement>('.toc-item'));
   if (pageNum !== undefined) {
-    const el = container.querySelector<HTMLElement>(`.toc-item[data-page="${pageNum}"]`);
-    el?.classList.add('active');
+    items.find(el => el.dataset.page === String(pageNum))?.classList.add('active');
   } else if (titleOrAnchor) {
     // Match by .toc-item-title text (excludes level badge), then anchor fallback
-    let el = Array.from(container.querySelectorAll<HTMLElement>('.toc-item'))
-      .find(e => e.querySelector('.toc-item-title')?.textContent?.trim() === titleOrAnchor);
-    if (!el) el = container.querySelector<HTMLElement>(`.toc-item[data-anchor="${titleOrAnchor}"]`) ?? undefined;
+    const el = items.find(e => e.querySelector('.toc-item-title')?.textContent?.trim() === titleOrAnchor)
+      ?? items.find(e => e.dataset.anchor === titleOrAnchor);
     el?.classList.add('active');
   }
 }

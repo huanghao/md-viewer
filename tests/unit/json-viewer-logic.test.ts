@@ -1,210 +1,172 @@
-import { describe, expect, it } from 'bun:test';
-import {
-  highlight,
-  renderLeaf,
-  inlinePreview,
-  buildNode,
-} from '../../src/client/ui/json-viewer';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { Window } from 'happy-dom';
+import { appendHighlighted, buildNode, inlinePreview, renderLeaf } from '../../src/client/ui/json-viewer';
 
-// ==================== highlight ====================
+const KEYS = ['window', 'document', 'Node', 'HTMLElement'] as const;
+const saved: Record<string, any> = {};
+let win: Window;
 
-describe('highlight', () => {
-  it('returns text unchanged when query is empty', () => {
-    expect(highlight('hello world', '')).toBe('hello world');
-  });
-
-  it('wraps single match in <mark>', () => {
-    expect(highlight('hello world', 'world')).toBe(
-      'hello <mark class="json-match">world</mark>'
-    );
-  });
-
-  it('wraps multiple matches', () => {
-    expect(highlight('aaa bbb aaa', 'aaa')).toBe(
-      '<mark class="json-match">aaa</mark> bbb <mark class="json-match">aaa</mark>'
-    );
-  });
-
-  it('is case-insensitive', () => {
-    expect(highlight('Hello World', 'hello')).toBe(
-      '<mark class="json-match">Hello</mark> World'
-    );
-  });
-
-  it('returns text unchanged when no match', () => {
-    expect(highlight('hello', 'xyz')).toBe('hello');
-  });
-
-  it('handles empty text', () => {
-    expect(highlight('', 'foo')).toBe('');
-  });
+beforeAll(() => {
+  win = new Window({ url: 'http://localhost/' });
+  for (const k of KEYS) {
+    saved[k] = (globalThis as any)[k];
+    (globalThis as any)[k] = k === 'window' ? win : (win as any)[k];
+  }
 });
 
-// ==================== renderLeaf ====================
+afterAll(() => {
+  for (const k of KEYS) (globalThis as any)[k] = saved[k];
+});
+
+function wrap(el: HTMLElement): HTMLElement {
+  const holder = document.createElement('div');
+  holder.appendChild(el);
+  return holder;
+}
+
+function marksIn(el: Element): string[] {
+  return Array.from(el.querySelectorAll('mark.json-match')).map((m) => m.textContent ?? '');
+}
+
+describe('appendHighlighted', () => {
+  it('无查询时只写入纯文本', () => {
+    const p = document.createElement('span');
+    appendHighlighted(p, 'hello', '');
+    expect(p.textContent).toBe('hello');
+    expect(p.querySelector('mark')).toBeNull();
+  });
+
+  it('包裹所有命中，大小写不敏感', () => {
+    const p = document.createElement('span');
+    appendHighlighted(p, 'Aaa bbb aaa', 'aaa');
+    expect(marksIn(p)).toEqual(['Aaa', 'aaa']);
+    expect(p.textContent).toBe('Aaa bbb aaa');
+  });
+
+  it('无命中时保持原文', () => {
+    const p = document.createElement('span');
+    appendHighlighted(p, 'hello', 'xyz');
+    expect(p.querySelector('mark')).toBeNull();
+    expect(p.textContent).toBe('hello');
+  });
+
+  it('文本中的 HTML 作为文字显示，不生成元素', () => {
+    const p = document.createElement('span');
+    appendHighlighted(p, '<img src=x>', 'img');
+    expect(p.querySelector('img')).toBeNull();
+    expect(p.textContent).toBe('<img src=x>');
+    expect(marksIn(p)).toEqual(['img']);
+  });
+
+  it('搜索 amp 不会切断 & 字符（不再在转义后的实体中间插入标记）', () => {
+    const p = document.createElement('span');
+    appendHighlighted(p, '"a&b"', 'amp');
+    expect(p.textContent).toBe('"a&b"');
+    expect(marksIn(p)).toEqual([]);
+  });
+});
 
 describe('renderLeaf', () => {
-  it('renders null', () => {
-    expect(renderLeaf(null, '')).toBe('<span class="json-null">null</span>');
+  it('按类型渲染', () => {
+    expect(renderLeaf(null, '').className).toBe('json-null');
+    expect(renderLeaf(null, '').textContent).toBe('null');
+    expect(renderLeaf(true, '').className).toBe('json-boolean');
+    expect(renderLeaf(false, '').textContent).toBe('false');
+    expect(renderLeaf(42, '').className).toBe('json-number');
+    expect(renderLeaf(3.14, '').textContent).toBe('3.14');
   });
 
-  it('renders boolean true', () => {
-    expect(renderLeaf(true, '')).toBe('<span class="json-boolean">true</span>');
+  it('字符串带 JSON 引号', () => {
+    const el = renderLeaf('hello', '');
+    expect(el.className).toBe('json-string');
+    expect(el.textContent).toBe('"hello"');
   });
 
-  it('renders boolean false', () => {
-    expect(renderLeaf(false, '')).toBe('<span class="json-boolean">false</span>');
-  });
-
-  it('renders number', () => {
-    expect(renderLeaf(42, '')).toBe('<span class="json-number">42</span>');
-    expect(renderLeaf(3.14, '')).toBe('<span class="json-number">3.14</span>');
-    expect(renderLeaf(0, '')).toBe('<span class="json-number">0</span>');
-  });
-
-  it('renders string with JSON quotes', () => {
-    expect(renderLeaf('hello', '')).toBe('<span class="json-string">&quot;hello&quot;</span>');
-  });
-
-  it('escapes HTML in string values', () => {
-    const result = renderLeaf('<script>', '');
-    expect(result).toContain('&lt;script&gt;');
-    expect(result).not.toContain('<script>');
-  });
-
-  it('highlights query match in null', () => {
-    expect(renderLeaf(null, 'ul')).toContain('<mark class="json-match">ul</mark>');
-  });
-
-  it('highlights query match in string', () => {
-    expect(renderLeaf('hello', 'ell')).toContain('<mark class="json-match">ell</mark>');
+  it('高亮查询命中', () => {
+    expect(marksIn(renderLeaf(null, 'ul'))).toEqual(['ul']);
+    expect(marksIn(renderLeaf('hello', 'ell'))).toEqual(['ell']);
   });
 });
 
-// ==================== inlinePreview ====================
-
 describe('inlinePreview', () => {
-  it('returns full JSON for short values', () => {
-    expect(inlinePreview({ a: 1 })).toBe('{&quot;a&quot;:1}');
-  });
-
-  it('truncates long values with ellipsis', () => {
-    const longObj = { key: 'a'.repeat(100) };
-    const result = inlinePreview(longObj, 20);
-    expect(result.endsWith('…')).toBe(true);
-    // The text before ellipsis should be <= 20 chars (before HTML escaping)
-  });
-
-  it('handles arrays', () => {
+  it('短值返回完整 JSON', () => {
+    expect(inlinePreview({ a: 1 })).toBe('{"a":1}');
     expect(inlinePreview([1, 2, 3])).toBe('[1,2,3]');
-  });
-
-  it('handles null', () => {
     expect(inlinePreview(null)).toBe('null');
   });
 
-  it('escapes HTML in preview', () => {
-    const result = inlinePreview({ k: '<b>' });
-    expect(result).toContain('&lt;b&gt;');
+  it('长值截断并加省略号', () => {
+    const result = inlinePreview({ key: 'a'.repeat(100) }, 20);
+    expect(result.endsWith('…')).toBe(true);
+    expect(result.length).toBe(21);
   });
 });
 
-// ==================== buildNode ====================
-
-describe('buildNode — leaf nodes', () => {
-  it('renders a string leaf without key', () => {
-    const html = buildNode('hello', null, 0, '');
-    expect(html).toContain('class="json-string"');
-    expect(html).toContain('hello');
-    expect(html).not.toContain('json-key');
+describe('buildNode — 叶子节点', () => {
+  it('无 key 的字符串叶子不含 key 元素', () => {
+    const el = wrap(buildNode('hello', null, 0, ''));
+    expect(el.querySelector('.json-string')?.textContent).toBe('"hello"');
+    expect(el.querySelector('.json-key')).toBeNull();
   });
 
-  it('renders a string leaf with key', () => {
-    const html = buildNode('hello', 'name', 0, '');
-    expect(html).toContain('class="json-key"');
-    expect(html).toContain('&quot;name&quot;'); // key is HTML-escaped JSON string
-    expect(html).toContain('class="json-string"');
+  it('带 key 的叶子：key 为带引号的 JSON 字符串', () => {
+    const el = wrap(buildNode('hello', 'name', 0, ''));
+    expect(el.querySelector('.json-key')?.textContent).toBe('"name"');
+    expect(el.querySelector('.json-colon')?.textContent).toBe(':');
+    expect(el.querySelector('.json-string')).not.toBeNull();
   });
 
-  it('renders number leaf', () => {
-    const html = buildNode(42, 'count', 0, '');
-    expect(html).toContain('class="json-number"');
-    expect(html).toContain('42');
-  });
-
-  it('renders null leaf', () => {
-    const html = buildNode(null, 'x', 0, '');
-    expect(html).toContain('class="json-null"');
-    expect(html).toContain('null');
-  });
-
-  it('renders boolean leaf', () => {
-    const html = buildNode(true, 'flag', 0, '');
-    expect(html).toContain('class="json-boolean"');
-    expect(html).toContain('true');
+  it('叶子不含展开结构', () => {
+    const el = wrap(buildNode(42, 'count', 0, ''));
+    expect(el.querySelector('.json-number')?.textContent).toBe('42');
+    expect(el.querySelector('.json-node-expandable')).toBeNull();
   });
 });
 
-describe('buildNode — expandable nodes', () => {
-  it('renders object with arrow and bracket', () => {
-    const html = buildNode({ a: 1 }, null, 0, '');
-    expect(html).toContain('▼'); // depth 0 → expanded
-    expect(html).toContain('{');
-    expect(html).toContain('}');
-    expect(html).toContain('1 keys');
+describe('buildNode — 可展开节点', () => {
+  it('对象显示括号与键数', () => {
+    const el = wrap(buildNode({ a: 1 }, null, 0, ''));
+    expect(el.querySelector('.json-count')?.textContent).toBe('1 keys');
+    const brackets = Array.from(el.querySelectorAll('.json-bracket')).map((b) => b.textContent);
+    expect(brackets).toContain('{');
+    expect(brackets).toContain('}');
   });
 
-  it('renders array with correct count', () => {
-    const html = buildNode([1, 2, 3], null, 0, '');
-    expect(html).toContain('3 items');
-    expect(html).toContain('[');
-    expect(html).toContain(']');
+  it('数组显示元素数', () => {
+    const el = wrap(buildNode([1, 2, 3], null, 0, ''));
+    expect(el.querySelector('.json-count')?.textContent).toBe('3 items');
   });
 
-  it('depth 0 is expanded (▼), depth 1+ is collapsed (▶)', () => {
-    // depth 0: expanded
-    const htmlD0 = buildNode({ a: 1 }, null, 0, '');
-    expect(htmlD0).toContain('▼');
-    expect(htmlD0).not.toContain('▶');
+  it('depth 0 展开（▼），depth 1+ 折叠（▶）', () => {
+    const d0 = wrap(buildNode({ a: 1 }, null, 0, ''));
+    expect(d0.querySelector('.json-toggle')?.textContent).toBe('▼');
+    expect(d0.querySelector('.json-children')?.classList.contains('collapsed')).toBe(false);
 
-    // depth 1: collapsed
-    const htmlD1 = buildNode({ a: 1 }, 'nested', 1, '');
-    expect(htmlD1).toContain('▶');
-    expect(htmlD1).not.toContain('▼');
+    const d1 = wrap(buildNode({ a: 1 }, 'nested', 1, ''));
+    expect(d1.querySelector('.json-toggle')?.textContent).toBe('▶');
+    expect(d1.querySelector('.json-children')?.classList.contains('collapsed')).toBe(true);
   });
 
-  it('collapsed node shows inline preview', () => {
-    const html = buildNode({ a: 1 }, 'obj', 1, '');
-    expect(html).toContain('json-preview');
+  it('折叠节点显示预览，展开节点不显示', () => {
+    expect(wrap(buildNode({ a: 1 }, 'obj', 1, '')).querySelector('.json-preview')).not.toBeNull();
+    expect(wrap(buildNode({ a: 1 }, 'obj', 0, '')).querySelector('.json-preview')).toBeNull();
   });
 
-  it('expanded node does not show preview', () => {
-    const html = buildNode({ a: 1 }, 'obj', 0, '');
-    expect(html).not.toContain('json-preview');
+  it('高亮键与字符串值中的命中', () => {
+    const keyEl = wrap(buildNode({ myKey: 'val' }, null, 0, 'myK'));
+    expect(marksIn(keyEl)).toEqual(['myK']);
+    const strEl = wrap(buildNode('searchable', null, 0, 'search'));
+    expect(marksIn(strEl)).toEqual(['search']);
   });
 
-  it('highlights query in keys', () => {
-    const html = buildNode({ myKey: 'val' }, null, 0, 'myK');
-    expect(html).toContain('<mark class="json-match">myK</mark>');
+  it('键中的 HTML 作为文字显示', () => {
+    const el = wrap(buildNode({ '<script>': 1 }, null, 0, ''));
+    expect(el.querySelector('script')).toBeNull();
+    expect(el.querySelector('.json-key')?.textContent).toBe('"<script>"');
   });
 
-  it('highlights query in string values', () => {
-    const html = buildNode('searchable', null, 0, 'search');
-    expect(html).toContain('<mark class="json-match">search</mark>');
-  });
-
-  it('escapes XSS in keys', () => {
-    const html = buildNode({ '<script>': 1 }, null, 0, '');
-    expect(html).not.toContain('<script>');
-    expect(html).toContain('&lt;script&gt;');
-  });
-
-  it('empty object renders 0 keys', () => {
-    const html = buildNode({}, null, 0, '');
-    expect(html).toContain('0 keys');
-  });
-
-  it('empty array renders 0 items', () => {
-    const html = buildNode([], null, 0, '');
-    expect(html).toContain('0 items');
+  it('空对象与空数组', () => {
+    expect(wrap(buildNode({}, null, 0, '')).querySelector('.json-count')?.textContent).toBe('0 keys');
+    expect(wrap(buildNode([], null, 0, '')).querySelector('.json-count')?.textContent).toBe('0 items');
   });
 });

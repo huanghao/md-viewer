@@ -1,5 +1,7 @@
-import { escapeHtml } from '../utils/escape';
 import { isJsonlFile } from '../utils/file-type';
+
+// JSON / JSONL 查看器：用 DOM API 构建（不经过 innerHTML），文本内容一律作为 textContent 写入。
+// 搜索高亮在原始文本上切分，所以不会切断 HTML 实体。
 
 // ==================== Types ====================
 
@@ -7,104 +9,128 @@ type JsonValue = string | number | boolean | null | JsonObject | JsonArray;
 interface JsonObject { [key: string]: JsonValue }
 type JsonArray = JsonValue[];
 
+// ==================== Helpers ====================
+
+/** 把 text 追加到 parent：命中 query 的部分包进 <mark class="json-match">（大小写不敏感） */
+export function appendHighlighted(parent: HTMLElement, text: string, query: string): void {
+  if (!query) {
+    parent.appendChild(document.createTextNode(text));
+    return;
+  }
+  const lq = query.toLowerCase();
+  const lt = text.toLowerCase();
+  let i = 0;
+  while (i < text.length) {
+    const idx = lt.indexOf(lq, i);
+    if (idx === -1) {
+      parent.appendChild(document.createTextNode(text.slice(i)));
+      break;
+    }
+    if (idx > i) parent.appendChild(document.createTextNode(text.slice(i, idx)));
+    const mark = document.createElement('mark');
+    mark.className = 'json-match';
+    mark.textContent = text.slice(idx, idx + lq.length);
+    parent.appendChild(mark);
+    i = idx + lq.length;
+  }
+}
+
+function span(className: string, text?: string): HTMLSpanElement {
+  const el = document.createElement('span');
+  el.className = className;
+  if (text !== undefined) el.textContent = text;
+  return el;
+}
+
+function keyElements(key: string | null, query: string): HTMLElement[] {
+  if (key === null) return [];
+  const keyEl = span('json-key');
+  appendHighlighted(keyEl, JSON.stringify(key), query);
+  return [keyEl, span('json-colon', ':')];
+}
+
 // ==================== Inline preview ====================
 
 export function inlinePreview(value: JsonValue, maxLen = 60): string {
   const raw = JSON.stringify(value);
-  if (raw.length <= maxLen) return escapeHtml(raw);
-  return escapeHtml(raw.slice(0, maxLen)) + '…';
+  if (raw.length <= maxLen) return raw;
+  return raw.slice(0, maxLen) + '…';
 }
 
-// ==================== Build node HTML ====================
+// ==================== Build nodes ====================
 
-export function buildNode(
-  value: JsonValue,
-  key: string | null,
-  depth: number,
-  query: string,
-): string {
+export function renderLeaf(value: JsonValue, query: string): HTMLElement {
+  let cls: string;
+  let text: string;
+  if (value === null) {
+    cls = 'json-null';
+    text = 'null';
+  } else if (typeof value === 'boolean') {
+    cls = 'json-boolean';
+    text = String(value);
+  } else if (typeof value === 'number') {
+    cls = 'json-number';
+    text = String(value);
+  } else {
+    cls = 'json-string';
+    text = JSON.stringify(value);
+  }
+  const el = span(cls);
+  appendHighlighted(el, text, query);
+  return el;
+}
+
+export function buildNode(value: JsonValue, key: string | null, depth: number, query: string): HTMLLIElement {
+  const li = document.createElement('li');
   const isExpandable = value !== null && typeof value === 'object';
-  const defaultExpanded = depth < 1; // depth 0 children expanded, depth>=1 collapsed
 
   if (!isExpandable) {
-    // Leaf node
-    const keyHtml = key !== null
-      ? `<span class="json-key">${highlight(escapeHtml(JSON.stringify(key)), query)}</span><span class="json-colon">:</span>`
-      : '';
-    const valHtml = renderLeaf(value, query);
-    return `
-      <li>
-        <div class="json-node">
-          <span class="json-toggle"></span>
-          ${keyHtml}
-          ${valHtml}
-        </div>
-      </li>`;
+    const row = document.createElement('div');
+    row.className = 'json-node';
+    row.appendChild(span('json-toggle'));
+    for (const el of keyElements(key, query)) row.appendChild(el);
+    row.appendChild(renderLeaf(value, query));
+    li.appendChild(row);
+    return li;
   }
 
-  // Expandable node (object or array)
+  // 对象或数组：depth 0 展开，其余折叠
   const isArray = Array.isArray(value);
-  const entries = isArray
-    ? (value as JsonArray).map((v, i) => ({ k: String(i), v }))
-    : Object.entries(value as JsonObject).map(([k, v]) => ({ k, v }));
+  const entries: Array<[string, JsonValue]> = isArray
+    ? (value as JsonArray).map((v, i) => [String(i), v])
+    : Object.entries(value as JsonObject);
   const count = entries.length;
   const openBracket = isArray ? '[' : '{';
   const closeBracket = isArray ? ']' : '}';
-  const collapsed = !defaultExpanded;
-  const arrow = collapsed ? '▶' : '▼';
-  const childrenClass = collapsed ? 'json-children collapsed' : 'json-children';
+  const collapsed = depth >= 1;
 
-  const keyHtml = key !== null
-    ? `<span class="json-key">${highlight(escapeHtml(JSON.stringify(key)), query)}</span><span class="json-colon">:</span>`
-    : '';
+  const row = document.createElement('div');
+  row.className = 'json-node json-node-expandable';
+  row.setAttribute('data-expanded', String(!collapsed));
+  row.appendChild(span('json-toggle', collapsed ? '▶' : '▼'));
+  for (const el of keyElements(key, query)) row.appendChild(el);
+  row.appendChild(span('json-bracket', openBracket));
+  row.appendChild(span('json-count', `${count} ${isArray ? 'items' : 'keys'}`));
+  if (collapsed) row.appendChild(span('json-preview', inlinePreview(value)));
+  const close = span('json-bracket json-close-bracket', closeBracket);
+  close.style.display = collapsed ? 'none' : 'inline';
+  row.appendChild(close);
+  li.appendChild(row);
 
-  const previewHtml = collapsed
-    ? `<span class="json-preview">${inlinePreview(value)}</span>`
-    : '';
-
-  const childrenHtml = entries
-    .map(({ k, v }) => buildNode(v, isArray ? null : k, depth + 1, query))
-    .join('');
-
-  return `
-    <li>
-      <div class="json-node json-node-expandable" data-expanded="${!collapsed}">
-        <span class="json-toggle">${arrow}</span>
-        ${keyHtml}
-        <span class="json-bracket">${openBracket}</span>
-        <span class="json-count">${count} ${isArray ? 'items' : 'keys'}</span>
-        ${previewHtml}
-        <span class="json-bracket json-close-bracket" style="display:${collapsed ? 'none' : 'inline'}">${closeBracket}</span>
-      </div>
-      <ul class="${childrenClass}">
-        ${childrenHtml}
-        <li><div class="json-node"><span class="json-toggle"></span><span class="json-bracket">${closeBracket}</span></div></li>
-      </ul>
-    </li>`;
-}
-
-export function renderLeaf(value: JsonValue, query: string): string {
-  if (value === null) return `<span class="json-null">${highlight('null', query)}</span>`;
-  if (typeof value === 'boolean') return `<span class="json-boolean">${highlight(String(value), query)}</span>`;
-  if (typeof value === 'number') return `<span class="json-number">${highlight(String(value), query)}</span>`;
-  // string
-  return `<span class="json-string">${highlight(escapeHtml(JSON.stringify(value)), query)}</span>`;
-}
-
-export function highlight(text: string, query: string): string {
-  if (!query) return text;
-  const lq = query.toLowerCase();
-  const lt = text.toLowerCase();
-  let result = '';
-  let i = 0;
-  while (i < text.length) {
-    const idx = lt.indexOf(lq, i);
-    if (idx === -1) { result += text.slice(i); break; }
-    result += text.slice(i, idx);
-    result += `<mark class="json-match">${text.slice(idx, idx + lq.length)}</mark>`;
-    i = idx + lq.length;
+  const children = document.createElement('ul');
+  children.className = collapsed ? 'json-children collapsed' : 'json-children';
+  for (const [k, v] of entries) {
+    children.appendChild(buildNode(v, isArray ? null : k, depth + 1, query));
   }
-  return result;
+  const endLi = document.createElement('li');
+  const endRow = document.createElement('div');
+  endRow.className = 'json-node';
+  endRow.appendChild(span('json-toggle'));
+  endRow.appendChild(span('json-bracket', closeBracket));
+  endLi.appendChild(endRow);
+  children.appendChild(endLi);
+  li.appendChild(children);
+  return li;
 }
 
 // ==================== Search: expand ancestors ====================
@@ -119,12 +145,12 @@ function expandMatchingAncestors(container: HTMLElement, query: string): boolean
     const childrenUl = el.querySelector(':scope > .json-children') as HTMLElement | null;
 
     if (!childrenUl) {
-      // Leaf li — check text content
+      // 叶子：检查文本
       const text = nodeDiv?.textContent?.toLowerCase() || '';
       return text.includes(lq);
     }
 
-    // Expandable — recurse children
+    // 可展开节点：递归子节点
     const childLis = Array.from(childrenUl.querySelectorAll(':scope > li')) as HTMLElement[];
     let childMatch = false;
     for (const child of childLis) {
@@ -177,10 +203,7 @@ function attachToggleHandlers(container: HTMLElement): void {
       if (preview) {
         preview.style.display = '';
       } else {
-        const previewSpan = document.createElement('span');
-        previewSpan.className = 'json-preview';
-        previewSpan.textContent = '…';
-        nodeDiv.appendChild(previewSpan);
+        nodeDiv.appendChild(span('json-preview', '…'));
       }
     } else {
       nodeDiv.setAttribute('data-expanded', 'true');
@@ -200,9 +223,7 @@ export function renderJsonContent(
   filePath: string,
   query: string = '',
 ): void {
-  const isJsonl = isJsonlFile(filePath);
-
-  if (isJsonl) {
+  if (isJsonlFile(filePath)) {
     renderJsonl(container, rawText, query);
   } else {
     renderJson(container, rawText, query);
@@ -221,34 +242,42 @@ export function renderJsonContent(
   }
 }
 
+function errorBlock(message: string, raw: string): HTMLElement {
+  const err = document.createElement('div');
+  err.className = 'json-error';
+  err.appendChild(document.createTextNode(message));
+  const pre = document.createElement('pre');
+  pre.textContent = raw;
+  err.appendChild(pre);
+  return err;
+}
+
 function renderJson(container: HTMLElement, rawText: string, query: string): void {
   let parsed: JsonValue;
   try {
     parsed = JSON.parse(rawText);
   } catch (e) {
-    container.innerHTML = `
-      <div class="json-viewer">
-        <div class="json-error">
-          JSON 解析失败：${escapeHtml(String(e))}
-          <pre>${escapeHtml(rawText.slice(0, 500))}</pre>
-        </div>
-      </div>`;
+    const viewer = document.createElement('div');
+    viewer.className = 'json-viewer';
+    viewer.appendChild(errorBlock(`JSON 解析失败：${String(e)}`, rawText.slice(0, 500)));
+    container.replaceChildren(viewer);
     return;
   }
 
   const viewer = document.createElement('div');
   viewer.className = 'json-viewer';
-  viewer.innerHTML = `<ul>${buildNode(parsed, null, 0, query)}</ul>`;
+  const ul = document.createElement('ul');
+  ul.appendChild(buildNode(parsed, null, 0, query));
+  viewer.appendChild(ul);
   container.appendChild(viewer);
 }
 
 function renderJsonl(container: HTMLElement, rawText: string, query: string): void {
-  const lines = rawText.split('\n');
   const viewer = document.createElement('div');
   viewer.className = 'json-viewer';
 
   let lineNum = 0;
-  for (const line of lines) {
+  for (const line of rawText.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     lineNum++;
@@ -262,15 +291,12 @@ function renderJsonl(container: HTMLElement, rawText: string, query: string): vo
     try {
       parsed = JSON.parse(trimmed);
     } catch (e) {
-      const errDiv = document.createElement('div');
-      errDiv.className = 'json-error';
-      errDiv.innerHTML = `解析失败：${escapeHtml(String(e))}<pre>${escapeHtml(trimmed.slice(0, 200))}</pre>`;
-      viewer.appendChild(errDiv);
+      viewer.appendChild(errorBlock(`解析失败：${String(e)}`, trimmed.slice(0, 200)));
       continue;
     }
 
     const ul = document.createElement('ul');
-    ul.innerHTML = buildNode(parsed, null, 0, query);
+    ul.appendChild(buildNode(parsed, null, 0, query));
     viewer.appendChild(ul);
   }
 

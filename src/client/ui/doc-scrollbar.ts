@@ -57,12 +57,12 @@ export function updateScrollbar(): void {
 }
 
 export function clearDiffMarkers(): void {
-  if (markersEl) markersEl.innerHTML = '';
+  if (markersEl) markersEl.replaceChildren();
 }
 
 export function updateDiffMarkers(groups: Array<{ el: HTMLElement; kind: 'insert' | 'delete' | 'modify' }>): void {
   if (!markersEl || !contentEl) return;
-  markersEl.innerHTML = '';
+  markersEl.replaceChildren();
   const totalHeight = contentEl.scrollHeight;
   if (totalHeight === 0) return;
 

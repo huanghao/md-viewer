@@ -1,5 +1,6 @@
 import type { AppState, FileInfo, FileData } from './types';
 import { unwatchFile } from './api/files';
+import { createReactive, subscribeReactive } from './utils/reactive';
 import { loadConfig } from './config';
 import { storageGet, storageSet, storageRemove } from './utils/storage';
 import { recordSignal } from './utils/focus-signals';
@@ -13,8 +14,8 @@ import {
   restoreWorkspaceAuxiliaryState,
 } from './workspace-state';
 
-// 全局状态
-export const state: AppState = {
+// 全局状态（响应式：任何真实的写入都会通知 subscribeState 的订阅者）
+export const state: AppState = createReactive<AppState>({
   sessionFiles: new Map(),
   currentFile: null,
   searchQuery: '', // 搜索关键词
@@ -29,7 +30,10 @@ export const state: AppState = {
   annotationSummaries: new Map(),
   workspaceLoadingIds: new Set(),
   workspaceFailedIds: new Set(),
-};
+});
+
+/** 订阅状态变化（侧栏等视图据此重绘；订阅者应自行合并，见 requestSidebarRender） */
+export { subscribeReactive as subscribeState };
 
 // 状态持久化
 const STORAGE_KEY = 'md-viewer:openFiles';

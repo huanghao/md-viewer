@@ -272,8 +272,18 @@ CSS 方案定为 **Tailwind CSS v4**，与 React 迁移配合。顺序上 token 
 - ~~目录高亮选择器注入~~ 已修复（`3340669`）：标题含引号时原先会抛异常。
 - ~~P2 约 30 处 `document` 监听无卸载~~ 已复核，判断被高估：多数启动时只注册一次并有守卫；有清理的也正确。未发现确认的重复注册 bug，不做批量改动。
 
+**状态所有权（2026-11-08）**
+- `src/client/utils/reactive.ts`：`createReactive` 包装普通对象与数组（Proxy），`ReactiveMap` / `ReactiveSet` 为 `Map` / `Set` 的子类。任何**值确实变化**的写入（赋值、删除、`Map.set` / `delete` / `clear`、`Set.add` / `delete`）都会同步通知 `subscribeReactive` 的订阅者；相同值的写入不通知。
+- `src/client/state.ts` 的 `state` 由 `createReactive` 创建，并导出 `subscribeState`。`init.ts` 订阅它，每次变化调用 `requestSidebarRender()`（同一同步段内合并为一次重绘）。原来约 88 处写入点的代码无需改写，深层写入（例如 `file.content = …`）同样生效。
+- 约定：
+  - 写入一律直接改 `state` 上的属性，不要持有某个嵌套对象的原始引用后长期修改（读取得到的是代理，身份稳定）。
+  - 不要对 `state` 使用 `structuredClone`（代理无法克隆）；需要快照时用 `JSON` 或手动拷贝字段。
+  - 订阅者必须自行合并重绘，不得在订阅回调中同步写回 `state` 造成回环。
+- 验证：`tests/unit/reactive.test.ts` 覆盖属性、嵌套、数组、Map/Set、身份稳定与序列化；浏览器中检查空闲时无 DOM 变动（无重绘回环），添加文件、焦点视图、快速打开、工作区树、标签持久化（刷新后恢复）均正常。
+- 边界：41 处显式 `requestSidebarRender()` 调用保留（它们同时覆盖非状态来源的刷新，例如 store 直接推送）。它们与订阅合并后只会产生一次重绘，可以在后续逐步删除。
+
 **仍未完成**
-- P1 状态所有权：`state`（`state.ts`）是可变的全局对象，约 71 处写入分布在 9 个模块，写完后需要手动调用重绘。根本解法是把 `state` 改为带订阅的 store，并对 `sessionFiles` 内对象的修改改为不可变更新。这是数据模型层的改动，影响面覆盖侧栏、正文、批注、SSE，需要先写设计（谁拥有哪些字段、更新入口、订阅粒度），再分步迁移，每步做浏览器验证。在此之前不做。
+- ~~P1 状态所有权~~ 已完成（2026-11-08）：`state` 改为可订阅的响应式对象，见下文「状态所有权」。
 - P2 残留的 `innerHTML` 模板（均已转义或为静态内容，不是安全问题）：`ui/toc-panel.ts` 与 `toc-manager.ts`（需要一起迁）、`ui/path-autocomplete.ts`、`ui/shortcuts-help.ts`、`diff-view.ts` 的段落/行级模板（内容经 `md()` 消毒）。
 - 安全：`/api/workspace-agent-command` 与 Agent 进程派生的剩余参数（`model`、`provider`、`thinking`）只做了类型检查，没有白名单；它们作为独立参数传给 CLI，不经过 shell。
 

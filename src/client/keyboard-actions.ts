@@ -1,7 +1,7 @@
 import { state } from './state';
 import { registerAction } from './keybindings';
 import { dismissAnnotationPopupByEscape } from './annotation';
-import { hideQuickOpen } from './ui/quick-open';
+import { hideQuickOpen, isQuickOpenVisible } from './ui/quick-open';
 import { hideShortcutsHelp, isShortcutsHelpVisible } from './ui/shortcuts-help';
 import { closePreferences, isPreferencesOpen } from './ui/preferences';
 
@@ -26,8 +26,7 @@ export function registerAppKeyboardActions(deps: KeyboardActionDeps): void {
     defaultKey: 'Escape',
     handler: () => {
       if (dismissAnnotationPopupByEscape()) return;
-      const qoOverlay = document.querySelector('.quick-open-overlay') as HTMLElement | null;
-      if (qoOverlay && qoOverlay.style.display !== 'none') { hideQuickOpen(); return; }
+      if (isQuickOpenVisible()) { hideQuickOpen(); return; }
       if (isShortcutsHelpVisible()) { hideShortcutsHelp(); return; }
       if (isPreferencesOpen()) { closePreferences(); return; }
     },

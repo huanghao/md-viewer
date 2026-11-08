@@ -51,11 +51,10 @@ function scoreToken(text: string, token: string): number {
   return 240;
 }
 
-export function fuzzyMatch(text: string, query: string): FuzzyMatchResult | null {
+/** 按查询词匹配文本，返回得分与合并后的高亮区间（不做 HTML 转义，供结构化渲染使用）。 */
+export function fuzzyRanges(text: string, query: string): { score: number; ranges: Array<[number, number]> } | null {
   const trimmed = query.trim();
-  if (!trimmed) {
-    return { score: 0, highlight: escapeHtml(text) };
-  }
+  if (!trimmed) return { score: 0, ranges: [] };
 
   const tokens = trimmed.split(/\s+/);
   const lower = text.toLowerCase();
@@ -66,13 +65,35 @@ export function fuzzyMatch(text: string, query: string): FuzzyMatchResult | null
     const t = token.toLowerCase();
     const idx = lower.indexOf(t);
     if (idx === -1) return null;
-    const s = scoreToken(text, token);
-    totalScore += s;
+    totalScore += scoreToken(text, token);
     ranges.push([idx, idx + token.length]);
   }
 
-  const merged = mergeRanges(ranges);
-  return { score: totalScore / tokens.length, highlight: buildHighlightFromRanges(text, merged) };
+  return { score: totalScore / tokens.length, ranges: mergeRanges(ranges) };
+}
+
+/** 把文本切成带匹配标记的片段，React 直接渲染即可，无需 innerHTML。 */
+export function fuzzySegments(text: string, query: string): Array<{ text: string; match: boolean }> {
+  const result = fuzzyRanges(text, query);
+  if (!result || result.ranges.length === 0) return [{ text, match: false }];
+  const segments: Array<{ text: string; match: boolean }> = [];
+  let pos = 0;
+  for (const [start, end] of result.ranges) {
+    if (pos < start) segments.push({ text: text.slice(pos, start), match: false });
+    segments.push({ text: text.slice(start, end), match: true });
+    pos = end;
+  }
+  if (pos < text.length) segments.push({ text: text.slice(pos), match: false });
+  return segments;
+}
+
+export function fuzzyMatch(text: string, query: string): FuzzyMatchResult | null {
+  if (!query.trim()) {
+    return { score: 0, highlight: escapeHtml(text) };
+  }
+  const result = fuzzyRanges(text, query);
+  if (!result) return null;
+  return { score: result.score, highlight: buildHighlightFromRanges(text, result.ranges) };
 }
 
 export function fuzzyScore(text: string, query: string): number {

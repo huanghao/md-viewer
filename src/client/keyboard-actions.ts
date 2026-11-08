@@ -2,7 +2,6 @@ import { state } from './state';
 import { registerAction } from './keybindings';
 import { dismissAnnotationPopupByEscape } from './annotation';
 import { hideQuickOpen, isQuickOpenVisible } from './ui/quick-open';
-import { hideShortcutsHelp, isShortcutsHelpVisible } from './ui/shortcuts-help';
 import { closePreferences, isPreferencesOpen } from './ui/preferences';
 
 export interface KeyboardActionDeps {
@@ -27,7 +26,6 @@ export function registerAppKeyboardActions(deps: KeyboardActionDeps): void {
     handler: () => {
       if (dismissAnnotationPopupByEscape()) return;
       if (isQuickOpenVisible()) { hideQuickOpen(); return; }
-      if (isShortcutsHelpVisible()) { hideShortcutsHelp(); return; }
       if (isPreferencesOpen()) { closePreferences(); return; }
     },
   });

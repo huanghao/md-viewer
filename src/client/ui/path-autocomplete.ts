@@ -1,5 +1,10 @@
+// 路径补全：绑定到输入框的键盘与请求逻辑在这里；面板渲染由 path-autocomplete/ 的 React 组件负责。
+import { createElement } from 'react';
+import { createRoot } from 'react-dom/client';
 import { getPathSuggestions } from '../api/files';
 import type { PathSuggestion } from '../types';
+import { PathSuggestPanel } from '../path-autocomplete/PathSuggestPanel';
+import { pathSuggestStore } from '../path-autocomplete/store';
 
 interface PathAutocompleteOptions {
   kind: 'file' | 'directory';
@@ -7,39 +12,48 @@ interface PathAutocompleteOptions {
   shouldActivate?: (input: string) => boolean;
 }
 
+let panelMounted = false;
+function ensurePanel(): void {
+  if (panelMounted) return;
+  panelMounted = true;
+  const host = document.createElement('div');
+  host.id = 'pathAutocompleteHost';
+  document.body.appendChild(host);
+  createRoot(host).render(createElement(PathSuggestPanel));
+}
+
 export function attachPathAutocomplete(
   input: HTMLInputElement | HTMLTextAreaElement,
   options: PathAutocompleteOptions
 ): void {
+  ensurePanel();
+  const owner = Symbol('path-autocomplete');
   let suggestions: PathSuggestion[] = [];
   let activeIndex = -1;
   let requestId = 0;
   let debounceTimer: number | null = null;
 
-  const panel = document.createElement('div');
-  panel.className = 'path-autocomplete-panel';
-  panel.style.display = 'none';
-  document.body.appendChild(panel);
-
-  const isVisible = () => panel.style.display !== 'none';
+  const isVisible = () => pathSuggestStore.getState().visible && pathSuggestStore.getState().owner === owner;
 
   const hide = () => {
-    // Invalidate pending async refresh results so they can't re-open the panel after hide.
+    // 作废尚未返回的请求，避免它们在隐藏后重新打开面板
     requestId += 1;
     if (debounceTimer !== null) {
       window.clearTimeout(debounceTimer);
       debounceTimer = null;
     }
-    panel.style.display = 'none';
     suggestions = [];
     activeIndex = -1;
+    pathSuggestStore.hide(owner);
   };
 
   const syncPosition = () => {
     const rect = input.getBoundingClientRect();
-    panel.style.left = `${Math.round(rect.left + window.scrollX)}px`;
-    panel.style.top = `${Math.round(rect.bottom + window.scrollY + 4)}px`;
-    panel.style.width = `${Math.round(rect.width)}px`;
+    pathSuggestStore.update({
+      left: Math.round(rect.left + window.scrollX),
+      top: Math.round(rect.bottom + window.scrollY + 4),
+      width: Math.round(rect.width),
+    });
   };
 
   const render = () => {
@@ -47,24 +61,12 @@ export function attachPathAutocomplete(
       hide();
       return;
     }
-
-    panel.innerHTML = suggestions
-      .map((item, index) => {
-        const cls = index === activeIndex
-          ? 'path-autocomplete-item active'
-          : 'path-autocomplete-item';
-        const icon = item.type === 'directory' ? '📁' : '📄';
-        return `
-          <div class="${cls}" data-index="${index}">
-            <span class="path-autocomplete-icon">${icon}</span>
-            <span class="path-autocomplete-text">${escapeHtml(item.display)}</span>
-          </div>
-        `;
-      })
-      .join('');
-
+    pathSuggestStore.show(owner, {
+      items: suggestions,
+      activeIndex,
+      onPick: (index: number) => choose(index),
+    });
     syncPosition();
-    panel.style.display = 'block';
   };
 
   const choose = (index: number) => {
@@ -124,14 +126,11 @@ export function attachPathAutocomplete(
     debounceTimer = window.setTimeout(refresh, 100);
   };
 
-  panel.addEventListener('mousedown', (e) => {
-    e.preventDefault();
-    const target = (e.target as HTMLElement).closest('.path-autocomplete-item') as HTMLElement | null;
-    if (!target) return;
-    const index = Number(target.dataset.index);
-    if (Number.isNaN(index)) return;
-    choose(index);
-  });
+  const moveActive = (delta: number) => {
+    if (suggestions.length === 0) return;
+    activeIndex = (activeIndex + delta + suggestions.length) % suggestions.length;
+    pathSuggestStore.update({ activeIndex });
+  };
 
   input.addEventListener('focus', scheduleRefresh);
   input.addEventListener('input', scheduleRefresh);
@@ -144,19 +143,13 @@ export function attachPathAutocomplete(
 
     if (key === 'ArrowDown') {
       e.preventDefault();
-      if (suggestions.length > 0) {
-        activeIndex = (activeIndex + 1) % suggestions.length;
-        render();
-      }
+      moveActive(1);
       return;
     }
 
     if (key === 'ArrowUp') {
       e.preventDefault();
-      if (suggestions.length > 0) {
-        activeIndex = (activeIndex - 1 + suggestions.length) % suggestions.length;
-        render();
-      }
+      moveActive(-1);
       return;
     }
 
@@ -198,13 +191,4 @@ export function attachPathAutocomplete(
   window.addEventListener('scroll', () => {
     if (isVisible()) syncPosition();
   }, true);
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }

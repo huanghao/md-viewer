@@ -326,7 +326,8 @@ export async function renderMermaidDiagrams(container: HTMLElement): Promise<voi
     mermaid.initialize({
       startOnLoad: false,
       theme: 'neutral',
-      securityLevel: 'loose'
+      // 文档内容不可信：strict 会净化图中的 HTML 标签（默认值），不开放 loose 的脚本式交互
+      securityLevel: 'strict'
     });
     mermaidInitialized = true;
   }

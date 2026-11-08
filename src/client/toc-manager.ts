@@ -1,3 +1,4 @@
+import { escapeHtml } from './utils/escape';
 import type { TocItem } from './toc-extractor.js';
 import type { PdfViewerInstance } from './pdf-viewer.js';
 
@@ -260,7 +261,7 @@ export async function updateToc(filePath: string): Promise<void> {
     );
   } catch (err) {
     console.error('[TOC] scan failed:', err);
-    panel.innerHTML = `<div class="toc-error">目录加载失败<br><span class="toc-error-detail">${String(err)}</span></div>`;
+    panel.innerHTML = `<div class="toc-error">目录加载失败<br><span class="toc-error-detail">${escapeHtml(String(err))}</span></div>`;
   }
 }
 

@@ -284,7 +284,9 @@ CSS 方案定为 **Tailwind CSS v4**，与 React 迁移配合。顺序上 token 
 
 **仍未完成**
 - ~~P1 状态所有权~~ 已完成（2026-11-08）：`state` 改为可订阅的响应式对象，见下文「状态所有权」。
-- P2 残留的 `innerHTML` 模板（均已转义或为静态内容，不是安全问题）：`ui/toc-panel.ts` 与 `toc-manager.ts`（需要一起迁）、`ui/path-autocomplete.ts`、`ui/shortcuts-help.ts`、`diff-view.ts` 的段落/行级模板（内容经 `md()` 消毒）。
+- ~~P2 路径补全面板 `innerHTML`~~ 已迁移（`794fb71`）：`path-autocomplete/`（共享单例面板，记录拥有它的输入框，避免误关其它输入框的建议）。键盘与请求逻辑仍绑定在输入框事件上。
+- ~~快捷键帮助弹层~~ 已删除（`794fb71`）：提交 `a20b52b` 已移除 `?` 键与按钮，模块无入口，属于死代码。
+- P2 仍有 `innerHTML`：`ui/toc-panel.ts` 与 `toc-manager.ts`（目录，约 400 行，含宽度拖拽与收起，需一起迁移，尚未做）；`diff-view.ts` 与 `content-renderer.ts` 的正文内容（属于设计文档 §4.5 规定的命令式内容区，内容经消毒或转义，保留）。
 - 安全：`/api/workspace-agent-command` 与 Agent 进程派生的剩余参数（`model`、`provider`、`thinking`）只做了类型检查，没有白名单；它们作为独立参数传给 CLI，不经过 shell。
 
 每一步都必须保持 `bun test tests/unit`、`go test -race ./cmd/workspace-scanner`、`bun run build` 通过。

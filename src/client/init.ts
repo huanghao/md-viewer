@@ -258,6 +258,7 @@ import {
       }
     },
     renderAll,
+    renderSidebar,
   });
   // 偏好面板的主题即时预览：由组合根注入，避免 preferences 导入入口模块
   setThemeApplier(applyTheme);

@@ -169,8 +169,7 @@ async function runWorkspaceSearch(query: string, roots: string[], rootsKey: stri
     workspaceSearchLoaded = true;
   }
 
-  const { renderSidebar } = await import('./sidebar');
-  renderSidebar();
+  redrawSidebar();
 }
 
 function ensureWorkspaceSearchResults(query: string): void {
@@ -352,9 +351,15 @@ export interface WorkspaceCallbacks {
   loadAndSwitchFile: (path: string) => Promise<void>;
   /** 全量重绘（侧栏 + 正文 + 批注）；由组合根注入，避免 UI 模块导入入口 main.ts */
   renderAll: () => void;
+  /** 侧栏重绘；由组合根注入，避免与 ui/sidebar.ts 形成循环依赖 */
+  renderSidebar: () => void;
 }
 
 let _workspaceCallbacks: WorkspaceCallbacks | undefined;
+
+function redrawSidebar(): void {
+  _workspaceCallbacks?.renderSidebar();
+}
 let _delegateBound = false;
 
 async function handleWorkspaceToggle(workspaceId: string): Promise<void> {
@@ -363,8 +368,7 @@ async function handleWorkspaceToggle(workspaceId: string): Promise<void> {
 
   state.currentWorkspace = workspaceId;
   if (state.searchQuery.trim()) {
-    const { renderSidebar } = await import('./sidebar');
-    renderSidebar();
+    redrawSidebar();
     return;
   }
   toggleWorkspaceExpanded(workspaceId);
@@ -372,8 +376,7 @@ async function handleWorkspaceToggle(workspaceId: string): Promise<void> {
   // 如果展开且没有加载文件树，则加载
   if (workspace.isExpanded && !state.fileTree.has(workspaceId)) {
     markWorkspaceLoading(workspaceId);
-    const { renderSidebar } = await import('./sidebar');
-    renderSidebar();
+    redrawSidebar();
 
     const tree = await scanWorkspace(workspaceId);
     if (!tree) {
@@ -384,14 +387,12 @@ async function handleWorkspaceToggle(workspaceId: string): Promise<void> {
     }
   }
 
-  const { renderSidebar } = await import('./sidebar');
-  renderSidebar();
+  redrawSidebar();
 }
 
 async function retryWorkspaceScan(workspaceId: string): Promise<void> {
   markWorkspaceLoading(workspaceId);
-  const { renderSidebar } = await import('./sidebar');
-  renderSidebar();
+  redrawSidebar();
 
   const tree = await scanWorkspace(workspaceId);
   if (!tree) {
@@ -401,13 +402,12 @@ async function retryWorkspaceScan(workspaceId: string): Promise<void> {
     clearWorkspaceFailed(workspaceId);
   }
 
-  renderSidebar();
+  redrawSidebar();
 }
 
 async function handleAskRemoveWorkspace(workspaceId: string): Promise<void> {
   pendingRemoveWorkspaceId = workspaceId;
-  const { renderSidebar } = await import('./sidebar');
-  renderSidebar();
+  redrawSidebar();
 }
 
 async function handleConfirmRemoveWorkspace(workspaceId: string): Promise<void> {
@@ -417,16 +417,14 @@ async function handleConfirmRemoveWorkspace(workspaceId: string): Promise<void> 
   removeWorkspace(workspaceId);
   pendingRemoveWorkspaceId = null;
 
-  const { renderSidebar } = await import('./sidebar');
-  renderSidebar();
+  redrawSidebar();
   showSuccess(`已移除工作区: ${workspace.name}`);
 }
 
 async function handleNodeClick(workspaceId: string, nodePath: string): Promise<void> {
   toggleNodeExpanded(workspaceId, nodePath);
 
-  const { renderSidebar } = await import('./sidebar');
-  renderSidebar();
+  redrawSidebar();
 }
 
 async function handleFileClick(filePath: string): Promise<void> {
@@ -460,14 +458,12 @@ async function handleRetryMissingFile(filePath: string): Promise<void> {
 
 async function handleMoveWorkspaceUp(workspaceId: string): Promise<void> {
   moveWorkspaceByOffset(workspaceId, -1);
-  const { renderSidebar } = await import('./sidebar');
-  renderSidebar();
+  redrawSidebar();
 }
 
 async function handleMoveWorkspaceDown(workspaceId: string): Promise<void> {
   moveWorkspaceByOffset(workspaceId, 1);
-  const { renderSidebar } = await import('./sidebar');
-  renderSidebar();
+  redrawSidebar();
 }
 
 async function handleFocusFileClick(filePath: string): Promise<void> {
@@ -485,15 +481,13 @@ async function handleFocusFileClick(filePath: string): Promise<void> {
 async function handleUnpinFile(path: string): Promise<void> {
   const { unpinFile } = await import('../utils/pinned-files');
   unpinFile(path);
-  const { renderSidebar } = await import('./sidebar');
-  renderSidebar();
+  redrawSidebar();
 }
 
 async function handlePinFile(path: string): Promise<void> {
   const { pinFile } = await import('../utils/pinned-files');
   pinFile(path);
-  const { renderSidebar } = await import('./sidebar');
-  renderSidebar();
+  redrawSidebar();
 }
 
 /** 工作区树渲染读取：当前处于“再次点击确认移除”状态的工作区 */
@@ -517,8 +511,7 @@ export function bindWorkspaceEvents(callbacks?: WorkspaceCallbacks): void {
       }
 
       pendingRemoveWorkspaceId = null;
-      const { renderSidebar } = await import('./sidebar');
-      renderSidebar();
+      redrawSidebar();
     });
   }
 

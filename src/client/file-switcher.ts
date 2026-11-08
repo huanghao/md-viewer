@@ -122,7 +122,6 @@ async function executePendingAddAction(): Promise<void> {
   requestSidebarRender();
   showSuccess(`已添加工作区: ${workspace.name}`);
   setSearchQuery('');
-  requestSidebarRender();
 }
 
 // 添加文件
@@ -136,7 +135,6 @@ export async function addFileByPath(path: string, focus: boolean = true) {
 
     // 清空统一输入框
     setSearchQuery('');
-    requestSidebarRender();
   }
 }
 
@@ -239,7 +237,6 @@ export function removeFileHandler(path: string) {
     // Reuse switchFile so lazy-loading triggers for session files with empty content.
     void switchFile(state.currentFile);
   } else {
-    requestSidebarRender();
     renderContent();
     deps.syncAnnotationsForCurrentFile(true);
     resetTocPanel('empty');

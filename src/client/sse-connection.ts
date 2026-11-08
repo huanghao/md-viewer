@@ -98,7 +98,6 @@ async function syncOpenFilesAfterReconnect() {
 
   if (hasUpdate) {
     saveState();
-    requestSidebarRender();
     await _deps!.updateToolbarButtons();
 
     // 如果当前文件有更新且未在 diff 模式，给用户提示

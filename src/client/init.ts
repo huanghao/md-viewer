@@ -295,7 +295,6 @@ import {
   // 拉取批注摘要（失败静默忽略，不阻塞主流程）
   fetchAnnotationSummaries().then((summaries) => {
     setAnnotationSummaries(summaries);
-    requestSidebarRender();
   }).catch(() => {/* 静默忽略 */});
 
   renderContent();

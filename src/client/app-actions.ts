@@ -62,8 +62,7 @@ export async function onFileLoaded(data: FileData, focus = false): Promise<void>
       // 还原：base = 快照，pending = 磁盘当前内容
       file.pendingContent = file.content;
       file.content = snap.content;
-      saveState();
-      requestSidebarRender();   // 让 M 标记出现
+      saveState();   // 状态写入会触发侧栏重绘（M 标记随之出现）
     });
   }
 

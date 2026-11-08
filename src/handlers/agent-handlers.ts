@@ -53,6 +53,30 @@ export function agentSystemPromptArgs(backendName: string | null): string[] {
   return backendName === "claude" ? ["--append-system-prompt", AGENT_SYSTEM_PROMPT] : [];
 }
 
+const AGENT_OPTION_MAX_LENGTH = 128;
+// 首字符不能是 "-"：这些值会作为独立 argv 元素交给子进程，以 "-" 开头就可能被当成选项（参数注入）
+const AGENT_OPTION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/+-]*$/;
+
+export type AgentRunOptions = { provider?: string; model?: string; thinking?: string };
+
+/** 校验可选的运行参数（provider/model/thinking）。空值视为未指定。 */
+export function validateAgentRunOptions(input: unknown): { ok: true; options: AgentRunOptions } | { ok: false; error: string } {
+  const src = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+  const options: AgentRunOptions = {};
+  for (const key of ["provider", "model", "thinking"] as const) {
+    const raw = src[key];
+    if (raw === undefined || raw === null || raw === "") continue;
+    if (typeof raw !== "string") return { ok: false, error: `${key} 必须是字符串` };
+    const value = raw.trim();
+    if (!value) continue;
+    if (value.length > AGENT_OPTION_MAX_LENGTH || !AGENT_OPTION_PATTERN.test(value)) {
+      return { ok: false, error: `${key} 含有非法字符或长度超过 ${AGENT_OPTION_MAX_LENGTH}` };
+    }
+    options[key] = value;
+  }
+  return { ok: true, options };
+}
+
 export async function handleStartAgentRun(c: Context) {
   const body = await c.req.json<{ path?: string; sessionIdOverride?: string; backend?: string; provider?: string; model?: string; prompt?: string; thinking?: string }>().catch(() => ({}) as any);
   const rawPath = body?.path;
@@ -61,6 +85,10 @@ export async function handleStartAgentRun(c: Context) {
   const docPath = resolve(rawPath);
   const customPrompt = body?.prompt?.trim();
   if (!customPrompt) return c.json({ error: "缺少 prompt 参数" }, 400);
+
+  const optionsResult = validateAgentRunOptions(body);
+  if (!optionsResult.ok) return c.json({ error: optionsResult.error }, 400);
+  const runOptions = optionsResult.options;
 
   const existingSession = getEffectiveAgentSession(docPath, findWorkspaceForPath(docPath));
   if (existingSession?.running) {
@@ -78,7 +106,7 @@ export async function handleStartAgentRun(c: Context) {
   if (body?.backend === "pi") {
     const displayPrompt = customPrompt;
     const sentPrompt = buildSentPrompt(customPrompt, docPath);
-    const argv = buildPiArgv({ prompt: sentPrompt, sessionId, provider: body?.provider || "kimi-coding", model: body?.model, thinking: body?.thinking });
+    const argv = buildPiArgv({ prompt: sentPrompt, sessionId, provider: runOptions.provider || "kimi-coding", model: runOptions.model, thinking: runOptions.thinking });
 
     const runId = randomUUID();
     if (!tryMarkAgentRunning(docPath, runId)) {
@@ -124,7 +152,7 @@ export async function handleStartAgentRun(c: Context) {
     "--output-format", "stream-json",
     "--verbose",
     ...agentSystemPromptArgs(backendName),
-    ...(typeof body?.model === "string" && body.model ? ["--model", body.model] : []),
+    ...(runOptions.model ? ["--model", runOptions.model] : []),
   ];
 
   const runId = randomUUID();

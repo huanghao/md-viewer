@@ -1,18 +1,21 @@
 import type { FileData, FilesResponse, NearbyResponse, PathSuggestionsResponse, PathDetectResponse } from '../types';
 import { showError } from '../ui/toast';
 
+// 文件加载失败（含链接跳转失败）多为一次性情况，自动消失，避免一直挂在页面上
+const LOAD_ERROR_MS = 6000;
+
 // 加载单个文件
 export async function loadFile(path: string, silent: boolean = false): Promise<FileData | null> {
   try {
     const response = await fetch(`/api/file?path=${encodeURIComponent(path)}`);
     const data = await response.json();
     if (data.error) {
-      if (!silent) showError(data.error);
+      if (!silent) showError(data.error, LOAD_ERROR_MS);
       return null;
     }
     return data;
   } catch (e: any) {
-    if (!silent) showError(`加载失败: ${e.message}`);
+    if (!silent) showError(`加载失败: ${e.message}`, LOAD_ERROR_MS);
     return null;
   }
 }

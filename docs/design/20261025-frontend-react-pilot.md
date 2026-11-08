@@ -254,20 +254,27 @@ CSS 方案定为 **Tailwind CSS v4**，与 React 迁移配合。顺序上 token 
 - **深色模式核对（2026-11-08）**：CDP 截图核对批注列表、查找栏、Diff 横幅，均可读。查找栏与 Diff 的「关」按钮在窄窗口下与工具栏、侧栏悬浮按钮重叠，属于既有布局问题，未在本阶段修改。最近栏标签需要工作区数据才会出现，本次环境中没有工作区，未能核对。
 - 尚未完成：PDF 查看器外壳（指示器之外的部分，仍为命令式）；以及最后一步——删除 `main.ts`/`init.ts` 中的手写装配，这一步需要先决定 `init.ts` 的编排去向，并由用户做真实页面验收。
 
-**架构复查（2026-11-08）与后续处理**：迁移完成后对全量代码做了一次架构审查，结果与处理如下。
-- ~~P0 Markdown 正文未消毒~~ 已修复（`2775cc0`）：正文、Diff 视图、Agent 助手消息的 `marked` 输出先经 `utils/html-sanitize.ts` 白名单消毒，再还原数学占位符。浏览器验证：注入的 `onerror`、`<script>`、`javascript:` 链接均不执行，表格、任务列表、代码、公式正常。
-- ~~P1 运行时循环依赖~~ 已修复（`792d004`）：`renderMath` 迁到 `utils/math-render.ts`，打破 6 模块环。静态 SCC 检查修复后为零环（修复前可检出该环，检查本身有效）。
+**架构复查（2026-11-08）与处理结果**：迁移完成后对全量代码做了架构审查，逐项处理结果如下。
+- ~~P0 Markdown 正文未消毒~~ 已修复（`2775cc0`）：正文、Diff 视图、Agent 助手消息的 `marked` 输出先经 `utils/html-sanitize.ts` 白名单消毒，再还原数学占位符。
+- ~~P0-补充 Mermaid `securityLevel: 'loose'`~~ 已修复（`053ec11`）：改为 `strict`，图中 HTML 标签被净化；浏览器验证正常图渲染、载荷不执行。
+- ~~P1 运行时循环依赖~~ 已修复（`792d004`）：`renderMath` 迁到 `utils/math-render.ts`，打破 6 模块环。静态 SCC 检查修复后为零环（修复前可检出，检查有效）。
 - ~~P1 UI 导入入口 `main.ts`~~ 已修复（`792d004`）：`renderAll`、主题预览改为注入回调。
-- ~~P1 `sidebar-workspace` 动态导入 `./sidebar`~~ 已修复（`33404ac`）：13 处（不是此前估计的 20 处）改为 `WorkspaceCallbacks.renderSidebar` 注入。
-- ~~P1 写接口缺少同源校验~~ 已修复（`db054bf`）：`src/origin-guard.ts` 对带 `Origin` 且与请求地址不一致的非安全方法返回 403；无 `Origin` 的 CLI 请求放行。
-- ~~链接跳转错误常驻~~ 已修复（`c73a651`）：`api/files.ts` 的加载错误改为 6 秒自动消失。
-- ~~P3 store 样板重复~~ 已修复（`38893c4`）：新增 `utils/create-store.ts`，12 个 store 迁移，对外 API 不变；`agent/store.ts` 是 reducer 形式，未纳入。
-- ~~目录高亮选择器注入~~ 已修复（`3340669`）：标题含引号时 `setActiveTocItem` 原先会抛异常。
-- ~~P2 约 30 处 `document` 监听无卸载~~ 已复核，判断被高估：多数在启动时只注册一次（已有 `_delegateBound` 等守卫），有清理的（如 `TabStrip`、`SessionBar`、`KeybindingsTab`、全屏预览）也正确。目前没有确认的重复注册 bug，不做批量改动。
+- ~~P1 动态导入 `./sidebar`~~ 已修复（`33404ac`）：13 处（原估计 20 处）改为 `WorkspaceCallbacks.renderSidebar` 注入。
+- ~~P1 写接口缺同源校验~~ 已修复（`db054bf`）：`src/origin-guard.ts` 对带 `Origin` 且与请求地址不一致的非安全方法返回 403；无 `Origin` 的 CLI 请求放行。
+- ~~安全：Agent 命令形状未校验~~ 已修复（`75a5b84`）：`validateAgentCommand` 只接受非空字符串数组（数量、长度、NUL 有上限）；`model` 必须为字符串。
+- ~~链接跳转错误常驻~~ 已修复（`c73a651`）：加载错误 6 秒自动消失。
+- ~~P3 store 样板重复~~ 已修复（`38893c4`）：`utils/create-store.ts`，12 个 store 迁移，对外 API 不变（`agent/store.ts` 为 reducer 形式，未纳入）。
+- ~~P1 `renderSidebar()` 同一事件内多次重绘~~ 部分修复（`2a8c910`）：调用改为 `requestSidebarRender()`，同一同步段内合并为一次微任务重绘。`renderSidebar` 本身未变。
+- ~~P2 快速打开 `innerHTML`~~ 已迁移（`8208959`）：`quick-open/`（store + 纯逻辑 + React）。修复快速输入时慢响应覆盖新结果的竞态；高亮改为结构化片段。
+- ~~P2 JSON 查看器 `innerHTML`~~ 已迁移（`29a2b28`）：改用 DOM API，搜索高亮不再切断 HTML 实体；`doc-scrollbar` 清空改用 `replaceChildren`。
+- ~~P2 消息提示 `innerHTML`~~ 已迁移（`94e0c10`）：`toast/`（store + React）。操作按钮文字不再拼接 HTML（原先未转义）。
+- ~~目录错误信息未转义~~ 已修复（`053ec11`）。
+- ~~目录高亮选择器注入~~ 已修复（`3340669`）：标题含引号时原先会抛异常。
+- ~~P2 约 30 处 `document` 监听无卸载~~ 已复核，判断被高估：多数启动时只注册一次并有守卫；有清理的也正确。未发现确认的重复注册 bug，不做批量改动。
 
 **仍未完成**
-- P1 `renderSidebar()` 广播式重绘与全局状态写入：约 50 处调用分布在约 10 个模块，状态写入分布在 6 个模块。这是状态流的设计变更，不是机械替换。需要先写设计（谁拥有状态、何时重绘、如何分片订阅），再分步迁移，每步有浏览器验证。在此之前不做。
-- P2 仍用 `innerHTML` 的界面：`ui/toc-panel.ts`（与 `toc-manager.ts` 共用 pane 与激活状态，需一起迁）、`ui/quick-open.ts`、`ui/json-viewer.ts`、`diff-view.ts`（497 行，段落/行级 diff 视图）、`ui/doc-scrollbar.ts`、`toc-manager.ts`。它们的动态内容已转义，不是当前安全问题；迁移按界面逐个做，每个都要 CDP 验证。
-- 安全（已部分处理）：XSS 已切断；同源写接口已校验。`/api/workspace-agent-command` 与 Agent 进程派生的参数来源未做专门审计，需要单独一次安全复核。
+- P1 状态所有权：`state`（`state.ts`）是可变的全局对象，约 71 处写入分布在 9 个模块，写完后需要手动调用重绘。根本解法是把 `state` 改为带订阅的 store，并对 `sessionFiles` 内对象的修改改为不可变更新。这是数据模型层的改动，影响面覆盖侧栏、正文、批注、SSE，需要先写设计（谁拥有哪些字段、更新入口、订阅粒度），再分步迁移，每步做浏览器验证。在此之前不做。
+- P2 残留的 `innerHTML` 模板（均已转义或为静态内容，不是安全问题）：`ui/toc-panel.ts` 与 `toc-manager.ts`（需要一起迁）、`ui/path-autocomplete.ts`、`ui/shortcuts-help.ts`、`diff-view.ts` 的段落/行级模板（内容经 `md()` 消毒）。
+- 安全：`/api/workspace-agent-command` 与 Agent 进程派生的剩余参数（`model`、`provider`、`thinking`）只做了类型检查，没有白名单；它们作为独立参数传给 CLI，不经过 shell。
 
 每一步都必须保持 `bun test tests/unit`、`go test -race ./cmd/workspace-scanner`、`bun run build` 通过。

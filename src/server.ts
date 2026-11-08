@@ -15,6 +15,7 @@ import { pruneOrphanedAgentSessions } from "./agent-storage.ts";
 import { recoverStuckAgentRuns } from "./agent-recovery.ts";
 import { loadConfig, getServerPort, getServerHost, initConfig } from "./config.ts";
 import { otelMiddleware } from "./otel-middleware.ts";
+import { originGuard } from "./origin-guard.ts";
 import { registerAgentRoutes } from "./routes/agent.ts";
 import { registerAnnotationRoutes } from "./routes/annotations.ts";
 import { registerFileRoutes } from "./routes/files.ts";
@@ -35,6 +36,7 @@ const config = loadConfig();
 const app = new Hono();
 
 app.use("*", otelMiddleware);
+app.use("*", originGuard);
 
 registerStaticRoutes(app);
 registerOtelRoutes(app);

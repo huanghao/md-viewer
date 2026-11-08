@@ -17,7 +17,7 @@ import { looksLikePathInput } from './utils/path-input';
 import type { TabBatchAction } from './utils/tab-batch';
 import { initToolbarActions } from './main-actions';
 import { mountToolbar } from './toolbar';
-import { showError } from './ui/toast';
+import { mountToastStack, showError } from './ui/toast';
 import { showPreferences } from './ui/preferences';
 import { setThemeApplier } from './preferences/controller';
 
@@ -130,6 +130,9 @@ import {
     updateToolbarButtons,
     addFileByPath,
   });
+
+  // 消息提示容器：尽早挂载，之后的 showToast 才能立即显示
+  mountToastStack();
 
   // 拉取服务端客户端配置（失败静默）
   await loadClientConfig();

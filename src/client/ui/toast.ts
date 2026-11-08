@@ -1,127 +1,22 @@
-import { escapeHtml } from '../utils/escape';
+// 消息提示（toast）。状态与动画在 toast/ 下（store + React 组件），这里提供对外便捷 API。
+import { createElement } from 'react';
+import { createRoot } from 'react-dom/client';
+import { ToastStack } from '../toast/ToastStack';
+import { toastStore, type ToastOptions, type ToastType } from '../toast/store';
 
-// Toast 类型
-export type ToastType = 'success' | 'error' | 'warning' | 'info';
+export type { ToastType };
 
-// Toast 配置
-interface ToastOptions {
-  message: string;
-  type?: ToastType;
-  duration?: number; // 毫秒，0 表示不自动关闭
-  action?: { label: string; onClick: () => void };
+/** 在 body 中挂载提示容器（组合根调用一次）。挂载前调用 showToast 的提示会排队保存，挂载后显示。 */
+export function mountToastStack(): void {
+  const container = document.createElement('div');
+  container.id = 'toast-container';
+  container.className = 'toast-container';
+  document.body.appendChild(container);
+  createRoot(container).render(createElement(ToastStack));
 }
 
-// Toast 容器
-let toastContainer: HTMLElement | null = null;
-
-// 初始化 Toast 容器
-function initToastContainer() {
-  if (toastContainer) return;
-
-  toastContainer = document.createElement('div');
-  toastContainer.id = 'toast-container';
-  toastContainer.className = 'toast-container';
-  document.body.appendChild(toastContainer);
-}
-
-// 显示 Toast
-export function showToast(options: ToastOptions | string) {
-  // 支持简单的字符串调用
-  const config: ToastOptions = typeof options === 'string'
-    ? { message: options, type: 'info', duration: 3000 }
-    : { type: 'info', duration: 3000, ...options };
-  // duration=0 means sticky (no auto-close); undefined/negative falls back to 3000
-  if (config.duration === undefined || config.duration < 0) config.duration = 3000;
-
-  initToastContainer();
-
-  // 创建 Toast 元素
-  const toast = document.createElement('div');
-  toast.className = `toast toast-${config.type}${config.duration === 0 ? ' toast-sticky' : ''}`;
-
-  // 图标
-  const icons = {
-    success: '✓',
-    error: '!',
-    warning: '⚠',
-    info: 'ℹ'
-  };
-
-  const isSticky = config.duration === 0;
-  const actionHtml = config.action
-    ? `<button class="toast-action">${config.action.label}</button>`
-    : '';
-  const closeHtml = isSticky
-    ? `<button class="toast-close" title="关闭">×</button>`
-    : '';
-  const progressHtml = config.duration && config.duration > 0
-    ? `<div class="toast-progress"><div class="toast-progress-bar"></div></div>`
-    : '';
-  toast.innerHTML = `
-    <span class="toast-icon">${icons[config.type!]}</span>
-    <span class="toast-message">${escapeHtml(config.message)}</span>
-    ${actionHtml}
-    ${closeHtml}
-    ${progressHtml}
-  `;
-
-  // 添加到容器
-  toastContainer!.appendChild(toast);
-
-  // 触发入场动画，然后启动进度条
-  requestAnimationFrame(() => {
-    toast.classList.add('toast-show');
-    if (config.duration && config.duration > 0) {
-      const bar = toast.querySelector('.toast-progress-bar') as HTMLElement | null;
-      if (bar) {
-        bar.style.transitionDuration = `${config.duration}ms`;
-        requestAnimationFrame(() => { bar.style.width = '0%'; });
-      }
-    }
-  });
-
-  // 自动关闭
-  if (config.duration && config.duration > 0) {
-    setTimeout(() => {
-      hideToast(toast);
-    }, config.duration);
-  }
-
-  // action 按钮
-  if (config.action) {
-    const btn = toast.querySelector('.toast-action') as HTMLButtonElement | null;
-    btn?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      config.action!.onClick();
-      hideToast(toast);
-    });
-  }
-
-  if (isSticky) {
-    // sticky toast：只有 × 按钮关闭，允许用户选中文字复制
-    const closeBtn = toast.querySelector('.toast-close') as HTMLButtonElement | null;
-    closeBtn?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      hideToast(toast);
-    });
-  } else {
-    // 普通 toast：点击任意位置关闭
-    toast.addEventListener('click', () => {
-      hideToast(toast);
-    });
-  }
-
-  return toast;
-}
-
-// 隐藏 Toast
-function hideToast(toast: HTMLElement) {
-  toast.classList.remove('toast-show');
-  toast.classList.add('toast-hide');
-
-  setTimeout(() => {
-    toast.remove();
-  }, 300); // 动画时长
+export function showToast(options: ToastOptions | string): number {
+  return toastStore.add(options);
 }
 
 // 便捷方法 — 统一默认 3000ms，调用方无需再传 duration

@@ -1,7 +1,7 @@
 // Content rendering module — extracted from main.ts (Task B1)
 // Contains: isMarkdownContent, resolveMarkdownAssetSrc, rewriteMarkdownAssetUrls,
 //           renderMath, renderMermaidDiagrams, mountPdfPageIndicator, unmountPdfPageIndicator,
-//           renderContent, renderBreadcrumb, showNearbyMenu, flashContentUpdated
+//           renderContent, renderBreadcrumb, flashContentUpdated
 //           and helper functions: isHtmlPath, isJsonPath, isPdfPath, isUrlPath, applyPdfModeButtons
 
 import { highlightCodeBlocks } from './utils/code-highlight';
@@ -15,8 +15,6 @@ import type { PdfViewerInstance } from './pdf-viewer.js';
 
 import { state, saveScrollPosition } from './state';
 import { updateStatusbarFile } from './statusbar';
-import { getNearbyFiles } from './api/files';
-import { escapeHtml, escapeAttr } from './utils/escape';
 import { normalizeJoinedPath } from './utils/md-link';
 import { renderJsonContent } from './ui/json-viewer';
 import { mountScrollbar, unmountScrollbar, updateScrollbar } from './ui/doc-scrollbar';
@@ -521,57 +519,6 @@ export function renderBreadcrumb() {
 
   const charCount = file.content.trim().length;
   updateStatusbarFile(charCount, file.createdAt, file.gitCreatedAt);
-}
-
-// ── Nearby menu ───────────────────────────────────────────────────────────────
-export async function showNearbyMenu(e: Event) {
-  e.stopPropagation();
-  if (!state.currentFile) return;
-
-  const button = e.target as HTMLElement;
-  const existingMenu = document.querySelector('.nearby-menu');
-  if (existingMenu) {
-    existingMenu.remove();
-    return;
-  }
-
-  try {
-    const data = await getNearbyFiles(state.currentFile);
-    if (!data.files || data.files.length === 0) {
-      showInfo('附近没有其他 Markdown 文件');
-      return;
-    }
-
-    const menuElement = document.createElement('div');
-    menuElement.className = 'nearby-menu';
-    menuElement.innerHTML = `
-      <div class="nearby-menu-header">附近的文件</div>
-      ${data.files.map(f => `
-        <div class="nearby-menu-item" data-action="nearby-open" data-path="${escapeAttr(f.path)}">
-          📄 ${escapeHtml(f.name)}
-        </div>
-      `).join('')}
-    `;
-    menuElement.addEventListener('click', (ev) => {
-      const item = (ev.target as HTMLElement).closest('[data-action="nearby-open"]') as HTMLElement | null;
-      if (item?.dataset.path) void _addFileByPath!(item.dataset.path, true);
-    });
-
-    const rect = button.getBoundingClientRect();
-    menuElement.style.position = 'fixed';
-    menuElement.style.left = rect.left + 'px';
-    menuElement.style.top = (rect.bottom + 5) + 'px';
-
-    document.body.appendChild(menuElement);
-
-    const closeMenu = () => {
-      menuElement.remove();
-      document.removeEventListener('click', closeMenu);
-    };
-    setTimeout(() => document.addEventListener('click', closeMenu), 0);
-  } catch (err: any) {
-    showError('获取附近文件失败: ' + err.message);
-  }
 }
 
 // `:root` 只匹配文档级别的根元素，在 shadow root 内部永远匹配不到任何东西——

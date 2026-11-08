@@ -69,7 +69,6 @@ export async function onFileLoaded(data: FileData, focus = false): Promise<void>
   if (focus && (state.config.sidebarTab === 'focus' || state.config.sidebarTab === 'full')) {
     await revealFileInWorkspace(data.path);
   }
-  requestSidebarRender();
   renderContent();
   syncAnnotationsForCurrentFile(focus && previousFile !== data.path);
   if (focus) {
@@ -156,7 +155,6 @@ async function syncFileFromDisk(path: string, options: { silent?: boolean; highl
     });
   }
 
-  requestSidebarRender();
   await updateToolbarButtons();
   return true;
 }

@@ -1,6 +1,6 @@
 import type { FileData } from './types';
 import { state, saveState, addOrUpdateFile } from './state';
-import { renderSidebar } from './ui/sidebar';
+import { renderSidebar, requestSidebarRender } from './ui/sidebar';
 import { diffBannerStore } from './diff-banner/store';
 import { renderContent, flashContentUpdated, isHtmlPath } from './content-renderer';
 import { updateToc } from './toc-manager';
@@ -63,14 +63,14 @@ export async function onFileLoaded(data: FileData, focus = false): Promise<void>
       file.pendingContent = file.content;
       file.content = snap.content;
       saveState();
-      renderSidebar();   // 让 M 标记出现
+      requestSidebarRender();   // 让 M 标记出现
     });
   }
 
   if (focus && (state.config.sidebarTab === 'focus' || state.config.sidebarTab === 'full')) {
     await revealFileInWorkspace(data.path);
   }
-  renderSidebar();
+  requestSidebarRender();
   renderContent();
   syncAnnotationsForCurrentFile(focus && previousFile !== data.path);
   if (focus) {
@@ -88,7 +88,7 @@ export function scrollContentToTop(): void {
 
 // ── Render all ──────────────────────────────────────────────────────────────
 export function renderAll(): void {
-  renderSidebar();
+  requestSidebarRender();
   renderContent();
   syncAnnotationsForCurrentFile(false);
 }
@@ -157,7 +157,7 @@ async function syncFileFromDisk(path: string, options: { silent?: boolean; highl
     });
   }
 
-  renderSidebar();
+  requestSidebarRender();
   await updateToolbarButtons();
   return true;
 }
@@ -201,7 +201,7 @@ export function startWorkspacePolling(): void {
     workspacePollRunning = true;
     try {
       await Promise.allSettled(toScan.map((workspace) => scanWorkspace(workspace.id)));
-      renderSidebar();
+      requestSidebarRender();
     } finally {
       workspacePollRunning = false;
     }

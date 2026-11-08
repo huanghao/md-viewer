@@ -1,6 +1,6 @@
 import { state } from '../state';
 import { saveConfig } from '../config';
-import { renderSidebar } from '../ui/sidebar';
+import { renderSidebar, requestSidebarRender } from '../ui/sidebar';
 import { showError, showSuccess } from '../ui/toast';
 
 export type PrefTab = '外观' | '快捷键' | '评论' | 'Agent';
@@ -90,6 +90,6 @@ export function applyThemeLive(): void {
 
 export async function saveConfigAndNotify(): Promise<void> {
   await saveConfig(state.config);
-  renderSidebar();
+  requestSidebarRender();
   showSuccess('设置已保存');
 }

@@ -4,7 +4,7 @@ import { setAnnotationSummaries } from './state';
 import { pruneDeadFeatureStorageKeys, pruneStalePerFileStorage } from './utils/storage';
 import { hydrateExpandedWorkspaces } from './workspace';
 import { loadFile } from './api/files';
-import { renderSidebar, renderTabs, renderFiles, initFileListActions, initWorkspaceActions, initSearchBoxCallbacks, applyTabBatchAction, setSidebarSearchQuery, setSidebarTab, scrollCurrentFileIntoView } from './ui/sidebar';
+import { renderSidebar, renderTabs, renderFiles, initFileListActions, initWorkspaceActions, initSearchBoxCallbacks, applyTabBatchAction, setSidebarSearchQuery, setSidebarTab, scrollCurrentFileIntoView, requestSidebarRender } from './ui/sidebar';
 import { mountTabStrip } from './tabs';
 import { mountSidebarHeader } from './sidebar-header';
 import { mountFileList } from './file-list';
@@ -289,12 +289,12 @@ import {
   mountFocusView({ onRendered: scrollCurrentFileIntoView });
 
   // 根据配置渲染侧边栏
-  renderSidebar();
+  requestSidebarRender();
 
   // 拉取批注摘要（失败静默忽略，不阻塞主流程）
   fetchAnnotationSummaries().then((summaries) => {
     setAnnotationSummaries(summaries);
-    renderSidebar();
+    requestSidebarRender();
   }).catch(() => {/* 静默忽略 */});
 
   renderContent();

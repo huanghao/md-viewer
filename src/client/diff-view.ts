@@ -6,7 +6,7 @@ import { mountScrollbar, unmountScrollbar, updateDiffMarkers, clearDiffMarkers }
 import { shouldRefreshDiff } from './ui/diff-refresh';
 import { diffBannerStore } from './diff-banner/store';
 import { mountDiffBanner } from './diff-banner';
-import { renderSidebar } from './ui/sidebar';
+import { renderSidebar, requestSidebarRender } from './ui/sidebar';
 import { highlightCodeBlocks } from './utils/code-highlight';
 import { toolbarStore } from './toolbar/store';
 import { protectMath } from './utils/math-protect';
@@ -492,6 +492,6 @@ export async function acceptDiffUpdate(): Promise<void> {
   if (state.currentFile) _updateToc(state.currentFile);
   _syncAnnotationsForCurrentFile(false);
   _flashContentUpdated();
-  renderSidebar();
+  requestSidebarRender();
   await _updateToolbarButtons();
 }

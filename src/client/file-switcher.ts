@@ -9,7 +9,7 @@ import {
 import { addWorkspace } from './workspace';
 import { loadFile, searchFiles, openFile, detectPathType } from './api/files';
 import { addConfirmStore } from './add-confirm/store';
-import { renderSidebar, resetSidebarFileAnchor } from './ui/sidebar';
+import { renderSidebar, resetSidebarFileAnchor, requestSidebarRender } from './ui/sidebar';
 import { showSuccess, showError, showInfo } from './ui/toast';
 import { renderContent } from './content-renderer';
 import { isPdfPath, isUrlPath } from './content-renderer';
@@ -49,7 +49,7 @@ export function getWorkspaceNameFromPath(path: string): string {
 export async function openFileInBrowser(path: string): Promise<void> {
   const { clearListDiff } = await import('./workspace-state');
   clearListDiff(path);
-  renderSidebar();
+  requestSidebarRender();
 
   if (isUrlPath(path)) {
     window.open(path, '_blank', 'noopener,noreferrer');
@@ -120,10 +120,10 @@ async function executePendingAddAction(): Promise<void> {
   }
 
   const workspace = addWorkspace(getWorkspaceNameFromPath(pendingAddAction.path), pendingAddAction.path);
-  renderSidebar();
+  requestSidebarRender();
   showSuccess(`已添加工作区: ${workspace.name}`);
   setSearchQuery('');
-  renderSidebar();
+  requestSidebarRender();
 }
 
 // 添加文件
@@ -137,7 +137,7 @@ export async function addFileByPath(path: string, focus: boolean = true) {
 
     // 清空统一输入框
     setSearchQuery('');
-    renderSidebar();
+    requestSidebarRender();
   }
 }
 
@@ -205,7 +205,7 @@ export async function switchFile(path: string) {
   switchToFile(path);
   updateZoomDisplay(true);
   resetSidebarFileAnchor();
-  renderSidebar();
+  requestSidebarRender();
 
   // Immediately show loading state to avoid stale TOC during transition
   const tocPanel = document.getElementById('tocPanel');
@@ -241,7 +241,7 @@ export function removeFileHandler(path: string) {
     // Reuse switchFile so lazy-loading triggers for session files with empty content.
     void switchFile(state.currentFile);
   } else {
-    renderSidebar();
+    requestSidebarRender();
     renderContent();
     deps.syncAnnotationsForCurrentFile(true);
     const panel = document.getElementById('tocPanel');

@@ -166,6 +166,21 @@ export function renderFiles(): void {
   fileListStore.setSnapshot({ rows, empty: null });
 }
 
+let sidebarRenderQueued = false;
+
+/**
+ * 请求重绘侧边栏：同一个同步代码段内的多次请求合并为一次（微任务末尾执行）。
+ * 用于事件处理里连续改状态后的重绘，避免每次修改都全量推送所有 store。
+ */
+export function requestSidebarRender(): void {
+  if (sidebarRenderQueued) return;
+  sidebarRenderQueued = true;
+  queueMicrotask(() => {
+    sidebarRenderQueued = false;
+    renderSidebar();
+  });
+}
+
 // 渲染整个侧边栏（根据模式选择）
 export function renderSidebar(): void {
   const tab = state.config.sidebarTab;

@@ -6,18 +6,11 @@
   <title>MD Viewer - Markdown Viewer</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
   <script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.11.1/highlight.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/katex.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/web/pdf_viewer.css">
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/katex.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.47/dist/contrib/auto-render.min.js"></script>
-  <script type="module">
-    import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/build/pdf.mjs';
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/build/pdf.worker.mjs';
-    window.pdfjsLib = pdfjsLib;
-    window.dispatchEvent(new Event('pdfjslib-ready'));
-  </script>
   <link rel="stylesheet" href="/client.css">
   <style id="theme-md-css"></style>
   <style id="theme-hl-css"></style>

@@ -7,6 +7,7 @@
 import { highlightCodeBlocks } from './utils/code-highlight';
 import { sanitizeHtml } from './utils/html-sanitize';
 import { renderMath } from './utils/math-render';
+import { loadMermaid } from './utils/mermaid-loader';
 
 import { toolbarStore } from './toolbar/store';
 import { pdfPageIndicatorStore } from './pdf-page-indicator/store';
@@ -310,15 +311,21 @@ function openMermaidLightbox(sourceSvg: SVGSVGElement): void {
 }
 
 export async function renderMermaidDiagrams(container: HTMLElement): Promise<void> {
-  const mermaid = (window as any).mermaid;
-  if (!mermaid) return;
-
   const codeBlocks = Array.from(
     container.querySelectorAll(
       '.markdown-body pre > code.language-mermaid, .markdown-body pre > code.lang-mermaid, .markdown-body pre > code.language-flowchart, .markdown-body pre > code.lang-flowchart'
     )
   ) as HTMLElement[];
   if (codeBlocks.length === 0) return;
+
+  // 只有出现 mermaid 代码块时才加载脚本；加载失败则保留为普通代码块
+  let mermaid: any;
+  try {
+    mermaid = await loadMermaid();
+  } catch (err) {
+    console.warn('[mermaid] 加载失败，保留为代码块显示', err);
+    return;
+  }
 
   if (!mermaidInitialized) {
     mermaid.initialize({

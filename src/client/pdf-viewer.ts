@@ -1,11 +1,25 @@
-// PDF.js loaded via ES module in html.ts, exposed as window.pdfjsLib after 'pdfjslib-ready' event
 import { pdfDefaultScale, setPdfPendingRectCoords } from './pdf-state';
 
+// PDF.js（~650KB）只在第一次打开 PDF 时动态加载，不再拖慢普通 Markdown 的首屏。
+const PDFJS_MODULE_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/build/pdf.mjs';
+const PDFJS_WORKER_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/build/pdf.worker.mjs';
+let pdfjsPromise: Promise<any> | null = null;
+
 function getPdfjsLib(): Promise<any> {
-  if ((window as any).pdfjsLib) return Promise.resolve((window as any).pdfjsLib);
-  return new Promise(resolve => {
-    window.addEventListener('pdfjslib-ready', () => resolve((window as any).pdfjsLib), { once: true });
-  });
+  if (!pdfjsPromise) {
+    // 用变量保存 URL：避免打包器尝试解析远程 import
+    const moduleUrl = PDFJS_MODULE_URL;
+    pdfjsPromise = import(/* @vite-ignore */ moduleUrl)
+      .then((lib: any) => {
+        lib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+        return lib;
+      })
+      .catch((err: unknown) => {
+        pdfjsPromise = null;
+        throw err;
+      });
+  }
+  return pdfjsPromise;
 }
 
 export interface PdfPageTextItem {

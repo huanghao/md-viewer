@@ -11,6 +11,7 @@ import {
   setWorkspaceExpandedState,
 } from './workspace-tree-expansion-persistence';
 import { showWarning } from './ui/toast';
+import { fileTreeEquals } from './utils/file-tree-equal';
 
 const FILE_TREE_CACHE_KEY = 'md-viewer:fileTreeCache';
 
@@ -229,6 +230,11 @@ export async function scanWorkspace(workspaceId: string): Promise<FileTreeNode |
     }
 
     void isFirstLoad; // suppress unused warning
+
+    // 结构未变（轮询的常见情况）：不替换 state.fileTree、不重写缓存，也不触发侧栏重绘
+    if (previousTree && fileTreeEquals(previousTree, tree)) {
+      return previousTree;
+    }
 
     // 缓存文件树（内存 + localStorage）
     state.fileTree.set(workspaceId, tree);

@@ -62,7 +62,7 @@ export async function handleOpenFile(c: Context) {
     content,
     lastModified: getLastModified(resolvedPath) ?? Date.now(),
     createdAt: (() => { try { return statSync(resolvedPath).birthtimeMs; } catch { return undefined; } })(),
-    gitCreatedAt: getGitCreatedAt(resolvedPath),
+    gitCreatedAt: await getGitCreatedAt(resolvedPath),
     isRemote: false,
   };
 
@@ -116,14 +116,14 @@ export async function handleFileCreatedAt(c: Context) {
     const body = await c.req.json<{ paths: string[] }>();
     const paths = Array.isArray(body?.paths) ? body.paths : [];
     const result: Record<string, { createdAt?: number; gitCreatedAt?: number }> = {};
-    for (const p of paths) {
+    // 并行查询 git（各自异步、带缓存），不再逐个串行阻塞
+    await Promise.all(paths.map(async (p) => {
       const resolved = resolve(p);
       let createdAt: number | undefined;
-      let gitCreatedAt: number | undefined;
       try { createdAt = statSync(resolved).birthtimeMs; } catch { /* skip */ }
-      gitCreatedAt = getGitCreatedAt(resolved);
+      const gitCreatedAt = await getGitCreatedAt(resolved);
       result[p] = { createdAt, gitCreatedAt };
-    }
+    }));
     return c.json(result);
   } catch (error: any) {
     return c.json({ error: error?.message }, 500);

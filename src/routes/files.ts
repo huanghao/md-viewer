@@ -1,13 +1,13 @@
 import type { Hono } from "hono";
 import {
   handleGetFileAsset,
+  handleGetRawFile,
   handleGetPdfAsset,
 } from "../handlers/file-asset-handlers.ts";
 import {
   handleFileCreatedAt,
   handleOpenFile,
   handleOpenInEditor,
-  handleOpenLocalFile,
 } from "../handlers/file-open-handlers.ts";
 import {
   handleDetectPath,
@@ -20,21 +20,23 @@ import {
   handleUnwatchFile,
 } from "../handlers/file-read-handlers.ts";
 import {
-  handleWriteFile,
-} from "../handlers/file-write-handlers.ts";
+  handleGetPdfToc,
+  handlePutPdfToc,
+} from "../handlers/pdf-toc-handlers.ts";
 
 export function registerFileRoutes(app: Hono): void {
   app.get("/api/file", handleGetFile);
   app.post("/api/unwatch-file", handleUnwatchFile);
   app.get("/api/file-asset", handleGetFileAsset);
+  app.get("/raw/*", handleGetRawFile);
   app.get("/api/pdf-asset", handleGetPdfAsset);
-  app.post("/api/file-write", handleWriteFile);
+  app.get("/api/pdf-toc", handleGetPdfToc);
+  app.put("/api/pdf-toc", handlePutPdfToc);
   app.get("/api/files", handleGetFiles);
   app.get("/api/nearby", handleGetNearby);
   app.get("/api/path-suggestions", handlePathSuggestions);
   app.post("/api/detect-path", handleDetectPath);
   app.post("/api/open-file", handleOpenFile);
-  app.post("/api/open-local-file", handleOpenLocalFile);
   app.post("/api/open-in-editor", handleOpenInEditor);
   app.post("/api/file-created-at", handleFileCreatedAt);
 }

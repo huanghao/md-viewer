@@ -45,30 +45,6 @@ export function getWorkspaceNameFromPath(path: string): string {
 
 // ==================== File operations ====================
 
-export async function openFileInBrowser(path: string): Promise<void> {
-  const { clearListDiff } = await import('./workspace-state');
-  clearListDiff(path);
-  requestSidebarRender();
-
-  if (isUrlPath(path)) {
-    window.open(path, '_blank', 'noopener,noreferrer');
-    return;
-  }
-  try {
-    const response = await fetch('/api/open-local-file', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path })
-    });
-    const data = await response.json();
-    if (data?.error) {
-      showError(`打开 HTML 失败: ${data.error}`);
-    }
-  } catch (error: any) {
-    showError(`打开 HTML 失败: ${error?.message || '未知错误'}`);
-  }
-}
-
 // ==================== Add confirm UI ====================
 
 type PendingAddAction =

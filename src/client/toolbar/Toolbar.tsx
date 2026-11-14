@@ -1,5 +1,7 @@
 import { Fragment, useState, useRef, useSyncExternalStore } from 'react';
 import { copyAbsolutePath, copyRelativePath } from '../utils/clipboard';
+import { openFileInBrowser } from '../utils/raw-file';
+import { isHtmlFile } from '../utils/file-type';
 import { toolbarStore, type PdfMode } from './store';
 
 export interface ToolbarDeps {
@@ -47,6 +49,17 @@ function Breadcrumb({ path }: { path: string }) {
           <CheckIcon />
           <span className="copy-tooltip">复制绝对路径</span>
         </button>
+        {isHtmlFile(path) && (
+          <button
+            className="copy-filename-button"
+            title="在浏览器打开（新页面里没有批注）"
+            onClick={() => openFileInBrowser(path)}
+          >
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true">
+              <path d="M9 2h5v5h-1.5V4.56L7.78 9.28 6.72 8.22l4.72-4.72H9V2zM3.5 4H7v1.5H3.5v7h7V9H12v4.25c0 .41-.34.75-.75.75h-8.5a.75.75 0 01-.75-.75v-8.5c0-.41.34-.75.75-.75z"/>
+            </svg>
+          </button>
+        )}
         <button
           className="copy-filename-button open-in-editor-button"
           title="在 VS Code 中打开"

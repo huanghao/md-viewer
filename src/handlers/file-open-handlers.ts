@@ -74,43 +74,6 @@ export async function handleOpenFile(c: Context) {
   return c.json({ success: true, filename: fileInfo.filename });
 }
 
-export async function handleOpenLocalFile(c: Context) {
-  try {
-    const body = await c.req.json<{ path?: string }>();
-    const rawPath = body?.path?.trim();
-    if (!rawPath) {
-      return c.json({ error: "缺少 path 参数" }, 400);
-    }
-    if (isUrl(rawPath)) {
-      return c.json({ error: "仅支持本地文件" }, 400);
-    }
-
-    const resolvedPath = resolve(rawPath);
-    if (!existsSync(resolvedPath)) {
-      return c.json({ error: "文件不存在" }, 404);
-    }
-
-    const ext = extname(resolvedPath).toLowerCase();
-    if (ext !== ".html" && ext !== ".htm") {
-      return c.json({ error: "仅支持 html/htm 文件" }, 400);
-    }
-
-    const proc = Bun.spawn(["open", resolvedPath], {
-      stdout: "ignore",
-      stderr: "pipe",
-    });
-    const code = await proc.exited;
-    if (code !== 0) {
-      const err = await new Response(proc.stderr).text();
-      return c.json({ error: err || `open 失败，退出码 ${code}` }, 500);
-    }
-
-    return c.json({ success: true });
-  } catch (error: any) {
-    return c.json({ error: error?.message || "打开失败" }, 500);
-  }
-}
-
 export async function handleFileCreatedAt(c: Context) {
   try {
     const body = await c.req.json<{ paths: string[] }>();

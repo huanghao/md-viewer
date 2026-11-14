@@ -69,6 +69,25 @@ export function getAssetContentType(path: string): string {
       return "video/mp4";
     case ".webm":
       return "video/webm";
+    case ".html":
+    case ".htm":
+      return "text/html; charset=utf-8";
+    case ".css":
+      return "text/css; charset=utf-8";
+    case ".js":
+    case ".mjs":
+      return "text/javascript; charset=utf-8";
+    case ".json":
+      return "application/json; charset=utf-8";
+    case ".txt":
+    case ".md":
+      return "text/plain; charset=utf-8";
+    case ".pdf":
+      return "application/pdf";
+    case ".woff":
+      return "font/woff";
+    case ".woff2":
+      return "font/woff2";
     default:
       return "application/octet-stream";
   }

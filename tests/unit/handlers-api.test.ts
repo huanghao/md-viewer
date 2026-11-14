@@ -19,7 +19,8 @@ import {
   handleUnwatchFile,
   handleWorkspaceIndexStats,
   handleWorkspaceSearch,
-  handleWriteFile,
+  handleGetPdfToc,
+  handlePutPdfToc,
   scanCache,
 } from '../../src/handlers';
 import { closeWatcher, getWatchedFileCountForTesting } from '../../src/file-watcher';
@@ -448,22 +449,23 @@ describe('handlers — annotation APIs', () => {
   });
 });
 
-describe('handlers — file write API', () => {
-  it('handleWriteFile only writes .toc.json sidecars', async () => {
-    const sidecarPath = join(tempRoot, 'readme.md.toc.json');
-    const forbiddenPath = join(tempRoot, 'readme.md');
+describe('handlers — pdf toc cache', () => {
+  it('按 PDF 路径存取目录，写入位置在数据目录而不是 PDF 旁边', async () => {
+    const pdf = join(tempRoot, 'a.pdf');
+    const miss = await handleGetPdfToc(makeContext({ url: `http://localhost/?path=${encodeURIComponent(pdf)}` }));
+    expect(miss.status).toBe(404);
 
-    const forbiddenResponse = await handleWriteFile(makeContext({
-      body: { path: forbiddenPath, content: '# overwrite' },
-    }));
-    expect(forbiddenResponse.status).toBe(403);
-    expect(existsSync(forbiddenPath)).toBe(false);
+    const toc = [{ title: 'Intro', level: 1, pageNum: 1, children: [] }];
+    const put = await handlePutPdfToc(makeContext({ body: { path: pdf, toc } }));
+    expect(put.status).toBe(200);
+    expect(existsSync(pdf + '.toc.json')).toBe(false);
 
-    const response = await handleWriteFile(makeContext({
-      body: { path: sidecarPath, content: '{"headings":[]}' },
-    }));
-    expect(response.status).toBe(200);
-    expect(await readJson(response)).toEqual({ success: true });
-    expect(readFileSync(sidecarPath, 'utf-8')).toBe('{"headings":[]}');
+    const hit = await handleGetPdfToc(makeContext({ url: `http://localhost/?path=${encodeURIComponent(pdf)}` }));
+    expect(await readJson(hit)).toEqual({ toc });
+  });
+
+  it('拒绝缺少参数或 toc 不是数组的写入', async () => {
+    const res = await handlePutPdfToc(makeContext({ body: { path: '/x.pdf', toc: 'nope' } }));
+    expect(res.status).toBe(400);
   });
 });

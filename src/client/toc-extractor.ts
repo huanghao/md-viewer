@@ -94,20 +94,14 @@ export async function resolvePdfOutlinePageNums(
   await walk(items);
 }
 
-// sidecar 文件路径约定：foo.pdf.toc.json
-export function sidecarPath(pdfPath: string): string {
-  return pdfPath + '.toc.json';
-}
-
+// PDF 目录缓存：由服务端按 PDF 路径存取，不再往 PDF 旁边写 .toc.json
 export async function loadSidecar(pdfPath: string): Promise<TocItem[] | null> {
   try {
-    const res = await fetch(`/api/file?path=${encodeURIComponent(sidecarPath(pdfPath))}`);
+    const res = await fetch(`/api/pdf-toc?path=${encodeURIComponent(pdfPath)}`);
     if (!res.ok) return null;
-    const json = await res.json() as { content?: string };
-    if (!json.content) return null;
-    const parsed = JSON.parse(json.content) as TocItem[];
-    if (!Array.isArray(parsed)) { console.warn('[TOC] sidecar not an array:', pdfPath); return null; }
-    return parsed;
+    const json = await res.json() as { toc?: unknown };
+    if (!Array.isArray(json.toc)) { console.warn('[TOC] cache not an array:', pdfPath); return null; }
+    return json.toc as TocItem[];
   } catch (err) {
     console.warn('[TOC] loadSidecar failed:', pdfPath, err);
     return null;
@@ -115,10 +109,10 @@ export async function loadSidecar(pdfPath: string): Promise<TocItem[] | null> {
 }
 
 export async function saveSidecar(pdfPath: string, toc: TocItem[]): Promise<void> {
-  await fetch('/api/file-write', {
-    method: 'POST',
+  await fetch('/api/pdf-toc', {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path: sidecarPath(pdfPath), content: JSON.stringify(toc, null, 2) }),
+    body: JSON.stringify({ path: pdfPath, toc }),
   });
 }
 

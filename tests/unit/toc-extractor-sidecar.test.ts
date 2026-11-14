@@ -1,12 +1,5 @@
 import { describe, expect, it, mock, beforeEach, afterEach } from 'bun:test';
-import { sidecarPath, loadSidecar, saveSidecar, scanPdfHeadings, type TocItem } from '../../src/client/toc-extractor';
-
-describe('sidecarPath', () => {
-  it('appends .toc.json to pdf path', () => {
-    expect(sidecarPath('/docs/report.pdf')).toBe('/docs/report.pdf.toc.json');
-    expect(sidecarPath('simple.pdf')).toBe('simple.pdf.toc.json');
-  });
-});
+import { loadSidecar, saveSidecar, scanPdfHeadings, type TocItem } from '../../src/client/toc-extractor';
 
 describe('loadSidecar', () => {
   let originalFetch: typeof fetch;
@@ -16,7 +9,7 @@ describe('loadSidecar', () => {
 
   it('returns parsed TocItem[] on success', async () => {
     const toc: TocItem[] = [{ title: 'Intro', level: 1, pageNum: 1, children: [] }];
-    const apiResponse = { content: JSON.stringify(toc), path: '/docs/report.pdf.toc.json' };
+    const apiResponse = { toc };
     globalThis.fetch = mock(async () => new Response(JSON.stringify(apiResponse), { status: 200 }));
     const result = await loadSidecar('/docs/report.pdf');
     expect(result).toEqual(toc);
@@ -34,14 +27,14 @@ describe('loadSidecar', () => {
     expect(result).toBeNull();
   });
 
-  it('encodes the sidecar path in the URL', async () => {
+  it('encodes the pdf path in the URL', async () => {
     let capturedUrl = '';
     globalThis.fetch = mock(async (url: string) => {
       capturedUrl = url;
-      return new Response('[]', { status: 200 });
+      return new Response('{"toc":[]}', { status: 200 });
     });
     await loadSidecar('/path with spaces/report.pdf');
-    expect(capturedUrl).toContain(encodeURIComponent('/path with spaces/report.pdf.toc.json'));
+    expect(capturedUrl).toContain(encodeURIComponent('/path with spaces/report.pdf'));
   });
 });
 
@@ -51,7 +44,7 @@ describe('saveSidecar', () => {
   beforeEach(() => { originalFetch = globalThis.fetch; });
   afterEach(() => { globalThis.fetch = originalFetch; });
 
-  it('POSTs to /api/file-write with correct path and content', async () => {
+  it('PUTs to /api/pdf-toc with pdf path and toc', async () => {
     let capturedBody: any;
     globalThis.fetch = mock(async (_url: string, opts: any) => {
       capturedBody = JSON.parse(opts.body);
@@ -59,8 +52,8 @@ describe('saveSidecar', () => {
     });
     const toc: TocItem[] = [{ title: 'Ch1', level: 1, pageNum: 2, children: [] }];
     await saveSidecar('/docs/report.pdf', toc);
-    expect(capturedBody.path).toBe('/docs/report.pdf.toc.json');
-    expect(JSON.parse(capturedBody.content)).toEqual(toc);
+    expect(capturedBody.path).toBe('/docs/report.pdf');
+    expect(capturedBody.toc).toEqual(toc);
   });
 });
 

@@ -241,3 +241,35 @@ describe('diffBlocks table rows', () => {
     expect(diffBlocks('a | b', 'a | c')[0].changedRows).toBeUndefined();
   });
 });
+
+describe('diffBlocks 容器块内部细节', () => {
+  it('列表：只标出变化的条目，含嵌套条目', () => {
+    const oldT = '- a\n- b\n  - b1\n- c';
+    const newT = '- a\n- b\n  - b1\n  - b2\n- c2';
+    const [blk] = diffBlocks(oldT, newT);
+    expect(blk.changed).toBe(true);
+    expect(blk.itemCount).toBe(5);
+    expect(blk.changedItems).toEqual([3, 4]);
+  });
+
+  it('松散列表（条目间有空行）仍是同一个块', () => {
+    const blocks = splitBlocks('- a\n\n- b\n\n  续段\n\npara');
+    expect(blocks).toEqual(['- a\n\n- b\n\n  续段', 'para']);
+  });
+
+  it('代码块：只标出新增/修改的行', () => {
+    const oldT = '```js\nconst a = 1;\nfoo();\n```';
+    const newT = '```js\nconst a = 1;\nbar();\nfoo();\n```';
+    const [blk] = diffBlocks(oldT, newT);
+    expect(blk.changedLines).toEqual([1]);
+    expect(blk.codeLineCount).toBe(3);
+  });
+
+  it('引用块：逐子块比较，并递归到列表', () => {
+    const oldT = '> p1\n>\n> - x\n> - y';
+    const newT = '> p1\n>\n> - x\n> - z';
+    const [blk] = diffBlocks(oldT, newT);
+    expect(blk.children?.map(c => c.changed)).toEqual([false, true]);
+    expect(blk.children?.[1].changedItems).toEqual([1]);
+  });
+});

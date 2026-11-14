@@ -2,6 +2,7 @@ import { state, saveState } from './state';
 import { loadFile } from './api/files';
 import { diffLines } from './utils/diff';
 import { diffBlocks } from './utils/diff-blocks';
+import { applyBlockDetail } from './utils/diff-detail';
 import { mountScrollbar, unmountScrollbar, updateDiffMarkers, clearDiffMarkers } from './ui/doc-scrollbar';
 import { shouldRefreshDiff } from './ui/diff-refresh';
 import { diffBannerStore } from './diff-banner/store';
@@ -271,13 +272,10 @@ export function renderParagraphDiffView(oldContent: string, newContent: string):
     container.querySelectorAll<HTMLElement>(sel.split(',').map(s => `.markdown-body > ${s}`).join(','))
   );
 
-  // 表格块：标出具体变化的行（<tr> 顺序 = 表头 + 数据行）
+  // 容器块（表格 / 列表 / 代码 / 引用）：标出内部具体变化的部分
   blocks.forEach((block, idx) => {
     const el = blockEls[idx];
-    if (!block.changedRows || !el || el.tagName !== 'TABLE') return;
-    el.classList.add('diff-table-rows');
-    const trs = el.querySelectorAll<HTMLElement>('tr');
-    for (const r of block.changedRows) trs[r]?.classList.add('diff-row-changed');
+    if (el) applyBlockDetail(el, block);
   });
 
   // 把连续的改动块归组，整组包在一个 wrapper div 里，作为一个导航单元

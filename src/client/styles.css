@@ -1703,16 +1703,39 @@
       border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
     }
 
-    /* 表格 diff：变化只由行高亮表达，表格本身不加任何整块标记 */
-    table.diff-table-rows[data-para-changed] {
+    /* 容器块（表格/列表/代码/引用）diff：变化只由内部元素高亮表达，容器本身不加整块标记 */
+    [data-para-changed].diff-detail {
       padding-left: 0;
       margin-left: 0;
     }
-    table.diff-table-rows[data-para-changed]::before {
+    [data-para-changed].diff-detail::before {
       display: none;
     }
-    table.diff-table-rows[data-para-changed].diff-focused {
+    [data-para-changed].diff-detail.diff-focused {
       background: none;
+    }
+
+    /* 列表 diff：变化的条目（嵌套的未变子条目还原底色） */
+    li.diff-item-changed {
+      background: var(--color-warning-bg);
+      box-shadow: -14px 0 0 var(--color-warning-bg), -17px 0 0 #e6a817;
+    }
+    li.diff-item-changed li:not(.diff-item-changed) {
+      background: var(--color-surface);
+      box-shadow: none;
+    }
+
+    /* 代码 diff：变化的行 */
+    .diff-code-line { display: block; }
+    .diff-code-line-changed {
+      background: var(--color-warning-bg);
+      box-shadow: -8px 0 0 var(--color-warning-bg), -11px 0 0 #e6a817;
+    }
+
+    /* 引用 diff：变化的子块 */
+    .diff-child-changed {
+      background: var(--color-warning-bg);
+      border-radius: var(--radius-sm);
     }
 
     /* 表格 diff：变化的行 */

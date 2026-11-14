@@ -2911,7 +2911,7 @@
       position: relative;
       border-radius: var(--radius-md);
       padding: 6px 9px;
-      padding-right: 52px;
+      padding-right: 58px; /* 为绝对定位的 24 小时制时间戳（HH:MM:SS）留位 */
       white-space: pre-wrap;
       word-break: break-word;
       line-height: 1.4;
@@ -2956,7 +2956,7 @@
       color: var(--color-text-muted, #999);
       font-family: var(--font-mono, monospace);
       font-size: 12px;
-      padding: 2px 52px 2px 9px;
+      padding: 2px 58px 2px 9px;
     }
     .agent-msg-error {
       background: var(--color-error);
@@ -2965,7 +2965,7 @@
     .agent-msg-result {
       color: var(--color-text-muted, #999);
       font-size: 12px;
-      padding: 4px 52px 4px 9px;
+      padding: 4px 58px 4px 9px;
     }
     .agent-msg-thinking {
       color: var(--color-text-muted, #999);

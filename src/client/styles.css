@@ -1732,6 +1732,14 @@
       box-shadow: -8px 0 0 var(--color-warning-bg), -11px 0 0 #e6a817;
     }
 
+    /* 词级 diff：段落/条目内新增或修改的文字 */
+    .diff-word-changed {
+      background: rgba(240, 165, 0, 0.32);
+      border-radius: 2px;
+      box-decoration-break: clone;
+      -webkit-box-decoration-break: clone;
+    }
+
     /* 引用 diff：变化的子块 */
     .diff-child-changed {
       background: var(--color-warning-bg);

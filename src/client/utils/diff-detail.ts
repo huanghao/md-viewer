@@ -1,4 +1,5 @@
 import type { BlockDiff } from './diff-blocks';
+import { pickBestOld, wordDiffRanges } from './word-diff';
 
 const BLOCK_SEL = 'p,h1,h2,h3,h4,h5,h6,ul,ol,pre,blockquote,hr,table';
 
@@ -75,5 +76,78 @@ export function applyBlockDetail(el: HTMLElement, block: BlockDiff): void {
       applyBlockDetail(sub, child);
       if (!sub.classList.contains('diff-detail')) sub.classList.add('diff-child-changed');
     });
+  }
+}
+
+// ── 段落/列表条目内的词级高亮 ──────────────────────────────────────────────
+
+/** 单元自身的文本节点：不进入嵌套列表、引用、代码块（它们有各自的单元）。 */
+function ownTextNodes(el: HTMLElement): Text[] {
+  const out: Text[] = [];
+  const walk = (node: Node) => {
+    for (const child of Array.from(node.childNodes)) {
+      if (child.nodeType === Node.TEXT_NODE) out.push(child as Text);
+      else if (child.nodeType === Node.ELEMENT_NODE) {
+        const c = child as HTMLElement;
+        if (c.matches('ul,ol,blockquote,pre,table,.katex,.katex-display')) continue;
+        walk(c);
+      }
+    }
+  };
+  walk(el);
+  return out;
+}
+
+/** 旧文档渲染结果里的候选文本：所有段落 + 列表条目自身文本。 */
+export function collectOldTexts(oldRoot: HTMLElement): string[] {
+  const texts: string[] = [];
+  oldRoot.querySelectorAll<HTMLElement>('p, li').forEach(el => {
+    const t = ownTextNodes(el).map(n => n.data).join('').trim();
+    if (t) texts.push(t);
+  });
+  return texts;
+}
+
+function wrapRanges(nodes: Text[], ranges: Array<[number, number]>): void {
+  let offset = 0;
+  for (const node of nodes) {
+    const start = offset, end = offset + node.data.length;
+    offset = end;
+    const local = ranges
+      .map(([s, e]) => [Math.max(s, start) - start, Math.min(e, end) - start] as [number, number])
+      .filter(([s, e]) => e > s);
+    if (local.length === 0) continue;
+    const frag = document.createDocumentFragment();
+    let pos = 0;
+    for (const [s, e] of local) {
+      if (s > pos) frag.appendChild(document.createTextNode(node.data.slice(pos, s)));
+      const mark = document.createElement('span');
+      mark.className = 'diff-word-changed';
+      mark.textContent = node.data.slice(s, e);
+      frag.appendChild(mark);
+      pos = e;
+    }
+    if (pos < node.data.length) frag.appendChild(document.createTextNode(node.data.slice(pos)));
+    node.replaceWith(frag);
+  }
+}
+
+/** 变化块里的“文字单元”：自身是段落，或其中已标记为变化的条目 / 引用子段落。 */
+export function wordTargets(blockEl: HTMLElement): HTMLElement[] {
+  if (blockEl.tagName === 'P') return [blockEl];
+  return Array.from(blockEl.querySelectorAll<HTMLElement>('li.diff-item-changed, p.diff-child-changed'));
+}
+
+/** 对每个单元找最像的旧文本，只高亮新增/修改的词；找不到相近旧文本就保持整段标记。 */
+export function markChangedWords(units: HTMLElement[], oldTexts: string[]): void {
+  for (const el of units) {
+    const nodes = ownTextNodes(el);
+    const text = nodes.map(n => n.data).join('');
+    if (!text.trim()) continue;
+    const old = pickBestOld(text, oldTexts);
+    if (old === null) continue;
+    const ranges = wordDiffRanges(old, text);
+    if (!ranges || ranges.length === 0) continue;
+    wrapRanges(nodes, ranges);
   }
 }

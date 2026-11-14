@@ -2,7 +2,7 @@ import { state, saveState } from './state';
 import { loadFile } from './api/files';
 import { diffLines } from './utils/diff';
 import { diffBlocks } from './utils/diff-blocks';
-import { applyBlockDetail } from './utils/diff-detail';
+import { applyBlockDetail, collectOldTexts, markChangedWords, wordTargets } from './utils/diff-detail';
 import { mountScrollbar, unmountScrollbar, updateDiffMarkers, clearDiffMarkers } from './ui/doc-scrollbar';
 import { shouldRefreshDiff } from './ui/diff-refresh';
 import { diffBannerStore } from './diff-banner/store';
@@ -276,6 +276,15 @@ export function renderParagraphDiffView(oldContent: string, newContent: string):
   blocks.forEach((block, idx) => {
     const el = blockEls[idx];
     if (el) applyBlockDetail(el, block);
+  });
+
+  // 段落 / 列表条目：在变化的单元里只高亮新增或修改的词
+  const oldRoot = document.createElement('div');
+  oldRoot.innerHTML = sanitizeHtml((window as any).marked.parse(safeOld));
+  const oldTexts = collectOldTexts(oldRoot);
+  blocks.forEach((block, idx) => {
+    const el = blockEls[idx];
+    if (block.changed && el) markChangedWords(wordTargets(el), oldTexts);
   });
 
   // 把连续的改动块归组，整组包在一个 wrapper div 里，作为一个导航单元

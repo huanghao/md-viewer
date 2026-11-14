@@ -21,7 +21,7 @@ export function handleEvents(c: Context) {
       addClient(client);
 
       controller.enqueue(encoder.encode(`event: connected\ndata: ${JSON.stringify({})}\n\n`));
-      c.req.signal.addEventListener("abort", () => {
+      c.req.raw.signal.addEventListener("abort", () => {
         removeClient(client!);
       });
     },

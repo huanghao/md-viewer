@@ -72,7 +72,7 @@ export function QuickOpen() {
     >
       <div className="quick-open-panel">
         <div className="quick-open-input-row">
-          <span className="quick-open-search-icon">🔍</span>
+          <span className="quick-open-search-icon"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5L14 14" /></svg></span>
           <input
             ref={inputRef}
             className="quick-open-input"

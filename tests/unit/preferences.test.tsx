@@ -50,7 +50,7 @@ describe('偏好设置对话框', () => {
     expect(isPreferencesOpen()).toBe(true);
     expect(overlay()).not.toBeNull();
     const navItems = [...document.querySelectorAll('.preferences-nav-item')].map((n) => n.textContent?.trim());
-    expect(navItems).toEqual(['🎨外观', '⌨️快捷键', '💬评论', '🤖Agent']);
+    expect(navItems).toEqual(['外观', '快捷键', '评论', 'Agent']);
 
     await act(async () => closePreferences());
     await flush();

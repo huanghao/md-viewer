@@ -49,13 +49,12 @@ describe('状态栏', () => {
     await act(async () => root.unmount());
   });
 
-  it('连接状态：圆点类名与文字随状态变化，failed 按未连接显示', async () => {
+  it('连接状态：正常态不显示，异常时圆点类名与文字随状态变化，failed 按未连接显示', async () => {
     const { host, root } = await mount();
     const dot = () => host.querySelector('#sbDot')!.className;
     const text = () => host.querySelector('#sbConnectionText')!.textContent;
     await act(async () => updateStatusbarConnection('connected'));
-    expect(dot()).toContain('connected');
-    expect(text()).toBe('已连接');
+    expect(host.querySelector('#sbConnection')).toBeNull();
     await act(async () => updateStatusbarConnection('connecting'));
     expect(dot()).toContain('connecting');
     expect(text()).toBe('连接中');

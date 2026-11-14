@@ -29,10 +29,13 @@ export function StatusBar() {
       <div className="sb-spacer" />
       <span className="sb-item" id="sbCreatedAt">{ts ? `创建于 ${fmt(ts)}` : ''}</span>
       <span className="sb-item" id="sbCharCount">{charCount > 0 ? `${charCount.toLocaleString()} 字` : ''}</span>
-      <span className="sb-item sb-connection" id="sbConnection">
-        <span className={`sb-dot ${dotClass}`} id="sbDot" />
-        <span id="sbConnectionText">{CONNECTION_TEXT[connection]}</span>
-      </span>
+      {/* 正常态保持安静：只有连接异常时才出现 */}
+      {connection !== 'connected' && (
+        <span className="sb-item sb-connection" id="sbConnection">
+          <span className={`sb-dot ${dotClass}`} id="sbDot" />
+          <span id="sbConnectionText">{CONNECTION_TEXT[connection]}</span>
+        </span>
+      )}
     </>
   );
 }

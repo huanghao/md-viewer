@@ -12,11 +12,11 @@ import {
   type PrefTab,
 } from './controller';
 
-const TABS: Array<{ id: PrefTab; icon: string }> = [
-  { id: '外观', icon: '🎨' },
-  { id: '快捷键', icon: '⌨️' },
-  { id: '评论', icon: '💬' },
-  { id: 'Agent', icon: '🤖' },
+const TABS: Array<{ id: PrefTab }> = [
+  { id: '外观' },
+  { id: '快捷键' },
+  { id: '评论' },
+  { id: 'Agent' },
 ];
 
 /** 偏好设置对话框：外壳与导航在这里，各标签页自管自己的草稿 */
@@ -43,7 +43,6 @@ export function PreferencesDialog() {
                 className={`preferences-nav-item${tab === t.id ? ' active' : ''}`}
                 onClick={() => setPrefTab(t.id)}
               >
-                <span className="preferences-nav-icon">{t.icon}</span>
                 {t.id}
               </div>
             ))}
